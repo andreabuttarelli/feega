@@ -15,6 +15,7 @@
   const INCLUDES = ['include1', 'include2', 'include3', 'include4'] as const;
   const EDITOR_LINES = ['editorLine1', 'editorLine2', 'editorLine3'] as const;
   const QUESTIONS = ['faq1', 'faq2', 'faq3', 'faq4'] as const;
+  const INTERVAL_UNIT = { [CloudInterval.Monthly]: 'perEditorBilledMonthly', [CloudInterval.Annual]: 'perEditorBilledYearly' } as const;
   const INTERVALS = [CloudInterval.Monthly, CloudInterval.Annual] as const;
 
   let interval = $state(CloudInterval.Annual);
@@ -55,7 +56,60 @@
 {/if}
 
 <div class="billing" data-testid="billing-page" data-plan={data.plan}>
-  {#if !isCloud}
+  {#if isCloud}
+    <article class="plan current" data-testid="billing-current">
+      <div class="strip pixels" aria-hidden="true"><PixelBand /></div>
+      <div class="title">
+        <h3>{$_('app.settings.billing.planCloud')}</h3>
+        <span class="badge" class:warn={data.pastDue || !!data.endsAt}>{$_('app.settings.billing.currentPlan')} · {$_(`app.settings.billing.${status}`)}</span>
+      </div>
+
+      {#if data.interval}
+        <p class="price" data-testid="billing-price">
+          <span class="amount">{money(CLOUD_PRICES[data.interval].perMonth)}</span>
+          <span class="unit">{$_(`app.settings.billing.${INTERVAL_UNIT[data.interval]}`)}</span>
+        </p>
+      {/if}
+
+      <dl class="facts">
+        <div>
+          <dt>{$_('app.settings.billing.seatsOfEditors')}</dt>
+          <dd data-testid="billing-seats">{data.seatsPaid} / {data.editors}</dd>
+        </div>
+        <div>
+          <dt>{data.endsAt ? $_('app.settings.billing.endsOn') : $_('app.settings.billing.renews')}</dt>
+          <dd data-testid="billing-renewal">{formatDay(data.endsAt ?? data.renewsAt) ?? $_('app.settings.billing.noRenewal')}</dd>
+        </div>
+      </dl>
+
+      {#if data.pastDue}
+        <p class="note">{$_('app.settings.billing.pastDueNote')}</p>
+      {:else if data.endsAt}
+        <p class="note">{$_('app.settings.billing.endingNote')}</p>
+      {/if}
+
+      <div class="action">
+        {#if data.canManage}
+          <button type="button" class="cta" disabled={busy !== Busy.Idle} onclick={manage} data-testid="billing-manage">
+            {busy === Busy.Portal ? $_('app.settings.billing.managing') : $_('app.settings.billing.manage')}
+          </button>
+        {:else}
+          <p class="hint">{$_('app.settings.billing.askOwner')}</p>
+        {/if}
+      </div>
+
+      <ul data-testid="billing-includes">
+        {#each INCLUDES as item (item)}<li>{$_(`app.settings.billing.${item}`)}</li>{/each}
+      </ul>
+    </article>
+
+    {#if data.canManage}
+      <div class="downgrade">
+        <button type="button" class="link" disabled={busy !== Busy.Idle} onclick={manage} data-testid="billing-downgrade">{$_('app.settings.billing.downgrade')}</button>
+        <p>{$_('app.settings.billing.downgradeHint')}</p>
+      </div>
+    {/if}
+  {:else}
     <div class="toggle" role="group" aria-label={$_('app.settings.billing.intervalLabel')}>
       {#each INTERVALS as option (option)}
         <button type="button" class:on={interval === option} aria-pressed={interval === option} onclick={() => (interval = option)} data-testid="interval-{option}">
@@ -64,58 +118,29 @@
         </button>
       {/each}
     </div>
-  {/if}
 
-  <div class="plans">
-    <article class="plan" data-testid="billing-plan">
-      <div class="strip terminal" aria-hidden="true"><span>$</span>npx feega</div>
-      <div class="title">
-        <h3>{$_('app.settings.billing.planFree')}</h3>
-        {#if !isCloud}<span class="badge">{$_('app.settings.billing.current')}</span>{/if}
-      </div>
-      <p class="for">{$_('app.settings.billing.editorFor')}</p>
-      <p class="price"><span class="amount">{money(0)}</span> <span class="unit">{$_('app.settings.billing.editorUnit')}</span></p>
-      <div class="action"><span class="cta outline">{$_('app.settings.billing.editorCta')}</span></div>
-      <p class="start">{$_('app.settings.billing.freeLine')}</p>
-      <ul>
-        {#each EDITOR_LINES as item (item)}<li>{$_(`app.settings.billing.${item}`)}</li>{/each}
-      </ul>
-    </article>
-
-    <article class="plan" data-testid={isCloud ? 'billing-cloud' : 'billing-upgrade'}>
-      <div class="strip pixels" aria-hidden="true"><PixelBand /></div>
-      <div class="title">
-        <h3>{$_('app.settings.billing.planCloud')}</h3>
-        {#if isCloud}
-          <span class="badge" class:warn={data.pastDue || !!data.endsAt}>{$_('app.settings.billing.current')} · {$_(`app.settings.billing.${status}`)}</span>
-        {/if}
-      </div>
-      <p class="for">{$_('app.settings.billing.cloudFor')}</p>
-
-      {#if isCloud}
-        <p class="price" data-testid="billing-seats">
-          <span class="amount">{data.seatsPaid}</span>
-          <span class="unit">/ {data.editors} {$_('app.settings.billing.seatsPaid')}</span>
-        </p>
-        <div class="action">
-          <button type="button" class="cta" disabled={!data.canManage || busy !== Busy.Idle} onclick={manage} data-testid="billing-manage">
-            {busy === Busy.Portal ? $_('app.settings.billing.managing') : $_('app.settings.billing.manage')}
-          </button>
+    <div class="plans">
+      <article class="plan" data-testid="billing-plan">
+        <div class="strip terminal" aria-hidden="true"><span>$</span>npx feega</div>
+        <div class="title">
+          <h3>{$_('app.settings.billing.planFree')}</h3>
+          <span class="badge">{$_('app.settings.billing.current')}</span>
         </div>
-        <div class="start">
-          <p>
-            {data.endsAt ? $_('app.settings.billing.endsOn') : $_('app.settings.billing.renews')}
-            <span data-testid="billing-renewal">{formatDay(data.endsAt ?? data.renewsAt) ?? $_('app.settings.billing.noRenewal')}</span>
-          </p>
-          {#if data.pastDue}
-            <p class="note">{$_('app.settings.billing.pastDueNote')}</p>
-          {:else if data.endsAt}
-            <p class="note">{$_('app.settings.billing.endingNote')}</p>
-          {:else}
-            <p class="hint">{$_('app.settings.billing.manageHint')}</p>
-          {/if}
+        <p class="for">{$_('app.settings.billing.editorFor')}</p>
+        <p class="price"><span class="amount">{money(0)}</span> <span class="unit">{$_('app.settings.billing.editorUnit')}</span></p>
+        <div class="action"><span class="cta outline">{$_('app.settings.billing.editorCta')}</span></div>
+        <p class="start">{$_('app.settings.billing.freeLine')}</p>
+        <ul>
+          {#each EDITOR_LINES as item (item)}<li>{$_(`app.settings.billing.${item}`)}</li>{/each}
+        </ul>
+      </article>
+
+      <article class="plan" data-testid="billing-upgrade">
+        <div class="strip pixels" aria-hidden="true"><PixelBand /></div>
+        <div class="title">
+          <h3>{$_('app.settings.billing.planCloud')}</h3>
         </div>
-      {:else}
+        <p class="for">{$_('app.settings.billing.cloudFor')}</p>
         <p class="price" data-testid="billing-price">
           <span class="amount">{money(price.perMonth)}</span>
           <span class="unit">{$_('app.settings.billing.perEditorMonth')}</span>
@@ -130,28 +155,27 @@
             ? $_('app.settings.billing.billedYearly', { values: { amount: money(price.perYear) } })
             : $_('app.settings.billing.billedMonthly')}
         </p>
-      {/if}
+        <ul data-testid="billing-includes">
+          {#each INCLUDES as item (item)}<li>{$_(`app.settings.billing.${item}`)}</li>{/each}
+        </ul>
+      </article>
+    </div>
 
-      <ul data-testid="billing-includes">
-        {#each INCLUDES as item (item)}<li>{$_(`app.settings.billing.${item}`)}</li>{/each}
-      </ul>
-    </article>
-  </div>
-
-  <dl class="summary">
-    <div>
-      <dt>{$_('app.settings.billing.editors')}</dt>
-      <dd>{data.editors}</dd>
-    </div>
-    <div>
-      <dt>{$_('app.settings.billing.seatsPaid')}</dt>
-      <dd>{data.seatsPaid}</dd>
-    </div>
-    <div>
-      <dt>{data.endsAt ? $_('app.settings.billing.endsOn') : $_('app.settings.billing.renews')}</dt>
-      <dd>{formatDay(data.endsAt ?? data.renewsAt) ?? $_('app.settings.billing.noRenewal')}</dd>
-    </div>
-  </dl>
+    <dl class="summary">
+      <div>
+        <dt>{$_('app.settings.billing.editors')}</dt>
+        <dd>{data.editors}</dd>
+      </div>
+      <div>
+        <dt>{$_('app.settings.billing.seatsPaid')}</dt>
+        <dd>{data.seatsPaid}</dd>
+      </div>
+      <div>
+        <dt>{$_('app.settings.billing.renews')}</dt>
+        <dd>{$_('app.settings.billing.noRenewal')}</dd>
+      </div>
+    </dl>
+  {/if}
 
   <section class="faq" data-testid="billing-faq">
     <h3>{$_('app.settings.billing.faqTitle')}</h3>
@@ -227,6 +251,69 @@
     border-radius: var(--sx-radius-lg);
     background: var(--sx-bg);
     color: var(--sx-ink);
+  }
+
+  .plan.current {
+    box-shadow: inset 0 0 0 1px var(--sx-accent);
+  }
+
+  .facts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 16px;
+    margin: 0;
+  }
+
+  .facts dt {
+    font-size: 13px;
+    opacity: 0.65;
+  }
+
+  .facts dd {
+    margin: 4px 0 0;
+    font-size: var(--sx-fs-lead);
+    letter-spacing: -0.02em;
+  }
+
+  .plan.current .note {
+    padding: 12px 14px;
+    border-radius: var(--sx-radius-md);
+    background: var(--sx-tint-accent);
+    box-shadow: inset 0 0 0 1px var(--sx-accent);
+  }
+
+  .plan.current .hint {
+    opacity: 0.7;
+  }
+
+  .downgrade {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px 16px;
+    padding: 0 24px;
+    font-size: 13px;
+    opacity: 0.7;
+  }
+
+  .link {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  .link:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+
+  .link:focus-visible {
+    outline: 2px solid var(--sx-accent);
+    outline-offset: 2px;
   }
 
   .strip {

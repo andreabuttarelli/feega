@@ -3,12 +3,13 @@ import { render } from 'svelte/server';
 import '$lib/i18n';
 import { BillingPlan } from '$lib/billing-plan';
 import { CheckoutOutcome } from '$lib/billing-path';
+import { CloudInterval } from '$lib/cloud-pricing';
 import BillingPage from './BillingPage.svelte';
 
 type Data = Parameters<typeof BillingPage>[1]['data'];
 
-const FREE: Data = { plan: BillingPlan.Free, canManage: true, editors: 2, seatsPaid: 0, renewsAt: null, endsAt: null, pastDue: false };
-const CLOUD: Data = { plan: BillingPlan.Cloud, canManage: true, editors: 3, seatsPaid: 3, renewsAt: '2026-12-21T00:00:00.000Z', endsAt: null, pastDue: false };
+const FREE: Data = { plan: BillingPlan.Free, canManage: true, editors: 2, seatsPaid: 0, renewsAt: null, endsAt: null, pastDue: false, interval: null };
+const CLOUD: Data = { plan: BillingPlan.Cloud, canManage: true, editors: 3, seatsPaid: 3, renewsAt: '2026-12-21T00:00:00.000Z', endsAt: null, pastDue: false, interval: CloudInterval.Annual };
 
 const html = (data: Data, outcome = CheckoutOutcome.None) => render(BillingPage, { props: { data, outcome } }).body;
 
@@ -38,18 +39,47 @@ describe('billing page, Free editor', () => {
 });
 
 describe('billing page, Cloud', () => {
-  it('shows paid seats against editors, the renewal date and manage billing', () => {
+  it('leads with the current plan: seats, price per editor, interval and renewal', () => {
     const body = html(CLOUD);
 
+    expect(body).toContain('data-testid="billing-current"');
     expect(body).toContain('Feega Cloud');
-    expect(body).toContain('editor seats paid');
+    expect(body).toContain('current plan');
+    expect(body).toContain('3 / 3');
+    expect(body).toContain('€12');
+    expect(body).toContain('billed yearly');
     expect(body).toContain('21 December 2026');
     expect(body).toContain('data-testid="billing-manage"');
+  });
+
+  it('prices a monthly plan at the monthly rate', () => {
+    const body = html({ ...CLOUD, interval: CloudInterval.Monthly });
+
+    expect(body).toContain('€15');
+    expect(body).toContain('billed monthly');
+  });
+
+  it('hides the pricing toggle, the upgrade and the plan cards', () => {
+    const body = html(CLOUD);
+
+    expect(body).not.toContain('data-testid="interval-annual"');
+    expect(body).not.toContain('data-testid="billing-upgrade-button"');
     expect(body).not.toContain('data-testid="billing-upgrade"');
+    expect(body).not.toContain('Free editor');
+  });
+
+  it('offers a small downgrade to free through the portal', () => {
+    const body = html(CLOUD);
+
+    expect(body).toContain('data-testid="billing-downgrade"');
+    expect(body).toContain('downgrade to free');
   });
 
   it('warns about a failed payment', () => {
-    expect(html({ ...CLOUD, pastDue: true })).toContain('Your last payment failed');
+    const body = html({ ...CLOUD, pastDue: true });
+
+    expect(body).toContain('Your last payment failed');
+    expect(body).toContain('payment failed');
   });
 
   it('shows the end date of a canceled plan instead of a renewal', () => {
@@ -57,17 +87,25 @@ describe('billing page, Cloud', () => {
 
     expect(body).toContain('1 January 2027');
     expect(body).toContain('Cloud is canceled');
+    expect(body).not.toContain('21 December 2026');
   });
 });
 
 describe('billing page, read only', () => {
-  it('disables the actions and says who can change billing', () => {
+  it('disables the free upgrade and says who can change billing', () => {
     const free = html({ ...FREE, canManage: false });
-    const cloud = html({ ...CLOUD, canManage: false });
 
     expect(free).toContain('Only the workspace owner can change billing');
     expect(free).toMatch(/data-testid="billing-upgrade-button"[^>]*disabled|disabled[^>]*data-testid="billing-upgrade-button"/);
-    expect(cloud).toMatch(/data-testid="billing-manage"[^>]*disabled|disabled[^>]*data-testid="billing-manage"/);
+  });
+
+  it('shows the current plan without actions to a non-owner', () => {
+    const body = html({ ...CLOUD, canManage: false });
+
+    expect(body).toContain('data-testid="billing-current"');
+    expect(body).toContain('ask the owner to manage billing');
+    expect(body).not.toContain('data-testid="billing-manage"');
+    expect(body).not.toContain('data-testid="billing-downgrade"');
   });
 });
 

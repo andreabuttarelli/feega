@@ -1,6 +1,7 @@
 import type { Db } from '$lib/server/db/client';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { EDITOR_ROLES } from '$lib/org-roles';
+import type { CloudInterval } from '$lib/cloud-pricing';
 import { PLAN } from '$lib/credit-ladder';
 import type { SeatProration, SeatSubscription } from '$lib/server/stripe';
 import { createServiceRoleDb } from '$lib/server/db/client';
@@ -39,6 +40,7 @@ export type SeatStatus = {
   grandfathered: boolean;
   endsAt: string | null;
   renewsAt: string | null;
+  interval: CloudInterval | null;
   pricePerEditor: number;
   seatsPaid: number | null;
   seatsPaidUntil: string | null;
@@ -242,6 +244,7 @@ export async function seatStatus(db: Db, orgId: string): Promise<SeatStatus> {
     grandfathered: !!org.editor_seats_grandfathered_at,
     endsAt: sub?.endsAt ?? null,
     renewsAt: sub?.periodEnd ?? null,
+    interval: sub?.interval ?? null,
     pricePerEditor: PLAN.price,
     seatsPaid: org.seats_paid ?? null,
     seatsPaidUntil: org.seats_paid_until ?? null

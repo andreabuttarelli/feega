@@ -16,6 +16,7 @@ export const load = async ({ parent, locals }: SharedEvent) => {
     seatsPaid: seats.paid ? (seats.seatsPaid ?? seats.editors) : 0,
     renewsAt: seats.paid ? (seats.renewsAt ?? seats.seatsPaidUntil) : null,
     endsAt: seats.endsAt,
+    interval: seats.paid ? seats.interval : null,
     pastDue: seats.pastDue || seats.unpaid
   };
 };
