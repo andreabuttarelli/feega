@@ -1,6 +1,7 @@
 import type { LiveEditAsk } from '@feega/live-edit/live-ask';
 import type { Place } from '@feega/live-edit/move-node';
-import type { AddKind } from '@feega/live-edit/add-node';
+import type { AddKind, AddPlace } from '@feega/live-edit/add-node';
+import type { WrapTag } from '@feega/live-edit/wrap-node';
 import type { LoopMove } from '@feega/live-edit/move-loop-item';
 import type { Usage } from '@feega/live-edit/move-usage';
 import type { StructureOp } from '@feega/live-edit/structure';
@@ -187,8 +188,8 @@ export type HostMessage =
   | { kind: ToHost.Prefs; prefs: Prefs }
   | { kind: ToHost.Setting; key: SettingKey; value: SettingValue }
   | { kind: ToHost.Move; from: string; to: string; place: Place }
-  | { kind: ToHost.Structure; op: StructureOp; at: string; to?: string; usage?: Usage; loop?: LoopMove; instance?: number; add?: { kind: AddKind; src?: string } }
-  | { kind: ToHost.AddImage; at: string }
+  | { kind: ToHost.Structure; op: StructureOp; at: string; to?: string; usage?: Usage; loop?: LoopMove; instance?: number; add?: { kind: AddKind; src?: string; place?: AddPlace }; wrap?: WrapTag }
+  | { kind: ToHost.AddImage; at: string; place?: AddPlace }
   | { kind: ToHost.Server; action: ServerAction }
   | { kind: ToHost.Redo }
   | { kind: ToHost.Font; ask: EditAsk; google: boolean }
