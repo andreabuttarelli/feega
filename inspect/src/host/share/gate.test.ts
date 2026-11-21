@@ -24,13 +24,13 @@ describe('editGate', () => {
     const gate = editGate(() => 0);
 
     for (const kind of [ToHost.Open, ToHost.Restart, ToHost.External, ToHost.Prefs, ToHost.Setting, ToHost.Server, ToHost.Diff, ToHost.SourceControl, ToHost.AttachUrl, ToHost.AddPlugin, ToHost.SignIn, ToHost.SignOut, ToHost.Copy, ToHost.CommentAdd, ToHost.CommentResolve, ToHost.ImageChoose]) {
-      expect(gate.check(ada, { kind })).toEqual({ ok: false, reason: 'only the host can do that' });
+      expect(gate.check(ada, { kind })).toEqual({ ok: false, reason: 'only the host can do that', quiet: true });
     }
   });
 
   it('refuses a kind it does not know', () => {
-    expect(editGate(() => 0).check(ada, { kind: 'rm-rf' })).toEqual({ ok: false, reason: 'only the host can do that' });
-    expect(editGate(() => 0).check(ada, {})).toEqual({ ok: false, reason: 'only the host can do that' });
+    expect(editGate(() => 0).check(ada, { kind: 'rm-rf' })).toEqual({ ok: false, reason: 'only the host can do that', quiet: true });
+    expect(editGate(() => 0).check(ada, {})).toEqual({ ok: false, reason: 'only the host can do that', quiet: true });
   });
 
   it('lets editors edit and read', () => {

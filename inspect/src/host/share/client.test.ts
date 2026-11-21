@@ -218,6 +218,19 @@ describe('shareClient', () => {
     expect(local.messages.map((m) => JSON.parse(m).kind)).toEqual([ToHost.Ready]);
   });
 
+  it('drops host only messages without telling the visitor', async () => {
+    const { relay, editor } = await rig();
+    await relay.send(jsonFrame(4, FrameType.WsOpen, { path: '/feega-host', headers: { 'x-feega-visitor': encodeVisitor(ada) }, protocols: [] }));
+    await waitFor(() => editor.sockets[0], 'local editor socket');
+
+    await relay.send(textFrame(4, JSON.stringify({ kind: ToHost.Prefs, prefs: {} })));
+    await relay.send(textFrame(4, JSON.stringify({ kind: ToHost.Ready })));
+
+    await waitFor(() => editor.sockets[0].messages.length > 0, 'ready');
+    expect(editor.sockets[0].messages).toEqual([JSON.stringify({ kind: ToHost.Ready })]);
+    expect(relay.frames.filter((f) => f.type === FrameType.WsText)).toEqual([]);
+  });
+
   it('lets an editor edit and locks the element against another editor', async () => {
     const { relay, editor } = await rig();
     const bo = { userId: 'bo', name: 'Bo', role: 'editor' as const };

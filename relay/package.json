@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev --local --var VISITOR_BASE:localhost:8787 --var WEB_ORIGIN:http://localhost:5173",
+    "dev": "wrangler dev --local --infer-origin-from-routes false --var VISITOR_BASE:localhost:8787 --var WEB_ORIGIN:http://localhost:5173",
     "test": "vitest run",
     "deploy": "wrangler deploy"
   },

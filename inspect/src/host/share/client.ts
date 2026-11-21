@@ -101,7 +101,7 @@ export function shareClient(options: ShareClientOptions): ShareClient {
       forward(text);
       return;
     }
-    send(textFrame(streamId, JSON.stringify({ kind: ToView.Edited, ok: false, reason: verdict.reason })));
+    verdict.quiet || send(textFrame(streamId, JSON.stringify({ kind: ToView.Edited, ok: false, reason: verdict.reason })));
   }
 
   function openSocket(streamId: number, open: WsOpen) {

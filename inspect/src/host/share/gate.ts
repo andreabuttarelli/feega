@@ -49,7 +49,7 @@ const RULES: Partial<Record<string, Rule>> = {
   [ToHost.ImageUpload]: EDIT
 };
 
-export type Verdict = { ok: true } | { ok: false; reason: string };
+export type Verdict = { ok: true } | { ok: false; reason: string; quiet?: boolean };
 
 const ALLOWED: Verdict = { ok: true };
 const refused = (reason: string): Verdict => ({ ok: false, reason });
@@ -70,7 +70,7 @@ export function editGate(now: () => number = Date.now) {
     check(visitor: VisitorInfo, message: Message): Verdict {
       const rule = message.kind === undefined ? undefined : RULES[message.kind];
       if (!rule) {
-        return refused(HOST_ONLY);
+        return { ok: false, reason: HOST_ONLY, quiet: true };
       }
       if (rule.access === Access.Anyone) {
         return ALLOWED;
