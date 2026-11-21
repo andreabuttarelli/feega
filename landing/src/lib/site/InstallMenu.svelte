@@ -1,6 +1,8 @@
 <script lang="ts">
   import { browserEnv, installOptions, Outcome, runOption, type InstallOption } from './install';
   import { EDITOR_ICONS } from './editor-icons';
+  import CommandField from './CommandField.svelte';
+  import { APPLE_ICON } from './social-icons';
   import { DESKTOP_DMGS, DESKTOP_INSTALL_COMMAND, DESKTOP_PUBLISHED, DOWNLOAD_PATH } from './links';
 
   let { label }: { label: string } = $props();
@@ -8,18 +10,12 @@
   const options = installOptions().filter((o) => !o.soon);
   let open = $state(false);
   let copied = $state(false);
-  let desktopCopied = $state(false);
   let root: HTMLDivElement;
 
   function choose(option: InstallOption) {
     const outcome = runOption(option, browserEnv(), (text) => navigator.clipboard?.writeText(text));
     copied = outcome === Outcome.Copied;
     open = copied;
-  }
-
-  function copyDesktop() {
-    navigator.clipboard?.writeText(DESKTOP_INSTALL_COMMAND);
-    desktopCopied = true;
   }
 
   function onKey(event: KeyboardEvent) {
@@ -53,13 +49,10 @@
         </button>
       {/each}
       {#if DESKTOP_PUBLISHED}
-        <p class="section">desktop app (beta)</p>
-        <button role="menuitem" type="button" onclick={copyDesktop}>
-          <code>{DESKTOP_INSTALL_COMMAND}</code>
-          <span class="done">{desktopCopied ? 'copied' : 'copy'}</span>
-        </button>
+        <p class="section"><img src="/img/feega-desktop.png" alt="" width="20" height="20" />desktop app (beta)</p>
+        <div class="field"><CommandField command={DESKTOP_INSTALL_COMMAND} /></div>
         {#each DESKTOP_DMGS as dmg (dmg.arch)}
-          <a role="menuitem" href={dmg.href}>dmg · {dmg.arch.toLowerCase()}</a>
+          <a role="menuitem" href={dmg.href}><span class="logo">{@html APPLE_ICON}</span><span>dmg · {dmg.arch.toLowerCase()}</span></a>
         {/each}
         <p class="hint">macOS blocks the dmg. allow it in privacy & security, open anyway.</p>
       {/if}
@@ -163,6 +156,9 @@
   }
 
   .section {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     margin: 8px 10px 4px;
     padding-top: 8px;
     border-top: 1px solid rgb(255 255 255 / 0.1);
@@ -177,11 +173,12 @@
     line-height: 1.35;
   }
 
-  code {
-    font-family: 'Fragment Mono', monospace;
-    font-size: 13px;
-    text-align: left;
-    overflow-wrap: anywhere;
+  .field {
+    margin: 2px 4px 6px;
+  }
+
+  .section img {
+    border-radius: 4px;
   }
 
   .all {
