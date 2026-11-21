@@ -6,6 +6,7 @@ import SiteFooter from './theme/SiteFooter.astro';
 <Default {...Astro.props}>
   <slot name="header" slot="header" />
   <slot name="sidebar" slot="sidebar" />
+  <div class="sx-page-controls"></div>
   <slot />
 </Default>
 <SiteFooter />
