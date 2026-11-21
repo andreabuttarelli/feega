@@ -9,6 +9,8 @@ export enum PostOutcome {
 const LOOPBACK_HOSTS = ['127.0.0.1', 'localhost'];
 const EXTENSION_ID = 'andreabuttarelli.feega';
 const SIGN_IN_PATH = '/signin';
+const DESKTOP_LABEL = 'Feega';
+const DESKTOP_SIGN_IN_URL = 'feega://signin';
 
 const EDITORS = [
   { label: 'VS Code', scheme: 'vscode' },
@@ -37,13 +39,22 @@ export async function postSession(port: string | number, session: CliSession, se
   return PostOutcome.Unreachable;
 }
 
-export function editorLinks(session: CliSession): { label: string; href: string }[] {
-  const query = new URLSearchParams({
+type OpenLink = { label: string; href: string };
+
+const queryOf = (session: CliSession) =>
+  new URLSearchParams({
     access_token: session.access_token,
     refresh_token: session.refresh_token,
     expires_at: String(session.expires_at),
     state: session.state
   });
+
+export function desktopLink(session: CliSession): OpenLink {
+  return { label: DESKTOP_LABEL, href: `${DESKTOP_SIGN_IN_URL}?${queryOf(session)}` };
+}
+
+export function editorLinks(session: CliSession): OpenLink[] {
+  const query = queryOf(session);
 
   return EDITORS.map(({ label, scheme }) => ({ label, href: `${scheme}://${EXTENSION_ID}${SIGN_IN_PATH}?${query}` }));
 }
