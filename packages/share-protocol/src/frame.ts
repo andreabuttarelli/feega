@@ -53,6 +53,7 @@ export type Present = VisitorInfo & { selection?: string };
 export type Presence = { visitors: Present[] };
 export type Kick = { userId: string };
 
+export const SET_COOKIE_SEPARATOR = '\n';
 export const CONTROL_STREAM = 0;
 export const MAX_STREAM_ID = 0xffffffff;
 

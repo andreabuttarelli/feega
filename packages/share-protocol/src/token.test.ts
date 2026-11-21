@@ -80,6 +80,14 @@ describe('token', () => {
     }
   });
 
+  it('carries an optional display name and rejects a non string one', async () => {
+    const named = await verifyToken(await signToken(claims({ name: 'Ada' }), SECRET), SECRET, NOW);
+    const bad = await verifyToken(await signToken({ ...claims(), name: 5 } as never, SECRET), SECRET, NOW);
+
+    expect(named).toEqual({ ok: true, claims: claims({ name: 'Ada' }) });
+    expect(bad).toEqual({ ok: false, fault: TokenFault.Claims });
+  });
+
   it('refuses an empty secret', async () => {
     await expect(signToken(claims(), '')).rejects.toThrow();
     expect(await verifyToken('a.b.c', '', NOW)).toEqual({ ok: false, fault: TokenFault.Malformed });

@@ -1,7 +1,7 @@
 import { isSid } from './sid';
 import type { Role } from './frame';
 
-export type Claims = { sid: string; role: Role; sub: string; org: string; exp: number };
+export type Claims = { sid: string; role: Role; sub: string; org: string; exp: number; name?: string };
 
 export enum TokenFault {
   Malformed = 'malformed',
@@ -19,7 +19,7 @@ const encoder = new TextEncoder();
 
 const b64url = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes)).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
 
-function fromB64url(text: string): Uint8Array | null {
+function fromB64url(text: string): Uint8Array<ArrayBuffer> | null {
   try {
     const padded = text.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(text.length / 4) * 4, '=');
     return Uint8Array.from(atob(padded), (c) => c.charCodeAt(0));
@@ -54,7 +54,7 @@ export async function signToken(claims: Claims, secret: string): Promise<string>
 const nonEmpty = (value: unknown): value is string => typeof value === 'string' && value !== '';
 
 function claimsOf(value: Record<string, unknown>): Claims | null {
-  const valid = isSid(value.sid) && ROLES.includes(value.role as string) && nonEmpty(value.sub) && nonEmpty(value.org) && typeof value.exp === 'number' && Number.isFinite(value.exp);
+  const valid = isSid(value.sid) && ROLES.includes(value.role as string) && nonEmpty(value.sub) && nonEmpty(value.org) && typeof value.exp === 'number' && Number.isFinite(value.exp) && (value.name === undefined || typeof value.name === 'string');
   return valid ? (value as Claims) : null;
 }
 
