@@ -1,6 +1,10 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { Channel, type Link, type Preferences, type ShellState } from './types';
 
+window.addEventListener('DOMContentLoaded', () => {
+  document.documentElement.dataset.platform = process.platform;
+});
+
 const call = (channel: Channel, ...args: unknown[]) => ipcRenderer.invoke(channel, ...args);
 
 contextBridge.exposeInMainWorld('feega', {

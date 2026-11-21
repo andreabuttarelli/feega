@@ -9,6 +9,7 @@ import { TabStatus, type AppOption, type TabInfo } from './types';
 
 export const CHROME_HEIGHT = 44;
 const MAX_LOG_LINES = 200;
+const OPAQUE_BACKGROUND = '#121212';
 const NO_APP = 'no web app (package.json) found in this folder';
 
 type Tab = { info: TabInfo; view: WebContentsView; stop: () => Promise<void>; pick: ((app: string | null) => void) | null };
@@ -80,6 +81,7 @@ export function tabHost(window: BrowserWindow, changed: () => void, pids: PidFil
   const open = async (dir: string) => {
     const id = `tab-${++next}`;
     const view = new WebContentsView();
+    view.setBackgroundColor(OPAQUE_BACKGROUND);
     const info: TabInfo = { id, dir, name: basename(dir), status: TabStatus.Starting, message: 'looking for the app', log: [], url: '', apps: [] };
     tabs.set(id, { info, view, stop: async () => undefined, pick: null });
     remember();

@@ -1,4 +1,4 @@
-import { BrowserWindow, app, dialog, ipcMain, shell } from 'electron';
+import { BrowserWindow, app, dialog, ipcMain, nativeTheme, shell, type BrowserWindowConstructorOptions } from 'electron';
 import { basename, join } from 'node:path';
 import { accountStore } from './account';
 import { LINKS } from './links';
@@ -11,10 +11,16 @@ import { Channel, type Link, type Preferences, type ShellState } from './types';
 
 const DEFAULT_SIZE = { width: 1440, height: 900 };
 const MIN_SIZE = { minWidth: 900, minHeight: 600 };
-const BACKGROUND = '#000000';
+const SOLID_BACKGROUND = '#121212';
+const TRANSPARENT = '#00000000';
+const VIBRANCY = 'under-window';
+
+const surface = (): BrowserWindowConstructorOptions =>
+  process.platform === 'darwin' ? { vibrancy: VIBRANCY, visualEffectState: 'active', backgroundColor: TRANSPARENT } : { backgroundColor: SOLID_BACKGROUND };
 const TRAFFIC_LIGHTS = { x: 18, y: 20 };
 
 app.whenReady().then(() => {
+  nativeTheme.themeSource = 'dark';
   const userData = app.getPath('userData');
   const settings = settingsStore(userData);
   const account = accountStore(userData);
@@ -24,7 +30,7 @@ app.whenReady().then(() => {
   const window = new BrowserWindow({
     ...DEFAULT_SIZE,
     ...MIN_SIZE,
-    backgroundColor: BACKGROUND,
+    ...surface(),
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: TRAFFIC_LIGHTS,
     webPreferences: { preload: join(__dirname, 'preload.cjs'), contextIsolation: true, sandbox: true }

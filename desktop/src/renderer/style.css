@@ -19,7 +19,6 @@ html,
 body {
   margin: 0;
   height: 100%;
-  background: var(--surface);
   color: #fff;
   font-family: var(--sans);
   font-weight: var(--sx-w-body);
@@ -29,6 +28,17 @@ body {
   user-select: none;
   cursor: default;
   transition: background 300ms var(--ease);
+}
+
+html {
+  background: var(--surface);
+  transition: background 300ms var(--ease);
+}
+
+html[data-platform='darwin'] {
+  --surface: rgb(18 18 18 / 0.55);
+  --card: rgb(31 31 31 / 0.6);
+  --card-hover: rgb(40 40 40 / 0.7);
 }
 
 body {
@@ -63,9 +73,7 @@ svg {
   align-items: center;
   gap: 4px;
   padding: 0 14px 0 88px;
-  background: var(--surface);
   -webkit-app-region: drag;
-  transition: background 300ms var(--ease);
 }
 
 #bar > * {
