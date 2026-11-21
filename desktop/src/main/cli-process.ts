@@ -14,24 +14,42 @@ export type CliEvents = {
   onExit: (tail: string) => void;
 };
 
-export const freePort = () =>
-  new Promise<number>((resolve, reject) => {
+const MAX_PORT = 65535;
+const AUTO = 0;
+
+const reserved = new Set<number>();
+
+const portFree = (port: number) =>
+  new Promise<number | null>((resolve) => {
     const server = createServer();
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', () => {
-      const { port } = server.address() as { port: number };
-      server.close(() => resolve(port));
+    server.once('error', () => resolve(null));
+    server.listen(port, '127.0.0.1', () => {
+      const { port: bound } = server.address() as { port: number };
+      server.close(() => resolve(bound));
     });
   });
 
-export async function startCli(dir: string, pids: PidFile, events: CliEvents) {
-  const port = await freePort();
+export async function freePort(from: number = AUTO): Promise<number> {
+  for (let port = from; port <= (from === AUTO ? AUTO : MAX_PORT); port++) {
+    const bound = reserved.has(port) ? null : await portFree(port);
+    if (bound !== null && !reserved.has(bound)) {
+      reserved.add(bound);
+      return bound;
+    }
+  }
+  return freePort(AUTO);
+}
+
+export type CliOptions = { editorPort: number; telemetry: boolean };
+
+export async function startCli(dir: string, pids: PidFile, options: CliOptions, events: CliEvents) {
+  const port = await freePort(options.editorPort);
   const cli = join(__dirname, '..', '..', 'npx', 'dist', 'cli.cjs');
   const args = [cli, dir, '--no-open', '--port', String(port)];
   const child = spawn(process.execPath, args, {
     detached: true,
     stdio: ['pipe', 'pipe', 'pipe'],
-    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', [STOP_ON_STDIN_END]: '1', FORCE_COLOR: '0' }
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', [STOP_ON_STDIN_END]: '1', FORCE_COLOR: '0', ...(options.telemetry ? {} : { FEEGA_TELEMETRY: '0' }) }
   });
 
   if (child.pid) {
@@ -60,6 +78,7 @@ export async function startCli(dir: string, pids: PidFile, events: CliEvents) {
   child.stderr.on('data', take);
   child.on('exit', () => {
     exited = true;
+    reserved.delete(port);
     if (child.pid) {
       pids.remove(child.pid);
     }

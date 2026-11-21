@@ -1,11 +1,13 @@
-import { BrowserWindow, app, dialog, ipcMain } from 'electron';
+import { BrowserWindow, app, dialog, ipcMain, shell } from 'electron';
 import { basename, join } from 'node:path';
 import { accountStore } from './account';
+import { LINKS } from './links';
+import { installMenu } from './menu';
 import { pidFile } from './pid-file';
 import { frameworkOf } from './project-info';
 import { settingsStore } from './store';
 import { tabHost } from './tabs';
-import { Channel, type ShellState } from './types';
+import { Channel, type Link, type Preferences, type ShellState } from './types';
 
 const DEFAULT_SIZE = { width: 1440, height: 900 };
 const MIN_SIZE = { minWidth: 900, minHeight: 600 };
@@ -34,11 +36,15 @@ app.whenReady().then(() => {
     email: account.email(),
     signingIn: account.waiting(),
     skipped: settings.get().skipped,
-    recents: settings.get().recents.map(({ dir, at }) => ({ dir, at, name: basename(dir), framework: frameworkOf(dir) }))
+    recents: settings.get().recents.map(({ dir, at }) => ({ dir, at, name: basename(dir), framework: frameworkOf(dir) })),
+    preferences: settings.get().preferences
   });
 
   const publish = () => window.webContents.send(Channel.State, state());
-  const tabs = tabHost(window, publish, pids);
+  const tabs = tabHost(window, publish, pids, {
+    options: () => ({ editorPort: settings.get().preferences.editorPort, telemetry: settings.get().preferences.telemetry }),
+    opened: (dirs) => settings.remember(dirs)
+  });
 
   const openDir = (dir: string) => {
     settings.visit(dir);
@@ -71,8 +77,25 @@ app.whenReady().then(() => {
   ipcMain.handle(Channel.RetryTab, (_event, id: string) => void tabs.retry(id));
   ipcMain.handle(Channel.ChooseApp, (_event, id: string, app: string) => tabs.choose(id, app));
   ipcMain.handle(Channel.Activate, (_event, id: string | null) => tabs.activate(id));
+  ipcMain.handle(Channel.SetPreferences, (_event, change: Partial<Preferences>) => {
+    settings.prefer(change);
+    publish();
+  });
+  ipcMain.handle(Channel.OpenLink, (_event, link: Link) => shell.openExternal(LINKS[link]));
+  ipcMain.handle(Channel.Overlay, (_event, open: boolean) => tabs.overlay(open));
+  ipcMain.handle(Channel.Quit, () => app.quit());
+
+  installMenu(() => window.webContents.send(Channel.ShowSettings));
 
   void window.loadFile(join(__dirname, 'renderer', 'index.html'));
+
+  const reopenLast = () => {
+    const wanted = settings.get().preferences.reopenOnLaunch && (account.email() !== null || settings.get().skipped);
+    for (const dir of wanted ? settings.get().openDirs : []) {
+      void tabs.open(dir);
+    }
+  };
+  window.webContents.once('did-finish-load', reopenLast);
 
   let closing = false;
   app.on('before-quit', (event) => {

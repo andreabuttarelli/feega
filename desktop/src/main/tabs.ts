@@ -2,7 +2,7 @@ import { WebContentsView, type BrowserWindow } from 'electron';
 import { basename } from 'node:path';
 import { chosenApp } from '../../../inspect/src/host/app-root';
 import { diskTree } from './app-tree';
-import { startCli } from './cli-process';
+import { startCli, type CliOptions } from './cli-process';
 import { type PidFile } from './pid-file';
 import { frameworkOf } from './project-info';
 import { TabStatus, type AppOption, type TabInfo } from './types';
@@ -13,15 +13,19 @@ const NO_APP = 'no web app (package.json) found in this folder';
 
 type Tab = { info: TabInfo; view: WebContentsView; stop: () => Promise<void>; pick: ((app: string | null) => void) | null };
 
-export function tabHost(window: BrowserWindow, changed: () => void, pids: PidFile) {
+export type HostConfig = { options: () => CliOptions; opened: (dirs: string[]) => void };
+
+export function tabHost(window: BrowserWindow, changed: () => void, pids: PidFile, config: HostConfig) {
   const tabs = new Map<string, Tab>();
   let active: string | null = null;
   let next = 0;
+  let overlay = false;
+  let quitting = false;
 
   const layout = () => {
     const [width, height] = window.getContentSize();
     for (const [id, tab] of tabs) {
-      tab.view.setVisible(id === active && tab.info.status === TabStatus.Ready);
+      tab.view.setVisible(!overlay && id === active && tab.info.status === TabStatus.Ready);
       tab.view.setBounds({ x: 0, y: CHROME_HEIGHT, width, height: Math.max(0, height - CHROME_HEIGHT) });
     }
   };
@@ -38,12 +42,19 @@ export function tabHost(window: BrowserWindow, changed: () => void, pids: PidFil
 
   window.on('resize', layout);
 
+  const remember = () => {
+    if (!quitting) {
+      config.opened([...tabs.values()].map((t) => t.info.dir));
+    }
+  };
+
   const close = async (id: string) => {
     const tab = tabs.get(id);
     if (!tab) {
       return;
     }
     tabs.delete(id);
+    remember();
     tab.pick?.(null);
     window.contentView.removeChildView(tab.view);
     tab.view.webContents.close();
@@ -71,6 +82,7 @@ export function tabHost(window: BrowserWindow, changed: () => void, pids: PidFil
     const view = new WebContentsView();
     const info: TabInfo = { id, dir, name: basename(dir), status: TabStatus.Starting, message: 'looking for the app', log: [], url: '', apps: [] };
     tabs.set(id, { info, view, stop: async () => undefined, pick: null });
+    remember();
     window.contentView.addChildView(view);
     active = id;
     layout();
@@ -86,7 +98,7 @@ export function tabHost(window: BrowserWindow, changed: () => void, pids: PidFil
     }
     patch(id, { status: TabStatus.Starting, name: basename(root), message: 'starting dev server', apps: [] });
 
-    const cli = await startCli(root, pids, {
+    const cli = await startCli(root, pids, config.options(), {
       onLine: (line) => patch(id, { message: line.replace(/^feega:\s*/, ''), log: [...(tabs.get(id)?.info.log ?? []), line].slice(-MAX_LOG_LINES) }),
       onUrl: (url) => {
         patch(id, { status: TabStatus.Ready, url });
@@ -128,6 +140,13 @@ export function tabHost(window: BrowserWindow, changed: () => void, pids: PidFil
         await open(dir);
       }
     },
-    closeAll: () => Promise.all([...tabs.keys()].map(close))
+    overlay: (open: boolean) => {
+      overlay = open;
+      layout();
+    },
+    closeAll: () => {
+      quitting = true;
+      return Promise.all([...tabs.keys()].map(close));
+    }
   };
 }

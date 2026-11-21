@@ -11,19 +11,32 @@ export type TabInfo = { id: string; dir: string; name: string; status: TabStatus
 
 export type RecentInfo = { dir: string; name: string; framework: string; at: number };
 
-export type ShellState = { tabs: TabInfo[]; active: string | null; email: string | null; signingIn: boolean; skipped: boolean; recents: RecentInfo[] };
+export type Preferences = { editorPort: number; reopenOnLaunch: boolean; telemetry: boolean };
+
+export type ShellState = { tabs: TabInfo[]; active: string | null; email: string | null; signingIn: boolean; skipped: boolean; recents: RecentInfo[]; preferences: Preferences };
+
+export enum Link {
+  Account = 'account',
+  Docs = 'docs',
+  Community = 'community'
+}
 
 export enum Channel {
   State = 'state',
   GetState = 'get-state',
   SignIn = 'sign-in',
-  SignOut = 'sign-out',
   CancelSignIn = 'cancel-sign-in',
+  SignOut = 'sign-out',
   Skip = 'skip',
   PickFolder = 'pick-folder',
   OpenDir = 'open-dir',
   CloseTab = 'close-tab',
   RetryTab = 'retry-tab',
   ChooseApp = 'choose-app',
-  Activate = 'activate'
+  Activate = 'activate',
+  SetPreferences = 'set-preferences',
+  OpenLink = 'open-link',
+  Overlay = 'overlay',
+  ShowSettings = 'show-settings',
+  Quit = 'quit'
 }

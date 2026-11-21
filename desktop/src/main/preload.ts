@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import { Channel, type ShellState } from './types';
+import { Channel, type Link, type Preferences, type ShellState } from './types';
 
 const call = (channel: Channel, ...args: unknown[]) => ipcRenderer.invoke(channel, ...args);
 
@@ -15,5 +15,10 @@ contextBridge.exposeInMainWorld('feega', {
   chooseApp: (id: string, app: string) => call(Channel.ChooseApp, id, app),
   retryTab: (id: string) => call(Channel.RetryTab, id),
   activate: (id: string | null) => call(Channel.Activate, id),
+  setPreferences: (change: Partial<Preferences>) => call(Channel.SetPreferences, change),
+  openLink: (link: Link) => call(Channel.OpenLink, link),
+  overlay: (open: boolean) => call(Channel.Overlay, open),
+  quit: () => call(Channel.Quit),
+  onSettings: (listener: () => void) => ipcRenderer.on(Channel.ShowSettings, () => listener()),
   onState: (listener: (state: ShellState) => void) => ipcRenderer.on(Channel.State, (_event, state) => listener(state))
 });

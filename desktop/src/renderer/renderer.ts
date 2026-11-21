@@ -1,6 +1,6 @@
 import { LOGO_PATHS, type Logo } from '../../../landing/src/lib/site/codebase/logos';
 import { PIXELS, pixelSvg } from './pixel';
-import { TabStatus, type RecentInfo, type ShellState, type TabInfo } from '../main/types';
+import { Link, TabStatus, type RecentInfo, type ShellState, type TabInfo } from '../main/types';
 
 type Bridge = {
   state: () => Promise<ShellState>;
@@ -14,6 +14,11 @@ type Bridge = {
   retryTab: (id: string) => Promise<void>;
   chooseApp: (id: string, app: string) => Promise<void>;
   activate: (id: string | null) => Promise<void>;
+  setPreferences: (change: Partial<ShellState['preferences']>) => Promise<void>;
+  openLink: (link: Link) => Promise<void>;
+  overlay: (open: boolean) => Promise<void>;
+  quit: () => Promise<void>;
+  onSettings: (listener: () => void) => void;
   onState: (listener: (state: ShellState) => void) => void;
 };
 
@@ -96,6 +101,18 @@ const explain = (tab: TabInfo) => {
   return FRIENDLY.find(([pattern]) => pattern.test(text))?.[1] ?? tab.message;
 };
 
+enum Route {
+  Home = 'home',
+  Settings = 'settings'
+}
+
+const PORT_MIN = 1024;
+const PORT_MAX = 65535;
+const DEFAULT_CUSTOM_PORT = 4100;
+const AUTO_PORT = 0;
+
+let route = Route.Home;
+let overlayOn = false;
 let menuOpen = false;
 let rendered = new Set<string>();
 let lastState: ShellState | null = null;
@@ -108,17 +125,101 @@ const tabChip = (tab: TabInfo, active: boolean, fresh: boolean) => {
   return chip;
 };
 
+const toggleMenu = (open: boolean) => {
+  menuOpen = open;
+  syncOverlay();
+  if (lastState) {
+    render(lastState);
+  }
+};
+
+const showRoute = (next: Route) => {
+  route = next;
+  menuOpen = false;
+  syncOverlay();
+  if (lastState) {
+    render(lastState);
+  }
+};
+
+const syncOverlay = () => {
+  const wanted = menuOpen || route === Route.Settings;
+  if (wanted !== overlayOn) {
+    overlayOn = wanted;
+    void bridge.overlay(wanted);
+  }
+};
+
 const accountChip = (state: ShellState) => {
   const label = state.email ?? 'guest';
   const avatar = el('span', { class: `avatar${state.email ? '' : ' guest'}`, text: label[0] });
-  return el('button', { class: 'chip', on: () => ((menuOpen = !menuOpen), lastState && render(lastState)) }, avatar, el('span', { text: label }));
+  return el('button', { class: 'chip', on: () => toggleMenu(!menuOpen) }, avatar, el('span', { text: label }));
 };
 
+const menuRow = (label: string, on: () => void, hint = '') => el('button', { class: 'row', on }, el('span', { text: label }), el('span', { class: 'hint', text: hint }));
+
 const accountMenu = (state: ShellState) => {
-  const action = state.email ? pill('sign out', 'ghost', run(() => bridge.signOut())) : pill('sign in', 'ghost', run(() => bridge.signIn()));
-  action.className = '';
-  return el('div', { class: 'menu' }, el('div', { class: 'who', text: state.email ?? 'not signed in' }), action);
+  const label = state.email ?? 'guest · not signed in';
+  const who = el('div', { class: 'who' }, el('span', { class: `avatar${state.email ? '' : ' guest'}`, text: (state.email ?? 'guest')[0] }), el('span', { class: 'label', text: label }));
+  const account = state.email ? menuRow('account settings', run(() => bridge.openLink(Link.Account)), '↗') : el('button', { class: 'pill primary small signin', text: 'sign in', on: run(() => bridge.signIn()) });
+  const rows = [
+    who,
+    account,
+    menuRow('settings', () => showRoute(Route.Settings), '⌘,'),
+    menuRow('docs', run(() => bridge.openLink(Link.Docs)), '↗'),
+    menuRow('community', run(() => bridge.openLink(Link.Community)), '↗'),
+    el('div', { class: 'divider' }),
+    ...(state.email ? [menuRow('sign out', run(() => bridge.signOut()))] : []),
+    menuRow('quit feega', run(() => bridge.quit()), '⌘Q')
+  ];
+  return el('div', { class: 'menu' }, ...rows);
 };
+
+const switchEl = (on: boolean, change: (next: boolean) => void) => {
+  const knob = el('span', { class: 'knob' });
+  const node = el('button', { class: `switch${on ? ' on' : ''}`, on: () => change(!on) }, knob);
+  node.setAttribute('role', 'switch');
+  node.setAttribute('aria-checked', String(on));
+  return node;
+};
+
+const settingRow = (title: string, hint: string, control: HTMLElement) => el('div', { class: 'setting' }, el('div', {}, el('div', { class: 'title', text: title }), el('div', { class: 'desc', text: hint })), control);
+
+const portControl = (editorPort: number) => {
+  const custom = editorPort > 0;
+  const input = el('input', { class: `port${custom ? '' : ' hidden'}` }) as HTMLInputElement;
+  input.type = 'number';
+  input.min = String(PORT_MIN);
+  input.max = String(PORT_MAX);
+  input.value = custom ? String(editorPort) : String(DEFAULT_CUSTOM_PORT);
+  input.addEventListener('change', () => void bridge.setPreferences({ editorPort: Math.min(PORT_MAX, Math.max(PORT_MIN, Number(input.value) || DEFAULT_CUSTOM_PORT)) }));
+  input.addEventListener('keydown', (event) => event.stopPropagation());
+  const auto = el('button', { class: `seg${custom ? '' : ' on'}`, text: 'auto', on: run(() => bridge.setPreferences({ editorPort: AUTO_PORT })) });
+  const own = el('button', { class: `seg${custom ? ' on' : ''}`, text: 'custom', on: run(() => bridge.setPreferences({ editorPort: DEFAULT_CUSTOM_PORT })) });
+  return el('div', { class: 'port-control' }, input, el('div', { class: 'segmented' }, auto, own));
+};
+
+const settingsPanel = (state: ShellState) => {
+  const { editorPort, reopenOnLaunch, telemetry } = state.preferences;
+  return el(
+    'div',
+    { class: 'panel' },
+    settingRow('editor port', 'port of the first editor. more tabs take the next free one.', portControl(editorPort)),
+    settingRow('open last projects on launch', 'reopen the folders that were open when you quit.', switchEl(reopenOnLaunch, (next) => void bridge.setPreferences({ reopenOnLaunch: next }))),
+    settingRow('anonymous usage data', 'counts only, never your code. off starts the editor with FEEGA_TELEMETRY=0.', switchEl(telemetry, (next) => void bridge.setPreferences({ telemetry: next })))
+  );
+};
+
+const settingsView = (state: ShellState): View => ({
+  key: 'settings',
+  build: () => el('div', { class: 'dash' }, el('div', { class: 'dash-head' }, el('div', {}, el('p', { class: 'kicker', text: 'feega desktop' }), el('h1', { class: 'display page-title', text: 'settings' })), pill('done', 'primary', () => showRoute(Route.Home))), settingsPanel(state)),
+  patch: (root) => {
+    const typing = root.querySelector('input:focus');
+    if (!typing) {
+      root.querySelector('.panel')?.replaceWith(settingsPanel(state));
+    }
+  }
+});
 
 const renderBar = (state: ShellState) => {
   if (!state.email && !state.skipped && state.tabs.length === 0) {
@@ -247,6 +348,9 @@ const TAB_VIEWS: Record<TabStatus, (tab: TabInfo) => View> = {
 };
 
 const viewOf = (state: ShellState): View => {
+  if (route === Route.Settings) {
+    return settingsView(state);
+  }
   const tab = state.tabs.find((t) => t.id === state.active);
   if (tab) {
     return TAB_VIEWS[tab.status](tab);
@@ -276,11 +380,27 @@ function render(state: ShellState) {
 }
 
 document.addEventListener('click', (event) => {
-  if (menuOpen && !(event.target as HTMLElement).closest('.menu, .chip') && lastState) {
-    menuOpen = false;
-    render(lastState);
+  if (menuOpen && !(event.target as HTMLElement).closest('.menu, .chip')) {
+    toggleMenu(false);
   }
 });
 
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') {
+    if (menuOpen) {
+      toggleMenu(false);
+      return;
+    }
+    if (route === Route.Settings) {
+      showRoute(Route.Home);
+    }
+    return;
+  }
+  if ((event.metaKey || event.ctrlKey) && event.key === ',') {
+    showRoute(Route.Settings);
+  }
+});
+
+bridge.onSettings(() => showRoute(Route.Settings));
 bridge.onState(render);
 void bridge.state().then(render);
