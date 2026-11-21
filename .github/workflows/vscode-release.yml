@@ -9,11 +9,24 @@ permissions:
   contents: write
   actions: write
 
+env:
+  TAGGED: ${{ startsWith(github.ref, 'refs/tags/vscode-v') || startsWith(github.ref, 'refs/tags/release-v') }}
+
 jobs:
-  publish:
+  test:
     runs-on: ubuntu-24.04
-    env:
-      TAGGED: ${{ startsWith(github.ref, 'refs/tags/vscode-v') || startsWith(github.ref, 'refs/tags/release-v') }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npx svelte-kit sync
+      - run: npx vitest run inspect/src npx/src packages
+
+  build:
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -33,29 +46,66 @@ jobs:
           npm whoami
       - run: npm ci --no-audit --no-fund
       - run: npx svelte-kit sync
-      - run: npx vitest run inspect/src npx/src packages
       - name: Version from the tag
         if: env.TAGGED == 'true'
         working-directory: inspect
         run: npm version --no-git-tag-version --allow-same-version "${GITHUB_REF_NAME#*-v}"
       - name: Build the extension and the npx package
         run: node npx/build.mjs
+      - run: npx -y @vscode/vsce@3 package --no-dependencies -o feega.vsix --baseImagesUrl "https://raw.githubusercontent.com/andreabuttarelli/feega/${GITHUB_REF_NAME}/inspect"
+        working-directory: inspect
+      - uses: actions/upload-artifact@v4
+        with:
+          name: feega-build
+          path: |
+            inspect/feega.vsix
+            npx/dist
+          retention-days: 7
+
+  e2e:
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/download-artifact@v4
+        with:
+          name: feega-build
       - name: npx feega on landing/, driven by Playwright
         run: |
           (cd landing && npm ci --no-audit --no-fund)
+          npm ci --no-audit --no-fund
           npx playwright install --with-deps chromium
           node npx/test/editor.e2e.mjs
-      - run: npx -y @vscode/vsce@3 package --no-dependencies -o feega.vsix --baseImagesUrl "https://raw.githubusercontent.com/andreabuttarelli/feega/${GITHUB_REF_NAME}/inspect"
-        working-directory: inspect
+
+  marketplace:
+    needs: [test, e2e]
+    if: startsWith(github.ref, 'refs/tags/vscode-v') || startsWith(github.ref, 'refs/tags/release-v')
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: feega-build
       - name: Visual Studio Marketplace
-        if: env.TAGGED == 'true'
-        working-directory: inspect
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
-        run: npx -y @vscode/vsce@3 publish --no-dependencies --packagePath feega.vsix --skip-duplicate
+        run: npx -y @vscode/vsce@3 publish --no-dependencies --packagePath inspect/feega.vsix --skip-duplicate
+
+  openvsx:
+    needs: [test, e2e]
+    if: startsWith(github.ref, 'refs/tags/vscode-v') || startsWith(github.ref, 'refs/tags/release-v')
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: inspect/package.json
+      - uses: actions/download-artifact@v4
+        with:
+          name: feega-build
       - name: Open VSX
-        if: env.TAGGED == 'true'
-        working-directory: inspect
         env:
           OVSX_PAT: ${{ secrets.OVSX_PAT }}
         run: |
@@ -63,11 +113,23 @@ jobs:
             echo "::warning::OVSX_PAT is not set: skipped Open VSX"
             exit 0
           fi
-          PUBLISHER=$(node -p "require('./package.json').publisher")
+          PUBLISHER=$(node -p "require('./inspect/package.json').publisher")
           npx -y ovsx create-namespace "$PUBLISHER" -p "$OVSX_PAT" || echo "namespace $PUBLISHER already exists"
-          npx -y ovsx publish feega.vsix -p "$OVSX_PAT" --skip-duplicate
+          npx -y ovsx publish inspect/feega.vsix -p "$OVSX_PAT" --skip-duplicate
+
+  npm:
+    needs: [test, e2e]
+    if: startsWith(github.ref, 'refs/tags/vscode-v') || startsWith(github.ref, 'refs/tags/release-v')
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: 'https://registry.npmjs.org'
+      - uses: actions/download-artifact@v4
+        with:
+          name: feega-build
       - name: npm
-        if: env.TAGGED == 'true'
         working-directory: npx/dist
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -78,14 +140,22 @@ jobs:
             exit 0
           fi
           npm publish --access public
+
+  release:
+    needs: [marketplace, openvsx, npm]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: inspect/CHANGELOG.md
+      - uses: actions/download-artifact@v4
+        with:
+          name: feega-build
       - name: Attach to the release
-        if: env.TAGGED == 'true'
-        working-directory: inspect
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" feega.vsix --title "Feega ${GITHUB_REF_NAME#*-v}" --notes-file CHANGELOG.md || gh release upload "$GITHUB_REF_NAME" feega.vsix --clobber
+        run: gh release create "$GITHUB_REF_NAME" inspect/feega.vsix --title "Feega ${GITHUB_REF_NAME#*-v}" --notes-file inspect/CHANGELOG.md || gh release upload "$GITHUB_REF_NAME" inspect/feega.vsix --clobber
       - name: Refresh the landing version
-        if: env.TAGGED == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run deploy.yml --ref main -f project=feega-landing
