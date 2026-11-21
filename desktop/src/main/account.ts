@@ -1,0 +1,48 @@
+import { safeStorage, shell } from 'electron';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { type Account } from '../../../inspect/src/host/account';
+import { SignInEnd, signIn } from '../../../inspect/src/host/sign-in';
+
+export function accountStore(userData: string) {
+  const path = join(userData, 'account.bin');
+  let signing: AbortController | null = null;
+
+  const read = (): Account | null => {
+    try {
+      return JSON.parse(safeStorage.decryptString(readFileSync(path)));
+    } catch {
+      return null;
+    }
+  };
+
+  const write = (account: Account) => {
+    if (!safeStorage.isEncryptionAvailable()) {
+      return;
+    }
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, safeStorage.encryptString(JSON.stringify(account)), { mode: 0o600 });
+  };
+
+  let held = read();
+
+  return {
+    email: () => held?.user.email ?? null,
+    start: async (): Promise<boolean> => {
+      signing?.abort();
+      signing = new AbortController();
+      const outcome = await signIn({ openBrowser: (url) => shell.openExternal(url), signal: signing.signal });
+      if (outcome.end !== SignInEnd.Done) {
+        return false;
+      }
+      held = outcome.account;
+      write(held);
+      return true;
+    },
+    clear: () => {
+      signing?.abort();
+      held = null;
+      rmSync(path, { force: true });
+    }
+  };
+}
