@@ -5,7 +5,7 @@
   import PageTitle from '$lib/components/PageTitle.svelte';
   import PageHead from '$lib/components/PageHead.svelte';
   import { Notice } from '$lib/components/ui/notice';
-  import { sectionEditable, SETTINGS_SECTIONS } from '$lib/components/settings/platforms';
+  import { sectionEditable, SETTINGS_NAV, SETTINGS_SECTIONS } from '$lib/components/settings/platforms';
   import '$lib/styles/settings-shell.css';
 
   let { data, children } = $props();
@@ -21,6 +21,11 @@
   <div class="content settings-shell">
     <PageHead {title} subtitle={null} />
     <PageTitle text={title} />
+    <nav class="tabs" aria-label={$_('app.nav.settings')}>
+      {#each SETTINGS_NAV as entry (entry.section)}
+        <a href={entry.href} aria-current={entry.section === activeSection ? 'page' : undefined}>{$_(entry.labelKey)}</a>
+      {/each}
+    </nav>
     {#if !editable}<Notice>View only: ask an admin of this organisation for edit access.</Notice>{/if}
     <div class="settings" inert={!editable}>
       {@render children()}
@@ -34,6 +39,26 @@
     max-width: var(--content-max);
     margin-inline: auto;
     padding: var(--content-pad-top) var(--content-pad-x) var(--content-pad-bottom);
+  }
+
+  .tabs {
+    display: flex;
+    gap: var(--ui-space-4);
+    margin: var(--ui-space-4) 0 var(--ui-space-6);
+    overflow-x: auto;
+  }
+
+  .tabs a {
+    padding-bottom: var(--ui-space-1);
+    border-bottom: 1.5px solid transparent;
+    color: var(--ui-text-tertiary);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .tabs a[aria-current='page'] {
+    border-bottom-color: var(--ui-text);
+    color: var(--ui-text);
   }
 
 </style>

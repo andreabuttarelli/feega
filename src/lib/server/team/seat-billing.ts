@@ -40,6 +40,8 @@ export type SeatStatus = {
   endsAt: string | null;
   renewsAt: string | null;
   pricePerEditor: number;
+  seatsPaid: number | null;
+  seatsPaidUntil: string | null;
 };
 
 export type SeatCounts = { quantity: number; paid: number; editors: number };
@@ -240,7 +242,9 @@ export async function seatStatus(db: Db, orgId: string): Promise<SeatStatus> {
     grandfathered: !!org.editor_seats_grandfathered_at,
     endsAt: sub?.endsAt ?? null,
     renewsAt: sub?.periodEnd ?? null,
-    pricePerEditor: PLAN.price
+    pricePerEditor: PLAN.price,
+    seatsPaid: org.seats_paid ?? null,
+    seatsPaidUntil: org.seats_paid_until ?? null
   };
 }
 

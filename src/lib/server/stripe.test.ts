@@ -12,7 +12,9 @@ const pricesList = vi.fn();
 
 vi.mock('$env/dynamic/private', () => ({
 	env: {
-		STRIPE_SECRET_KEY: 'sk_test_123'
+		STRIPE_SECRET_KEY: 'sk_test_123',
+		STRIPE_PRICE_CLOUD_MONTHLY: 'price_cloud_m',
+		STRIPE_PRICE_CLOUD_ANNUAL: 'price_cloud_y'
 	}
 }));
 
@@ -332,6 +334,23 @@ describe('seatSubscription', () => {
 		const { seatSubscription } = await import('./stripe');
 
 		expect(await seatSubscription('sub_1')).toMatchObject({ perEditor: false, endsAt: null });
+	});
+});
+
+describe('cloudPriceId', () => {
+	it('reads the monthly and the annual Stripe price from the environment', async () => {
+		const { cloudPriceId } = await import('./stripe');
+		const { CloudInterval } = await import('$lib/cloud-pricing');
+
+		expect(cloudPriceId(CloudInterval.Monthly)).toBe('price_cloud_m');
+		expect(cloudPriceId(CloudInterval.Annual)).toBe('price_cloud_y');
+	});
+
+	it('treats a subscription on a Cloud price as per editor', async () => {
+		subscriptionsRetrieve.mockResolvedValue({ status: 'active', cancel_at: null, items: { data: [{ id: 'si_c', quantity: 2, price: { id: 'price_cloud_y', lookup_key: null } }] } });
+		const { seatSubscription } = await import('./stripe');
+
+		expect(await seatSubscription('sub_1')).toMatchObject({ perEditor: true, quantity: 2 });
 	});
 });
 
