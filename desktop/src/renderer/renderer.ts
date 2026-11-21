@@ -34,6 +34,8 @@ const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
 const STAGGER_MS = 50;
+const HERO_TITLE = 'start designing in your codebase';
+const HERO_LEAD = 'edit your running app like in figma. every change lands in your source.';
 const FACTS = ['free, forever', 'every edit a diff', 'no AI, no tokens'];
 
 const FRIENDLY: [RegExp, string][] = [
@@ -120,7 +122,7 @@ const accountMenu = (state: ShellState) => {
 
 const renderBar = (state: ShellState) => {
   if (!state.email && !state.skipped && state.tabs.length === 0) {
-    bar.replaceChildren(el('span', { class: 'grow' }));
+    bar.replaceChildren(el('span', { class: 'brand', html: `${mark(22)}<span>feega</span>` }), el('span', { class: 'grow' }));
     return;
   }
   const known = rendered;
@@ -160,7 +162,7 @@ const startView = (state: ShellState): View => ({
     const actions = state.signingIn
       ? [el('button', { class: 'pill waiting', text: 'waiting for your browser…' }), pill('cancel', 'outline', run(() => bridge.cancelSignIn()))]
       : [pill('sign in', 'primary', run(() => bridge.signIn())), pill('continue without account', 'outline', run(() => bridge.skip()))];
-    return el('div', { class: 'screen' }, el('h1', { class: 'display hero-title', text: 'feega' }), el('p', { class: 'lead', text: 'design in your codebase' }), el('div', { class: 'actions' }, ...actions), el('ul', { class: 'facts' }, ...FACTS.map((fact) => el('li', { text: fact }))), el('div', { class: 'band' }));
+    return el('div', { class: 'screen banded' }, el('h1', { class: 'display serif hero-title', text: HERO_TITLE }), el('p', { class: 'lead', text: HERO_LEAD }), el('div', { class: 'actions' }, ...actions), el('ul', { class: 'facts' }, ...FACTS.map((fact) => el('li', { text: fact }))), el('div', { class: 'band' }));
   }
 });
 
@@ -181,14 +183,15 @@ const openCard = () =>
 const dashboardView = (state: ShellState): View => ({
   key: 'dashboard',
   build: () => {
-    const empty = el('div', { class: 'empty' }, el('div', { class: 'band slim' }), el('h2', { class: 'display', text: 'no projects yet' }), el('p', { class: 'lead', text: 'open a folder and it shows up here' }));
-    return el(
+    const empty = el('div', { class: 'empty' }, el('h2', { class: 'display', text: 'no projects yet' }), el('p', { class: 'lead', text: 'open a folder and it shows up here' }));
+    const page = el(
       'div',
       { class: 'dash' },
       el('div', { class: 'dash-head' }, el('div', {}, el('p', { class: 'kicker', text: 'feega desktop' }), el('h1', { class: 'display page-title', text: 'projects' })), pill('open folder', 'primary', run(() => bridge.pickFolder()))),
       el('div', { class: 'grid' }, openCard(), ...state.recents.map(recentCard)),
       ...(state.recents.length ? [] : [empty])
     );
+    return state.recents.length ? page : el('div', { class: 'frame' }, page, el('div', { class: 'band' }));
   }
 });
 
