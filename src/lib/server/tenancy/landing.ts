@@ -8,6 +8,7 @@ import { ORG_COOKIE } from '$lib/server/tenancy/context';
 import { CURRENT_TERMS_VERSION } from '$lib/legal-links';
 import { ProductEvent, track } from '$lib/server/product-events/track';
 import { markSignedUp } from '$lib/server/core-usage';
+import { onboardingPathFor } from '$lib/server/onboarding/onboarding';
 
 export const INVITE_PARAM = 'invite_token';
 export const INVITE_ERROR_PARAM = 'invite_error';
@@ -18,9 +19,10 @@ export type LandingDeps = {
   acceptInvite: typeof acceptInvite;
   homePathFor: typeof homePathFor;
   track: typeof track;
+  onboardingPathFor: typeof onboardingPathFor;
 };
 
-const LANDING_DEPS: LandingDeps = { ensureProfile, recordTermsAcceptance, acceptInvite, homePathFor, track };
+const LANDING_DEPS: LandingDeps = { ensureProfile, recordTermsAcceptance, acceptInvite, homePathFor, track, onboardingPathFor };
 
 async function recordFirstAcceptance(db: Db, deps: LandingDeps, userId: string, termsAcceptedAt: string | null) {
   if (termsAcceptedAt) {
@@ -47,7 +49,9 @@ export async function landingPath(
   await recordFirstAcceptance(db, deps, user.id, profile.termsAcceptedAt);
 
   if (!inviteToken) {
-    return deps.homePathFor(db, ENTRY_DEPS, user, cookies.get(ORG_COOKIE) ?? null);
+    const chosenOrgId = cookies.get(ORG_COOKIE) ?? null;
+    const home = await deps.homePathFor(db, ENTRY_DEPS, user, chosenOrgId);
+    return (await deps.onboardingPathFor(db, user, chosenOrgId, home)) ?? home;
   }
 
   const result = await deps.acceptInvite({ token: inviteToken, userId: user.id, email: user.email ?? '' });
@@ -57,5 +61,6 @@ export async function landingPath(
 
   await deps.track(ProductEvent.TeamInviteAccepted, { userId: user.id, orgId: result.orgId }, { role: result.role });
 
-  return deps.homePathFor(db, ENTRY_DEPS, user, result.orgId);
+  const home = await deps.homePathFor(db, ENTRY_DEPS, user, result.orgId);
+  return (await deps.onboardingPathFor(db, user, result.orgId, home)) ?? home;
 }
