@@ -2,7 +2,7 @@ import { safeStorage, shell } from 'electron';
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { type Account } from '../../../inspect/src/host/account';
-import { SignInEnd, signIn } from '../../../inspect/src/host/sign-in';
+import { SignInClient, SignInEnd, signIn } from '../../../inspect/src/host/sign-in';
 
 export function accountStore(userData: string) {
   const path = join(userData, 'account.bin');
@@ -36,7 +36,7 @@ export function accountStore(userData: string) {
       const mine = (signing = new AbortController());
       waiting = true;
       changed();
-      const outcome = await signIn({ openBrowser: (url) => shell.openExternal(url), signal: mine.signal });
+      const outcome = await signIn({ client: SignInClient.Desktop, openBrowser: (url) => shell.openExternal(url), signal: mine.signal });
       if (signing === mine) {
         waiting = false;
       }
