@@ -244,13 +244,11 @@ describe('the images', () => {
     }
   });
 
-  it.each(AGENT_SLUGS.filter((s) => s.endsWith('claude-code')))('%s uses the Feega next to Claude Code screenshot', (slug) => {
-    expect(shots(ALTERNATIVES[slug]).some((s) => s.src.endsWith('feega-claude-code.webp'))).toBe(true);
-  });
-
-  it.each(AGENT_SLUGS.filter((s) => !s.endsWith('claude-code')))('%s marks the agent panel as illustrative', (slug) => {
-    const composite = shots(ALTERNATIVES[slug]).find((s) => /feega-(codex|cursor)\.webp$/.test(s.src));
-    expect(composite?.alt.toLowerCase()).toContain('illustrative');
+  it.each(CHECKED_SLUGS)('%s shows no composed agent panel', (slug) => {
+    for (const s of shots(ALTERNATIVES[slug])) {
+      expect(s.src).not.toMatch(/feega-(codex|cursor|claude-code)\.webp$/);
+      expect(`${s.alt} ${s.caption}`.toLowerCase()).not.toMatch(/illustrative|composite/);
+    }
   });
 });
 

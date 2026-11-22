@@ -6,6 +6,7 @@ export enum EditorShotId {
   Responsive = 'tablet',
   React = 'react',
   Vue = 'vue',
+  Nuxt = 'nuxt',
   SvelteKit = 'sveltekit'
 }
 
@@ -57,6 +58,7 @@ export const EDITOR_SHOTS: Readonly<Record<EditorShotId, EditorShot>> = {
   },
   [EditorShotId.React]: frameworkShot(EditorShotId.React, 'react', 'React', 'App.jsx'),
   [EditorShotId.Vue]: frameworkShot(EditorShotId.Vue, 'vue', 'Vue', 'App.vue'),
+  [EditorShotId.Nuxt]: frameworkShot(EditorShotId.Nuxt, 'nuxt', 'Nuxt 4', 'app.vue'),
   [EditorShotId.SvelteKit]: frameworkShot(EditorShotId.SvelteKit, 'sveltekit', 'SvelteKit', '+page.svelte')
 };
 

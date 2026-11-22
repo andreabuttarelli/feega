@@ -31,7 +31,7 @@ export const TAILWIND: Topic = {
       heading: 'What Feega will not rewrite',
       html: `<p><strong>Classes built in code.</strong> <code>cn()</code>, <code>clsx()</code>, <code>twMerge()</code>, template literals and Svelte or Vue class expressions are code. Feega reports "class is not a literal, not written" with the file and line, and leaves them for you. Libraries like shadcn/ui use <code>cn()</code> inside their primitives, so editing those needs a person.</p>
 <p><strong>Variants other than width.</strong> <code>hover:</code>, <code>dark:</code> and <code>group-*</code> classes are not chosen by the breakpoint logic. Feega edits the class that is active for the width and leaves state variants alone.</p>
-<p><strong>A v3 config theme.</strong> Tokens are read from CSS: <code>@theme</code> in Tailwind v4 and the variables in your global stylesheet. Feega 0.2.2 does not read <code>tailwind.config.js</code>, so custom v3 theme names may come out as arbitrary values. The class still works; it just isn't your name for it.</p>
+<p><strong>A v3 config theme.</strong> Tokens are read from CSS: <code>@theme</code> in Tailwind v4 and the variables in your global stylesheet. Feega reads <code>tailwind.config.js</code> for breakpoints and themes but not for tokens, so custom v3 theme names may come out as arbitrary values. The class still works; it just isn't your name for it.</p>
 <p><strong>Raw HTML.</strong> Elements from <code>dangerouslySetInnerHTML</code>, <code>{@html}</code> or <code>v-html</code> have no line of their own. In Tailwind mode Feega refuses and says to style them from the parent.</p>`
     },
     {
