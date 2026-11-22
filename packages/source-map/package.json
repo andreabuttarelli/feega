@@ -1,6 +1,6 @@
 {
   "name": "feega-source-map",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Dev-only plugins that tag every element with the file:line:col that wrote it, so Feega can open the source behind what you click.",
   "license": "Apache-2.0",
   "type": "module",
