@@ -3982,10 +3982,16 @@ document.querySelectorAll('.fl-modal:not([data-ready])').forEach((root) => {
     root.style.setProperty('--n', String(i));
   }
 
+  function mount(root) {
+    if (!root.hasAttribute('data-ready')) {
+      root.setAttribute('data-ready', '');
+      build(root, root.dataset.reveal === 'char' ? 'char' : 'word');
+    }
+    return track(root);
+  }
+
   document.querySelectorAll('.fl-scroll-reveal-text .reveal:not([data-ready])').forEach((root) => {
-    root.setAttribute('data-ready', '');
-    build(root, root.dataset.reveal === 'char' ? 'char' : 'word');
-    track(root);
+    mount(root);
   });
 })();
 </script>
@@ -4070,10 +4076,16 @@ document.querySelectorAll('.fl-modal:not([data-ready])').forEach((root) => {
     root.style.setProperty('--n', String(i));
   }
 
+  function mount(root) {
+    if (!root.hasAttribute('data-ready')) {
+      root.setAttribute('data-ready', '');
+      build(root, root.dataset.reveal === 'char' ? 'char' : 'word');
+    }
+    return track(root);
+  }
+
   document.querySelectorAll('.fl-scroll-reveal-text .reveal:not([data-ready])').forEach((root) => {
-    root.setAttribute('data-ready', '');
-    build(root, root.dataset.reveal === 'char' ? 'char' : 'word');
-    track(root);
+    mount(root);
   });
 })();
 </script>
