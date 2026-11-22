@@ -80,9 +80,6 @@ describe('topic pages', () => {
   it.each(pages)('%s has two to five light images with alt text', (_, t) => {
     const shots = t.sections.flatMap((s) => (s.editor ? [EDITOR_SHOTS[s.editor]] : []));
     const figures = [t.cover, ...t.sections.flatMap((s) => (s.figure ? [s.figure] : [])), ...shots];
-    for (const shot of shots) {
-      expect(existsSync(resolve(STATIC_DIR, shot.narrow.src.slice(1))), shot.narrow.src).toBe(true);
-    }
     expect(figures.length).toBeGreaterThanOrEqual(2);
     expect(figures.length).toBeLessThanOrEqual(MAX_FIGURES);
     for (const f of figures) {

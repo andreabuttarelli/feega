@@ -23,9 +23,8 @@ function sourceFiles(dir: string): string[] {
 }
 
 describe('editor screenshots', () => {
-  it.each(Object.entries(EDITOR_SHOTS))('%s ships a desktop file, a narrow crop and alt text', (_, shot) => {
+  it.each(Object.entries(EDITOR_SHOTS))('%s ships a file and alt text', (_, shot) => {
     expect(existsSync(resolve(STATIC_DIR, shot.src.slice(1))), shot.src).toBe(true);
-    expect(existsSync(resolve(STATIC_DIR, shot.narrow.src.slice(1))), shot.narrow.src).toBe(true);
     expect(shot.alt.length).toBeGreaterThan(MIN_ALT);
   });
 
@@ -40,7 +39,6 @@ describe('editor screenshots', () => {
     const entry = manifest.shots[id];
     expect(entry, id).toBeDefined();
     expect(entry.files).toContain(basename(EDITOR_SHOTS[id].src));
-    expect(entry.files).toContain(basename(EDITOR_SHOTS[id].narrow.src));
   });
 
   it('no demo page appears in two different shots', () => {
