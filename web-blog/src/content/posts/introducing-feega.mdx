@@ -1,42 +1,59 @@
 ---
 title: Introducing Feega
-description: One canvas for design, motion and AI. Open source, and one command away.
+description: Feega is a free, open-source VS Code extension. Click an element in your running app, edit it, and the change is written to your source.
 date: 2026-10-27
+updated: 2026-11-22
 cover: /covers/introducing-feega.png
-coverAlt: "Feega cover: one canvas for design, motion and AI"
-tags: [announcement, canvas, open-source]
+coverAlt: "Cover: Design in your codebase"
+tags: [announcement, open-source]
 ---
 
-import DemoVideo from '../../components/DemoVideo.astro';
+Design and code live in different places. You adjust a padding in a design tool, someone translates it into code, and details get lost on the way. Or you ask an agent for a change as small as four pixels and wait for a prompt to come back.
 
-Making a piece of visual content today means a relay race between tools. You sketch in one, animate in another, generate an image somewhere else, then export, re-import and lose the thread every time you hand something over.
+Feega closes that gap. It is a free, open-source VS Code extension to **design in your codebase.**
 
-Feega is our answer: **one canvas for design, motion and AI.**
+This post first went up on 27 October, when Feega was a different product: a canvas with motion and AI generation. We removed all of it on 20 November. [Why Feega is now one thing](/posts/design-in-your-codebase/) tells that story. What follows describes Feega as it is today.
 
-## One canvas
+## How it works
 
-Everything lives on the same infinite canvas. Frames you design, scenes you animate and media you generate sit side by side, so you can see the whole piece at once and move material between its parts without exporting anything.
+Run your app through Feega and click an element. Edit it in the right bar: text, size, spacing, layout, colour, gradients, radius, shadows, typography and position. The preview updates, and so does the file.
 
-<DemoVideo name="combine-scenes" caption="Scenes combined on the canvas." />
+Feega starts your dev server and, in development only, tags each element with the file, line and column it came from. A click on the page lands on a line of source.
 
-## Design, motion and AI together
+## The change is a diff
 
-Design and motion are not two apps glued together. A frame you lay out is the same frame you animate, and the timeline works on the elements you already have.
+Feega writes the edit the way you would, in the system your project already uses: a Tailwind class, a rule in a CSS module, a scoped style. Every edit shows up in Changes, where you can review it, undo it or revert it.
 
-AI is part of the canvas, not a separate destination. You can ask for an image, a video or a change from the chat beside your work, and the result lands on the canvas where you can keep editing it by hand.
+There is no AI in the loop, no tokens and no account needed. It sits next to the agent you already use: you adjust, your agent codes, same files.
+
+## What you can do
+
+- **Layers.** The element tree of your page. Select from it, reorder siblings, hide or lock rows.
+- **Breakpoints.** Pick full, desktop, tablet or phone width. In a Tailwind project the edit goes to the class that applies at that width.
+- **Changes.** Every edit as a diff in your source.
+- **Plugins.** A mesh gradient that writes plain CSS, a 3D object you place on an element, and more. You choose which ones are on, and each lists the permissions it asks for.
+- **Templates.** A free [library of sections, components and app screens](https://www.feega.app/templates), each in Svelte, React, Vue, Astro and HTML.
+
+## What it works with
+
+React and Next.js, Vue and Nuxt, Svelte and SvelteKit, Astro, React Router and Vite, styled with Tailwind, CSS modules, scoped styles or plain CSS. It runs in VS Code, Cursor, Windsurf and VSCodium on macOS, Windows and Linux, or in any browser with `npx feega`.
+
+It does not write everything. Class names built by an expression, and text that comes from data rather than markup, are refused with a message that points at the line. The [docs](https://docs.feega.app) list the limits per framework.
 
 ## Open source
 
-Feega is open source. You can read how it works, follow what we build, open an issue or send a pull request. The code is on [GitHub](https://github.com/andreabuttarelli/feega).
+Feega is Apache-2.0. You can read how it works, follow what we build, open an issue or send a pull request. The code is on [GitHub](https://github.com/andreabuttarelli/feega).
+
+Feega Cloud is planned for later. The extension stays free. See [pricing](https://www.feega.app/pricing).
 
 ## Try it
 
-One command gets you started:
+Install it from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=andreabuttarelli.feega), or [Open VSX](https://open-vsx.org/extension/AndreaButtarelli/feega) for Cursor, Windsurf and VSCodium. Or run this in your app folder:
 
 ```bash
 npx feega
 ```
 
-From there, the [docs](https://docs.feega.app) walk through the canvas, motion and the AI tools. If you want to talk to us, or show what you made, join us on [Discord](https://discord.gg/PUp37DG6vr).
+The [docs](https://docs.feega.app) have a quick start and a page per framework. If you want to talk to us, or show what you made, join us on [Discord](https://discord.gg/PUp37DG6vr).
 
-We are building Feega in public, and this blog is where we will write about it.
+We are building Feega in public, and this blog is where we write about it.
