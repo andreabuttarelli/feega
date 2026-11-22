@@ -12,6 +12,7 @@ import { Launch } from './launch';
 import { Verdict, verdictOf } from './candidate';
 import { until, type Probes, type Watched } from './ready';
 import { stampedDev } from './stamped-dev';
+import { commandShown } from './server-info';
 
 export { Launch };
 
