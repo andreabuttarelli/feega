@@ -1,0 +1,36 @@
+{
+  "id": "blog-cards",
+  "name": "Blog cards",
+  "description": "Three article cards with cover, tag, date, title and reading time.",
+  "category": "section",
+  "tags": [
+    "blog",
+    "articles",
+    "cards"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    },
+    {
+      "family": "Fragment Mono",
+      "weights": [
+        400
+      ]
+    }
+  ],
+  "tier": "free"
+}

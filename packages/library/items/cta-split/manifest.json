@@ -1,0 +1,29 @@
+{
+  "id": "cta-split",
+  "name": "CTA, split",
+  "description": "Headline left, two actions right, on an accent field.",
+  "category": "section",
+  "tags": [
+    "cta",
+    "conversion"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    }
+  ],
+  "tier": "free"
+}

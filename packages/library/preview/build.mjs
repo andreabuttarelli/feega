@@ -4,9 +4,9 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (...parts) => readFileSync(join(ROOT, ...parts), 'utf8');
-const FONTS = '../../../landing/static/site/fonts';
+const FONTS = 'https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&family=Fragment+Mono&display=swap';
 const THEMES = ['light', 'dark'];
-const ID_ATTRIBUTES = /\b(id|for|aria-controls|aria-labelledby)="([^"]+)"/g;
+const ID_ATTRIBUTES = /\b(id|for|name|aria-controls|aria-labelledby|aria-describedby)="([^"]+)"/g;
 
 const ids = readdirSync(join(ROOT, 'items'), { withFileTypes: true })
   .filter((entry) => entry.isDirectory())
@@ -41,11 +41,10 @@ const html = `<!doctype html>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Feega library, basic</title>
+<link rel="stylesheet" href="${FONTS}" />
 <style>
-@font-face{font-family:"BDO Grotesk";src:url("${FONTS}/bdo-grotesk-variable.woff2") format("woff2");font-weight:300 900}
-@font-face{font-family:"Fragment Mono";src:url("${FONTS}/fragment-mono-latin.woff2") format("woff2")}
 ${read('tokens.css')}
-body{margin:0;padding:2rem 1rem;background:#0b0b0b;color:#f0eee9;font-family:"BDO Grotesk",system-ui,sans-serif;letter-spacing:-0.02em}
+body{margin:0;padding:2rem 1rem;background:#0b0b0b;color:#f0eee9;font-family:"Inter Tight",system-ui,sans-serif;letter-spacing:-0.02em}
 .intro{max-width:80rem;margin:0 auto 4rem}
 .intro h1{margin:0;font-size:clamp(3rem,9vw,7rem);font-weight:500;line-height:.9;letter-spacing:-0.05em}
 .intro p{margin:1rem 0 0;color:#a3a09a;font-size:1.125rem}

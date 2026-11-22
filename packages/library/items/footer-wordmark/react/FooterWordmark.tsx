@@ -1,0 +1,24 @@
+import './FooterWordmark.css';
+
+export function FooterWordmark() {
+  return (
+    <footer className="fl-footer-wordmark">
+      <div className="fl-container top">
+        <ul>
+          <li><a href="#">product</a></li>
+          <li><a href="#">pricing</a></li>
+          <li><a href="#">docs</a></li>
+          <li><a href="#">blog</a></li>
+        </ul>
+        <ul>
+          <li><a href="#">GitHub</a></li>
+          <li><a href="#">X</a></li>
+          <li><a href="#">LinkedIn</a></li>
+        </ul>
+        <p>hi@example.com</p>
+      </div>
+      <p className="mark" aria-hidden="true">yourbrand</p>
+      <div className="fl-container legal"><span>© 2026 Yourbrand</span><span><a href="#">privacy</a> · <a href="#">terms</a></span></div>
+    </footer>
+  );
+}

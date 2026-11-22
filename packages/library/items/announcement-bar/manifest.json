@@ -1,0 +1,35 @@
+{
+  "id": "announcement-bar",
+  "name": "Announcement bar",
+  "description": "Thin bar above the navbar for a launch or notice, with a link.",
+  "category": "section",
+  "tags": [
+    "banner",
+    "announcement"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    },
+    {
+      "family": "Fragment Mono",
+      "weights": [
+        400
+      ]
+    }
+  ],
+  "tier": "free"
+}

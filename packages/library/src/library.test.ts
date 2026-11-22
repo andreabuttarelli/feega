@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { compile } from 'svelte/compiler';
 import ts from 'typescript';
 import {
 	CATEGORIES,
+	GOOGLE_FONTS,
 	ITEMS_DIR,
 	REQUIRED_FRAMEWORKS,
 	TOKENS_FILE,
@@ -26,12 +29,51 @@ const VALID_MANIFEST = {
 	tags: [],
 	frameworks: ['svelte', 'react', 'vue', 'astro'],
 	dependencies: [],
+	fonts: [{ family: 'Inter Tight', weights: [400] }],
 	tier: 'free'
 };
+const FONT_FAMILIES = /--feega-font(?:-[a-z]+)?:\s*([^;]+);/g;
+const FAMILY_NAME = /"([^"]+)"/g;
+const SYSTEM_FAMILIES = ['SF Mono', 'Segoe UI', 'Helvetica Neue'];
+const SANS = 'Inter Tight';
+const MONO = 'Fragment Mono';
+const PREVIEW_DIR = join(ITEMS_DIR, '..', 'preview');
+const AA = 4.5;
+const CONTRAST_PAIRS = [
+	['accent', 'accent-fg'],
+	['accent-hover', 'accent-fg'],
+	['danger', 'danger-fg'],
+	['accent-soft', 'accent-text'],
+	['success-soft', 'success'],
+	['danger-soft', 'danger'],
+	['raised', 'fg-subtle']
+];
+
+function tokenFamilies(): string[] {
+	return [...tokens.matchAll(FONT_FAMILIES)].flatMap((m) => [...m[1].matchAll(FAMILY_NAME)].map((f) => f[1]));
+}
+
+function themes(): Record<string, string>[] {
+	return tokens
+		.split(/@media|\[data-theme="dark"\] {/)
+		.map((block) => Object.fromEntries([...block.matchAll(/--feega-([a-z-]+):\s*(#[0-9a-f]{6});/g)].map((m) => [m[1], m[2]])));
+}
+
+function luminance(hex: string): number {
+	const [r, g, b] = [1, 3, 5]
+		.map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+		.map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+	return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function contrast(a: string, b: string): number {
+	const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+	return (hi + 0.05) / (lo + 0.05);
+}
 
 describe('library items', () => {
-	it('ships about twenty items', () => {
-		expect(items.length).toBeGreaterThanOrEqual(20);
+	it('ships about sixty items', () => {
+		expect(items.length).toBeGreaterThanOrEqual(60);
 	});
 
 	it('has one folder per manifest id', () => {
@@ -48,6 +90,9 @@ describe('library items', () => {
 		expect(parseManifest({ ...VALID_MANIFEST, preview: 'https://example.com/x.png' }).preview).toBe('https://example.com/x.png');
 		expect(() => parseManifest({ ...VALID_MANIFEST, preview: 3 })).toThrow();
 		expect(() => parseManifest({ ...VALID_MANIFEST, frameworks: ['html'] })).toThrow();
+		expect(() => parseManifest({ ...VALID_MANIFEST, fonts: undefined })).toThrow();
+		expect(() => parseManifest({ ...VALID_MANIFEST, fonts: [{ family: 'BDO Grotesk', weights: [400] }] })).toThrow();
+		expect(() => parseManifest({ ...VALID_MANIFEST, fonts: [{ family: SANS, weights: [] }] })).toThrow();
 	});
 
 	it('covers every category', () => {
@@ -95,6 +140,13 @@ describe('library items', () => {
 				}
 			});
 
+			it('lists every font family it renders', () => {
+				const families = item.fonts.map((font) => font.family);
+				const source = readFileSync(itemFiles(item, 'html')[1], 'utf8');
+				expect(families).toContain(SANS);
+				expect(families.includes(MONO)).toBe(source.includes('--feega-font-mono'));
+			});
+
 			it('has a compiling svelte component', () => {
 				const file = itemFiles(item, 'svelte').find((f) => f.endsWith('.svelte'))!;
 				expect(() => compile(readFileSync(file, 'utf8'), { filename: file })).not.toThrow();
@@ -129,6 +181,19 @@ describe('library items', () => {
 });
 
 describe('tokens.css', () => {
+	it('uses only Google Fonts families or system stacks', () => {
+		const families = new Set(tokenFamilies().filter((family) => !SYSTEM_FAMILIES.includes(family)));
+		expect([...families].sort()).toEqual([...GOOGLE_FONTS].sort());
+	});
+
+	it('reaches AA contrast for text on fills, in both themes', () => {
+		for (const theme of themes()) {
+			for (const [bg, fg] of CONTRAST_PAIRS) {
+				expect(contrast(theme[bg], theme[fg]), `${fg} on ${bg}`).toBeGreaterThanOrEqual(AA);
+			}
+		}
+	});
+
 	it('declares a light and a dark theme', () => {
 		expect(tokens).toContain('[data-theme="dark"]');
 		expect(tokens).toContain('prefers-color-scheme: dark');
@@ -140,4 +205,12 @@ describe('tokens.css', () => {
 			expect(tokens.includes(`--feega-${name}:`), name).toBe(true);
 		}
 	});
+});
+
+describe('preview', () => {
+	it('has no horizontal overflow at 360, 375, 768, 1024 and 1280', async () => {
+		execFileSync('node', [join(PREVIEW_DIR, 'build.mjs')]);
+		const { findOverflow } = await import('../preview/overflow.mjs');
+		expect(await findOverflow()).toEqual([]);
+	}, 120_000);
 });

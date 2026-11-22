@@ -47,7 +47,7 @@
 .fl-modal h2{font-size:1.375rem;font-weight:600;letter-spacing:-0.04em}
 .fl-modal form p{color:var(--feega-fg-muted)}
 .fl-modal .actions{display:flex;justify-content:flex-end;gap:var(--feega-space-2);margin-top:var(--feega-space-4)}
-.fl-modal .danger{border-color:var(--feega-danger);background:var(--feega-danger);color:var(--feega-accent-fg)}
+.fl-modal .danger{border-color:var(--feega-danger);background:var(--feega-danger);color:var(--feega-danger-fg)}
 .fl-modal .danger:hover{border-color:var(--feega-danger);background:var(--feega-danger);opacity:0.88}
 @media (prefers-reduced-motion:reduce){:where([class^="fl-"]) *,:where([class^="fl-"]) *::before,:where([class^="fl-"]) *::after{animation:none!important;transition:none!important}}
 </style>

@@ -9,6 +9,15 @@ export const CATEGORIES = ['section', 'component', 'app'] as const;
 export type Framework = (typeof FRAMEWORKS)[number];
 export const TIERS = ['free', 'pro'] as const;
 
+export const GOOGLE_FONTS = ['Inter Tight', 'Fragment Mono'] as const;
+
+export type GoogleFont = (typeof GOOGLE_FONTS)[number];
+
+export interface FontNeed {
+	family: GoogleFont;
+	weights: number[];
+}
+
 export type Category = (typeof CATEGORIES)[number];
 export type Tier = (typeof TIERS)[number];
 
@@ -20,6 +29,7 @@ export interface LibraryItem {
 	tags: string[];
 	frameworks: Framework[];
 	dependencies: string[];
+	fonts: FontNeed[];
 	tier: Tier;
 	preview?: string;
 }
@@ -27,6 +37,19 @@ export interface LibraryItem {
 const PACKAGE_DIR = join(dirname(fileURLToPath(import.meta.url)), '..');
 export const ITEMS_DIR = join(PACKAGE_DIR, 'items');
 export const TOKENS_FILE = join(PACKAGE_DIR, 'tokens.css');
+
+function isFontList(value: unknown): value is FontNeed[] {
+	return (
+		Array.isArray(value) &&
+		value.every(
+			(font) =>
+				GOOGLE_FONTS.includes(font?.family) &&
+				Array.isArray(font.weights) &&
+				font.weights.length > 0 &&
+				font.weights.every((weight: unknown) => Number.isInteger(weight))
+		)
+	);
+}
 
 function isStringList(value: unknown): value is string[] {
 	return Array.isArray(value) && value.every((entry) => typeof entry === 'string');
@@ -44,6 +67,7 @@ export function parseManifest(raw: unknown): LibraryItem {
 		m.frameworks.every((f) => FRAMEWORKS.includes(f as Framework)) &&
 		REQUIRED_FRAMEWORKS.every((f) => (m.frameworks as string[]).includes(f)) &&
 		isStringList(m.dependencies) &&
+		isFontList(m.fonts) &&
 		TIERS.includes(m.tier as Tier) &&
 		(m.preview === undefined || typeof m.preview === 'string');
 	if (!valid) {

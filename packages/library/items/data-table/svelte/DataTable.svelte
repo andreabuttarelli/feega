@@ -61,7 +61,7 @@
 .fl-data-table .search:focus-within{box-shadow:inset 0 0 0 1px var(--feega-accent),0 0 0 3px var(--feega-accent-soft)}
 .fl-data-table .search .fl-px{width:12px}
 .fl-data-table .search input{width:10rem;border:0;background:transparent;color:var(--feega-fg);font:inherit;font-size:var(--feega-text-sm);outline:none}
-.fl-data-table .scroll{overflow-x:auto;border:1px solid var(--feega-line);border-radius:var(--feega-radius-md)}
+.fl-data-table .scroll{position:relative;overflow-x:auto;border:1px solid var(--feega-line);border-radius:var(--feega-radius-md)}
 .fl-data-table table{width:100%;min-width:40rem;border-collapse:collapse;font-size:var(--feega-text-sm)}
 .fl-data-table th{padding:10px 16px;background:var(--feega-surface);color:var(--feega-fg-subtle);font-family:var(--feega-font-mono);font-size:11px;font-weight:400;letter-spacing:0.02em;text-align:left;text-transform:uppercase}
 .fl-data-table td{padding:12px 16px;border-top:1px solid var(--feega-line);color:var(--feega-fg-muted);transition:background-color var(--feega-dur-fast) var(--feega-ease)}
