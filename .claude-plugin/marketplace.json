@@ -12,7 +12,7 @@
       "name": "feega",
       "source": "./",
       "description": "Set up a web project for Feega visual editing, start the editor, and write markup Feega can edit back into source.",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "author": { "name": "Andrea Buttarelli" },
       "homepage": "https://docs.feega.app",
       "repository": "https://github.com/andreabuttarelli/feega",
