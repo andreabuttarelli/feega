@@ -57,8 +57,14 @@ jobs:
       - run: npx vitest run --root . --dir desktop desktop/src
       - run: npm run build
         working-directory: desktop
-      - run: npx electron-builder ${{ matrix.targets }} --publish never
+      - run: npx electron-builder --config electron-builder.config.cjs ${{ matrix.targets }} --publish never
         working-directory: desktop
+        env:
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
       - name: Update manifests for the macOS self-updater
         if: startsWith(matrix.name, 'mac-')
         run: node scripts/mac-manifest.cjs fragments release
