@@ -47,7 +47,7 @@ export const FAQ = [
   },
   {
     q: "Which editors and frameworks does it support?",
-    a: "VS Code, Cursor, Windsurf and VSCodium. React, Next.js, SvelteKit and Vue, styled with Tailwind or plain CSS."
+    a: "VS Code, Cursor, Windsurf and VSCodium. React, Next.js, SvelteKit, Vue, Nuxt, React Router, Astro and Vite, styled with Tailwind or plain CSS."
   },
   {
     q: "Does it need an AI agent?",

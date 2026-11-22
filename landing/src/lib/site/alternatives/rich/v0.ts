@@ -73,6 +73,6 @@ export const V0: Rich = {
     { q: 'Can I use both?', a: 'Yes. Both end in your source files. Commit between sessions to keep diffs readable.' },
     { q: 'Does Feega open pull requests?', a: 'No. It writes files and you commit as usual.' },
     { q: 'Do I need Vercel for Feega?', a: 'No. It is independent of where you host.' },
-    { q: 'Which frameworks does Feega support?', a: 'SvelteKit, React, Next.js and Vue, with CSS or Tailwind.' }
+    { q: 'Which frameworks does Feega support?', a: 'SvelteKit, React, Next.js, Vue, Nuxt, React Router, Astro and Vite, with CSS or Tailwind.' }
   ]
 };

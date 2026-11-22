@@ -14,7 +14,7 @@ import { VSCODIUM } from './integrations/vscodium';
 
 export const FOR_HUB: Hub = {
   path: '/for',
-  title: 'Visual editing for React, Next.js, SvelteKit and Vue | Feega',
+  title: 'Visual editing for React, Vue, Nuxt and more | Feega',
   description: 'How Feega maps a click to your source in each framework, what it writes back (Tailwind, CSS modules or <style>) and where it stops.',
   heading: 'Feega for your framework',
   menuLabel: 'frameworks',

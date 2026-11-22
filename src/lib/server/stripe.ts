@@ -2,6 +2,7 @@ import { env } from '$env/dynamic/private';
 import Stripe from 'stripe';
 import { createAdminClient } from './supabase-admin';
 import { PLAN, PLAN_CURRENCY, planForLookupKey, type Plan } from '$lib/credit-ladder';
+import { CloudInterval, type CloudIntervalName } from '$lib/cloud-pricing';
 import { formatCredits } from '$lib/components/credit-amount-format';
 
 let client: Stripe | null = null;
@@ -38,6 +39,19 @@ async function fetchPlanPriceId(): Promise<string | undefined> {
   return data.find((price) => price.currency === PLAN_CURRENCY && price.unit_amount === PLAN.price * CENTS_PER_UNIT)?.id;
 }
 
+const CLOUD_PRICE_ENV: Record<CloudIntervalName, () => string | undefined> = {
+  [CloudInterval.Monthly]: () => env.STRIPE_PRICE_CLOUD_MONTHLY,
+  [CloudInterval.Annual]: () => env.STRIPE_PRICE_CLOUD_ANNUAL
+};
+
+export function cloudPriceId(interval: CloudIntervalName): string | undefined {
+  return CLOUD_PRICE_ENV[interval]() || undefined;
+}
+
+const isCloudPrice = (priceId: string): boolean => Object.values(CloudInterval).some((interval) => !!priceId && cloudPriceId(interval) === priceId);
+
+const isPerEditor = (price: { id: string; lookup_key: string | null }): boolean => price.lookup_key === PLAN.lookupKey || isCloudPrice(price.id);
+
 export async function subscriptionPriceId(): Promise<string | undefined> {
   planPriceId ??= fetchPlanPriceId().catch((e) => {
     planPriceId = null;
@@ -56,12 +70,14 @@ export enum SeatProration {
   Invoice = 'always_invoice'
 }
 
-export type SeatSubscription = { itemId: string; quantity: number; perEditor: boolean; status: string; endsAt: string | null; periodEnd: string | null };
+const INTERVAL_OF_STRIPE: Record<string, CloudInterval> = { month: CloudInterval.Monthly, year: CloudInterval.Annual };
+
+export type SeatSubscription = { itemId: string; quantity: number; perEditor: boolean; status: string; endsAt: string | null; periodEnd: string | null; interval: CloudInterval | null };
 
 export async function seatSubscription(subscriptionId: string): Promise<SeatSubscription | null> {
   const sub = await stripe().subscriptions.retrieve(subscriptionId);
   const items = sub.items.data;
-  const item = items.find((i) => i.price.lookup_key === PLAN.lookupKey) ?? items[0];
+  const item = items.find((i) => isPerEditor(i.price)) ?? items[0];
   if (!item) {
     return null;
   }
@@ -69,7 +85,8 @@ export async function seatSubscription(subscriptionId: string): Promise<SeatSubs
   return {
     itemId: item.id,
     quantity: item.quantity ?? 1,
-    perEditor: item.price.lookup_key === PLAN.lookupKey,
+    perEditor: isPerEditor(item.price),
+    interval: INTERVAL_OF_STRIPE[item.price.recurring?.interval ?? ''] ?? null,
     status: sub.status,
     endsAt: sub.cancel_at ? new Date(sub.cancel_at * 1000).toISOString() : null,
     periodEnd: item.current_period_end ? new Date(item.current_period_end * 1000).toISOString() : null
