@@ -30,14 +30,18 @@ body[data-mode="still"] #still, body[data-mode="video"] #video { display: block;
 .eyebrow::before { content: ''; width: 9px; height: 9px; background: var(--orange); }
 .title { font-weight: 600; letter-spacing: -.055em; line-height: .9; color: var(--ink); }
 
-#still .lockup { position: absolute; left: 64px; top: 58px; height: 44px; }
-#still .eyebrow { position: absolute; left: 66px; top: 268px; }
-#still .title { position: absolute; left: 60px; top: 302px; font-size: 96px; }
-#still .shot { position: absolute; left: 620px; top: 100px; width: 640px; height: 537px; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 0 rgb(0 0 0 / .06), 0 30px 60px -20px rgb(30 20 10 / .35); background: var(--chrome); }
-#still .shot img { position: absolute; left: -155px; top: 0; width: 860px; }
-#still .diff { position: absolute; left: 700px; top: 432px; width: 330px; border-radius: 10px; background: var(--chrome); color: var(--chrome-text); font-family: 'Fragment Mono', monospace; font-size: 17px; box-shadow: 0 24px 50px -16px rgb(30 20 10 / .45); overflow: hidden; }
-.diff .file { padding: 12px 16px; color: var(--chrome-dim); font-size: 13px; border-bottom: 1px solid var(--chrome-line); }
-.diff .line { padding: 7px 16px; white-space: pre; }
+#still .lockup { position: absolute; left: 72px; top: 64px; height: 38px; display: flex; align-items: center; gap: 10px; }
+#still .lockup .mark { height: 100%; }
+#still .lockup .mark svg { height: 100%; width: auto; }
+#still .lockup .name { font-weight: 600; font-size: 34px; letter-spacing: -.04em; line-height: 1; color: var(--ink); }
+#still .eyebrow { position: absolute; left: 74px; top: 316px; font-size: 13px; gap: 9px; }
+#still .eyebrow::before { width: 8px; height: 8px; }
+#still .title { position: absolute; left: 69px; top: 347px; font-size: 82px; }
+#still .shot { position: absolute; left: 630px; top: 116px; width: 525px; height: 440px; border-radius: 9px; overflow: hidden; box-shadow: 0 1px 0 rgb(0 0 0 / .06), 0 30px 60px -20px rgb(30 20 10 / .35); background: var(--chrome); }
+#still .shot img { position: absolute; left: -127px; top: 0; width: 705px; }
+#still .diff { position: absolute; left: 698px; top: 388px; width: 280px; border-radius: 9px; background: var(--chrome); color: var(--chrome-text); font-family: 'Fragment Mono', monospace; font-size: 14.5px; box-shadow: 0 24px 50px -16px rgb(30 20 10 / .45); overflow: hidden; }
+.diff .file { padding: 10px 14px; color: var(--chrome-dim); font-size: 11px; border-bottom: 1px solid var(--chrome-line); }
+.diff .line { padding: 6px 14px; white-space: pre; }
 .diff .del { background: rgb(255 90 90 / .14); color: #ffb3ab; }
 .diff .add { background: rgb(60 210 130 / .14); color: #9ff0c2; }
 
@@ -86,7 +90,7 @@ body[data-mode="still"] #still, body[data-mode="video"] #video { display: block;
 </head>
 <body data-mode="still">
 <section id="still" class="mode">
-  <div class="lockup">{{LOCKUP}}</div>
+  <div class="lockup"><span class="mark">{{MARK}}</span><span class="name">Feega</span></div>
   <p class="eyebrow">free · open source · vs code</p>
   <h1 class="title">design in<br>your<br>codebase</h1>
   <div class="shot"><img src="data:image/webp;base64,{{SHOT}}" alt=""></div>

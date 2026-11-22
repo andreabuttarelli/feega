@@ -27,11 +27,15 @@ const markLobes = MARK_TURNS.map((turn) => `<path d="${MARK_LOBE}" transform="ro
 const wordmark = readFileSync(resolve(HERE, 'wordmark.svg'), 'utf8');
 const lockup = wordmark.replace(/(<svg[^>]*>)/, `$1<svg x="${-MARK_INSET}" y="${-MARK_INSET}" width="${MARK_BOX}" height="${MARK_BOX}" viewBox="0 0 ${MARK_BOX} ${MARK_BOX}"><g fill="${MarkTone.Orange}">${markLobes}</g></svg>`);
 
+const MARK_VIEW = MARK_BOX - 2 * MARK_INSET;
+const markOnly = `<svg viewBox="${MARK_INSET} ${MARK_INSET} ${MARK_VIEW} ${MARK_VIEW}"><g fill="${MarkTone.Orange}">${markLobes}</g></svg>`;
+
 const html = readFileSync(resolve(HERE, 'page.html'), 'utf8')
   .replace('{{SANS}}', base64(resolve(STATIC_DIR, 'site/fonts/bdo-grotesk-variable.woff2')))
   .replace('{{MONO}}', base64(resolve(STATIC_DIR, 'site/fonts/fragment-mono-latin.woff2')))
   .replace('{{SHOT}}', base64(resolve(STATIC_DIR, 'img/editor/selected.webp')))
   .replace('{{SCRIPT}}', readFileSync(resolve(HERE, 'timeline.js'), 'utf8'))
+  .replace('{{MARK}}', markOnly)
   .replaceAll('{{LOCKUP}}', lockup);
 
 const ffmpeg = (...args: string[]) => execFileSync(FFMPEG, ['-y', '-loglevel', 'error', ...args]);
