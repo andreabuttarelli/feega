@@ -1,9 +1,9 @@
 <script lang="ts">
-  import type { Snippet } from 'svelte';
+  import { untrack, type Snippet } from 'svelte';
   import { MIXED, type Shared } from '@feega/properties-panel/mixed';
   import { heldValue, liveNumber, type Held } from './scrub';
   import { typedCommit } from './typed-commit';
-  import { Unit, convert, cssOf, parseLength, stepOf, type UnitContext } from './units';
+  import { Unit, convert, cssOf, isKeyword, keywordOf, parseLength, stepOf, type UnitContext } from './units';
 
   type Props = {
     name: string;
@@ -12,6 +12,7 @@
     px: Shared<number>;
     units?: Unit[];
     unit?: string;
+    css?: string;
     context?: UnitContext;
     min?: number;
     max?: number;
@@ -21,16 +22,26 @@
     onpreview?: (value: string) => void;
   };
 
-  let { name, prefix = '', icon, px, units, unit = '', context, min = -100000, max = 100000, title, override = '', onchange, onpreview = () => undefined }: Props = $props();
+  let { name, prefix = '', icon, px, units, unit = '', css = '', context, min = -100000, max = 100000, title, override = '', onchange, onpreview = () => undefined }: Props = $props();
 
   const COARSE = 10;
   const DRAG_PX_PER_STEP = 2;
   const DECIMALS = 3;
 
-  let chosen = $state<Unit>(Unit.Px);
+  let picked = $state<Unit | null>(null);
   let scrub = $state<{ x: number; start: number } | null>(null);
   let draft = $state<number | null>(null);
   let held = $state<Held | null>(null);
+
+  const chosen = $derived(picked ?? keywordOf(css, units) ?? Unit.Px);
+  $effect(() => {
+    const keyword = keywordOf(css, units);
+    untrack(() => {
+      if (keyword !== null || (css && picked !== null && isKeyword(picked))) {
+        picked = null;
+      }
+    });
+  });
 
   const lengthy = $derived(Boolean(units?.length));
   const step = $derived(lengthy ? stepOf(chosen) : 1);
@@ -42,12 +53,12 @@
     if (kept !== null) {
       return kept;
     }
-    if (px === MIXED || !lengthy || !context || chosen === Unit.Auto) {
+    if (px === MIXED || !lengthy || !context || isKeyword(chosen)) {
       return px;
     }
     return convert({ value: px, unit: Unit.Px }, chosen, context).value;
   });
-  const text = $derived(shown === MIXED ? '' : String(Number((shown as number).toFixed(DECIMALS))));
+  const text = $derived(shown === MIXED || isKeyword(chosen) ? '' : String(Number((shown as number).toFixed(DECIMALS))));
 
   const clamp = (v: number) => Math.min(max, Math.max(min, v));
   const written = (v: number) => (lengthy ? cssOf({ value: clamp(v), unit: chosen }) : String(clamp(v)));
@@ -61,15 +72,15 @@
       return () => clearTimeout(id);
     }
   });
-  const hold = (v: number) => (held = { value: lengthy && context && chosen !== Unit.Px && chosen !== Unit.Auto ? convert({ value: v, unit: chosen }, Unit.Px, context).value : v, since: Date.now() });
+  const hold = (v: number) => (held = { value: lengthy && context && chosen !== Unit.Px && !isKeyword(chosen) ? convert({ value: v, unit: chosen }, Unit.Px, context).value : v, since: Date.now() });
 
   function commitText(raw: string) {
     if (lengthy) {
-      const parsed = parseLength(raw, chosen);
+      const parsed = parseLength(raw, isKeyword(chosen) ? Unit.Px : chosen);
       if (!parsed) {
         return;
       }
-      chosen = parsed.unit;
+      picked = parsed.unit;
       onchange(cssOf({ ...parsed, value: clamp(parsed.value) }));
       return;
     }
@@ -80,6 +91,13 @@
   }
 
   const typed = typedCommit(commitText);
+
+  function pickUnit(next: Unit) {
+    picked = next;
+    if (isKeyword(next)) {
+      onchange(next);
+    }
+  }
 
   function onKey(e: KeyboardEvent) {
     const input = e.currentTarget as HTMLInputElement;
@@ -129,9 +147,9 @@
   <span class="prefix" role="presentation" onpointerdown={grab} onpointermove={drag} onpointerup={drop} onlostpointercapture={drop}>
     {#if icon}{@render icon()}{:else}{prefix}{/if}
   </span>
-  <input class="value" type="text" inputmode="decimal" aria-label={name} value={text} placeholder={px === MIXED ? 'Mixed' : chosen === Unit.Auto ? 'auto' : ''} onkeydown={onKey} onfocus={typed.focus} onchange={(e) => typed.commit(e.currentTarget.value)} />
+  <input class="value" type="text" inputmode="decimal" aria-label={name} value={text} placeholder={px === MIXED ? 'Mixed' : ''} onkeydown={onKey} onfocus={typed.focus} onchange={(e) => typed.commit(e.currentTarget.value)} />
   {#if lengthy}
-    <select class="unit" value={chosen} aria-label={`${name} unit`} onchange={(e) => ((chosen = e.currentTarget.value as Unit), chosen === Unit.Auto && onchange(Unit.Auto))}>
+    <select class="unit" class:keyword={isKeyword(chosen)} value={chosen} aria-label={`${name} unit`} onchange={(e) => pickUnit(e.currentTarget.value as Unit)}>
       {#each units! as u (u)}<option value={u}>{u || '–'}</option>{/each}
     </select>
   {:else if unit}
@@ -212,6 +230,11 @@
     text-align: right;
     appearance: none;
     cursor: pointer;
+  }
+
+  .unit.keyword {
+    max-width: 96px;
+    color: var(--ui-text);
   }
 
   .unit:hover {

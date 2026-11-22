@@ -48,6 +48,48 @@ function zClass(value: string): string {
   return Z_STEPS.includes(digits) ? `${negative ? '-' : ''}z-${digits}` : `z-[${value}]`;
 }
 
+const REM_STEPS: Record<number, string> = { 20: 'xs', 24: 'sm', 28: 'md', 32: 'lg', 36: 'xl', 42: '2xl', 48: '3xl', 56: '4xl', 64: '5xl', 72: '6xl', 80: '7xl' };
+
+const MAX_WIDTH_SCALE: Record<string, string> = {
+  ...Object.fromEntries(Object.entries(REM_STEPS).map(([rem, name]) => [`${Number(rem) * PX_PER_REM}px`, name])),
+  '65ch': 'prose',
+  '640px': 'screen-sm',
+  '1536px': 'screen-2xl'
+};
+
+const CONTENT: Record<string, string> = { '100%': 'full', 'fit-content': 'fit', 'min-content': 'min', 'max-content': 'max' };
+const NO_LIMIT: Record<string, string> = { none: 'none' };
+const HEIGHT_VIEWPORT: Record<string, string> = { '100vh': 'screen', '100dvh': 'dvh', '100svh': 'svh', '100lvh': 'lvh' };
+const SPACING_SCALE: Record<string, string> = Object.fromEntries([...SPACING_STEPS.filter((step) => step > 0 && step !== 0.5).map((step) => [`${step * PX_PER_STEP}px`, String(step)]), ['1px', 'px']]);
+const ZERO = { '0px': '0' };
+
+const SIZE_SCALES: Record<string, Record<string, string>> = {
+  w: { ...CONTENT, auto: 'auto', '100vw': 'screen', ...ZERO },
+  h: { ...CONTENT, auto: 'auto', ...HEIGHT_VIEWPORT, ...ZERO },
+  'min-w': { ...CONTENT, ...ZERO },
+  'max-w': { ...CONTENT, ...NO_LIMIT, ...MAX_WIDTH_SCALE, ...ZERO },
+  'min-h': { ...CONTENT, ...HEIGHT_VIEWPORT, ...ZERO },
+  'max-h': { ...CONTENT, ...NO_LIMIT, ...HEIGHT_VIEWPORT, ...SPACING_SCALE, ...ZERO }
+};
+
+const LENGTH_TEXT = /^(-?[\d.]+)(px|rem)?$/;
+
+function pxKey(value: string): string {
+  const m = LENGTH_TEXT.exec(value);
+  if (!m) {
+    return value;
+  }
+  return `${Number(m[1]) * (m[2] === 'rem' ? PX_PER_REM : 1)}px`;
+}
+
+const sized = (prefix: string): Utility => ({
+  make: (v) => {
+    const name = SIZE_SCALES[prefix][pxKey(v)];
+    return name ? `${prefix}-${name}` : `${prefix}-[${v}]`;
+  },
+  owns: prefixed(prefix).owns
+});
+
 const offset = (prefix: string): Utility => ({ make: (v) => offsetClass(prefix, v), owns: prefixed(prefix).owns });
 
 const POSITIONS = ['static', 'relative', 'absolute', 'fixed', 'sticky'];
@@ -61,10 +103,12 @@ const UTILITIES: Record<string, Utility> = {
   'mix-blend-mode': keyword('mix-blend'),
   'background-clip': keyword('bg-clip'),
   'background-image': { make: (v) => `bg-[${v}]`, owns: (t) => t.startsWith('bg-[url(') },
-  'min-width': prefixed('min-w'),
-  'max-width': prefixed('max-w'),
-  'min-height': prefixed('min-h'),
-  'max-height': prefixed('max-h'),
+  width: sized('w'),
+  height: sized('h'),
+  'min-width': sized('min-w'),
+  'max-width': sized('max-w'),
+  'min-height': sized('min-h'),
+  'max-height': sized('max-h'),
   top: offset('top'),
   right: offset('right'),
   bottom: offset('bottom'),

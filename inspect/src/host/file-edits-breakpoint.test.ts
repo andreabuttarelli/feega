@@ -3,7 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ALL_SIZES } from '@feega/live-edit/breakpoints';
-import { ClassFamily, LiveProp } from '@feega/live-edit/live-fields';
+import { ClassFamily, LiveProp, arbitraryFamily } from '@feega/live-edit/live-fields';
+import { tailwindToken } from '@feega/live-edit/tailwind-property';
 import { fileEdits } from './file-edits';
 
 const TAILWIND = JSON.stringify({ devDependencies: { tailwindcss: '^4.0.0' } });
@@ -21,6 +22,46 @@ function app(manifest: string, page: string, extra: Record<string, string> = {})
 }
 
 const read = (root: string) => readFileSync(join(root, 'src/Page.svelte'), 'utf8');
+
+const maxWidth = (value: string, breakpoint?: string) => ({ at: 'src/Page.svelte:1:1', prop: LiveProp.Class, family: arbitraryFamily('max-width'), value: tailwindToken('max-width', value), css: { 'max-width': value }, breakpoint });
+
+describe('a max-width edit at a breakpoint', () => {
+  it('writes max-w-[720px] at md in a Tailwind project', async () => {
+    const root = app(TAILWIND, '<section class="px-4 max-w-prose">x</section>\n');
+    const out = await fileEdits(root).edit(maxWidth('720px', 'md'));
+
+    expect(out.ok).toBe(true);
+    expect(read(root)).toContain('class="px-4 max-w-prose md:max-w-[720px]"');
+  });
+
+  it('writes the theme scale class for all sizes', async () => {
+    const root = app(TAILWIND, '<section class="max-w-[10px] md:max-w-sm">x</section>\n');
+    await fileEdits(root).edit(maxWidth('65ch', ALL_SIZES));
+
+    expect(read(root)).toContain('class="max-w-prose md:max-w-sm"');
+  });
+
+  it('clears the limit at one breakpoint only', async () => {
+    const root = app(TAILWIND, '<section class="max-w-prose md:max-w-[720px]">x</section>\n');
+    await fileEdits(root).edit(maxWidth('', 'md'));
+
+    expect(read(root)).toContain('class="max-w-prose"');
+  });
+
+  it('writes the declaration inside the media query in a CSS project', async () => {
+    const root = app(PLAIN, STYLED);
+    await fileEdits(root).edit(maxWidth('720px', 'md'));
+
+    expect(read(root)).toContain('@media (min-width: 768px) {\n    .title {\n      max-width: 720px;');
+  });
+
+  it('writes a keyword declaration to the rule', async () => {
+    const root = app(PLAIN, STYLED);
+    await fileEdits(root).edit(maxWidth('none'));
+
+    expect(read(root)).toContain('max-width: none;');
+  });
+});
 
 describe('a style edit at a breakpoint', () => {
   it('writes a prefixed Tailwind class at the chosen breakpoint', async () => {

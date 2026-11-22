@@ -5,8 +5,9 @@ import { describe, expect, it } from 'vitest';
 import { ClassFamily, LiveProp, Side } from '@feega/live-edit/live-fields';
 import { fileEdits } from './file-edits';
 import { Place } from '@feega/live-edit/move-node';
-import { AddKind } from '@feega/live-edit/add-node';
+import { AddKind, AddPlace } from '@feega/live-edit/add-node';
 import { StructureOp } from '@feega/live-edit/structure';
+import { WrapTag } from '@feega/live-edit/wrap-node';
 import { PageTarget } from '@feega/live-edit/page-rule';
 import { ElementState } from '@feega/live-edit/element-state';
 
@@ -445,6 +446,39 @@ describe('fileEdits', () => {
     expect(read(root)).toBe(PAGE);
   });
 
+  it('avvolgere con section scrive il tag scelto, e un undo lo toglie', async () => {
+    const root = app();
+    const edits = fileEdits(root);
+    await edits.structure({ op: StructureOp.Wrap, at: 'src/Page.svelte:2:3', wrap: WrapTag.Section });
+
+    expect(read(root)).toContain('  <section class="flex flex-col">\n    <h1 class="text-2xl">Hello</h1>\n  </section>\n');
+    await edits.undo();
+    expect(read(root)).toBe(PAGE);
+  });
+
+  it('avvolgere con un link senza Tailwind non scrive nessuna regola di layout', async () => {
+    const root = app(PLAIN);
+    const edits = fileEdits(root);
+    await edits.structure({ op: StructureOp.Wrap, at: 'src/Page.svelte:2:3', wrap: WrapTag.Link });
+    const page = read(root);
+
+    expect(page).toContain('<a href="#">\n    <h1 class="text-2xl">Hello</h1>\n  </a>');
+    expect(page).not.toMatch(/flex-direction/);
+    await edits.undo();
+    expect(read(root)).toBe(PAGE);
+  });
+
+  it('aggiungere come figlio mette il nuovo elemento ultimo dentro quello scelto, e un undo lo toglie', async () => {
+    const root = app();
+    const edits = fileEdits(root);
+    const out = await edits.structure({ op: StructureOp.Add, at: 'src/Page.svelte:1:1', add: { kind: AddKind.Text, place: AddPlace.Child } });
+
+    expect(out.ok).toBe(true);
+    expect(read(root)).toMatch(/<p>Text<\/p>\n<\/section>/);
+    await edits.undo();
+    expect(read(root)).toBe(PAGE);
+  });
+
   it('avvolgere in un contenitore e togliere il contenitore sono un passo di undo ciascuno', async () => {
     const root = app();
     const edits = fileEdits(root);
@@ -486,5 +520,16 @@ describe('fileEdits in an element state', () => {
     const out = await fileEdits(root).edit({ at: 'src/Page.html:1:1', prop: LiveProp.Class, family: 'x', value: '', css: { color: 'red' }, state: ElementState.Hover });
 
     expect(out.ok).toBe(false);
+  });
+
+  it('in un file Astro il colore va in una regola del blocco style, non nell attributo style', async () => {
+    const root = app(PLAIN);
+    writeFileSync(join(root, 'src/Page.astro'), '---\nconst title = 1;\n---\n<main>\n  <h1>Hello</h1>\n</main>\n');
+    await fileEdits(root).edit({ at: 'src/Page.astro:5:3', prop: LiveProp.Color, value: '#ff0000', css: { color: '#ff0000' } });
+    const page = readFileSync(join(root, 'src/Page.astro'), 'utf8');
+
+    expect(page).toContain('<style>');
+    expect(page).toContain('color: #ff0000');
+    expect(page).not.toContain('style="');
   });
 });

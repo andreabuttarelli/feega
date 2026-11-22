@@ -1,4 +1,5 @@
 import { SOCKET_PATH, type HostMessage, type ViewMessage } from '../messages';
+import { plain } from './plain';
 
 declare const acquireVsCodeApi: undefined | (() => { postMessage: (message: HostMessage) => void });
 
@@ -17,7 +18,8 @@ function postMessageLink(post: (message: HostMessage) => void): Link {
 }
 
 function socketLink(): Link {
-  const socket = new WebSocket(`ws://${location.host}${SOCKET_PATH}`);
+  const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
+  const socket = new WebSocket(`${scheme}://${location.host}${SOCKET_PATH}`);
   const queued: string[] = [];
   socket.addEventListener('open', () => queued.splice(0).forEach((text) => socket.send(text)));
   socket.addEventListener('close', () => document.body.setAttribute('data-host', 'closed'));
@@ -41,7 +43,7 @@ function linkOf(): Link {
     return socketLink();
   }
   const api = acquireVsCodeApi();
-  return postMessageLink((message) => api.postMessage(message));
+  return postMessageLink((message) => api.postMessage(plain(message)));
 }
 
 const link = linkOf();

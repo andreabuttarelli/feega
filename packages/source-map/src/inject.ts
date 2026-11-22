@@ -1,6 +1,7 @@
 import { createRequire } from 'node:module';
 import { parse as parseJs } from '@babel/parser';
 import MagicString from 'magic-string';
+import { parse as parseHtml } from 'parse5';
 import { iconImports, pascalOf } from './icon-imports.ts';
 
 export const SOURCE_ATTR = 'data-feega-src';
@@ -16,11 +17,15 @@ const require = createRequire(import.meta.url);
 
 const HOST_TAG = /^[a-z][\w-]*$/;
 
+const NOT_STAMPED = new Set(['html', 'head', 'meta', 'link', 'title', 'base', 'script', 'style']);
+
 const FINDERS: Record<string, Finder> = {
   '.jsx': (code) => jsxTags(code, ['jsx']),
   '.tsx': (code) => jsxTags(code, ['jsx', 'typescript']),
   '.svelte': svelteTags,
-  '.vue': vueTags
+  '.vue': vueTags,
+  '.html': htmlTags,
+  '.astro': astroTags
 };
 
 export const MAPPED_EXTENSIONS = Object.keys(FINDERS);
@@ -91,6 +96,57 @@ function svelteTags(code: string): Tag[] {
   });
 
   return tags;
+}
+
+type HtmlNode = { nodeName: string; childNodes?: HtmlNode[]; content?: HtmlNode; sourceCodeLocation?: { startTag?: { startOffset: number; startLine: number; startCol: number } } };
+
+function htmlTags(code: string): Tag[] {
+  const tags: Tag[] = [];
+  const visit = (node: HtmlNode) => {
+    const start = node.sourceCodeLocation?.startTag;
+    if (start && !NOT_STAMPED.has(node.nodeName)) {
+      tags.push({ nameEnd: start.startOffset + 1 + node.nodeName.length, line: start.startLine, col: start.startCol });
+    }
+    node.childNodes?.forEach(visit);
+    if (node.content) {
+      visit(node.content);
+    }
+  };
+  visit(parseHtml(code, { sourceCodeLocationInfo: true }) as unknown as HtmlNode);
+  return tags;
+}
+
+type AstroNode = { type: string; name?: string; position?: { start: { offset: number } }; children?: AstroNode[] };
+
+function astroTags(code: string): Tag[] {
+  const { parse } = require('@astrojs/compiler/sync') as { parse: (src: string) => { ast: AstroNode } };
+  const lineStarts = lineStartsOf(code);
+  const charOffsetOf = charOffsets(code);
+  const tags: Tag[] = [];
+  const visit = (node: AstroNode) => {
+    const byteStart = node.position?.start.offset;
+    if (node.type === 'element' && node.name && byteStart !== undefined && !NOT_STAMPED.has(node.name)) {
+      const start = charOffsetOf(byteStart);
+      tags.push({ nameEnd: start + 1 + node.name.length, ...position(lineStarts, start) });
+    }
+    node.children?.forEach(visit);
+  };
+  visit(parse(code).ast);
+  return tags;
+}
+
+function charOffsets(code: string): (byteOffset: number) => number {
+  const byteToChar: number[] = [];
+  let char = 0;
+  for (const point of code) {
+    const bytes = Buffer.byteLength(point);
+    for (let i = 0; i < bytes; i++) {
+      byteToChar.push(char);
+    }
+    char += point.length;
+  }
+  byteToChar.push(char);
+  return (byteOffset) => byteToChar[byteOffset];
 }
 
 const VUE_ELEMENT = 1;

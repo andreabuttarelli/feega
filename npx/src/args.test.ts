@@ -1,6 +1,6 @@
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { Browser, Run, argsOf } from './args';
+import { Browser, Run, argsOf, usageOf } from './args';
 
 describe('npx feega arguments', () => {
   it('no argument opens the current folder on a free port in the browser', () => {
@@ -34,5 +34,19 @@ describe('npx feega arguments', () => {
   it('an unknown flag or a bad port is an error', () => {
     expect(argsOf(['--nope'], '/w')).toEqual({ run: Run.Error, reason: 'unknown option --nope' });
     expect(argsOf(['--port', 'x'], '/w')).toEqual({ run: Run.Error, reason: 'the port must be a number' });
+  });
+
+  it('the mcp command serves the Cloud tools over stdio when Cloud is on', () => {
+    expect(argsOf(['mcp'], '/w', true)).toEqual({ run: Run.Mcp });
+  });
+
+  it('with Cloud off the mcp command does not exist and the help does not name it', () => {
+    expect(argsOf(['mcp'], resolve('/w'))).toMatchObject({ run: Run.Editor, dir: resolve('/w', 'mcp') });
+    expect(usageOf(false)).not.toMatch(/mcp|Cloud/i);
+    expect(usageOf(true)).toMatch(/npx feega mcp/);
+  });
+
+  it('a folder named mcp is still a folder after a flag', () => {
+    expect(argsOf(['--no-open', 'mcp'], resolve('/w'))).toMatchObject({ run: Run.Editor, dir: resolve('/w', 'mcp') });
   });
 });
