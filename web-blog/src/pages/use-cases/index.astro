@@ -1,0 +1,16 @@
+---
+import Base from '../../layouts/Base.astro';
+import PostList from '../../components/PostList.astro';
+import { useCasesNewestFirst } from '../../site';
+
+const entries = await useCasesNewestFirst();
+---
+
+<Base title="Use cases" description="How to use Feega with clients, with coding agents and with AI site builders. What works today, step by step.">
+  <header class="index-head">
+    <nav class="sx-crumbs" aria-label="Breadcrumb"><a href="/">blog</a><span aria-hidden="true">/</span><span>use cases</span></nav>
+    <h1 class="page-title">Use cases</h1>
+    <p class="lede">Guides for working with Feega next to clients, coding agents and site builders. Each one only uses what Feega does today.</p>
+  </header>
+  <PostList posts={entries} />
+</Base>
