@@ -8,14 +8,10 @@
 .fl-parallax-gallery .field[data-dragging]{cursor:grabbing}
 .fl-parallax-gallery .field:focus-visible{outline-offset:-4px}
 .fl-parallax-gallery .field::before,.fl-parallax-gallery .field::after{content:"";position:absolute;inset:0;z-index:4;pointer-events:none}
-.fl-parallax-gallery .field::before{background:linear-gradient(90deg,var(--feega-bg),transparent 14%,transparent 86%,var(--feega-bg))}
-.fl-parallax-gallery .field::after{background:linear-gradient(180deg,var(--feega-bg),transparent 7%,transparent 93%,var(--feega-bg))}
-.fl-parallax-gallery .layer{position:absolute;inset:0}
-.fl-parallax-gallery .card{position:absolute;top:0;left:0;overflow:hidden;border-radius:var(--feega-radius-md);background:var(--feega-surface)}
-.fl-parallax-gallery .layer[data-depth="2"] .card{box-shadow:var(--feega-shadow)}
-.fl-parallax-gallery .card img{display:block;width:100%;height:100%;object-fit:cover;pointer-events:none}
-.fl-parallax-gallery .card[data-tone="0"]{background:linear-gradient(135deg,var(--feega-accent-soft),var(--feega-surface))}
-.fl-parallax-gallery .card[data-tone="1"]{background:linear-gradient(160deg,var(--feega-success-soft),var(--feega-raised))}
-.fl-parallax-gallery .card[data-tone="2"]{background:linear-gradient(200deg,var(--feega-surface),var(--feega-line-strong))}
-.fl-parallax-gallery .card[data-tone="3"]{background:linear-gradient(120deg,var(--feega-danger-soft),var(--feega-accent-soft))}
+.fl-parallax-gallery .field::before{background:linear-gradient(90deg,var(--feega-bg),transparent 18%,transparent 82%,var(--feega-bg))}
+.fl-parallax-gallery .field::after{background:linear-gradient(180deg,var(--feega-bg),transparent 8%,transparent 92%,var(--feega-bg))}
+.fl-parallax-gallery .layer{position:absolute;top:0;left:0;width:1800px;height:1300px;transform-origin:0 0}
+.fl-parallax-gallery .card{position:absolute;margin:0;overflow:hidden;border-radius:var(--feega-radius-md);background:var(--feega-surface);will-change:transform}
+.fl-parallax-gallery .layer[data-depth="near"] .card{box-shadow:var(--feega-shadow)}
+.fl-parallax-gallery .card img{display:block;width:100%;height:auto;pointer-events:none}
 @media (prefers-reduced-motion:reduce){:where([class^="fl-"]) *,:where([class^="fl-"]) *::before,:where([class^="fl-"]) *::after{animation:none!important;transition:none!important}}
