@@ -64,6 +64,6 @@ export const STITCH: Rich = {
     { q: 'Can Stitch edit my existing app?', a: 'Stitch Loop is meant to, through pull requests, but it is a waitlist as of 18 November 2026.' },
     { q: 'Can I use a DESIGN.md with Feega?', a: 'Feega does not read one. It works on your actual CSS or Tailwind classes.' },
     { q: 'Do they overlap?', a: 'Little. One explores new screens, the other refines existing ones.' },
-    { q: 'Which frameworks does Feega support?', a: 'SvelteKit, React, Next.js and Vue.' }
+    { q: 'Which frameworks does Feega support?', a: 'SvelteKit, React, Next.js, Vue, Nuxt, React Router, Astro and Vite.' }
   ]
 };

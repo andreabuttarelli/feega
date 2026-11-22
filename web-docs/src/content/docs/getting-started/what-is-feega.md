@@ -20,7 +20,7 @@ There is no AI and no token in the loop. Feega edits the code the way you would,
 
 ## What it supports
 
-- **Frameworks**: [SvelteKit](/frameworks/sveltekit/), [React with Vite](/frameworks/react-vite/), [Next.js](/frameworks/nextjs/), [Vue](/frameworks/vue/).
+- **Frameworks**: [SvelteKit](/frameworks/sveltekit/), [React with Vite](/frameworks/react-vite/), [Next.js](/frameworks/nextjs/), [Vue](/frameworks/vue/), [Nuxt](/frameworks/nuxt/), [React Router](/frameworks/react-router/), [Astro](/frameworks/astro/), [Vite](/frameworks/vite/). See [Supported frameworks](/frameworks/supported-frameworks/) for what is not supported.
 - **Styling**: [plain CSS, CSS modules, Svelte and Vue scoped styles, Tailwind](/styling/tailwind/).
 - **Editors**: VS Code, Cursor, Windsurf, VSCodium.
 - **Systems**: macOS, Windows, Linux.

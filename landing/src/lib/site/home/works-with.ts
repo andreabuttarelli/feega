@@ -1,4 +1,5 @@
 import { EDITOR_ICONS } from '../editor-icons';
+import { LOGO_PATHS, type Logo } from '../codebase/logos';
 
 export interface WorksWithItem {
   readonly name: string;
@@ -9,6 +10,8 @@ export interface WorksWithItem {
 const SVG_OPEN = '<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">';
 
 const svg = (path: string): string => `${SVG_OPEN}${path}</svg>`;
+
+const logo = (name: Logo): string => svg(`<path d="${LOGO_PATHS[name]}"/>`);
 
 export const EDITORS: readonly WorksWithItem[] = [
   { name: 'vs code', href: '/integrations/vscode', icon: EDITOR_ICONS['VS Code'] },
@@ -39,6 +42,10 @@ export const FRAMEWORKS: readonly WorksWithItem[] = [
     href: '/for/vue',
     icon: svg('<path d="M2 3h4.200L12 13 17.800 3H22L12 20.500z"/>')
   },
+  { name: 'nuxt', icon: logo('Nuxt') },
+  { name: 'react router', icon: logo('ReactRouter') },
+  { name: 'astro', icon: logo('Astro') },
+  { name: 'vite', icon: logo('Vite') },
   {
     name: 'tailwind',
     href: '/for/tailwind',

@@ -10,7 +10,7 @@ import type { Crumb } from './structured-data';
 import { HUBS } from './topics';
 import { topicPath } from './topics/topic';
 
-const SUMMARY = 'Feega is a free, open-source (Apache-2.0) VS Code extension to design in your codebase: click any element of your running app, edit it like in Figma, and the change is written to your code. No AI, no tokens, with diffs and undo. React, Next.js, SvelteKit and Vue, with Tailwind or plain CSS. Works in VS Code, Cursor, Windsurf and VSCodium on macOS, Windows and Linux, or in the browser with npx feega. Feega Cloud (GitHub sync, collaboration, sections and templates) is coming later.';
+const SUMMARY = 'Feega is a free, open-source (Apache-2.0) VS Code extension to design in your codebase: click any element of your running app, edit it like in Figma, and the change is written to your code. No AI, no tokens, with diffs and undo. React, Next.js, SvelteKit, Vue, Nuxt, React Router, Astro and Vite, with Tailwind or plain CSS. Works in VS Code, Cursor, Windsurf and VSCodium on macOS, Windows and Linux, or in the browser with npx feega. Feega Cloud (GitHub sync, collaboration, sections and templates) is coming later.';
 
 const HOW_IT_WORKS = [
   '- Run "Feega: Open from current workspace" in the command palette, or `npx feega` in the app folder. Feega starts your dev server and opens the app beside your code.',
@@ -23,6 +23,8 @@ const WRITES = [
   '- Tailwind projects: the matching utility class in the element\'s class or className, or your own theme token when one matches. At a smaller preview width it changes the class that applies at that width, so md:p-8 stays md: and p-4 stays the base.',
   '- Svelte and Vue without Tailwind: a rule in the component\'s <style> block.',
   '- React and Next.js without Tailwind: a rule in a CSS module next to the component, imported if it was not.',
+  '- Nuxt, React Router, Astro and Vite: tested with select, text, style and structure edits. Astro and Nuxt need Feega to start the dev server. Without a framework, Vite edits land in index.html.',
+  '- Not supported: Angular, plain static HTML without Vite, Create React App.',
   '- Not written: class names built by an expression (cn(), clsx(), template strings), and text that comes from data rather than markup. Feega says why and points at the line.'
 ].join('\n');
 

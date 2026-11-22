@@ -80,7 +80,7 @@ export const ROUNDUPS: Readonly<Record<string, Article>> = {
     ],
     mistakes: [
       { q: 'Testing on a template.', a: 'These tools differ on your messy, real repo. Use that.' },
-      { q: 'Ignoring the framework list.', a: 'Feega tests Next.js, SvelteKit, React and Vue on Vite; others are early. Check yours first.' }
+      { q: 'Ignoring the framework list.', a: 'Feega tests Next.js, SvelteKit, React, Vue, Nuxt, React Router and Astro, plus Vite without a framework. Angular and Create React App are not supported. Check yours first.' }
     ],
     questions: [
       { q: 'Can I edit my site visually without leaving the code?', a: 'Yes. All six write to the source files themselves.' },

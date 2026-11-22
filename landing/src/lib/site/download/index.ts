@@ -22,7 +22,7 @@ export const DOWNLOAD_PAGE = {
   },
   requirements: {
     heading: 'requirements',
-    items: [VSCODE_REQUIREMENT, 'React, Next.js, SvelteKit or Vue', 'Tailwind or plain CSS', 'macOS, Windows or Linux']
+    items: [VSCODE_REQUIREMENT, 'React, Next.js, SvelteKit, Vue, Nuxt, React Router, Astro or Vite', 'Tailwind or plain CSS', 'macOS, Windows or Linux']
   },
   privacy: 'runs locally. no account. sends nothing.'
 } as const;

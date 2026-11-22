@@ -30,7 +30,7 @@ export const WINDSURF: Topic = {
     {
       heading: 'What you can edit',
       html: `<p>Select any element on the page, or walk up to its parent with the breadcrumb. The right bar covers size, padding, margin, flex and grid layout, gap, typography, text and fill colour, borders, radius and shadows. Double-click text to change it in place when it is written in the markup. The device bar has desktop, laptop, tablet and phone widths, and edits apply to the class or media query active at that width.</p>
-<p>Frameworks where clicks map to source today: React and Vue on Vite, SvelteKit, and Next.js with webpack or Turbopack. The framework pages explain what gets written in each: <a href="/for/react">React</a>, <a href="/for/nextjs">Next.js</a>, <a href="/for/sveltekit">SvelteKit</a>, <a href="/for/vue">Vue</a>.</p>`
+<p>Frameworks where clicks map to source today: React and Vue on Vite, SvelteKit, Next.js with webpack or Turbopack, Nuxt, React Router, Astro, and Vite without a framework. Astro and Nuxt need Feega to start the dev server. The framework pages explain what gets written in each: <a href="/for/react">React</a>, <a href="/for/nextjs">Next.js</a>, <a href="/for/sveltekit">SvelteKit</a>, <a href="/for/vue">Vue</a>.</p>`
     },
     {
       heading: 'A design pass after Cascade, step by step',
@@ -62,7 +62,7 @@ export const WINDSURF: Topic = {
     { q: 'Does Feega work in Windsurf?', a: 'Yes. Windsurf installs extensions from Open VSX, where Feega is published.' },
     { q: 'Does Feega use Windsurf credits?', a: 'No. Feega makes no model calls, so edits cost nothing.' },
     { q: 'Can Cascade and Feega edit the same component?', a: 'Yes. Feega writes only the edited line and refuses to undo over later changes.' },
-    { q: 'Which frameworks work?', a: 'React and Vue on Vite, SvelteKit and Next.js, with Tailwind or plain CSS.' }
+    { q: 'Which frameworks work?', a: 'React and Vue on Vite, SvelteKit, Next.js, Nuxt, React Router, Astro and Vite, with Tailwind or plain CSS.' }
   ],
   sources: [
     OPEN_VSX,

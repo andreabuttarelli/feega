@@ -73,6 +73,6 @@ export const CURSOR_DESIGN_MODE: Rich = {
     { q: 'Does Feega work inside Cursor?', a: 'Yes. Cursor is one of the four editors the extension supports, with VS Code, Windsurf and VSCodium.' },
     { q: 'Does Feega have an agent?', a: 'No. It has no AI. It writes your hand edits to source.' },
     { q: 'Do I need to start my dev server first?', a: 'No. Feega starts it when you open the project. Design Mode needs one already running.' },
-    { q: 'Which frameworks work?', a: 'SvelteKit, React, Next.js and Vue, with CSS or Tailwind.' }
+    { q: 'Which frameworks work?', a: 'SvelteKit, React, Next.js, Vue, Nuxt, React Router, Astro and Vite, with CSS or Tailwind.' }
   ]
 };
