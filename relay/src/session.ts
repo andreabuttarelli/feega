@@ -1,14 +1,17 @@
 import { DurableObject } from 'cloudflare:workers';
-import { CONTROL_STREAM, FrameType, MAX_STREAM_ID, bytesFrame, decodeFrame, emptyFrame, encodeFrame, jsonFrame, jsonOf, textFrame, textOf, type ErrorBody, type Frame, type Kick, type Present, type ReqHead, type ResHead, type WsClose } from '../../packages/share-protocol/src/frame';
+import { CONTROL_STREAM, FrameType, MAX_STREAM_ID, bytesFrame, decodeFrame, emptyFrame, encodeFrame, jsonFrame, jsonOf, textFrame, textOf, type ErrorBody, type Frame, type Kick, type Present, type Roled, type ReqHead, type ResHead, type WsClose } from '../../packages/share-protocol/src/frame';
 import { VISITOR_HEADER, decodeVisitor, withVisitor } from '../../packages/share-protocol/src/visitor';
-import type { VisitorInfo } from '../../packages/share-protocol/src/frame';
-import { CloseCode, EXP_HEADER, INTENT_HEADER, Intent, type Env } from './env';
+import type { VisitorInfo, VisitorRole } from '../../packages/share-protocol/src/frame';
+import { CloseCode, EXP_HEADER, INTENT_HEADER, Intent, SID_HEADER, type Env } from './env';
 import { Deadline, MAX_VISITORS, deadlineOf } from './limits';
-import { forwardHeaders } from './routing';
+import { forwardHeaders, snapshotUrl } from './routing';
 import { failure, pendingResponse, type Pending } from './streams';
 
 const HTTP_BAD_REQUEST = 400;
 const HTTP_FORBIDDEN = 403;
+const HTTP_GONE = 410;
+const HTTP_FOUND = 302;
+const VISITOR_ROLES: readonly string[] = ['editor', 'viewer'] satisfies VisitorRole[];
 const HTTP_UNAVAILABLE = 503;
 const WS_OPEN_STATE = 1;
 const WS_SWITCHING = 101;
@@ -26,6 +29,8 @@ enum Key {
   Exp = 'expMs',
   Empty = 'emptySince',
   Kicked = 'kicked',
+  Roles = 'roles',
+  Closed = 'closed',
   Block = 'streamBlock'
 }
 
@@ -97,7 +102,14 @@ export class Session extends DurableObject<Env> {
     await this.schedule();
   }
 
+  private async isClosed(): Promise<boolean> {
+    return (await this.ctx.storage.get<boolean>(Key.Closed)) === true;
+  }
+
   private async acceptHost(request: Request): Promise<Response> {
+    if (await this.isClosed()) {
+      return failure(HTTP_GONE, 'this session is closed');
+    }
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
     const previous = this.hostSocket();
@@ -114,11 +126,20 @@ export class Session extends DurableObject<Env> {
     return ((await this.ctx.storage.get<string[]>(Key.Kicked)) ?? []).includes(userId);
   }
 
+  private async roleOf(visitor: VisitorInfo): Promise<VisitorInfo> {
+    const roles = (await this.ctx.storage.get<Record<string, VisitorRole>>(Key.Roles)) ?? {};
+    return { ...visitor, role: roles[visitor.userId] ?? visitor.role };
+  }
+
   private async admitVisitor(request: Request): Promise<Response> {
-    const visitor = decodeVisitor(request.headers.get(VISITOR_HEADER));
-    if (!visitor) {
+    const decoded = decodeVisitor(request.headers.get(VISITOR_HEADER));
+    if (!decoded) {
       return failure(HTTP_BAD_REQUEST, 'visitor missing');
     }
+    if (await this.isClosed()) {
+      return Response.redirect(snapshotUrl(this.env.WEB_ORIGIN, request.headers.get(SID_HEADER) ?? ''), HTTP_FOUND);
+    }
+    const visitor = await this.roleOf(decoded);
     if (await this.isKicked(visitor.userId)) {
       return failure(HTTP_FORBIDDEN, 'removed from this session');
     }
@@ -201,7 +222,9 @@ export class Session extends DurableObject<Env> {
       [FrameType.WsText]: () => socket?.send(textOf(frame.payload) ?? ''),
       [FrameType.WsBinary]: () => socket?.send(frame.payload),
       [FrameType.WsClose]: () => socket && this.closeFromHost(socket, jsonOf<WsClose>(frame)),
-      [FrameType.Kick]: () => this.kick(jsonOf<Kick>(frame))
+      [FrameType.Kick]: () => this.kick(jsonOf<Kick>(frame)),
+      [FrameType.Role]: () => this.setRole(jsonOf<Roled>(frame)),
+      [FrameType.Close]: () => this.close()
     };
     handlers[frame.type]?.();
   }
@@ -224,6 +247,27 @@ export class Session extends DurableObject<Env> {
     await this.ctx.storage.put(Key.Kicked, [...kicked, kick.userId]);
     const sockets = this.ctx.getWebSockets(userTag(kick.userId));
     sockets.forEach((socket) => socket.close(CloseCode.Kicked, 'removed by the host'));
+  }
+
+  private async setRole(change: Roled | null) {
+    if (!change?.userId || !VISITOR_ROLES.includes(change.role)) {
+      return;
+    }
+    const roles = (await this.ctx.storage.get<Record<string, VisitorRole>>(Key.Roles)) ?? {};
+    await this.ctx.storage.put(Key.Roles, { ...roles, [change.userId]: change.role });
+    for (const socket of this.ctx.getWebSockets(userTag(change.userId))) {
+      const attachment = socket.deserializeAttachment() as Attachment;
+      attachment.host || socket.serializeAttachment({ ...attachment, visitor: { ...attachment.visitor, role: change.role } } satisfies Attachment);
+    }
+    this.announce();
+  }
+
+  private async close() {
+    await this.ctx.storage.put(Key.Closed, true);
+    await this.ctx.storage.deleteAlarm();
+    this.pending.forEach((pending) => pending.fail('the session is closed'));
+    this.pending.clear();
+    this.visitorSockets().forEach((socket) => socket.close(CloseCode.Closed, 'the session is closed'));
   }
 
   async webSocketClose(socket: WebSocket, code: number, reason: string) {

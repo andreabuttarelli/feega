@@ -320,6 +320,98 @@ describe('presence and kick', () => {
   });
 });
 
+describe('role changes from the host', () => {
+  const lastPresence = async (host: Peer) => jsonOf<{ visitors: { userId: string; role: string }[] }>(await host.next((f) => f.type === FrameType.Presence))!.visitors;
+
+  it('promotes a visitor over the role in the cookie and announces it', async () => {
+    const sid = freshSid();
+    const host = await connectHost(sid);
+    await connectVisitor(sid, '/feega-host', { sub: 'ada', name: 'Ada', role: 'viewer' });
+    await host.next((f) => f.type === FrameType.WsOpen);
+
+    host.sendJson(0, FrameType.Role, { userId: 'ada', role: 'editor' });
+
+    let visitors = await lastPresence(host);
+    while (visitors.find((v) => v.userId === 'ada')?.role !== 'editor') {
+      visitors = await lastPresence(host);
+    }
+    const again = await connectVisitor(sid, '/hmr', { sub: 'ada', name: 'Ada', role: 'viewer' });
+    const open = await host.next((f) => f.type === FrameType.WsOpen);
+    expect(decodeVisitor(jsonOf<{ headers: Record<string, string> }>(open)!.headers[VISITOR_HEADER])?.role).toBe('editor');
+    again.socket.close(CLOSE_NORMAL, 'bye');
+  });
+
+  const roleOnRequest = async (host: Peer, sid: string, cookieRole: 'viewer' | 'editor') => {
+    const response = visit(sid, '/a', { sub: 'ada', role: cookieRole });
+    const head = await host.next((f) => f.type === FrameType.ReqHead);
+    host.sendJson(head.streamId, FrameType.ResHead, { status: 200, headers: {} });
+    host.send(emptyFrame(head.streamId, FrameType.ResEnd));
+    await response;
+    return decodeVisitor(headOf(head).headers[VISITOR_HEADER])?.role;
+  };
+
+  it('applies the new role to plain requests too, and demotes', async () => {
+    const sid = freshSid();
+    const host = await connectHost(sid);
+
+    host.sendJson(0, FrameType.Role, { userId: 'ada', role: 'editor' });
+    expect(await roleOnRequest(host, sid, 'viewer')).toBe('editor');
+
+    host.sendJson(0, FrameType.Role, { userId: 'ada', role: 'viewer' });
+    expect(await roleOnRequest(host, sid, 'editor')).toBe('viewer');
+  });
+
+  it('ignores a role frame with a bad role', async () => {
+    const sid = freshSid();
+    const host = await connectHost(sid);
+
+    host.sendJson(0, FrameType.Role, { userId: 'ada', role: 'host' });
+
+    expect(await roleOnRequest(host, sid, 'viewer')).toBe('viewer');
+  });
+});
+
+describe('a closed session', () => {
+  const snapshotPage = (sid: string) => `http://web.test/s/${sid}`;
+
+  it('redirects every visitor request to the snapshot page once the host closed it', async () => {
+    const sid = freshSid();
+    const host = await connectHost(sid);
+    const visitor = await connectVisitor(sid);
+
+    host.send(emptyFrame(0, FrameType.Close));
+    host.socket.close(CLOSE_NORMAL, 'stopped');
+
+    await expect.poll(() => visitor.closes.length).toBe(1);
+    await expect.poll(async () => (await visit(sid, '/deep?x=1')).headers.get('location')).toBe(snapshotPage(sid));
+    expect((await visit(sid, '/deep?x=1')).status).toBe(302);
+    await expect(connectVisitor(sid)).rejects.toThrow(/302/);
+  });
+
+  it('stays closed when the host connects again', async () => {
+    const sid = freshSid();
+    const host = await connectHost(sid);
+    host.send(emptyFrame(0, FrameType.Close));
+    await expect.poll(async () => (await visit(sid, '/')).status).toBe(302);
+
+    await expect(connectHost(sid)).rejects.toThrow(/410/);
+    expect((await visit(sid, '/')).headers.get('location')).toBe(snapshotPage(sid));
+  });
+
+  it('keeps saying the host is offline when the host merely dropped', async () => {
+    const sid = freshSid();
+    const host = await connectHost(sid);
+
+    host.socket.close(CLOSE_NORMAL, 'dropped');
+
+    await expect.poll(async () => (await visit(sid, '/')).status).toBe(503);
+    const back = await connectHost(sid);
+    const pending = visit(sid, '/again');
+    await answer(back, 'welcome back');
+    expect(await (await pending).text()).toBe('welcome back');
+  });
+});
+
 describe('limits', () => {
   it('admits ten people and refuses the eleventh, but lets a present one open more sockets', async () => {
     const sid = freshSid();

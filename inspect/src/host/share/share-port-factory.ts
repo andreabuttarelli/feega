@@ -35,7 +35,8 @@ export function cloudShare({ api, relayUrl, send, editorUrl }: CloudShareDeps): 
         active = null;
         await inner.stop(id);
       },
-      kick: inner.kick
+      kick: inner.kick,
+      setRole: inner.setRole
     };
   };
 

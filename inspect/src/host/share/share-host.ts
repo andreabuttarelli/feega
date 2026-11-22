@@ -1,11 +1,11 @@
 import { basename } from 'node:path';
-import type { Present } from '../../../../packages/share-protocol/src/frame';
+import type { Present, VisitorRole as Role } from '../../../../packages/share-protocol/src/frame';
 import { VisitorRole, type CloudApi } from '../cloud-api';
 import type { ShareHost, ShareInfo, ShareRequest } from '../share-port';
 import { shareClient, type Ended, type ShareClient } from './client';
 import { snapshotOf } from './snapshot';
 
-export type ShareApi = Pick<CloudApi, 'startSession' | 'closeSession'>;
+export type ShareApi = Pick<CloudApi, 'startSession' | 'closeSession' | 'setMember'>;
 
 export type ShareHostDeps = {
   api: ShareApi;
@@ -15,12 +15,13 @@ export type ShareHostDeps = {
   onEnded?: (id: string, why: Ended) => void;
 };
 
-export type ShareControl = ShareHost & { kick: (id: string, userId: string) => void };
+export type ShareControl = ShareHost & { kick: (id: string, userId: string) => void; setRole: (id: string, userId: string, role: Role) => Promise<void> };
 
 export const RELAY_URL = 'ws://127.0.0.1:8787/host';
 
 const HTTP_PUT = 'PUT';
 const ZIP_TYPE = 'application/zip';
+const API_ROLES: Record<Role, VisitorRole> = { viewer: VisitorRole.Viewer, editor: VisitorRole.Editor };
 
 export function shareHost({ api, relayUrl, send, onPresence, onEnded }: ShareHostDeps): ShareControl {
   const held = new Map<string, ShareClient>();
@@ -61,5 +62,10 @@ export function shareHost({ api, relayUrl, send, onPresence, onEnded }: ShareHos
     }
   }
 
-  return { start, stop, kick: (id, userId) => held.get(id)?.kick(userId) };
+  async function setRole(id: string, userId: string, role: Role): Promise<void> {
+    await api.setMember(id, userId, API_ROLES[role]);
+    held.get(id)?.setRole(userId, role);
+  }
+
+  return { start, stop, kick: (id, userId) => held.get(id)?.kick(userId), setRole };
 }

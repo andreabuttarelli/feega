@@ -1,6 +1,6 @@
 import type { ClientRequest } from 'node:http';
 import WebSocket from 'ws';
-import { FrameType, bytesFrame, decodeFrame, emptyFrame, encodeFrame, jsonFrame, jsonOf, textFrame, textOf, type Frame, type ErrorBody, type Present, type Presence, type ReqHead, type VisitorInfo, type WsClose, type WsOpen, CONTROL_STREAM } from '../../../../packages/share-protocol/src/frame';
+import { FrameType, bytesFrame, decodeFrame, emptyFrame, encodeFrame, jsonFrame, jsonOf, textFrame, textOf, type Frame, type ErrorBody, type Present, type Presence, type ReqHead, type VisitorInfo, type VisitorRole, type WsClose, type WsOpen, CONTROL_STREAM } from '../../../../packages/share-protocol/src/frame';
 import { VISITOR_HEADER, decodeVisitor } from '../../../../packages/share-protocol/src/visitor';
 import { ToView } from '../../messages';
 import { editGate } from './gate';
@@ -35,7 +35,7 @@ export type ShareClientOptions = {
   sleep?: (ms: number) => Promise<void>;
 };
 
-export type ShareClient = { ready: Promise<void>; appUrl: () => string | null; visitors: () => Present[]; kick: (userId: string) => void; close: () => void };
+export type ShareClient = { ready: Promise<void>; appUrl: () => string | null; visitors: () => Present[]; kick: (userId: string) => void; setRole: (userId: string, role: VisitorRole) => void; close: () => void };
 
 type Stream = { abort: () => void; visitor?: VisitorInfo; request?: ClientRequest };
 
@@ -221,8 +221,13 @@ export function shareClient(options: ShareClientOptions): ShareClient {
     appUrl: () => app?.toString() ?? null,
     visitors: () => present,
     kick: (userId) => void send(jsonFrame(CONTROL_STREAM, FrameType.Kick, { userId })),
+    setRole: (userId, role) => {
+      [...sockets.values()].filter((socket) => socket.visitor.userId === userId).forEach((socket) => (socket.visitor.role = role));
+      send(jsonFrame(CONTROL_STREAM, FrameType.Role, { userId, role }));
+    },
     close: () => {
       stopped = true;
+      send(emptyFrame(CONTROL_STREAM, FrameType.Close));
       relay?.close(NORMAL_CLOSE);
       dropStreams();
     }

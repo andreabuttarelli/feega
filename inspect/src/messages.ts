@@ -15,7 +15,7 @@ import type { OffsetSide } from '@feega/live-edit/authored-offsets';
 import type { Breakpoints } from '@feega/live-edit/breakpoints';
 import type { Theme } from '@feega/live-edit/themes';
 import type { CloudComment, CommentDraft } from './host/cloud-api';
-import type { Present } from '../../packages/share-protocol/src/frame';
+import type { Present, VisitorRole } from '../../packages/share-protocol/src/frame';
 import type { ReportFacts, SettingKey, SettingValue, Settings } from './settings';
 
 export enum IconSource {
@@ -149,7 +149,8 @@ export enum ToHost {
   CommentResolve = 'comment-resolve',
   ShareStart = 'share-start',
   ShareStop = 'share-stop',
-  ShareKick = 'share-kick'
+  ShareKick = 'share-kick',
+  ShareRole = 'share-role'
 }
 
 export type ChangeRow = { id: number; at: string; prop: string; value: string; scope: string; files: string[]; time: number };
@@ -236,7 +237,8 @@ export type HostMessage =
   | { kind: ToHost.CommentResolve; id: string }
   | { kind: ToHost.ShareStart; name: string; canEdit: boolean }
   | { kind: ToHost.ShareStop }
-  | { kind: ToHost.ShareKick; userId: string };
+  | { kind: ToHost.ShareKick; userId: string }
+  | { kind: ToHost.ShareRole; userId: string; role: VisitorRole };
 
 export type ViewMessage =
   | { kind: ToView.App; url: string; styling: Styling; prefs: Prefs | null; route?: string; breakpoints: Breakpoints; themes: Theme[] }

@@ -17,6 +17,7 @@ function rig(over: { control?: Partial<ShareControl>; editorUrl?: string | null;
     start: async (request) => (requests.push(request), { id: 'sess-1', url: 'https://abcdefghij.sessions.test', expiresAt: '2026-11-22T00:00:00Z' }),
     stop: async () => undefined,
     kick: () => undefined,
+    setRole: async () => undefined,
     ...over.control
   };
   const share: SharePort = { editorUrl: async () => (over.editorUrl === undefined ? 'http://127.0.0.1:9/' : over.editorUrl), control: (h) => ((hooks = h), control) };
@@ -125,6 +126,25 @@ describe('shareSession', () => {
     session.kick('u-1');
 
     expect(kicked).toEqual([['sess-1', 'u-1']]);
+  });
+
+  it('promotes a visitor of the live session', async () => {
+    const changed: string[][] = [];
+    const { session } = rig({ control: { setRole: async (id, userId, role) => void changed.push([id, userId, role]) } });
+    await session.start('x', false);
+
+    await session.setRole('u-1', 'editor');
+
+    expect(changed).toEqual([['sess-1', 'u-1', 'editor']]);
+  });
+
+  it('says why a promotion was refused', async () => {
+    const { session, last } = rig({ control: { setRole: async () => Promise.reject(new CloudError(CloudFailure.SeatsExhausted, 'No editor seats left', 402)) } });
+    await session.start('x', false);
+
+    await session.setRole('u-1', 'editor');
+
+    expect(last().error).toBe('All editor seats are in use. Add seats in your Feega plan.');
   });
 
   it('does not start twice', async () => {

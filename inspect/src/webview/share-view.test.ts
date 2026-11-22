@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { copyLabel, expiryLabel, roleLabel } from './share-view';
+import { copyLabel, expiryLabel, otherRole, roleLabel, roleToggleLabel } from './share-view';
 
 const NOW = Date.parse('2026-11-21T10:00:00Z');
 
@@ -19,6 +19,13 @@ describe('share view labels', () => {
   it('names the roles', () => {
     expect(roleLabel('editor')).toBe('Editor');
     expect(roleLabel('viewer')).toBe('Viewer');
+  });
+
+  it('offers the other role and says what it does', () => {
+    expect(otherRole('viewer')).toBe('editor');
+    expect(otherRole('editor')).toBe('viewer');
+    expect(roleToggleLabel('viewer')).toBe('Make editor');
+    expect(roleToggleLabel('editor')).toBe('Make viewer');
   });
 
   it('labels the copy button', () => {

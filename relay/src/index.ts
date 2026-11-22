@@ -1,6 +1,6 @@
 import { VISIT_COOKIE, VISITOR_HEADER, encodeVisitor } from '../../packages/share-protocol/src/visitor';
 import { verifyToken, type Claims } from '../../packages/share-protocol/src/token';
-import { EXP_HEADER, INTENT_HEADER, Intent, type Env } from './env';
+import { EXP_HEADER, INTENT_HEADER, Intent, SID_HEADER, type Env } from './env';
 import { Route, cookieOf, loginUrl, routeOf, safeNext, visitCookie } from './routing';
 
 export { Session } from './session';
@@ -69,7 +69,7 @@ async function visitor(request: Request, sid: string, env: Env): Promise<Respons
     return isUpgrade(request) ? text(HTTP_UNAUTHORIZED, 'sign in required') : Response.redirect(loginUrl(env.WEB_ORIGIN, sid, url.pathname + url.search), HTTP_FOUND);
   }
   const info = { userId: claims.sub, name: claims.name ?? FALLBACK_NAME, role: claims.role as 'editor' | 'viewer' };
-  return stubOf(env, sid).fetch(internalRequest(request, { [INTENT_HEADER]: Intent.Visitor, [VISITOR_HEADER]: encodeVisitor(info) }));
+  return stubOf(env, sid).fetch(internalRequest(request, { [INTENT_HEADER]: Intent.Visitor, [SID_HEADER]: sid, [VISITOR_HEADER]: encodeVisitor(info) }));
 }
 
 export default {

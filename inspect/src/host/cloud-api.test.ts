@@ -92,6 +92,12 @@ describe('cloud api client', () => {
     await expect(api.startSession('shop', VisitorRole.Viewer)).rejects.toMatchObject({ failure: CloudFailure.PlanRequired });
   });
 
+  it('maps a 402 seats_exhausted to its own failure', async () => {
+    const { api } = recorder(402, { error: 'seats_exhausted' });
+
+    await expect(api.setMember('abcdefghij', 'ada', VisitorRole.Editor)).rejects.toMatchObject({ failure: CloudFailure.SeatsExhausted });
+  });
+
   it('maps other failures to the status and server message', async () => {
     const { api } = recorder(500, { error: 'boom' });
 

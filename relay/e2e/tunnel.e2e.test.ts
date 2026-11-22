@@ -111,6 +111,16 @@ async function until<T>(read: () => T | undefined): Promise<T> {
   throw new Error('timed out');
 }
 
+async function replyWhere(read: () => Promise<Reply>, status: number): Promise<Reply> {
+  const deadline = Date.now() + WAIT_MS;
+  let reply = await read();
+  while (reply.status !== status && Date.now() < deadline) {
+    await sleep(50);
+    reply = await read();
+  }
+  return reply;
+}
+
 describe('the real host client through the real relay', () => {
   let relay: Relay;
   let app: Server;
@@ -196,6 +206,32 @@ describe('the real host client through the real relay', () => {
     editorVisitor.socket.terminate();
   });
 
+  it('lets the host promote a viewer, on the open socket and on a new one, and demote again', async () => {
+    const edit = JSON.stringify({ kind: ToHost.Edit, ask: { at: 'src/b.tsx:2:2' } });
+    const cookie = await cookieOf(sid, 'viewer', 'promoted');
+    const before = await openVisitor(relay, sid, SOCKET_PATH, cookie);
+
+    before.socket.send(edit);
+    expect(JSON.parse(await until(() => before.inbox[0]))).toMatchObject({ ok: false, reason: 'viewers cannot edit' });
+
+    host.setRole('promoted', 'editor');
+    await until(() => host.visitors().find((v) => v.userId === 'promoted' && v.role === 'editor'));
+    const after = await openVisitor(relay, sid, SOCKET_PATH, cookie);
+    before.socket.send(edit);
+    after.socket.send(edit);
+
+    expect(await until(() => before.inbox[1])).toBe(`editor-got:${edit}`);
+    expect(await until(() => after.inbox[0])).toBe(`editor-got:${edit}`);
+
+    host.setRole('promoted', 'viewer');
+    await until(() => host.visitors().find((v) => v.userId === 'promoted' && v.role === 'viewer'));
+    after.socket.send(edit);
+
+    expect(JSON.parse(await until(() => after.inbox[1]))).toMatchObject({ ok: false, reason: 'viewers cannot edit' });
+    before.socket.terminate();
+    after.socket.terminate();
+  });
+
   it('refuses the visitor over the limit', async () => {
     const seated: Visitor[] = [];
     for (let i = 0; i < MAX_VISITORS; i++) {
@@ -209,5 +245,48 @@ describe('the real host client through the real relay', () => {
     expect((extra as Error).message).toBe(`refused ${HTTP_UNAVAILABLE}`);
     expect(http.status).toBe(HTTP_UNAVAILABLE);
     seated.forEach((visitor) => visitor.socket.terminate());
+  });
+});
+
+describe('a session the host stopped', () => {
+  let relay: Relay;
+  let app: Server;
+  let editor: Server;
+  const sid = newSid();
+
+  beforeAll(async () => {
+    relay = await bootRelay();
+    app = localApp();
+    editor = localEditor();
+    await Promise.all([listening(app), listening(editor)]);
+  }, BOOT_MS);
+
+  afterAll(() => {
+    relay?.stop();
+    app?.close();
+    editor?.close();
+  });
+
+  const hostFor = async (id: string) =>
+    shareClient({
+      relayUrl: `ws://${LOOPBACK}:${relay.port}/host`,
+      hostToken: await token(id, 'host', 'host-1', 'Host'),
+      editorUrl: `http://${LOOPBACK}:${(editor.address() as AddressInfo).port}`,
+      appUrl: `http://${LOOPBACK}:${(app.address() as AddressInfo).port}`,
+      visitorOrigin: `http://${id}.localhost:${relay.port}`
+    });
+
+  it('sends every visitor to the snapshot page once the host stopped', async () => {
+    const stopped = await hostFor(sid);
+    await stopped.ready;
+    const cookie = await cookieOf(sid, 'viewer');
+    expect((await get(relay, sid, '/page', { cookie })).status).toBe(HTTP_OK);
+
+    stopped.close();
+
+    const redirected = await replyWhere(() => get(relay, sid, '/page', { cookie }), HTTP_FOUND);
+    expect(redirected.headers.location).toBe(`${WEB_ORIGIN}/s/${sid}`);
+    const deep = await get(relay, sid, '/a/b?c=1', { cookie });
+    expect(deep.headers.location).toBe(`${WEB_ORIGIN}/s/${sid}`);
   });
 });

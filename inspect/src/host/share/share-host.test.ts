@@ -3,6 +3,7 @@ import type { AddressInfo } from 'node:net';
 import { afterEach, describe, expect, it } from 'vitest';
 import { WebSocketServer } from 'ws';
 import { CloudError, CloudFailure, VisitorRole } from '../cloud-api';
+import { FrameType, decodeFrame, jsonOf, type Frame } from '../../../../packages/share-protocol/src/frame';
 import { shareHost, type ShareApi } from './share-host';
 
 let closers: (() => void)[] = [];
@@ -10,22 +11,24 @@ afterEach(() => closers.splice(0).forEach((close) => close()));
 
 async function relay(accept: boolean) {
   const tokens: string[] = [];
+  const frames: Frame[] = [];
   const server = createServer();
   const wss = new WebSocketServer({ noServer: true });
   server.on('upgrade', (request, socket, head) => {
     tokens.push(new URL(request.url ?? '', 'http://x').searchParams.get('token') ?? '');
-    accept ? wss.handleUpgrade(request, socket, head, () => undefined) : socket.end('HTTP/1.1 401 Unauthorized\r\n\r\n');
+    accept ? wss.handleUpgrade(request, socket, head, (peer) => peer.on('message', (data: Buffer) => void frames.push(decodeFrame(new Uint8Array(data))!))) : socket.end('HTTP/1.1 401 Unauthorized\r\n\r\n');
   });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   closers.push(() => (wss.close(), server.closeAllConnections(), server.close()));
-  return { url: `ws://127.0.0.1:${(server.address() as AddressInfo).port}/host`, tokens };
+  return { url: `ws://127.0.0.1:${(server.address() as AddressInfo).port}/host`, tokens, frames };
 }
 
 function apiStub(over: Partial<ShareApi> = {}) {
-  const calls: { started: [string, VisitorRole][]; closed: string[] } = { started: [], closed: [] };
+  const calls: { started: [string, VisitorRole][]; closed: string[]; members: [string, string, VisitorRole][] } = { started: [], closed: [], members: [] };
   const api: ShareApi = {
     startSession: async (name, role) => (calls.started.push([name, role]), { id: 'sess-1', url: 'https://abcdefghij.sessions.test', hostToken: 'host-jwt', expiresAt: '2026-11-22T00:00:00Z' }),
     closeSession: async (id) => (calls.closed.push(id), { snapshotUploadUrl: 'https://storage.test/upload?sig=1' }),
+    setMember: async (id, userId, role) => (calls.members.push([id, userId, role]), {}),
     ...over
   };
   return { api, calls };
@@ -108,6 +111,42 @@ describe('shareHost', () => {
     await host.stop('sess-1');
 
     expect(calls.closed).toEqual(['sess-1']);
+  });
+
+  it('promotes through the api, then tells the tunnel', async () => {
+    const { url, frames } = await relay(true);
+    const { api, calls } = apiStub();
+    const host = shareHost({ api, relayUrl: url, send: fetch });
+    await host.start({ dir: '/a', editorUrl: 'http://127.0.0.1:1/', visitorsCanEdit: false });
+
+    await host.setRole('sess-1', 'ada', 'editor');
+
+    expect(calls.members).toEqual([['sess-1', 'ada', VisitorRole.Editor]]);
+    await expect.poll(() => frames.filter((f) => f.type === FrameType.Role).map((f) => jsonOf(f))).toEqual([{ userId: 'ada', role: 'editor' }]);
+    await host.stop('sess-1');
+  });
+
+  it('does not tell the tunnel when the api refuses the promotion', async () => {
+    const { url, frames } = await relay(true);
+    const { api } = apiStub({ setMember: async () => Promise.reject(new CloudError(CloudFailure.SeatsExhausted, 'No editor seats left', 402)) });
+    const host = shareHost({ api, relayUrl: url, send: fetch });
+    await host.start({ dir: '/a', editorUrl: 'http://127.0.0.1:1/', visitorsCanEdit: false });
+
+    await expect(host.setRole('sess-1', 'ada', 'editor')).rejects.toMatchObject({ failure: CloudFailure.SeatsExhausted });
+    await host.stop('sess-1');
+
+    expect(frames.some((f) => f.type === FrameType.Role)).toBe(false);
+  });
+
+  it('sends the close frame on stop so visitors land on the snapshot', async () => {
+    const { url, frames } = await relay(true);
+    const { api } = apiStub();
+    const host = shareHost({ api, relayUrl: url, send: fetch });
+    await host.start({ dir: '/a', editorUrl: 'http://127.0.0.1:1/', visitorsCanEdit: false });
+
+    await host.stop('sess-1');
+
+    await expect.poll(() => frames.some((f) => f.type === FrameType.Close)).toBe(true);
   });
 
   it('refuses to stop a session it does not hold', async () => {

@@ -9,6 +9,7 @@ export type Env = {
 
 export const INTENT_HEADER = 'x-feega-intent';
 export const EXP_HEADER = 'x-feega-exp';
+export const SID_HEADER = 'x-feega-sid';
 
 export enum Intent {
   Host = 'host',
@@ -22,5 +23,6 @@ export enum CloseCode {
   Idle = 4000,
   Replaced = 4001,
   Expired = 4002,
-  Kicked = 4003
+  Kicked = 4003,
+  Closed = 4004
 }

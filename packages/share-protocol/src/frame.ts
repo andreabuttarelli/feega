@@ -11,7 +11,9 @@ export enum FrameType {
   WsClose = 10,
   Error = 11,
   Presence = 12,
-  Kick = 13
+  Kick = 13,
+  Role = 14,
+  Close = 15
 }
 
 export enum Payload {
@@ -34,7 +36,9 @@ export const FRAME_PAYLOADS: Record<FrameType, Payload> = {
   [FrameType.WsClose]: Payload.Json,
   [FrameType.Error]: Payload.Json,
   [FrameType.Presence]: Payload.Json,
-  [FrameType.Kick]: Payload.Json
+  [FrameType.Kick]: Payload.Json,
+  [FrameType.Role]: Payload.Json,
+  [FrameType.Close]: Payload.Empty
 };
 
 export type Frame = { streamId: number; type: FrameType; payload: Uint8Array };
@@ -52,6 +56,7 @@ export type VisitorInfo = { userId: string; name: string; role: VisitorRole };
 export type Present = VisitorInfo & { selection?: string };
 export type Presence = { visitors: Present[] };
 export type Kick = { userId: string };
+export type Roled = { userId: string; role: VisitorRole };
 
 export const SET_COOKIE_SEPARATOR = '\n';
 export const CONTROL_STREAM = 0;

@@ -73,7 +73,7 @@ export async function connectHost(sid: string, over: Partial<Claims> = {}): Prom
 }
 
 export async function connectVisitor(sid: string, path = '/feega-host', over: Partial<Claims> = {}, extra: Record<string, string> = {}): Promise<Peer> {
-  const response = await exports.default.fetch(visitorUrl(sid, path), { headers: { Upgrade: 'websocket', cookie: await cookieFor(sid, over), ...extra } });
+  const response = await exports.default.fetch(visitorUrl(sid, path), { redirect: 'manual', headers: { Upgrade: 'websocket', cookie: await cookieFor(sid, over), ...extra } });
   if (response.status !== 101 || !response.webSocket) {
     throw new Error(`visitor refused: ${response.status}`);
   }

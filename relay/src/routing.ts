@@ -54,3 +54,5 @@ export function forwardHeaders(headers: Headers): Record<string, string> {
 }
 
 export const loginUrl = (webOrigin: string, sid: string, path: string) => `${webOrigin}/s/${sid}?next=${encodeURIComponent(path)}`;
+
+export const snapshotUrl = (webOrigin: string, sid: string) => `${webOrigin}/s/${sid}`;

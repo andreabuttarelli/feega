@@ -1,5 +1,5 @@
 import { basename } from 'node:path';
-import type { Present } from '../../../../packages/share-protocol/src/frame';
+import type { Present, VisitorRole } from '../../../../packages/share-protocol/src/frame';
 import { ShareState, ToView, type ViewMessage } from '../../messages';
 import { CloudError, CloudFailure } from '../cloud-api';
 import { Stored, type Platform } from '../platform';
@@ -23,6 +23,7 @@ const ENDED_TEXT: Record<Ended, string> = {
 
 const FAILURE_TEXT: Record<CloudFailure, string | null> = {
   [CloudFailure.PlanRequired]: 'Feega Cloud needs a paid plan',
+  [CloudFailure.SeatsExhausted]: 'All editor seats are in use. Add seats in your Feega plan.',
   [CloudFailure.NotSignedIn]: 'Sign in to Feega to share',
   [CloudFailure.Http]: null
 };
@@ -98,5 +99,14 @@ export function shareSession({ platform, workspace, appUrl, post }: ShareSession
     await control.stop(id).catch((failure: Error) => ((error = failure.message), show()));
   }
 
-  return { show, start, stop, kick: (userId: string) => live && control?.kick(live.id, userId) };
+  async function setRole(userId: string, role: VisitorRole) {
+    if (!control || !live) {
+      return;
+    }
+    error = undefined;
+    await control.setRole(live.id, userId, role).catch((failure: unknown) => (error = reasonOf(failure)));
+    await show();
+  }
+
+  return { show, start, stop, setRole, kick: (userId: string) => live && control?.kick(live.id, userId) };
 }

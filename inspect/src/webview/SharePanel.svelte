@@ -4,14 +4,15 @@
   import Copy from '@lucide/svelte/icons/copy';
   import Share2 from '@lucide/svelte/icons/share-2';
   import X from '@lucide/svelte/icons/x';
+  import type { VisitorRole } from '../../../packages/share-protocol/src/frame';
   import { ShareState, ToView, type ViewMessage } from '../messages';
-  import { copyLabel, expiryLabel, roleLabel } from './share-view';
+  import { copyLabel, expiryLabel, otherRole, roleLabel, roleToggleLabel } from './share-view';
 
   type ShareView = Extract<ViewMessage, { kind: ToView.Share }>;
 
   const COPIED_MS = 1500;
 
-  let { view, onstart, onstop, onkick }: { view: ShareView | null; onstart: (name: string, canEdit: boolean) => void; onstop: () => void; onkick: (userId: string) => void } = $props();
+  let { view, onstart, onstop, onkick, onrole }: { view: ShareView | null; onstart: (name: string, canEdit: boolean) => void; onstop: () => void; onkick: (userId: string) => void; onrole: (userId: string, role: VisitorRole) => void } = $props();
 
   let open = $state(false);
   let name = $state('');
@@ -72,7 +73,7 @@
         <h3>Who is here</h3>
         <ul class="people" data-testid="share-visitors">
           {#each view.visitors as person (person.userId)}
-            <li><span class="who">{person.name}</span><span class="role">{roleLabel(person.role)}</span><button type="button" class="kick" aria-label={`Remove ${person.name}`} onclick={() => onkick(person.userId)}>Remove</button></li>
+            <li><span class="who">{person.name}</span><span class="role">{roleLabel(person.role)}</span><button type="button" class="kick" data-testid="share-role" aria-label={`${roleToggleLabel(person.role)}: ${person.name}`} onclick={() => onrole(person.userId, otherRole(person.role))}>{roleToggleLabel(person.role)}</button><button type="button" class="kick" aria-label={`Remove ${person.name}`} onclick={() => onkick(person.userId)}>Remove</button></li>
           {:else}
             <li class="muted">Nobody yet</li>
           {/each}

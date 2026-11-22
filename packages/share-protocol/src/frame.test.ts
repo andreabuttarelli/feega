@@ -63,6 +63,8 @@ describe('frame', () => {
     expect(FRAME_PAYLOADS[FrameType.Error]).toBe(Payload.Json);
     expect(FRAME_PAYLOADS[FrameType.Presence]).toBe(Payload.Json);
     expect(FRAME_PAYLOADS[FrameType.Kick]).toBe(Payload.Json);
+    expect(FRAME_PAYLOADS[FrameType.Role]).toBe(Payload.Json);
+    expect(FRAME_PAYLOADS[FrameType.Close]).toBe(Payload.Empty);
   });
 
   it('numbers the types as the contract does', () => {
@@ -70,6 +72,8 @@ describe('frame', () => {
     expect(FrameType.WsOpen).toBe(7);
     expect(FrameType.Presence).toBe(12);
     expect(FrameType.Kick).toBe(13);
+    expect(FrameType.Role).toBe(14);
+    expect(FrameType.Close).toBe(15);
   });
 
   it('carries json payloads including non-ascii text', () => {

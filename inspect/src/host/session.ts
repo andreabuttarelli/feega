@@ -424,7 +424,8 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.CommentResolve]: (m) => comments.resolve(m.id),
     [ToHost.ShareStart]: (m) => sharing.start(m.name, m.canEdit),
     [ToHost.ShareStop]: sharing.stop,
-    [ToHost.ShareKick]: (m) => sharing.kick(m.userId)
+    [ToHost.ShareKick]: (m) => sharing.kick(m.userId),
+    [ToHost.ShareRole]: (m) => sharing.setRole(m.userId, m.role)
   };
 
   platform.receive((message) => (handlers[message.kind] as (m: HostMessage) => unknown)(message));

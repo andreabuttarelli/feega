@@ -361,6 +361,36 @@ describe('shareClient', () => {
     }
   });
 
+  it('tells the relay a visitor changed role and gates edits by the new role at once', async () => {
+    const { relay, editor, client } = await rig();
+    await relay.send(jsonFrame(4, FrameType.WsOpen, { path: '/feega-host', headers: { 'x-feega-visitor': encodeVisitor(vera) }, protocols: [] }));
+    await relay.send(jsonFrame(5, FrameType.WsOpen, { path: '/feega-host', headers: { 'x-feega-visitor': encodeVisitor(ada) }, protocols: [] }));
+    await waitFor(() => editor.sockets.length === 2, 'two local sockets');
+    const edit = JSON.stringify({ kind: ToHost.Edit, ask: { at: 'a.svelte:1:1', prop: 'color', value: 'red' } });
+
+    client.setRole('vera', 'editor');
+    client.setRole('ada', 'viewer');
+
+    expect(jsonOf((await relay.next((f) => f.type === FrameType.Role && jsonOf<{ userId: string }>(f)?.userId === 'vera'))!)).toEqual({ userId: 'vera', role: 'editor' });
+    expect(jsonOf((await relay.next((f) => f.type === FrameType.Role))!)).toEqual({ userId: 'ada', role: 'viewer' });
+    await relay.send(textFrame(4, edit));
+    await relay.send(textFrame(5, edit));
+    const refusal = await relay.next((f) => f.type === FrameType.WsText && f.streamId === 5);
+    expect(JSON.parse(textOf(refusal.payload)!)).toEqual({ kind: ToView.Edited, ok: false, reason: 'viewers cannot edit' });
+    await waitFor(() => editor.sockets[0].messages.length === 1, 'the promoted edit');
+    expect(editor.sockets[1].messages).toEqual([]);
+  });
+
+  it('tells the relay the session is over before it disconnects', async () => {
+    const { relay, client } = await rig();
+
+    client.close();
+
+    const close = await relay.next((f) => f.type === FrameType.Close);
+    expect(close.streamId).toBe(0);
+    expect(close.payload).toHaveLength(0);
+  });
+
   it('does not reconnect after close', async () => {
     const { relay, client } = await rig({ sleep: async () => undefined });
 
