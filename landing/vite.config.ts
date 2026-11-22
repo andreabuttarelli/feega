@@ -30,7 +30,7 @@ function changelogEntries(): Plugin {
 
       const files = entryFiles();
       const imports = files.map((file, i) => `import e${i} from ${JSON.stringify(file)};`);
-      const contents = `${imports.join('\n')}\nimport legacy from './legacy';\nexport default [${files.map((_, i) => `e${i}`).join(',')}, ...legacy];`;
+      const contents = `${imports.join('\n')}\nexport default [${files.map((_, i) => `e${i}`).join(',')}];`;
       const out = await build({
         stdin: { contents, resolveDir: CHANGELOG_DIR, loader: 'ts' },
         tsconfigRaw: {},
