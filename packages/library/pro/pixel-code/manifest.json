@@ -1,0 +1,33 @@
+{
+  "id": "pixel-code",
+  "name": "Pixel code",
+  "description": "An animated pixel texture: a dithered blue field with lines of code that type, scroll and dissolve.",
+  "category": "section",
+  "tags": [
+    "pixel",
+    "texture",
+    "dither",
+    "animation",
+    "code"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    }
+  ],
+  "tier": "pro",
+  "preview": "https://www.feega.app/templates-shots/pixel-code-light.webp"
+}
