@@ -3,10 +3,10 @@ import { readFile } from 'node:fs/promises';
 import { createServer, type IncomingMessage } from 'node:http';
 import { join } from 'node:path';
 import { WebSocketServer, type WebSocket } from 'ws';
-import { SOCKET_PATH, type HostMessage, type ViewMessage } from '../../inspect/src/messages';
-import type { Transport } from '../../inspect/src/host/platform';
-import { FeegaServer, feegaHeaders } from '../../inspect/src/host/feega-server';
-import { panelHtml, type PanelTheme } from '../../inspect/src/host/panel-html';
+import { SOCKET_PATH, type HostMessage, type ViewMessage } from '../messages';
+import type { Transport } from './platform';
+import { FeegaServer, feegaHeaders } from './feega-server';
+import { panelHtml, type PanelTheme } from './panel-html';
 
 const HOST = '127.0.0.1';
 const HTTP_OK = 200;

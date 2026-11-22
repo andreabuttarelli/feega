@@ -3,15 +3,26 @@ import { createServer } from 'node:http';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium, type Page } from '@playwright/test';
-import { fileEdits } from '../src/host/file-edits.ts';
+import { fileEdits, type ManyAsk } from '../src/host/file-edits.ts';
 import { stylingOf } from '../src/host/styling.ts';
 import { Attach, startDev } from '../src/host/dev-server.ts';
-import { ServerState, ToHost, ToView, type EditAsk, type Pick } from '../src/messages.ts';
+import { ServerState, ToHost, ToView, type EditAsk, type Pick, type PluginAsk } from '../src/messages.ts';
+import { pluginCalls } from '../src/host/plugin-calls.ts';
+import { RestartWatch } from '../src/host/restart-watch.ts';
+import { shownFor, watchServer } from '../src/host/server-watch.ts';
 import { liveAtOf } from '@feega/live-edit/live-ask';
 import { SETTINGS } from '../src/settings.ts';
 import { searchIcons } from '../src/host/icon-search.ts';
 import { previewQueue } from '../src/host/icon-previews.ts';
+import { breakpointsOf } from '../src/host/breakpoints.ts';
+import { themesOf } from '../src/host/themes.ts';
+import { commentsHost, type CommentsCloud } from '../src/host/comments.ts';
+import type { CommentDraft } from '../src/host/cloud-api.ts';
+import { entriesOf, insertAskOf } from '../src/host/library.ts';
+import { buildCatalog } from '../../packages/library/src/catalog.ts';
+import type { AddPlace } from '@feega/live-edit/add-node';
 
+const catalog = buildCatalog();
 const PANEL_PORT = Number(process.env.PANEL_PORT ?? 5999);
 const dist = fileURLToPath(new URL('../dist/webview/', import.meta.url));
 const launcher = fileURLToPath(new URL('../dist/launcher/', import.meta.url));
@@ -24,7 +35,7 @@ const pageHtml = (theme: string) => `<!doctype html><html><head><meta charset="u
 export const DARK = ':root{--vscode-editor-background:#1f1f1f;--vscode-foreground:#cccccc;--vscode-sideBar-background:#181818;--vscode-focusBorder:#0078d4;--vscode-font-family:-apple-system,system-ui,sans-serif}';
 export const LIGHT = ':root{--vscode-editor-background:#ffffff;--vscode-foreground:#1f1f1f;--vscode-sideBar-background:#f8f8f8;--vscode-focusBorder:#0078d4;--vscode-font-family:-apple-system,system-ui,sans-serif}';
 
-export async function openPanel(appRoot: string, theme = DARK) {
+export async function openPanel(appRoot: string, theme = DARK, cloud?: CommentsCloud) {
   const running = await startDev(appRoot, launcher, { log: () => undefined, installing: () => undefined, spawned: () => undefined, signal: new AbortController().signal }, '', Attach.Never);
   if ('refused' in running) {
     throw new Error(running.refused);
@@ -44,37 +55,91 @@ export async function openPanel(appRoot: string, theme = DARK) {
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 });
   if (process.env.PROBE) {
-    page.on('console', (m) => console.log('console', m.text().slice(0, 160)));
+    page.on('console', (m) => console.log('console', m.text().slice(0, 800)));
     page.on('pageerror', (e) => console.log('pageerror', e.message));
   }
   const reply = (m: unknown) => page.evaluate((msg) => window.postMessage(msg, '*'), m);
+  let closed = false;
+  void watchServer({ started: running, restarts: new RestartWatch(), current: () => !closed, act: (step) => shownFor(step, undefined, '').forEach(reply) });
   const picks = new Map<number, (p: Pick | null) => void>();
   const saves: unknown[] = [];
+  const copied: string[] = [];
+  const comments = commentsHost(cloud, reply);
+  const history = () => reply({ kind: ToView.History, changes: edits.history(), canUndo: edits.canUndo(), canRedo: edits.canRedo() });
+  const runPlugin = pluginCalls({
+    root: appRoot,
+    appDir: () => '',
+    fetch,
+    propose: async (proposal, appDir) => {
+      const out = await edits.proposal(proposal, appDir);
+      await history();
+      await reply(out.ok ? { kind: ToView.Edited, ok: true, written: '' } : { kind: ToView.Edited, ok: false, reason: out.reason });
+      return out;
+    }
+  });
   const previewIcons = previewQueue(fetch, (name, svg) => reply({ kind: ToView.IconPreview, name, svg }));
 
-  await page.exposeFunction('toHost', async (m: { kind: ToHost; ask?: EditAsk; id?: number; pick?: Pick | null; query?: string; names?: string[] }) => {
+  await page.exposeFunction('toHost', async (m: { kind: ToHost; from?: string; to?: string; google?: boolean; family?: string; ask?: EditAsk; id?: number | string; pick?: Pick | null; query?: string; names?: string[]; text?: string; draft?: CommentDraft; at?: string; place?: string }) => {
     if (m.kind === ToHost.Ready) {
-      await reply({ kind: ToView.App, url: running.url, styling, prefs: null });
+      await reply({ kind: ToView.App, url: running.url, styling, prefs: null, breakpoints: await breakpointsOf(appRoot), themes: await themesOf(appRoot) });
       await reply({ kind: ToView.Server, state: ServerState.Running });
+      await comments.show();
       await reply({ kind: ToView.Settings, values: Object.fromEntries(SETTINGS.map((r) => [r.key, r.fallback])), facts: { version: '0.1.0', framework: 'sveltekit', styling } });
     }
     if (m.kind === ToHost.Picked) {
-      picks.get(m.id!)?.(m.pick ?? null);
+      picks.get(m.id as number)?.(m.pick ?? null);
     }
     if (m.kind === ToHost.Edit) {
       const out = await edits.edit(m.ask!);
       saves.push(out);
       await reply(out.ok ? { kind: ToView.Edited, ok: true, written: out.written, saved: liveAtOf(m.ask!.at), note: out.note } : { kind: ToView.Edited, ok: false, reason: out.reason, at: out.at });
     }
+    if (m.kind === ToHost.FontReplace || m.kind === ToHost.FontLoad) {
+      const out = m.kind === ToHost.FontReplace ? await edits.replaceFont(m.from!, m.to!, m.google!) : await edits.loadFont(m.family!);
+      await reply(out.ok ? { kind: ToView.Edited, ok: true, written: out.written, note: out.note } : { kind: ToView.Edited, ok: false, reason: out.reason });
+    }
+    if (m.kind === ToHost.Structure) {
+      const out = await edits.structure(m);
+      await reply(out.ok ? { kind: ToView.Edited, ok: true, written: out.written, select: out.selected } : { kind: ToView.Edited, ok: false, reason: out.reason, at: out.at });
+    }
+    if (m.kind === ToHost.LibraryList) {
+      await reply({ kind: ToView.Library, items: entriesOf(catalog) });
+    }
+    if (m.kind === ToHost.LibraryInsert) {
+      const ask = insertAskOf(catalog, m.id as string);
+      const out = ask.ok ? await edits.library(m.at as string, m.place as AddPlace, ask.item, ask.tokens) : ask;
+      await reply(out.ok ? { kind: ToView.Edited, ok: true, written: '', select: 'selected' in out ? out.selected : undefined } : { kind: ToView.Edited, ok: false, reason: out.reason });
+    }
+    if (m.kind === ToHost.StructureMany) {
+      const out = await edits.structureMany(m as unknown as ManyAsk);
+      await reply(out.ok ? { kind: ToView.Edited, ok: true, written: out.written, note: out.note, select: out.selected } : { kind: ToView.Edited, ok: false, reason: out.reason, at: out.at });
+    }
+    if (m.kind === ToHost.Copy) {
+      copied.push(m.text!);
+    }
     if (m.kind === ToHost.IconSearch) {
       const found = await searchIcons(appRoot, fetch, m.query!, null);
-      await reply({ kind: ToView.IconResults, id: m.id, ...found });
+      await reply({ kind: ToView.IconResults, id: m.id as number, ...found });
     }
     if (m.kind === ToHost.IconPreviews) {
       await previewIcons(m.names!);
     }
+    if (m.kind === ToHost.Comments) {
+      await comments.show();
+    }
+    if (m.kind === ToHost.CommentAdd) {
+      await comments.add(m.draft!);
+    }
+    if (m.kind === ToHost.CommentResolve) {
+      await comments.resolve(m.id as string);
+    }
     if (m.kind === ToHost.Undo) {
-      await edits.undo();
+      const out = await edits.undo();
+      await history();
+      await reply(out.ok ? { kind: ToView.Edited, ok: true, written: '' } : { kind: ToView.Edited, ok: false, reason: out.reason });
+    }
+    if (m.kind === ToHost.Plugin) {
+      await reply({ kind: ToView.Plugin, id: m.id as number, result: await runPlugin(m.ask as unknown as PluginAsk) });
     }
   });
 
@@ -93,12 +158,13 @@ export async function openPanel(appRoot: string, theme = DARK) {
   }
 
   const close = async () => {
+    closed = true;
     await browser.close();
     server.close();
     running.stop();
   };
 
-  return { page, frame, reply, edits, pickAt, saves, close, styling, url: running.url };
+  return { page, frame, reply, edits, pickAt, saves, copied, close, styling, url: running.url };
 }
 
 export type Panel = Awaited<ReturnType<typeof openPanel>>;

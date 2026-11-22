@@ -2,4 +2,8 @@
 
 No third-party source code is vendored in this repository. Fonts keep their licence files next to them in `static/fonts/`.
 
+## Inter Bold
+
+`packages/plugin-object-3d/src/runtime/inter_bold.typeface.json` is Inter Bold (Latin subset) converted to three.js typeface JSON by `packages/plugin-object-3d/scripts/make-font.mjs`. Copyright (c) 2016 The Inter Project Authors, SIL Open Font License 1.1, no Reserved Font Name. The licence is `packages/plugin-object-3d/src/runtime/OFL.txt`, and the 3D object plugin writes it next to the font in the user's project.
+
 The earlier version of Feega, which vendored code from OpenPencil, snapcn, Paper Shaders, Magic UI, Animata, free-remotion-templates, Arc and Ruixen UI, was removed on 20/11/2026. Its notices remain in the git history and in the archive `feega-20261120.bundle`.

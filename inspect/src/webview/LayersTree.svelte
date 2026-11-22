@@ -5,8 +5,10 @@
   import EyeOff from '@lucide/svelte/icons/eye-off';
   import Lock from '@lucide/svelte/icons/lock';
   import Unlock from '@lucide/svelte/icons/lock-open';
+  import { AddKind, AddPlace } from '@feega/live-edit/add-node';
   import { Place } from '@feega/live-edit/move-node';
   import type { LayerNode, Pick, Source } from '../messages';
+  import { ADD_DRAG_TYPE, rowPlace } from './insert-drop';
   import { sourceText } from './page-bridge';
   import { actionsOf, roleOf } from './roles';
   import { hiddenHere } from './layer-state';
@@ -15,14 +17,17 @@
   type Props = {
     nodes: LayerNode[];
     picked: Pick | null;
+    selected: Set<string>;
     badge?: string;
     depth?: number;
     open: Record<string, boolean>;
-    onselect: (source: Source, instance: number) => void;
+    onselect: (source: Source, instance: number, e?: MouseEvent) => void;
     onhover: (source: Source | null, instance: number) => void;
     onopen: (source: Source) => void;
     onmove: (from: Source, to: Source, place: Place) => void;
-    dragging: { source: Source | null; name: string; component: boolean; parentFile: string | null };
+    dragging: { source: Source | null; name: string; component: boolean; parentFile: string | null; hint: { id: string; place: AddPlace } | null };
+    oncontext: (source: Source, instance: number, at: { x: number; y: number }) => void;
+    onadd: (kind: AddKind, source: Source, place: AddPlace) => void;
     parentFile?: string | null;
     onusage: (file: string, from: string, to: string, place: Place) => void;
     hidden: Set<string>;
@@ -30,7 +35,7 @@
     ontoggle: (flag: 'hidden' | 'locked', source: Source) => void;
   };
 
-  let { nodes, picked, badge = '', depth = 0, open, onselect, onhover, onopen, onmove, dragging, parentFile = null, onusage, hidden, locked, ontoggle }: Props = $props();
+  let { nodes, picked, selected, badge = '', depth = 0, open, onselect, onhover, onopen, onmove, dragging, parentFile = null, onusage, hidden, locked, ontoggle, oncontext, onadd }: Props = $props();
 
   const INDENT_PX = 12;
   const EDGE_BAND = 0.25;
@@ -38,7 +43,7 @@
   const isPicked = (n: LayerNode) => picked !== null && n.source !== null && sourceText(picked.source) === sourceText(n.source);
   const actions = (n: LayerNode) => actionsOf(roleOf({ tag: n.tag, ownText: false, inlineText: false, elements: n.children.length, display: n.display }));
   const visual = (n: LayerNode) => n.source !== null && actions(n).visibility;
-  const choose = (n: LayerNode) => (n.source ? onselect(n.source, n.instance) : (open[key(n)] = !open[key(n)]));
+  const choose = (n: LayerNode, e?: MouseEvent) => (n.source ? onselect(n.source, n.instance, e) : (open[key(n)] = !open[key(n)]));
 
   function onKey(e: KeyboardEvent, node: LayerNode) {
     const actions: Record<string, () => void> = {
@@ -53,8 +58,38 @@
     }
   }
 
+  const addDrag = (e: DragEvent) => e.dataTransfer?.types.includes(ADD_DRAG_TYPE) ?? false;
+
+  const placeOf = (e: DragEvent) => {
+    const { top, height } = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    return rowPlace((e.clientY - top) / height);
+  };
+
+  function onOver(e: DragEvent, node: LayerNode) {
+    e.preventDefault();
+    if (addDrag(e) && node.source) {
+      dragging.hint = { id: key(node), place: placeOf(e) };
+    }
+  }
+
+  function onContext(e: MouseEvent, node: LayerNode) {
+    if (!node.source) {
+      return;
+    }
+    e.preventDefault();
+    oncontext(node.source, node.instance, { x: e.clientX, y: e.clientY });
+  }
+
   function onDrop(e: DragEvent, node: LayerNode) {
     e.preventDefault();
+    dragging.hint = null;
+    if (addDrag(e)) {
+      const kind = e.dataTransfer?.getData(ADD_DRAG_TYPE) as AddKind;
+      if (node.source && kind) {
+        onadd(kind, node.source, placeOf(e));
+      }
+      return;
+    }
     const from = dragging.source;
     dragging.source = null;
     if (!from || !node.source) {
@@ -75,21 +110,26 @@
   {@const id = key(node)}
   <div
     class="row"
-    class:picked={isPicked(node)}
+    class:picked={selected.has(id)}
     class:dim={hidden.has(id)}
+    class:drop-before={dragging.hint?.id === id && dragging.hint.place === AddPlace.Before}
+    class:drop-after={dragging.hint?.id === id && dragging.hint.place === AddPlace.After}
+    class:drop-child={dragging.hint?.id === id && dragging.hint.place === AddPlace.Child}
     role="treeitem"
-    aria-selected={isPicked(node)}
+    aria-selected={selected.has(id)}
     aria-expanded={node.children.length ? Boolean(open[id]) : undefined}
     tabindex="0"
     draggable={visual(node)}
     style={`padding-left:${8 + depth * INDENT_PX}px`}
     data-layer={id}
-    onclick={() => choose(node)}
+    onclick={(e) => choose(node, e)}
     onkeydown={(e) => onKey(e, node)}
     onpointerenter={() => onhover(visual(node) ? node.source : null, node.instance)}
     onpointerleave={() => onhover(null, 0)}
     ondragstart={() => Object.assign(dragging, { source: node.source, name: node.name, component: node.component, parentFile })}
-    ondragover={(e) => e.preventDefault()}
+    ondragover={(e) => onOver(e, node)}
+    ondragleave={() => dragging.hint?.id === id && (dragging.hint = null)}
+    oncontextmenu={(e) => onContext(e, node)}
     ondrop={(e) => onDrop(e, node)}
   >
     {#if node.children.length}
@@ -108,7 +148,7 @@
     </span>{/if}
   </div>
   {#if node.children.length && open[id]}
-    <Self nodes={node.children} {picked} {badge} depth={depth + 1} {open} {onselect} {onhover} {onopen} {onmove} {dragging} parentFile={node.source?.file ?? null} {onusage} {hidden} {locked} {ontoggle} />
+    <Self nodes={node.children} {picked} {selected} {badge} depth={depth + 1} {open} {onselect} {onhover} {onopen} {onmove} {dragging} parentFile={node.source?.file ?? null} {onusage} {hidden} {locked} {ontoggle} {oncontext} {onadd} />
   {/if}
 {/each}
 
@@ -129,6 +169,7 @@
     font-size: var(--ui-text-sm);
     cursor: default;
     outline: none;
+    user-select: none;
   }
 
   .row:hover {
@@ -137,6 +178,19 @@
 
   .row:focus-visible {
     box-shadow: inset 0 0 0 1px var(--ui-accent);
+  }
+
+  .row.drop-before {
+    box-shadow: inset 0 2px 0 var(--ui-accent);
+  }
+
+  .row.drop-after {
+    box-shadow: inset 0 -2px 0 var(--ui-accent);
+  }
+
+  .row.drop-child {
+    box-shadow: inset 0 0 0 1px var(--ui-accent);
+    background: color-mix(in srgb, var(--ui-accent) 14%, transparent);
   }
 
   .row.picked {

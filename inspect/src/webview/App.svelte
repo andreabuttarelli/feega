@@ -11,8 +11,9 @@
   import { ElementState } from '@feega/live-edit/element-state';
   import type { Styles } from './controls';
   import { untrack } from 'svelte';
-  import { selectionKey, SelectionKey } from './selection-keys';
-  import { AccountState, Mode, Onboarding, Move, ServerAction, Slot, type ChangeRow, type FontChoice, type LayerNode, type Palette, ServerState, type ServerInfo, Styling, ToHost, ToView, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
+  import { MOVES, Shortcut, isMac, needsBareFocus, shortcutOf, typingIn } from './selection-keys';
+  import { Click, NONE, Surface, clickOf, contains, extend, keyOf, only, primary, refOf, siblingsOf, toggle, visibleRows, type Selection } from './selection';
+  import { AccountState, Mode, Onboarding, Move, ServerAction, Slot, type ChangeRow, type FontChoice, type LayerNode, type LibraryEntry, type Palette, ServerState, type ServerInfo, Styling, ToHost, ToView, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
   import { fromHost, inVscode, toHost } from './host';
   import { imageSaved } from './image-file.svelte';
   import { iconDrawn, iconsFound } from './icon-search.svelte';
@@ -31,6 +32,7 @@
   import FeegaMenu from './FeegaMenu.svelte';
   import OnboardingDialog from './Onboarding.svelte';
   import ServerPopover from './ServerPopover.svelte';
+  import SharePanel from './SharePanel.svelte';
   import LayersTree from './LayersTree.svelte';
   import { hasSourceInfo } from './source-info';
   import ChangesList from './ChangesList.svelte';
@@ -40,6 +42,8 @@
   import { Tabs } from 'bits-ui';
   import { Tab } from './tabs';
   import { fontCss } from './fonts';
+  import MissingFont from './MissingFont.svelte';
+  import { SvelteSet } from 'svelte/reactivity';
   import { layerState, passThrough, type LayerFlag, type SavedLayers } from './layer-state';
   import { ClassFamily } from '@feega/live-edit/live-fields';
   import Breadcrumb from './Breadcrumb.svelte';
@@ -50,13 +54,27 @@
   import { Place } from '@feega/live-edit/move-node';
   import { StructureOp } from '@feega/live-edit/structure';
   import StructureMenu from './StructureMenu.svelte';
-  import { agentContext } from './agent-context';
-  import { AddKind } from '@feega/live-edit/add-node';
-  import { ADD_ITEMS, ADD_LOOP_ITEM, COPY_FOR_AGENT, MENU_ITEMS } from './structure-menu';
+  import LibraryPanel from './LibraryPanel.svelte';
+  import { LIBRARY_DRAG_TYPE } from './library';
+  import { agentContexts, commentContext } from './agent-context';
+  import CommentsList from './CommentsList.svelte';
+  import type { CloudComment, CommentDraft } from '../host/cloud-api';
+  import { pinIdOf, pinSlot, pinsOf, sourceOfComment, threadsOf } from './comments';
+  import { AddKind, AddPlace } from '@feega/live-edit/add-node';
+  import { WrapTag } from '@feega/live-edit/wrap-node';
+  import { ADD_DRAG_TYPE, insertSpot, type InsertSpot } from './insert-drop';
+  import { ADD_ITEMS, ADD_LOOP_ITEM, Command, LIBRARY_ID, LIBRARY_ITEM, menuFor, pickedOf } from './structure-menu';
   import { modeOfKey } from './modes';
   import { browseHistory } from './history';
   import { DEFAULT_ANCHOR, anchorBox, isAnchor, nearestAnchor, nextAnchor, type Anchor } from './anchors';
   import { PRESETS, SIZES, Size, Snap, fitOf, sizeForKey, snapped } from './sizes';
+  import { Where } from '@feega/plugin-api/manifest';
+  import type { Place as PluginPlace } from '@feega/plugin-api/protocol';
+  import PluginSections from './PluginSections.svelte';
+  import PluginOverlay from './PluginOverlay.svelte';
+  import { createPlugins } from './plugins.svelte';
+  import { selectionOf, sourceOfText } from './plugin-editor';
+  import { addMenuItems, contextMenuItems, parseItemId, pluginDrop } from './plugin-menus';
 
   const SETTLE_MS = 1200;
   const BAR_DEFAULT_PX = 300;
@@ -75,6 +93,7 @@
   const writtenThemeName = $derived(writtenTheme(themeName));
   let reach = $state(FOLLOW);
   let server = $state(ServerState.Detecting);
+  let restarting = $state(false);
   let serverReason = $state('');
   let serverInfo = $state<ServerInfo | null>(null);
   let bridged = $state(false);
@@ -83,6 +102,31 @@
   let textPending: string | null = null;
   let hover = $state<Pick | null>(null);
   let picked = $state<Pick | null>(null);
+  let selection = $state<Selection>(NONE);
+  let others = $state<Pick[]>([]);
+  const selectedKeys = $derived(new Set(selection.refs.map((r) => sourceText(r.source))));
+  const selectionId = $derived(selection.refs.map(keyOf).join(' '));
+  const several = $derived(selection.refs.length > 1);
+
+  function setSingle(pick: Pick | null) {
+    picked = pick;
+    selection = pick ? only(refOf(pick.source, pick.instanceIndex)) : NONE;
+  }
+
+  async function applySelection(next: Selection) {
+    selection = next;
+    const head = primary(next);
+    picked = head ? ((await bridge.again(head.source, head.instance)) ?? null) : null;
+  }
+
+  let othersAsked = 0;
+  async function hydrateOthers() {
+    const asked = ++othersAsked;
+    const found = await Promise.all(selection.refs.slice(0, -1).map((r) => bridge.again(r.source, r.instance)));
+    if (asked === othersAsked) {
+      others = found.filter((p): p is Pick => p !== null);
+    }
+  }
   let elementState = $state(ElementState.Default);
   let baseline = $state<Styles | null>(null);
   const writtenState = $derived(elementState === ElementState.Default ? undefined : elementState);
@@ -131,15 +175,28 @@
   let drag = $state<{ x: number; y: number; active: boolean } | null>(null);
   let drop = $state<Drop | null>(null);
 
-  let tab = $state(Tab.Properties);
+  let tab = $state<string>(Tab.Properties);
+  let share = $state<Extract<ViewMessage, { kind: ToView.Share }> | null>(null);
+  let cloud = $state<{ enabled: boolean; comments: CloudComment[]; error: string }>({ enabled: false, comments: [], error: '' });
+  let composing = $state(false);
+  let pinRects = $state<Record<string, Pick['rect']>>({});
+  let pinned = new Set<string>();
+  const COMMENTS_POLL_MS = 15_000;
+  const PIN_SIZE_PX = 20;
+  const PIN_STACK_PX = 22;
+  const pins = $derived(pinsOf(threadsOf(cloud.comments, false)));
+  const openComments = $derived(pins.length);
+  const cloudOn = $derived(Boolean(share?.available));
   let layers = $state<LayerNode[]>([]);
-  let palette = $state<Palette>({ document: [], tokens: [], fonts: [] });
+  let palette = $state<Palette>({ document: [], tokens: [], fonts: [], missing: [] });
+  const dismissedFonts = new SvelteSet<string>();
+  const fontNotice = $derived(palette.missing.find((m) => !dismissedFonts.has(m.family)) ?? null);
   let changes = $state<ChangeRow[]>([]);
   let canUndo = $state(false);
   let canRedo = $state(false);
   let scope = $state(Scope.Element);
   let layersOpen = $state<Record<string, boolean>>({ '(html):0:0': true, '(page):0:0': true });
-  const layerDrag = $state<{ source: Source | null; name: string; component: boolean; parentFile: string | null }>({ source: null, name: '', component: false, parentFile: null });
+  const layerDrag = $state<{ source: Source | null; name: string; component: boolean; parentFile: string | null; hint: { id: string; place: AddPlace } | null }>({ source: null, name: '', component: false, parentFile: null, hint: null });
 
   let hoverAsked = 0;
   async function hoverLayer(source: Source | null, instance: number) {
@@ -227,6 +284,7 @@
       }
       bridged = true;
       server = ServerState.Running;
+      restarting = false;
       visited(path);
       bridge.mode(mode);
       showTheme();
@@ -236,10 +294,17 @@
       refresh();
       bridge.track(Slot.Selected, untrack(() => picked?.source) ?? null, untrack(() => picked?.instanceIndex));
       bridge.track(Slot.Hovered, untrack(() => hover?.source) ?? null, untrack(() => hover?.instanceIndex));
+      pinned.clear();
+      trackPins();
     },
     moved: (path) => (visited(path), bridge.tree()),
-    tree: (tree) => (layers = tree),
+    tree: (tree) => ((layers = tree), askPalette()),
     tracked: (slot, rect) => {
+      const pin = pinIdOf(slot);
+      if (pin) {
+        pinRects[pin] = rect;
+        return;
+      }
       const target = slot === Slot.Selected ? picked : hover;
       if (target) {
         target.rect = rect;
@@ -262,12 +327,106 @@
     }
   });
 
+  const plugins = createPlugins({
+    pick: () => picked,
+    preview: (source, css) => (css ? bridge.preview(source, css) : bridge.clear(source)),
+    notify: showToast,
+    send: toHost
+  });
+
+  $effect(() => {
+    const selection = picked ? selectionOf(picked) : null;
+    untrack(() => plugins.host.selectionChanged(selection));
+  });
+
+  function runPluginItem(id: string, target: Source | null, place: PluginPlace | null = null) {
+    const item = parseItemId(id);
+    if (item) {
+      plugins.host.menu(item.plugin, item.item, target, place);
+    }
+    return item !== null;
+  }
+
+  function trackPins() {
+    const wanted = new Set(pins.map((pin) => pin.id));
+    for (const pin of pins) {
+      if (!pinned.has(pin.id)) {
+        bridge.track(pinSlot(pin.id), pin.source);
+      }
+    }
+    for (const id of pinned) {
+      if (!wanted.has(id)) {
+        bridge.track(pinSlot(id), null);
+        delete pinRects[id];
+      }
+    }
+    pinned = wanted;
+  }
+
+  $effect(() => {
+    pins;
+    if (bridged) {
+      untrack(trackPins);
+    }
+  });
+
+  $effect(() => {
+    if (!cloud.enabled) {
+      return;
+    }
+    const timer = setInterval(() => toHost({ kind: ToHost.Comments }), COMMENTS_POLL_MS);
+    return () => clearInterval(timer);
+  });
+
+  function startComment() {
+    if (!picked) {
+      return;
+    }
+    if (!cloud.enabled) {
+      showToast('Comments need a shared session');
+      return;
+    }
+    barClosed = false;
+    tab = Tab.Comments;
+    composing = true;
+  }
+
+  function sendComment(draft: CommentDraft) {
+    toHost({ kind: ToHost.CommentAdd, draft });
+    composing = false;
+  }
+
+  function copyComment(comment: CloudComment, replies: CloudComment[]) {
+    const text = commentContext(comment, replies);
+    if (inVscode) {
+      toHost({ kind: ToHost.Copy, text });
+    } else {
+      void navigator.clipboard?.writeText(text);
+    }
+    showToast('Copied for your agent');
+  }
+
+  function openPin(id: string) {
+    const thread = threadsOf(cloud.comments, true).find((t) => t.root.id === id);
+    if (thread) {
+      select(sourceOfComment(thread.root));
+    }
+    tab = Tab.Comments;
+  }
+
   function visited(path: string) {
     route = path;
     address = path;
     history.visited(path);
     navTick++;
     savePrefs();
+  }
+
+  function reloadAfterRestart() {
+    if (!url || !frame) {
+      return;
+    }
+    frame.src = new URL(route, url).toString();
   }
 
   function go(path: string | null) {
@@ -330,7 +489,17 @@
     refresh();
   }
 
+  $effect(() => {
+    selectionId;
+    if (bridged) {
+      untrack(hydrateOthers);
+    }
+  });
+
   function refresh() {
+    if (several) {
+      hydrateOthers();
+    }
     if (picked) {
       bridge.again(picked.source, picked.instanceIndex).then((p) => (picked = p ?? picked));
     }
@@ -371,7 +540,8 @@
         size = preset;
       }
     },
-    [ToView.Server]: (m) => ((server = m.state), (serverReason = m.reason ?? ''), (serverInfo = m.info ?? serverInfo)),
+    [ToView.Server]: (m) => ((server = m.state), (restarting = restarting ? m.state !== ServerState.Stopped : m.state === ServerState.Restarting), (serverReason = m.reason ?? ''), (serverInfo = m.info ?? serverInfo)),
+    [ToView.Reload]: () => reloadAfterRestart(),
     [ToView.Status]: (m) => (problem = { text: m.text }),
     [ToView.Edited]: (m) => {
       const unsavedText = textPending;
@@ -406,13 +576,18 @@
         }
       }, SETTLE_MS);
     },
+    [ToView.Plugin]: (m) => plugins.answer(m.id, m.result),
+    [ToView.Plugins]: (m) => plugins.sync(m.catalog, m.canInstall),
     [ToView.Account]: (m) => (account = { state: m.state, email: m.email }),
+    [ToView.Share]: (m) => (share = m),
+    [ToView.Library]: (m) => (libraryItems = m.items),
+    [ToView.Comments]: (m) => (cloud = { enabled: m.enabled, comments: m.comments, error: m.error ?? '' }),
     [ToView.Onboarding]: (m) => (onboarding = m.state),
     [ToView.IconResults]: (m) => iconsFound({ id: m.id, library: m.library, hits: m.hits, error: m.error ?? '' }),
     [ToView.IconPreview]: (m) => iconDrawn(m.name, m.svg),
     [ToView.ImageSaved]: (m) => (imageSaved.url = m.url),
     [ToView.Wiring]: (m) => Object.assign(wiringState, { at: m.at, instance: m.instance, wiring: m.wiring }),
-    [ToView.Pick]: (m) => bridge.at(m.x, m.y).then((pick) => ((picked = pick), toHost({ kind: ToHost.Picked, id: m.id, pick }))),
+    [ToView.Pick]: (m) => bridge.at(m.x, m.y).then((pick) => (setSingle(pick), toHost({ kind: ToHost.Picked, id: m.id, pick }))),
     [ToView.Change]: (m) => {
       const row = ROWS.find((r) => r.name === m.row);
       if (row) {
@@ -478,7 +653,7 @@
 
   function pressOverlay(e: PointerEvent) {
     const at = pagePoint(e);
-    if (picked && inside(at, picked.rect)) {
+    if (picked && !several && inside(at, picked.rect)) {
       drag = { ...at, active: false };
     }
   }
@@ -508,22 +683,34 @@
     return wasDrag;
   }
 
-  let menu = $state<{ x: number; y: number } | null>(null);
+  let menu = $state<{ x: number; y: number; where: Where.Layers | Where.Preview } | null>(null);
 
   async function onMenu(e: MouseEvent) {
     e.preventDefault();
-    await onPick(e);
-    menu = picked ? { x: e.clientX, y: e.clientY } : null;
+    const hit = await hitAt(e);
+    if (!hit || !contains(selection, refOf(hit.source, hit.instanceIndex))) {
+      setSingle(hit);
+    }
+    menu = picked ? { x: e.clientX, y: e.clientY, where: Where.Preview } : null;
+  }
+
+  async function hitAt(e: MouseEvent): Promise<Pick | null> {
+    const { x, y } = pagePoint(e);
+    const hit = await bridge.at(x, y);
+    const target = hit ? passThrough(hit, lockedNow) : null;
+    return target && hit && sourceText(target) !== sourceText(hit.source) ? await bridge.again(target) : target ? hit : null;
   }
 
   async function onPick(e: MouseEvent) {
     if (releaseOverlay()) {
       return;
     }
-    const { x, y } = pagePoint(e);
-    const hit = await bridge.at(x, y);
-    const target = hit ? passThrough(hit, lockedNow) : null;
-    picked = target && hit && sourceText(target) !== sourceText(hit.source) ? await bridge.again(target) : target ? hit : null;
+    const hit = await hitAt(e);
+    if (hit && clickOf(e, isMac, Surface.Preview) === Click.Toggle) {
+      applySelection(toggle(selection, refOf(hit.source, hit.instanceIndex)));
+      return;
+    }
+    setSingle(hit);
   }
 
   function onDouble(e: MouseEvent) {
@@ -592,17 +779,50 @@
     savePrefs();
   }
 
-  const STRUCTURE_KEYS = new Set(['Delete', 'Backspace']);
-  const typing = (e: KeyboardEvent) => e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement;
+  const typing = (e: KeyboardEvent) => typingIn(e.target as HTMLElement | null);
 
   async function select(source: Source, instance = 0) {
     bridge.reveal(source, instance);
-    picked = (await bridge.again(source, instance)) ?? picked;
+    const found = await bridge.again(source, instance);
+    if (found) {
+      setSingle(found);
+    }
+  }
+
+  function selectRow(source: Source, instance: number, e?: MouseEvent) {
+    const ref = refOf(source, instance);
+    const click = e ? clickOf(e, isMac, Surface.Layers) : Click.Single;
+    const next: Record<Click, () => Selection | null> = {
+      [Click.Single]: () => null,
+      [Click.Toggle]: () => toggle(selection, ref),
+      [Click.Range]: () => extend(selection, ref, visibleRows(layers, layersOpen))
+    };
+    const chosen = next[click]();
+    if (chosen) {
+      applySelection(chosen);
+      return;
+    }
+    select(source, instance);
   }
 
   async function moveSelection(move: Move) {
     if (picked) {
-      picked = (await bridge.move(picked.source, move)) ?? picked;
+      const moved = await bridge.move(picked.source, move);
+      if (moved) {
+        setSingle(moved);
+      }
+    }
+  }
+
+  async function selectParent() {
+    const parent = picked ? await bridge.move(picked.source, Move.Parent) : null;
+    setSingle(parent);
+  }
+
+  function selectSiblings() {
+    const head = primary(selection);
+    if (head) {
+      applySelection({ refs: siblingsOf(layers, head), anchor: head });
     }
   }
 
@@ -619,6 +839,33 @@
   }
 
   let addMenu = $state<{ x: number; y: number } | null>(null);
+  let libraryOpen = $state(false);
+  let libraryItems = $state<LibraryEntry[]>([]);
+
+  function openLibrary() {
+    libraryOpen = true;
+    leftClosed = false;
+    toHost({ kind: ToHost.LibraryList });
+  }
+
+  function insertLibrary(id: string, target: Source, place: AddPlace) {
+    toHost({ kind: ToHost.LibraryInsert, id, at: sourceText(target), place });
+  }
+
+  function pickAdd(id: string) {
+    if (runPluginItem(id, picked?.source ?? null)) {
+      return;
+    }
+    if (id === LIBRARY_ID) {
+      openLibrary();
+      return;
+    }
+    if (id === StructureOp.AddItem) {
+      restructure(StructureOp.AddItem);
+      return;
+    }
+    addElement(id as AddKind);
+  }
 
   function openAddMenu(x: number, y: number) {
     if (picked) {
@@ -626,19 +873,113 @@
     }
   }
 
-  function addElement(kind: AddKind) {
-    if (!picked) {
-      return;
-    }
-    const at = sourceText(picked.source);
-    toHost(kind === AddKind.Image ? { kind: ToHost.AddImage, at } : { kind: ToHost.Structure, op: StructureOp.Add, at, add: { kind } });
+  function insertElement(kind: AddKind, target: Source, place: AddPlace) {
+    const at = sourceText(target);
+    toHost(kind === AddKind.Image ? { kind: ToHost.AddImage, at, place } : { kind: ToHost.Structure, op: StructureOp.Add, at, add: { kind, place } });
   }
 
-  function copyForAgent() {
+  function addElement(kind: AddKind, place = AddPlace.Auto) {
+    if (picked) {
+      insertElement(kind, picked.source, place);
+    }
+  }
+
+  let addSpot = $state<InsertSpot | null>(null);
+  let spotAsked = 0;
+
+  const addDrag = (e: DragEvent) => (e.dataTransfer?.types.includes(ADD_DRAG_TYPE) || e.dataTransfer?.types.includes(LIBRARY_DRAG_TYPE)) ?? false;
+
+  async function overAdd(e: DragEvent) {
+    if (!addDrag(e)) {
+      return;
+    }
+    e.preventDefault();
+    const asked = ++spotAsked;
+    const at = pagePoint(e);
+    const target = await bridge.at(at.x, at.y);
+    const owner = target?.ancestors.at(-1);
+    const parent = owner ? await bridge.again(owner.source) : null;
+    if (asked === spotAsked) {
+      addSpot = target ? insertSpot(target, parent, at) : null;
+    }
+  }
+
+  function dropAdd(e: DragEvent) {
+    if (!addDrag(e)) {
+      return;
+    }
+    e.preventDefault();
+    spotAsked++;
+    const kind = e.dataTransfer?.getData(ADD_DRAG_TYPE) as AddKind;
+    const library = e.dataTransfer?.getData(LIBRARY_DRAG_TYPE);
+    const spot = addSpot;
+    addSpot = null;
+    addMenu = null;
+    if (library && spot) {
+      insertLibrary(library, spot.target, spot.place);
+      return;
+    }
+    const dropped = kind && spot ? pluginDrop(kind, spot) : null;
+    if (dropped) {
+      plugins.host.menu(dropped.plugin, dropped.item, dropped.target, dropped.place);
+      return;
+    }
+    if (kind && spot) {
+      insertElement(kind, spot.target, spot.place);
+    }
+  }
+
+  async function openLayerMenu(source: Source, instance: number, at: { x: number; y: number }) {
+    if (!contains(selection, refOf(source, instance))) {
+      await select(source, instance);
+    }
+    menu = { x: at.x, y: at.y, where: Where.Layers };
+  }
+
+  function layerAdd(kind: AddKind, source: Source, place: AddPlace) {
+    addMenu = null;
+    insertElement(kind, source, place);
+  }
+
+  const targetsOf = () => selection.refs.map((r) => ({ at: sourceText(r.source), instance: r.instance }));
+
+  function restructureMany(op: StructureOp, wrap?: WrapTag) {
+    toHost({ kind: ToHost.StructureMany, op, targets: targetsOf(), wrap });
+    if (op === StructureOp.Delete) {
+      setSingle(null);
+    }
+  }
+
+  function wrapWith(tag: WrapTag) {
+    if (several) {
+      restructureMany(StructureOp.Wrap, tag);
+      return;
+    }
+    if (picked) {
+      toHost({ kind: ToHost.Structure, op: StructureOp.Wrap, at: sourceText(picked.source), instance: picked.instanceIndex, wrap: tag });
+    }
+  }
+
+  function pickMenu(id: string) {
+    if (runPluginItem(id, picked?.source ?? null)) {
+      return;
+    }
+    const chosen = pickedOf(id);
+    const run: Record<Command, () => void> = {
+      [Command.Copy]: copyForAgent,
+      [Command.Structure]: () => chosen.command === Command.Structure && restructure(chosen.op),
+      [Command.Add]: () => chosen.command === Command.Add && addElement(chosen.kind, chosen.place),
+      [Command.Wrap]: () => chosen.command === Command.Wrap && wrapWith(chosen.tag)
+    };
+    run[chosen.command]();
+  }
+
+  async function copyForAgent() {
     if (!picked) {
       return;
     }
-    const text = agentContext(picked, { route, width: Math.round(fit.width), breakpoint: size === Size.Full ? undefined : reachBadge, theme: themeName === DEFAULT_THEME ? undefined : themeName, state: elementState === ElementState.Default ? undefined : elementState });
+    const picks = several ? (await Promise.all(selection.refs.map((r) => bridge.again(r.source, r.instance)))).filter((p): p is Pick => p !== null) : [picked];
+    const text = agentContexts(picks, { route, width: Math.round(fit.width), breakpoint: size === Size.Full ? undefined : reachBadge, theme: themeName === DEFAULT_THEME ? undefined : themeName, state: elementState === ElementState.Default ? undefined : elementState });
     if (inVscode) {
       toHost({ kind: ToHost.Copy, text });
     } else {
@@ -648,12 +989,16 @@
   }
 
   function restructure(op: StructureOp) {
+    if (several) {
+      restructureMany(op);
+      return;
+    }
     if (!picked) {
       return;
     }
     toHost({ kind: ToHost.Structure, op, at: sourceText(picked.source), instance: picked.instanceIndex });
     if (op === StructureOp.Delete) {
-      picked = null;
+      setSingle(null);
     }
   }
 
@@ -666,21 +1011,57 @@
     toHost({ kind: ToHost.Font, google: font.google, ask: { at: sourceText(picked.source), prop: LiveProp.Class, family: ClassFamily.FontFamily, value: `font-['${font.family.replace(/\s+/g, '_')}']`, css: { 'font-family': css }, rem: picked.rem, viewport: picked.viewport, scope, breakpoint: target, theme: writtenThemeName } });
   }
 
+  const SHORTCUTS: Partial<Record<Shortcut, () => void>> = {
+    [Shortcut.Delete]: () => restructure(StructureOp.Delete),
+    [Shortcut.Duplicate]: () => restructure(StructureOp.Duplicate),
+    [Shortcut.Wrap]: () => wrapWith(WrapTag.Div),
+    [Shortcut.Unwrap]: () => restructure(StructureOp.Unwrap),
+    [Shortcut.Siblings]: selectSiblings,
+    [Shortcut.Copy]: copyForAgent,
+    [Shortcut.Escape]: selectParent
+  };
+
+  const copying = () => Boolean(window.getSelection()?.toString());
+
+  function runShortcut(e: KeyboardEvent, shortcut: Shortcut | null): boolean {
+    const live = picked && mode === Mode.Design && !editing && !typing(e);
+    if (!shortcut || !live || (needsBareFocus(shortcut) && e.target instanceof HTMLButtonElement) || (shortcut === Shortcut.Copy && copying())) {
+      return false;
+    }
+    e.preventDefault();
+    const move = MOVES[shortcut];
+    if (move) {
+      moveSelection(move);
+      return true;
+    }
+    SHORTCUTS[shortcut]?.();
+    return true;
+  }
+
+  const FONT_RECHECK_MS = 1500;
+  const PALETTE_DEBOUNCE_MS = 400;
+  let paletteTimer: ReturnType<typeof setTimeout> | undefined;
+
+  function askPalette() {
+    clearTimeout(paletteTimer);
+    paletteTimer = setTimeout(() => bridge.palette(), PALETTE_DEBOUNCE_MS);
+  }
+
+  function replaceFont(from: string, to: FontChoice) {
+    toHost({ kind: ToHost.FontReplace, from, to: to.family, google: to.google });
+    setTimeout(() => bridge.palette(), FONT_RECHECK_MS);
+  }
+
+  function loadFont(family: string) {
+    toHost({ kind: ToHost.FontLoad, family });
+    setTimeout(() => bridge.palette(), FONT_RECHECK_MS);
+  }
+
+  const COMMENT_KEY = 'c';
+
   function onKey(e: KeyboardEvent) {
     const cmd = e.metaKey || e.ctrlKey;
-    const selecting = selectionKey(e);
-    if (selecting && picked && mode === Mode.Design && !editing && !typing(e) && !(e.target instanceof HTMLButtonElement)) {
-      e.preventDefault();
-      if (selecting.kind === SelectionKey.Clear) {
-        picked = null;
-        return;
-      }
-      moveSelection(selecting.move);
-      return;
-    }
-    if (STRUCTURE_KEYS.has(e.key) && picked && mode === Mode.Design && !editing && !typing(e) && !(e.target instanceof HTMLButtonElement)) {
-      e.preventDefault();
-      restructure(StructureOp.Delete);
+    if (runShortcut(e, shortcutOf(e, isMac))) {
       return;
     }
     if (e.key === '/' && picked && mode === Mode.Design && !editing && !typing(e) && !cmd) {
@@ -689,8 +1070,6 @@
       return;
     }
     const shortcuts: Record<string, () => void> = {
-      d: () => restructure(StructureOp.Duplicate),
-      g: () => restructure(e.shiftKey ? StructureOp.Unwrap : StructureOp.Wrap),
       z: () => toHost({ kind: e.shiftKey ? ToHost.Redo : ToHost.Undo }),
       '\\': () => (e.shiftKey ? ((leftClosed = !leftClosed), savePrefs()) : toggleBar()),
       '|': () => ((leftClosed = !leftClosed), savePrefs()),
@@ -706,6 +1085,11 @@
       return;
     }
     if (cmd || typing(e)) {
+      return;
+    }
+    if (cloudOn && e.key.toLowerCase() === COMMENT_KEY && picked && mode === Mode.Design && !editing) {
+      e.preventDefault();
+      startComment();
       return;
     }
     const next = modeOfKey(e.key);
@@ -729,15 +1113,19 @@
 
 <main bind:clientWidth={viewW} style={`grid-template-columns: ${leftPx}px minmax(0, 1fr) ${barPx}px; --bar: ${barPx}px; --left: ${leftPx}px`} class:sizing={sizing || leftSizing}>
   <aside class="left" class:closed={leftClosed}>
+    {#if libraryOpen}
+      <LibraryPanel items={libraryItems} canInsert={!!picked} oninsert={(id) => picked && insertLibrary(id, picked.source, AddPlace.After)} onclose={() => (libraryOpen = false)} />
+    {:else}
     <header class="left-head">Layers<button type="button" class="add" title="Add an element (/)" aria-label="Add" data-testid="add-button" disabled={!picked} onclick={(e) => openAddMenu(e.clientX, e.clientY)}>+ Add</button></header>
     <div class="layers" role="tree" aria-label="Layers" data-testid="layers">
-      <LayersTree nodes={layers} {picked} badge={badgeOf(elementState)} open={layersOpen} onselect={select} onhover={hoverLayer} onopen={(at) => toHost({ kind: ToHost.Open, at })} onmove={moveLayer} onusage={moveUsage} dragging={layerDrag} hidden={hiddenNow} locked={lockedNow} ontoggle={toggleFlag} />
+      <LayersTree nodes={layers} {picked} selected={selectedKeys} badge={badgeOf(elementState)} open={layersOpen} onselect={selectRow} onhover={hoverLayer} onopen={(at) => toHost({ kind: ToHost.Open, at })} onmove={moveLayer} onusage={moveUsage} dragging={layerDrag} hidden={hiddenNow} locked={lockedNow} ontoggle={toggleFlag} oncontext={openLayerMenu} onadd={layerAdd} />
     </div>
+    {/if}
     {#if !leftClosed}<span class="edge-right" role="separator" aria-orientation="vertical" aria-label="Resize Layers" title="Drag to resize, double-click to reset" onpointerdown={(e) => ((e.currentTarget as HTMLElement).setPointerCapture(e.pointerId), (leftSizing = { x: e.clientX, width: leftPx }))} onpointermove={(e) => leftSizing && (leftWidth = leftSizing.width + (e.clientX - leftSizing.x))} onpointerup={() => leftSizing && ((leftSizing = null), (leftWidth = leftPx), savePrefs())} ondblclick={() => ((leftWidth = LEFT_DEFAULT_PX), savePrefs())}></span>{/if}
   </aside>
   <section class="view">
     <header class="toolbar" bind:clientHeight={toolbarH}>
-      <FeegaMenu values={settings} {facts} {account} onaccount={(kind) => toHost({ kind })} onsetting={(key, value) => toHost({ kind: ToHost.Setting, key, value })} onlink={(link) => toHost({ kind: ToHost.External, url: link })} />
+      <FeegaMenu commands={plugins.commands} oncommand={(plugin, command) => plugins.host.command(plugin, command)} rows={plugins.rows} problems={plugins.problems} canInstall={plugins.canInstall} onenable={(id, enabled) => toHost({ kind: ToHost.PluginEnable, id, enabled })} onremove={(id) => toHost({ kind: ToHost.PluginRemove, id })} oninstall={(source) => toHost({ kind: ToHost.PluginInstall, source })} values={settings} {facts} {account} onaccount={(kind) => toHost({ kind })} onsetting={(key, value) => toHost({ kind: ToHost.Setting, key, value })} onlink={(link) => toHost({ kind: ToHost.External, url: link })} />
       <button type="button" class="icon" class:on={!leftClosed} title="Layers (⇧⌘\)" aria-label="Toggle Layers" data-testid="left-toggle" onclick={() => ((leftClosed = !leftClosed), savePrefs())}><PanelLeft size={15} /></button>
       <button type="button" class="icon" title="Back (⌘[)" disabled={!canBack} onclick={() => go(history.back())}><ArrowLeft size={15} /></button>
       <button type="button" class="icon" title="Forward (⌘])" disabled={!canForward} onclick={() => go(history.forward())}><ArrowRight size={15} /></button>
@@ -747,21 +1135,36 @@
         <input bind:value={address} aria-label="Route" data-testid="address" spellcheck="false" />
       </form>
       <DeviceBar {size} {fit} onsize={pickSize} onwidth={(w) => ((custom = snapped(w)), (size = Size.Custom), savePrefs())} />
+      {#each plugins.topBar as item (item.plugin + item.entry.id)}<button type="button" class="plugin-action" data-testid="plugin-action" onclick={() => plugins.host.action(item.plugin, item.entry.id)}>{item.entry.title}</button>{/each}
       {#if themes.length > 1}<ThemeBar {themes} choice={themeName} onchoose={chooseTheme} />{/if}
       {#if fit.scale < 1}<span class="zoom" data-testid="zoom">{Math.round(fit.scale * 100)}%</span>{/if}
       <button type="button" class="icon" title="Open in browser" onclick={() => toHost({ kind: ToHost.External, url: new URL(route, url).toString() })}><ExternalLink size={14} /></button>
+      {#if share?.available}<SharePanel view={share} onstart={(name, canEdit) => toHost({ kind: ToHost.ShareStart, name, canEdit })} onstop={() => toHost({ kind: ToHost.ShareStop })} onkick={(userId) => toHost({ kind: ToHost.ShareKick, userId })} onrole={(userId, role) => toHost({ kind: ToHost.ShareRole, userId, role })} />{/if}
       <button type="button" class="icon" class:on={!barClosed} title="Properties (⌘\)" onclick={toggleBar} data-testid="bar-toggle"><PanelRight size={15} /></button>
     </header>
 
     <div class="backdrop" role="presentation" bind:clientWidth={stage.w} bind:clientHeight={stage.h} onpointermove={resizeFrame} onpointerup={endDrag}>
       <div class="frame" class:framed={size !== Size.Full} style={`width:${fit.width * fit.scale}px;height:${fit.height * fit.scale}px`}>
         {#if url}<iframe bind:this={frame} src={start} title="App" data-testid="app-frame" style={`width:${fit.width}px;height:${fit.height}px;transform:scale(${fit.scale})`}></iframe>{/if}
+        {#if restarting}<div class="restarting" data-testid="restarting" role="status"><span class="server-dot-inline amber"></span>Restarting dev server…</div>{/if}
         {#if mode === Mode.Design && bridged && !editing}
-          <div class="overlay" role="presentation" onpointerdown={pressOverlay} onpointermove={dragOverlay} onpointerleave={() => (hover = null)} onclick={onPick} oncontextmenu={onMenu} ondblclick={onDouble} onwheel={(e) => bridge.scroll(e.deltaX / fit.scale, e.deltaY / fit.scale)}>
+          <div class="overlay" role="presentation" onpointerdown={pressOverlay} onpointermove={dragOverlay} onpointerleave={() => (hover = null)} onclick={onPick} oncontextmenu={onMenu} ondragover={overAdd} ondragleave={() => (addSpot = null)} ondrop={dropAdd} ondblclick={onDouble} onwheel={(e) => bridge.scroll(e.deltaX / fit.scale, e.deltaY / fit.scale)}>
             {#if hover}<div class="outline hover" style={box(hover)}></div>{/if}
+            {#if addSpot}
+              <div class="drop-line box" data-testid="add-outline" style={`left:${addSpot.outline.x * fit.scale - 1}px;top:${addSpot.outline.y * fit.scale - 1}px;width:${Math.max(2, addSpot.outline.w * fit.scale)}px;height:${Math.max(2, addSpot.outline.h * fit.scale)}px`}></div>
+              {#if addSpot.place !== AddPlace.Child}<div class="drop-line" data-testid="add-line" style={`left:${addSpot.line.x * fit.scale - 1}px;top:${addSpot.line.y * fit.scale - 1}px;width:${Math.max(2, addSpot.line.w * fit.scale)}px;height:${Math.max(2, addSpot.line.h * fit.scale)}px`}></div>{/if}
+            {/if}
             {#if drop}<div class="drop-line" class:box={drop.kind === DropKind.Inside} style={`left:${drop.line.x * fit.scale - 1}px;top:${drop.line.y * fit.scale - 1}px;width:${Math.max(2, drop.line.w * fit.scale)}px;height:${Math.max(2, drop.line.h * fit.scale)}px`}></div>{/if}
           {#if picked && hint}{#each hintBoxes(picked, hint) as area, i (i)}<div class="hint {hint.group}" style={`left:${area.x * fit.scale}px;top:${area.y * fit.scale}px;width:${area.w * fit.scale}px;height:${area.h * fit.scale}px`}></div>{/each}{/if}
+          {#if picked}<PluginOverlay {plugins} {picked} scale={fit.scale} />{/if}
+          {#each others as other (keyOf(refOf(other.source, other.instanceIndex)))}<div class="outline picked" data-testid="selected-outline" style={box(other)}></div>{/each}
           {#if picked}<div class="outline picked" style={box(picked)}><span class="label"><Breadcrumb pick={picked} onselect={select} compact state={elementState} /></span></div>{/if}
+          {#each pins as pin (pin.id)}
+            {@const rect = pinRects[pin.id]}
+            {#if rect}
+              <button type="button" class="pin" data-testid="comment-pin" title="Open comment" style={`left:${(rect.x + rect.width) * fit.scale - PIN_SIZE_PX / 2}px;top:${rect.y * fit.scale - PIN_SIZE_PX / 2 + pin.stack * PIN_STACK_PX}px`} onpointerdown={(e) => e.stopPropagation()} onclick={(e) => (e.stopPropagation(), openPin(pin.id))}>{pin.number}</button>
+            {/if}
+          {/each}
           </div>
         {/if}
         {#if size !== Size.Full}
@@ -793,8 +1196,14 @@
           <button type="button" class="link" data-action={ServerAction.RestartUnderFeega} onclick={() => toHost({ kind: ToHost.Server, action: ServerAction.RestartUnderFeega })}>Let Feega start the server</button>
         </div>
       {/if}
-      {#if menu}<StructureMenu x={menu.x} y={menu.y} items={MENU_ITEMS} onpick={(id) => (id === COPY_FOR_AGENT ? copyForAgent() : restructure(id as StructureOp))} onclose={() => (menu = null)} />{/if}
-      {#if addMenu}<StructureMenu x={addMenu.x} y={addMenu.y} items={picked && picked.instances > 1 ? [...ADD_ITEMS, ADD_LOOP_ITEM] : ADD_ITEMS} label="add" onpick={(id) => (id === StructureOp.AddItem ? restructure(StructureOp.AddItem) : addElement(id as AddKind))} onclose={() => (addMenu = null)} />{/if}
+      {#if menu}<StructureMenu x={menu.x} y={menu.y} items={contextMenuItems(menuFor(selection.refs.length), plugins.contextMenu, menu.where)} onpick={pickMenu} onclose={() => (menu = null)} />{/if}
+      {#if addMenu}<StructureMenu x={addMenu.x} y={addMenu.y} items={addMenuItems(picked && picked.instances > 1 ? [...ADD_ITEMS, ADD_LOOP_ITEM, LIBRARY_ITEM] : [...ADD_ITEMS, LIBRARY_ITEM], plugins.addMenu)} label="add" draggable={true} onpick={pickAdd} onclose={() => (addMenu = null)} />{/if}
+      {#if fontNotice}
+        <div class="notice missingfont" data-testid="font-notice">
+          <MissingFont missing={fontNotice} project={palette.fonts.filter((name) => !palette.missing.some((m) => m.family === name))} onreplace={replaceFont} onload={loadFont} />
+          <button type="button" class="link" onclick={() => dismissedFonts.add(fontNotice!.family)}>Dismiss</button>
+        </div>
+      {/if}
       {#if toast}<div class="toast" role="status">{toast}</div>{/if}
       <div class="float" class:moving bind:clientWidth={bar.w} bind:clientHeight={bar.h} style={`left:${barAt.x}px;top:${barAt.y}px`} data-anchor={anchor}>
         <button type="button" class="grip" title="Drag to move (arrow keys)" aria-label="Move the bar" onpointerdown={grabBar} onpointermove={dragBar} onpointerup={dropBar} onkeydown={onHandleKey}>
@@ -829,12 +1238,26 @@
       <Tabs.List class="tab-list">
         <Tabs.Trigger value={Tab.Properties} class="tab">Properties</Tabs.Trigger>
         <Tabs.Trigger value={Tab.Changes} class="tab" data-testid="changes-tab">Changes{changes.length ? ` ${changes.length}` : ''}</Tabs.Trigger>
+        {#if cloudOn}<Tabs.Trigger value={Tab.Comments} class="tab" data-testid="comments-tab">Comments{openComments ? ` ${openComments}` : ''}</Tabs.Trigger>{/if}
+        {#each plugins.sidePanel as panel (panel.plugin + panel.entry.id)}<Tabs.Trigger value={`plugin:${panel.plugin}/${panel.entry.id}`} class="tab" data-testid="plugin-tab">{panel.entry.title}</Tabs.Trigger>{/each}
       </Tabs.List>
       <Tabs.Content value={Tab.Properties}>
-        {#if picked}
+        {#if several}
+          <div class="what" data-testid="multi-selection">
+            <strong>{selection.refs.length} elements selected</strong>
+            <span class="where">Editing styles works on one element at a time. <button type="button" class="link" data-testid="multi-keep-primary" onclick={() => picked && setSingle(picked)}>Keep only &lt;{picked?.tag}&gt;</button></span>
+            <div class="multi-actions" data-testid="multi-actions">
+              <button type="button" data-action="duplicate" onclick={() => restructure(StructureOp.Duplicate)}>Duplicate</button>
+              <button type="button" data-action="wrap" onclick={() => wrapWith(WrapTag.Div)}>Wrap</button>
+              <button type="button" data-action="unwrap" onclick={() => restructure(StructureOp.Unwrap)}>Unwrap</button>
+              <button type="button" data-action="delete" onclick={() => restructure(StructureOp.Delete)}>Delete</button>
+              <button type="button" data-action="copy" onclick={copyForAgent}>Copy for agent</button>
+            </div>
+          </div>
+        {:else if picked}
           <div class="what" data-testid="selection">
             <Breadcrumb pick={picked} onselect={select} state={elementState} />
-            <span class="where">{#if picked.component}in {picked.component.file.split('/').pop()} · {/if}<button type="button" class="link" onclick={() => toHost({ kind: ToHost.Open, at: picked!.source })}>{picked.source.file.split('/').pop()}:{picked.source.line}</button> · <button type="button" class="link" data-testid="copy-for-agent" title="Copy file, selector and view for your coding agent" onclick={copyForAgent}>Copy for agent</button></span>
+            <span class="where">{#if picked.component}in {picked.component.file.split('/').pop()} · {/if}<button type="button" class="link" onclick={() => toHost({ kind: ToHost.Open, at: picked!.source })}>{picked.source.file.split('/').pop()}:{picked.source.line}</button> · <button type="button" class="link" data-testid="copy-for-agent" title="Copy file, selector and view for your coding agent" onclick={copyForAgent}>Copy for agent</button>{#if cloudOn} · <button type="button" class="link" data-testid="comment-start" title="Comment on this element (C)" onclick={startComment}>Comment</button>{/if}</span>
             {#if authored(picked.classes)}<code class="classes">{authored(picked.classes)}</code>{/if}
           </div>
           <BreakpointBar badge={reachBadge} theme={themeBadge(themeName)} items={reachItems(breakpoints)} choice={reach} onchoose={(id) => (reach = id)} />
@@ -842,7 +1265,8 @@
             <button type="button" class:on={scope === Scope.Element} onclick={() => (scope = Scope.Element)} title="Only this element (every instance of its component: {picked.instances})">This element{picked.instances > 1 ? ` ×${picked.instances}` : ''}</button>
             <button type="button" class:on={scope === Scope.Class} disabled={!picked.classCount || styling === Styling.Tailwind} onclick={() => (scope = Scope.Class)} title={styling === Styling.Tailwind ? 'Class scope needs CSS rules, not Tailwind' : `Every element with this class: ${picked.classCount}`}>All .{picked.classes.split(' ')[0] || 'class'}{picked.classCount ? ` (${picked.classCount})` : ''}</button>
           </div>
-          <Properties pick={picked} {breakpoints} {palette} {elementState} {baseline} onstate={chooseState} onpreview={preview} onchange={change} onsavevar={saveVar} onhint={(h) => (hint = h)} onfont={pickFont} onnotice={showToast} />
+          <Properties pick={picked} {breakpoints} {palette} {elementState} {baseline} onstate={chooseState} onpreview={preview} onchange={change} onsavevar={saveVar} onhint={(h) => (hint = h)} onfont={pickFont} onfontreplace={replaceFont} onfontload={loadFont} onnotice={showToast} />
+          <PluginSections {plugins} {palette} />
           <Interactions pick={picked} {changes} />
         {:else}
           <p class="empty">{bridged ? 'Click an element to edit it. Double-click text to rewrite it.' : 'The page has no Feega source map: element picking needs the feega-source-map plugin.'}</p>
@@ -850,6 +1274,14 @@
       </Tabs.Content>
       <Tabs.Content value={Tab.Changes}>
         <ChangesList {changes} onselect={select} onopen={(at) => toHost({ kind: ToHost.Open, at })} ondiff={(id) => toHost({ kind: ToHost.Diff, id })} onrevert={(id) => toHost({ kind: ToHost.Revert, id })} onrevertall={() => toHost({ kind: ToHost.Revert, id: null })} onscm={() => toHost({ kind: ToHost.SourceControl })} />
+      </Tabs.Content>
+      {#each plugins.sidePanel as panel (panel.plugin + panel.entry.id)}
+        <Tabs.Content value={`plugin:${panel.plugin}/${panel.entry.id}`}>
+          <iframe class="plugin-panel" title={panel.entry.title} sandbox="allow-scripts" srcdoc={panel.entry.html}></iframe>
+        </Tabs.Content>
+      {/each}
+      <Tabs.Content value={Tab.Comments}>
+        <CommentsList {cloud} {picked} {composing} onsubmit={(draft) => (draft.parentId ? toHost({ kind: ToHost.CommentAdd, draft }) : sendComment(draft))} oncancel={() => (composing = false)} onresolve={(id) => toHost({ kind: ToHost.CommentResolve, id })} onselect={select} oncopy={copyComment} />
       </Tabs.Content>
     </Tabs.Root>
   </aside>
@@ -1008,6 +1440,25 @@
     transform-origin: 0 0;
   }
 
+  .plugin-action {
+    height: 24px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-input);
+    color: var(--ui-text);
+    font: inherit;
+    font-size: var(--ui-text-xs);
+    cursor: pointer;
+  }
+
+  .plugin-panel {
+    width: 100%;
+    height: 100%;
+    min-height: 240px;
+    border: 0;
+  }
+
   .overlay {
     position: absolute;
     inset: 0;
@@ -1017,6 +1468,25 @@
   .outline {
     position: absolute;
     pointer-events: none;
+  }
+
+  .pin {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 1.5px solid #fff;
+    border-radius: var(--ui-radius-full);
+    background: var(--ui-accent);
+    color: #fff;
+    font: inherit;
+    font-size: 10px;
+    font-weight: 600;
+    cursor: pointer;
   }
 
   .hover {
@@ -1214,6 +1684,10 @@
     bottom: 64px;
   }
 
+  .notice.missingfont {
+    bottom: 120px;
+  }
+
   .attach {
     display: flex;
     gap: 6px;
@@ -1383,12 +1857,33 @@
     font-size: var(--ui-text-sm);
   }
 
+  .multi-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--ui-space-2);
+    margin-top: var(--ui-space-2);
+  }
+
+  .multi-actions button {
+    height: 26px;
+    padding: 0 var(--ui-space-3);
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-input);
+    color: var(--ui-text);
+    font: inherit;
+    font-size: var(--ui-text-xs);
+    cursor: pointer;
+  }
+
+  .multi-actions button:hover {
+    background: color-mix(in srgb, var(--ui-accent) 22%, var(--ui-input));
+  }
+
   .where {
-    overflow: hidden;
     color: var(--ui-text-3);
     font-size: var(--ui-text-xs);
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
   }
 
   .where .link {
@@ -1412,6 +1907,20 @@
     word-break: break-word;
   }
 
+  .restarting {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: color-mix(in srgb, var(--ui-panel) 70%, transparent);
+    backdrop-filter: blur(2px);
+    color: var(--ui-text);
+    font-size: var(--ui-text-sm);
+    pointer-events: none;
+  }
   .server-card {
     position: absolute;
     inset: 0;

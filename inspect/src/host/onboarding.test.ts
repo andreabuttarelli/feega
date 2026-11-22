@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { Onboarding, ToHost, ToView, type HostMessage, type ViewMessage } from '../messages';
-import { fileOnboardingStore, globalStateOnboardingStore, memoryOnboardingStore, type OnboardingStore } from './onboarding';
+import { deviceOnboardingStore, fileOnboardingStore, globalStateOnboardingStore, memoryOnboardingStore, type OnboardingStore } from './onboarding';
 import type { Platform } from './platform';
 import { inspectSession } from './session';
 
@@ -93,5 +93,28 @@ describe('onboarding in the session', () => {
 
     expect(await t.onboarding.read()).toBe(Onboarding.Seen);
     expect(states(t.sent)).toEqual([Onboarding.Seen]);
+  });
+});
+
+describe('the device onboarding store', () => {
+  it('is seen in VS Code once npx or the desktop app showed it on this device', async () => {
+    const path = freshPath();
+    await fileOnboardingStore(path).markSeen();
+
+    expect(await deviceOnboardingStore(globalState(), path).read()).toBe(Onboarding.Seen);
+  });
+
+  it('is seen by npx and the desktop app once VS Code showed it on this device', async () => {
+    const path = freshPath();
+    await deviceOnboardingStore(globalState(), path).markSeen();
+
+    expect(await fileOnboardingStore(path).read()).toBe(Onboarding.Seen);
+  });
+
+  it('stays seen in a VS Code profile that already showed it', async () => {
+    const state = globalState();
+    await state.markSeen();
+
+    expect(await deviceOnboardingStore(state, freshPath()).read()).toBe(Onboarding.Seen);
   });
 });

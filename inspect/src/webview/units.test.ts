@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Unit, UNITS_OF, Length, convert, parseLength, stepOf } from './units';
+import { Unit, UNITS_OF, Length, convert, cssOf, isKeyword, parseLength, stepOf } from './units';
 
 const context = { rem: 16, em: 20, parent: 400, viewport: { w: 1000, h: 800 } };
 
@@ -15,6 +15,49 @@ describe('parseLength', () => {
 
   it('auto is a value of its own', () => {
     expect(parseLength('auto', Unit.Px)).toEqual({ value: 0, unit: Unit.Auto });
+  });
+});
+
+describe('size keywords and viewport units', () => {
+  it.each([
+    ['none', Unit.Unlimited],
+    ['fit-content', Unit.FitContent],
+    ['min-content', Unit.MinContent],
+    ['max-content', Unit.MaxContent]
+  ])('%s is a value of its own', (text, unit) => {
+    expect(parseLength(text, Unit.Px)).toEqual({ value: 0, unit });
+    expect(cssOf({ value: 0, unit })).toBe(text);
+  });
+
+  it('reads dvh and ch', () => {
+    expect(parseLength('100dvh', Unit.Px)).toEqual({ value: 100, unit: Unit.Dvh });
+    expect(parseLength('65ch', Unit.Px)).toEqual({ value: 65, unit: Unit.Ch });
+  });
+
+  it('a keyword converts to no number', () => {
+    expect(convert({ value: 0, unit: Unit.FitContent }, Unit.Px, context)).toEqual({ value: 0, unit: Unit.Px });
+    expect(isKeyword(Unit.FitContent)).toBe(true);
+    expect(isKeyword(Unit.Px)).toBe(false);
+  });
+
+  it('dvh follows the preview height', () => {
+    expect(convert({ value: 400, unit: Unit.Px }, Unit.Dvh, context)).toEqual({ value: 50, unit: Unit.Dvh });
+  });
+
+  it('max sizes offer none, min sizes do not', () => {
+    expect(UNITS_OF['max-width']).toContain(Unit.Unlimited);
+    expect(UNITS_OF['max-height']).toContain(Unit.Unlimited);
+    expect(UNITS_OF['min-width']).not.toContain(Unit.Unlimited);
+    expect(UNITS_OF['min-height']).toContain(Unit.Auto);
+  });
+
+  it.each(['min-width', 'max-width', 'min-height', 'max-height'])('%s takes every length unit and the content keywords', (name) => {
+    expect(UNITS_OF[name]).toEqual(expect.arrayContaining([Unit.Px, Unit.Percent, Unit.Rem, Unit.Em, Unit.Vw, Unit.Vh, Unit.Dvh, Unit.Ch, Unit.FitContent, Unit.MinContent, Unit.MaxContent]));
+  });
+
+  it('width and height take fit-content', () => {
+    expect(UNITS_OF.width).toEqual(expect.arrayContaining([Unit.Auto, Unit.FitContent]));
+    expect(UNITS_OF.height).toEqual(expect.arrayContaining([Unit.Auto, Unit.FitContent]));
   });
 });
 
