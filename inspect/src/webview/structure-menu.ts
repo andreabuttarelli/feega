@@ -2,7 +2,7 @@ import { AddKind, AddPlace } from '@feega/live-edit/add-node';
 import { StructureOp } from '@feega/live-edit/structure';
 import { WrapTag } from '@feega/live-edit/wrap-node';
 
-export type MenuItem = { id: string; label: string; shortcut?: string; items?: MenuItem[]; still?: boolean };
+export type MenuItem = { id: string; label: string; shortcut?: string; items?: MenuItem[]; single?: boolean; still?: boolean };
 
 export const COPY_FOR_AGENT = 'copy-for-agent';
 export const ADD_CHILD_PREFIX = 'add-child:';
@@ -42,7 +42,7 @@ const prefixed = (prefix: string, items: MenuItem[]): MenuItem[] => items.map((i
 export const MENU_ITEMS: MenuItem[] = [
   { id: COPY_FOR_AGENT, label: 'Copy for agent' },
   { id: StructureOp.Duplicate, label: 'Duplicate', shortcut: '⌘D' },
-  { id: 'add-child', label: 'Add as child', items: prefixed(ADD_CHILD_PREFIX, ADD_ITEMS) },
+  { id: 'add-child', label: 'Add as child', items: prefixed(ADD_CHILD_PREFIX, ADD_ITEMS), single: true },
   { id: 'wrap-with', label: 'Wrap with', items: prefixed(WRAP_PREFIX, WRAP_ITEMS) },
   { id: StructureOp.Unwrap, label: 'Unwrap', shortcut: '⇧⌘G' },
   { id: StructureOp.Delete, label: 'Delete', shortcut: '⌫' }
@@ -50,6 +50,7 @@ export const MENU_ITEMS: MenuItem[] = [
 
 export const LIBRARY_ID = 'library';
 export const LIBRARY_ITEM: MenuItem = { id: LIBRARY_ID, label: 'Library', still: true };
+export const menuFor = (selected: number): MenuItem[] => MENU_ITEMS.filter((item) => !item.single || selected === 1);
 
 export const ADD_LOOP_ITEM: MenuItem = { id: StructureOp.AddItem, label: 'Add item' };
 

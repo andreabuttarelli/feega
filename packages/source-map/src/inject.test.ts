@@ -11,15 +11,6 @@ const hasVueCompiler = (() => {
   }
 })();
 
-const hasAstroCompiler = (() => {
-  try {
-    createRequire(import.meta.url).resolve('@astrojs/compiler/sync');
-    return true;
-  } catch {
-    return false;
-  }
-})();
-
 const tagsOf = (code: string) => [...code.matchAll(/<(\w+)[^>]*data-feega-src="([^"]+)"/g)].map((m) => `${m[1]} ${m[2]}`);
 
 describe('injectSource', () => {
@@ -121,12 +112,52 @@ describe('injectSource', () => {
     expect(out).toContain('<img data-feega-src="index.html:7:7" src="x.png">');
   });
 
-  it.skipIf(!hasAstroCompiler)('tags Astro elements and skips components and the front matter', () => {
+  it('tags Astro elements and skips components and the front matter', () => {
     const code = `---\nimport Card from './Card.astro';\nconst html = '<p>';\n---\n\n<main>\n  <Card><li>one</li></Card>\n  <h1 class="t">Hi</h1>\n</main>\n<style>\n  h1 { color: red }\n</style>\n`;
 
     const out = injectSource(code, 'src/pages/index.astro')!;
 
     expect(tagsOf(out)).toEqual(['main src/pages/index.astro:6:1', 'li src/pages/index.astro:7:9', 'h1 src/pages/index.astro:8:3']);
     expect(out).toContain('<Card>');
+  });
+
+  it('stamps Astro start tags after multibyte text, in maps, multi-line tags and self-closing tags', () => {
+    const code = [
+      '---',
+      "const beans = [{ name: 'Huila Washed', note: 'Red apple', price: '€14' }];",
+      '---',
+      '<main>',
+      '  <p>Café · Lisboa — à la carte</p>',
+      '  {beans.map((b) => (',
+      '    <article class="card">',
+      '      <h3>{b.name}</h3>',
+      '      <p>{b.note} · €</p>',
+      '      <img',
+      '        src="x.png"',
+      '        alt="é"',
+      '      />',
+      '      <br />',
+      '      <Card title="ü"><span>Sì</span></Card>',
+      '    </article>',
+      '  ))}',
+      '  <footer>Fine</footer>',
+      '</main>',
+      ''
+    ].join('\n');
+
+    const out = injectSource(code, 'p.astro')!;
+
+    expect(tagsOf(out)).toEqual([
+      'main p.astro:4:1',
+      'p p.astro:5:3',
+      'article p.astro:7:5',
+      'h3 p.astro:8:7',
+      'p p.astro:9:7',
+      'img p.astro:10:7',
+      'br p.astro:14:7',
+      'span p.astro:15:23',
+      'footer p.astro:18:3'
+    ]);
+    expect(out.replace(/ data-feega-src="[^"]*"/g, '')).toBe(code);
   });
 });

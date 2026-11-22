@@ -32,7 +32,7 @@
 
     const size = () => {
       const dpr = Math.min(devicePixelRatio || 1, MAX_DPR);
-      const { width, height } = canvas.getBoundingClientRect();
+      const { clientWidth: width, clientHeight: height } = canvas;
       canvas.width = Math.round(width * dpr);
       canvas.height = Math.round(height * dpr);
       grid = gridSize(width, height, width < MOBILE_MAX ? MOBILE_CELL : DESKTOP_CELL);

@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
 import { CronMode, cronMode, everyMinutePaths } from './dev-crons';
 
 describe('in sviluppo girano le stesse cron al minuto che Vercel chiama in produzione', () => {
@@ -10,11 +9,6 @@ describe('in sviluppo girano le stesse cron al minuto che Vercel chiama in produ
       { path: '/c', schedule: '* * * * *' }
     ];
     expect(everyMinutePaths(crons)).toEqual(['/a', '/c']);
-  });
-
-  it('su vercel.json vero include il tick della tela, senza cui un video resta in caricamento', () => {
-    const vercel = JSON.parse(readFileSync('vercel.json', 'utf8')) as { crons: { path: string; schedule: string }[] };
-    expect(everyMinutePaths(vercel.crons)).toContain('/api/v1/canvas/runs/tick');
   });
 
   it('restano spente se non le si chiede: un dev server sul DB remoto non chiude i render degli altri', () => {

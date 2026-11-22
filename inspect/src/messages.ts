@@ -15,6 +15,8 @@ import type { OffsetSide } from '@feega/live-edit/authored-offsets';
 import type { Breakpoints } from '@feega/live-edit/breakpoints';
 import type { Theme } from '@feega/live-edit/themes';
 import type { CloudComment, CommentDraft } from './host/cloud-api';
+import type { Catalog } from '@feega/plugin-api/external';
+import type { Proposal } from '@feega/plugin-api/protocol';
 import type { Present, VisitorRole } from '../../packages/share-protocol/src/frame';
 import type { ReportFacts, SettingKey, SettingValue, Settings } from './settings';
 
@@ -75,6 +77,7 @@ export enum ServerState {
   Starting = 'starting',
   Running = 'running',
   Reloading = 'reloading',
+  Restarting = 'restarting',
   Stopped = 'stopped'
 }
 
@@ -99,7 +102,20 @@ export type ColourPick = { css: string; token?: string };
 
 export type FontChoice = { family: string; google: boolean };
 
-export type Palette = { document: string[]; tokens: { name: string; value: string }[]; fonts: string[] };
+export type MissingFont = { family: string; fallback: string; declared: boolean };
+
+export type Palette = { document: string[]; tokens: { name: string; value: string }[]; fonts: string[]; missing: MissingFont[] };
+
+export enum PluginCall {
+  Project = 'project',
+  Source = 'source',
+  Propose = 'propose',
+  Fetch = 'fetch'
+}
+
+export type PluginAsk = { call: PluginCall.Project } | { call: PluginCall.Source; at: string } | { call: PluginCall.Propose; proposal: Proposal } | { call: PluginCall.Fetch; url: string };
+
+export type PluginResult = { ok: true; value: unknown } | { ok: false; reason: string };
 
 export type LibraryEntry = { id: string; name: string; description: string; category: string; tags: string[]; tier: string; page: string };
 
@@ -120,10 +136,13 @@ export enum ToHost {
   Setting = 'setting',
   Move = 'move',
   Structure = 'structure',
+  StructureMany = 'structure-many',
   AddImage = 'add-image',
   Server = 'server',
   Redo = 'redo',
   Font = 'font',
+  FontReplace = 'font-replace',
+  FontLoad = 'font-load',
   SaveVariable = 'save-variable',
   Revert = 'revert',
   Diff = 'diff',
@@ -154,7 +173,11 @@ export enum ToHost {
   ShareKick = 'share-kick',
   ShareRole = 'share-role',
   LibraryList = 'library-list',
-  LibraryInsert = 'library-insert'
+  LibraryInsert = 'library-insert',
+  Plugin = 'plugin',
+  PluginEnable = 'plugin-enable',
+  PluginRemove = 'plugin-remove',
+  PluginInstall = 'plugin-install'
 }
 
 export type ChangeRow = { id: number; at: string; prop: string; value: string; scope: string; files: string[]; time: number };
@@ -178,7 +201,10 @@ export enum ToView {
   Wiring = 'wiring',
   Comments = 'comments',
   Share = 'share',
-  Library = 'library'
+  Library = 'library',
+  Plugin = 'plugin',
+  Plugins = 'plugins',
+  Reload = 'reload'
 }
 
 export enum ShareState {
@@ -211,10 +237,13 @@ export type HostMessage =
   | { kind: ToHost.Setting; key: SettingKey; value: SettingValue }
   | { kind: ToHost.Move; from: string; to: string; place: Place }
   | { kind: ToHost.Structure; op: StructureOp; at: string; to?: string; usage?: Usage; loop?: LoopMove; instance?: number; add?: { kind: AddKind; src?: string; place?: AddPlace }; wrap?: WrapTag }
+  | { kind: ToHost.StructureMany; op: StructureOp; targets: { at: string; instance?: number }[]; wrap?: WrapTag }
   | { kind: ToHost.AddImage; at: string; place?: AddPlace }
   | { kind: ToHost.Server; action: ServerAction }
   | { kind: ToHost.Redo }
   | { kind: ToHost.Font; ask: EditAsk; google: boolean }
+  | { kind: ToHost.FontReplace; from: string; to: string; google: boolean }
+  | { kind: ToHost.FontLoad; family: string }
   | { kind: ToHost.SaveVariable; ask: EditAsk; name: string }
   | { kind: ToHost.Revert; id: number | null }
   | { kind: ToHost.Diff; id: number }
@@ -245,7 +274,11 @@ export type HostMessage =
   | { kind: ToHost.ShareKick; userId: string }
   | { kind: ToHost.ShareRole; userId: string; role: VisitorRole }
   | { kind: ToHost.LibraryList }
-  | { kind: ToHost.LibraryInsert; id: string; at: string; place: AddPlace };
+  | { kind: ToHost.LibraryInsert; id: string; at: string; place: AddPlace }
+  | { kind: ToHost.Plugin; id: number; ask: PluginAsk }
+  | { kind: ToHost.PluginEnable; id: string; enabled: boolean }
+  | { kind: ToHost.PluginRemove; id: string }
+  | { kind: ToHost.PluginInstall; source: string };
 
 export type ViewMessage =
   | { kind: ToView.App; url: string; styling: Styling; prefs: Prefs | null; route?: string; breakpoints: Breakpoints; themes: Theme[] }
@@ -264,7 +297,10 @@ export type ViewMessage =
   | { kind: ToView.Wiring; at: string; instance?: number; wiring: Wiring }
   | { kind: ToView.Comments; enabled: boolean; comments: CloudComment[]; error?: string }
   | { kind: ToView.Share; state: ShareState; available: boolean; name: string; canEdit: boolean; url?: string; expiresAt?: string; visitors: Present[]; notice: boolean; error?: string }
-  | { kind: ToView.Library; items: LibraryEntry[] };
+  | { kind: ToView.Library; items: LibraryEntry[] }
+  | { kind: ToView.Plugin; id: number; result: PluginResult }
+  | { kind: ToView.Plugins; catalog: Catalog; canInstall: boolean }
+  | { kind: ToView.Reload };
 
 export const INSPECT = 'feega:inspect';
 export const INSPECT_RESULT = 'feega:inspect:result';

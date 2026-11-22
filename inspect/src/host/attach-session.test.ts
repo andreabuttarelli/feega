@@ -7,6 +7,7 @@ import { ServerState, ToView, type HostMessage, type ViewMessage } from '../mess
 import { nodePlatform } from './node-platform';
 import type { Platform } from './platform';
 import { inspectSession } from './session';
+import { NO_ATTACH_MESSAGE } from '@feega/dev-run/attach-rule';
 
 const memory = vi.hoisted(() => ({ state: new Map<string, unknown>(), handlers: [] as ((m: unknown) => void)[], sent: [] as unknown[] }));
 
@@ -69,6 +70,12 @@ function workspaceOf(...apps: string[]): string {
   return root;
 }
 
+function workspaceWith(devDependencies: Record<string, string>): string {
+  const root = mkdtempSync(join(tmpdir(), 'feega-ws-'));
+  writeFileSync(join(root, 'package.json'), JSON.stringify({ scripts: { dev: 'dev' }, devDependencies }));
+  return root;
+}
+
 afterEach(() => servers.splice(0).forEach((s) => s.close()));
 
 describe.each(ADAPTERS)('attaching to a URL on the %s platform', (_name, make) => {
@@ -102,6 +109,20 @@ describe.each(ADAPTERS)('attaching to a URL on the %s platform', (_name, make) =
     expect(kinds.indexOf(ToView.App)).toBeLessThan(kinds.indexOf(ServerState.Running));
     expect(app && 'url' in app && app.url).toBe(running && 'info' in running && running.info?.url);
     expect(app && 'url' in app && new URL(app.url).port).toBe(String(running && 'info' in running && running.info?.port));
+  });
+
+  it.each([['astro'], ['nuxt']])('refuses to attach to a %s dev server and offers to start it', async (dependency) => {
+    const { platform, sent } = make();
+    const target = await appServer('<html><head></head><body>hi</body></html>');
+    const warn = vi.fn(async () => false);
+    const session = inspectSession({ ...platform, warn }, workspaceWith({ [dependency]: '^5.0.0' }));
+
+    const out = await session.attachUrl(target);
+
+    expect(out).toEqual({ refused: NO_ATTACH_MESSAGE, attachRefused: true });
+    expect(warn).toHaveBeenCalledWith(NO_ATTACH_MESSAGE, 'Start with Feega');
+    expect(sent).toContainEqual(expect.objectContaining({ kind: ToView.Server, state: ServerState.Stopped, reason: NO_ATTACH_MESSAGE }));
+    expect(sent.some((m) => m.kind === ToView.App)).toBe(false);
   });
 
   it('refuses an address nothing answers on', async () => {

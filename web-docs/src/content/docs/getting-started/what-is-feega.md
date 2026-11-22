@@ -1,35 +1,32 @@
 ---
 title: What is Feega
-description: The canvas, its nodes, and who works on it.
+description: Feega is a free, open-source VS Code extension to design in your codebase.
 sidebar:
   order: 1
 ---
 
-Feega is an infinite canvas for motion video and images. Everything on it is a typed node. A person, the chat in the sidebar, or an outside agent over MCP can create and change nodes.
+Feega is a free, open-source (Apache-2.0) VS Code extension. It also runs standalone with `npx feega`.
 
-Node types include `text`, `image`, `video`, `doc` and `iframe` for material and generation; frames (designs and videos) and free elements (shapes, text, vectors placed outside a frame) are nodes too. `describe_node_types` over MCP returns the exact schema per type.
+Run your app through Feega, click any element, and edit it like in Figma: text, size, spacing, colour, gradients, radius, shadows, typography, position. Each edit is written to your source files as a diff.
 
-## Hierarchy
+There is no AI and no token in the loop. Feega edits the code the way you would, in the system your project already uses: a Tailwind class, a CSS module rule, a scoped style.
 
-```
-org ── projects ──┬── canvases ── nodes ── nodes_connections
-                  │                 └── node_runs (one generation)
-                  └── assets
-```
+## How it works
 
-- An org holds members, projects and settings such as the [model allow-list](/ai/model-allow-list/) and [spend limits](/ai/spend-limits/).
-- Everything on a canvas is saved in the background; teammates see edits live.
-- A canvas can be saved as a [named version](/canvas/versions/) and restored later.
+1. Feega starts your dev server and shows the running app beside your code.
+2. In development, each element is tagged with the file, line and column it came from. A click on the page lands on a line of source.
+3. You edit in the right bar. The preview updates, and the file changes.
+4. Every edit appears in Changes. You can review, undo or revert it.
 
-## Ways to work
+## What it supports
 
-| You | Tool |
-|---|---|
-| Draw, animate, export | The canvas editor |
-| Ask for changes in words | [Canvas chat](/ai/canvas-chat/) |
-| Script or automate | [CLI](/integrations/cli/) |
-| Let Claude Code, Cursor or Claude Desktop drive | [MCP](/integrations/mcp/) |
+- **Frameworks**: [SvelteKit](/frameworks/sveltekit/), [React with Vite](/frameworks/react-vite/), [Next.js](/frameworks/nextjs/), [Vue](/frameworks/vue/), [Nuxt](/frameworks/nuxt/), [React Router](/frameworks/react-router/), [Astro](/frameworks/astro/), [Vite](/frameworks/vite/). See [Supported frameworks](/frameworks/supported-frameworks/) for what is not supported.
+- **Styling**: [plain CSS, CSS modules, Svelte and Vue scoped styles, Tailwind](/styling/tailwind/).
+- **Editors**: VS Code, Cursor, Windsurf, VSCodium.
+- **Systems**: macOS, Windows, Linux.
 
-:::note[How these docs were checked]
-Guides are written from the code and the public changelog on `dev`. Button labels come from the changelog; if the app differs, the app wins. Anything not confirmed in code is marked **Unverified**.
-:::
+## Two ways to run it
+
+The same editor runs [inside your editor](/getting-started/install/) as an extension, or in the browser with `npx feega`.
+
+An account is optional. Everything works without one. See [Account](/more/account/).

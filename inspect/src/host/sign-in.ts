@@ -8,11 +8,15 @@ export const SIGN_IN_TIMEOUT_MS = 5 * 60_000;
 const LOOPBACK_V4 = '127.0.0.1';
 const LOOPBACK_V6 = '::1';
 const WWW_PREFIX = 'www.';
-const STATE_PREFIX = 'app.';
 const HTTP_OK = 200;
 const HTTP_NO_CONTENT = 204;
 const HTTP_BAD_REQUEST = 400;
 const HTTP_NOT_FOUND = 404;
+
+export enum SignInClient {
+  Extension = 'app.',
+  Desktop = 'desktop.'
+}
 
 export enum SignInEnd {
   Done = 'done',
@@ -27,6 +31,7 @@ export type SignInDeps = {
   openBrowser: (url: string) => unknown;
   signal: AbortSignal;
   timeoutMs?: number;
+  client?: SignInClient;
   newState?: () => string;
 };
 
@@ -68,7 +73,7 @@ const reply = (res: ServerResponse, status: number, origin: string, text = '') =
   res.end(text);
 };
 
-export async function signIn({ appUrl = APP_URL, openBrowser, signal, timeoutMs = SIGN_IN_TIMEOUT_MS, newState = () => `${STATE_PREFIX}${randomUUID()}` }: SignInDeps): Promise<SignInOutcome> {
+export async function signIn({ appUrl = APP_URL, openBrowser, signal, timeoutMs = SIGN_IN_TIMEOUT_MS, client = SignInClient.Extension, newState = () => `${client}${randomUUID()}` }: SignInDeps): Promise<SignInOutcome> {
   const state = newState();
   const origins = originsOf(appUrl);
   const accepted = Promise.withResolvers<Account>();

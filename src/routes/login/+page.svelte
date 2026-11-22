@@ -7,7 +7,6 @@
   import { enhance } from '$app/forms';
   import { page } from '$app/stores';
   import { _, locale } from 'svelte-i18n';
-  import { isPlanKey, planByKey } from '$lib/plans';
   import { detectInAppBrowser, androidIntentUrl, guideFor, type InAppBrowser } from '$lib/in-app-browser';
   import { sanitizeWebsiteParam } from '$lib/website-param';
   import { legalHref } from '$lib/legal-links';
@@ -106,10 +105,7 @@
   const oauthLabel = (label: string) => (inApp?.isInApp ? $_('login.inapp.title') : label);
 
   const startFlow = $derived($page.url.searchParams.get('next') === 'onboarding');
-  const planParam = $derived($page.url.searchParams.get('plan') ?? '');
-  const cycleParam = $derived($page.url.searchParams.get('cycle') ?? '');
   const websiteParam = $derived(sanitizeWebsiteParam($page.url.searchParams.get('website')));
-  const chosenPlan = $derived(isPlanKey(planParam) ? planByKey(planParam) : null);
 
   // CLI login: opened by the feega CLI. Show a consent notice and carry the port/state through.
   const cliPort = $derived(data.cliPort ?? '');
@@ -165,10 +161,8 @@
           <p class="sub">{$_('login.forgot.sub')}</p>
         {:else if mode === 'signup'}
           {#if startFlow}
-            <PageTitle size={TitleSize.Small} text={chosenPlan ? $_('login.start.titlePlan', { values: { plan: chosenPlan.name } }) : $_('login.start.title')} />
-            <p class="sub">
-              {chosenPlan ? $_('login.start.subPlan', { values: { plan: chosenPlan.name } }) : $_('login.start.sub')}
-            </p>
+            <PageTitle size={TitleSize.Small} text={$_('login.start.title')} />
+            <p class="sub">{$_('login.start.sub')}</p>
           {:else}
             <PageTitle size={TitleSize.Small} text={$_('login.signup.title')} />
             <p class="sub">{$_('login.signup.sub')}</p>
@@ -183,8 +177,6 @@
           {#if cliState}<input type="hidden" name="cli_state" value={cliState} />{/if}
           {#if inviteToken}<input type="hidden" name="invite_token" value={inviteToken} />{/if}
           {#if startFlow}<input type="hidden" name="next" value="onboarding" />{/if}
-          {#if planParam}<input type="hidden" name="plan" value={planParam} />{/if}
-          {#if cycleParam}<input type="hidden" name="cycle" value={cycleParam} />{/if}
           {#if websiteParam}<input type="hidden" name="website" value={websiteParam} />{/if}
           <button type="submit" class="oauth apple" disabled={loading}>
             <svg class="gh" viewBox="0 0 17 20" width="16" height="19" aria-hidden="true">
@@ -200,8 +192,6 @@
           {#if cliState}<input type="hidden" name="cli_state" value={cliState} />{/if}
           {#if inviteToken}<input type="hidden" name="invite_token" value={inviteToken} />{/if}
           {#if startFlow}<input type="hidden" name="next" value="onboarding" />{/if}
-          {#if planParam}<input type="hidden" name="plan" value={planParam} />{/if}
-          {#if cycleParam}<input type="hidden" name="cycle" value={cycleParam} />{/if}
           {#if websiteParam}<input type="hidden" name="website" value={websiteParam} />{/if}
           <button type="submit" class="oauth" disabled={loading}>
             <svg class="gh" viewBox="0 0 18 18" width="18" height="18" aria-hidden="true">
@@ -219,8 +209,6 @@
           {#if cliState}<input type="hidden" name="cli_state" value={cliState} />{/if}
           {#if inviteToken}<input type="hidden" name="invite_token" value={inviteToken} />{/if}
           {#if startFlow}<input type="hidden" name="next" value="onboarding" />{/if}
-          {#if planParam}<input type="hidden" name="plan" value={planParam} />{/if}
-          {#if cycleParam}<input type="hidden" name="cycle" value={cycleParam} />{/if}
           {#if websiteParam}<input type="hidden" name="website" value={websiteParam} />{/if}
           <button type="submit" class="oauth" disabled={loading}>
             <svg class="gh" viewBox="0 0 16 16" width="18" height="18" aria-hidden="true">
@@ -239,8 +227,6 @@
           {#if cliState}<input type="hidden" name="cli_state" value={cliState} />{/if}
           {#if inviteToken}<input type="hidden" name="invite_token" value={inviteToken} />{/if}
           {#if startFlow}<input type="hidden" name="next" value="onboarding" />{/if}
-          {#if planParam}<input type="hidden" name="plan" value={planParam} />{/if}
-          {#if cycleParam}<input type="hidden" name="cycle" value={cycleParam} />{/if}
           {#if websiteParam}<input type="hidden" name="website" value={websiteParam} />{/if}
           <input type="hidden" name="token" value={appleIdToken?.token ?? ''} />
           <input type="hidden" name="nonce" value={appleIdToken?.nonce ?? ''} />
@@ -266,8 +252,6 @@
           {#if cliState}<input type="hidden" name="cli_state" value={cliState} />{/if}
           {#if inviteToken}<input type="hidden" name="invite_token" value={inviteToken} />{/if}
           {#if startFlow}<input type="hidden" name="next" value="onboarding" />{/if}
-          {#if planParam}<input type="hidden" name="plan" value={planParam} />{/if}
-          {#if cycleParam}<input type="hidden" name="cycle" value={cycleParam} />{/if}
           {#if websiteParam}<input type="hidden" name="website" value={websiteParam} />{/if}
           {#if mode === 'forgot'}<input type="hidden" name="locale" value={$locale ?? ''} />{/if}
           <input
@@ -324,7 +308,6 @@
             {@html $_('login.legal.notice', {
               values: {
                 terms: legalLink(legalHref('terms'), $_('legal.terms')),
-                acceptableUse: legalLink(legalHref('acceptableUse'), $_('legal.acceptableUse')),
                 privacy: legalLink(legalHref('privacy'), $_('legal.privacy')),
                 cookies: legalLink(legalHref('cookies'), $_('legal.cookies'))
               }

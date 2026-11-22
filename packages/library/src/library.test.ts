@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
 import { compile } from 'svelte/compiler';
 import ts from 'typescript';
 import {
@@ -37,7 +35,6 @@ const FAMILY_NAME = /"([^"]+)"/g;
 const SYSTEM_FAMILIES = ['SF Mono', 'Segoe UI', 'Helvetica Neue'];
 const SANS = 'Inter Tight';
 const MONO = 'Fragment Mono';
-const PREVIEW_DIR = join(ITEMS_DIR, '..', 'preview');
 const AA = 4.5;
 const CONTRAST_PAIRS = [
 	['accent', 'accent-fg'],
@@ -205,12 +202,4 @@ describe('tokens.css', () => {
 			expect(tokens.includes(`--feega-${name}:`), name).toBe(true);
 		}
 	});
-});
-
-describe('preview', () => {
-	it('has no horizontal overflow at 360, 375, 768, 1024 and 1280', async () => {
-		execFileSync('node', [join(PREVIEW_DIR, 'build.mjs')]);
-		const { findOverflow } = await import('../preview/overflow.mjs');
-		expect(await findOverflow()).toEqual([]);
-	}, 120_000);
 });

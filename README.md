@@ -1,151 +1,93 @@
+<p align="center"><img src="docs/readme/logos/mark.svg" width="56" alt="Feega"></p>
+
+<h1 align="center">Feega</h1>
+
+<p align="center"><b>A free, open-source visual editor for your codebase.</b><br>Click any element of your running app, edit it like in Figma, and the change is written to your code. No AI, no tokens, every edit a diff.</p>
+
 <p align="center">
-  <img src="https://klnswzhhgrqvbfjzioul.supabase.co/storage/v1/object/public/website/Frame%2072.png" width="72" alt="feega" />
+<a href="https://marketplace.visualstudio.com/items?itemName=andreabuttarelli.feega"><img alt="VS Marketplace" src="https://img.shields.io/visual-studio-marketplace/v/andreabuttarelli.feega?label=marketplace&style=flat-square&color=ff5100&labelColor=121212"></a>
+<a href="https://marketplace.visualstudio.com/items?itemName=andreabuttarelli.feega"><img alt="Installs" src="https://img.shields.io/visual-studio-marketplace/i/andreabuttarelli.feega?label=installs&style=flat-square&color=ff5100&labelColor=121212"></a>
+<a href="https://open-vsx.org/extension/AndreaButtarelli/feega"><img alt="Open VSX" src="https://img.shields.io/open-vsx/v/AndreaButtarelli/feega?label=open%20vsx&style=flat-square&color=ff5100&labelColor=121212"></a>
+<a href="https://www.npmjs.com/package/feega"><img alt="npm" src="https://img.shields.io/npm/v/feega?style=flat-square&color=ff5100&labelColor=121212"></a>
+<a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-ff5100?style=flat-square&labelColor=121212"></a>
+<img alt="Platforms" src="https://img.shields.io/badge/macOS%20%C2%B7%20Windows%20%C2%B7%20Linux-ff5100?style=flat-square&labelColor=121212&label=platforms">
 </p>
 
-<h3 align="center">feega</h3>
-<h1 align="center">The smart canvas for smarter ideas</h1>
+<p align="center"><a href="https://feega.app/video/feega-demo.mp4"><img src="docs/readme/feega-demo.gif" alt="Feega demo: select an element, edit it, review the diff" width="720"></a><br><sub><a href="https://feega.app/video/feega-demo.mp4">Watch the full-quality video</a></sub></p>
 
-<p align="center">
-  <a href="https://github.com/andreabuttarelli/feega/stargazers"><img src="https://img.shields.io/github/stars/andreabuttarelli/feega?style=flat&logo=github&logoColor=white&labelColor=131313&color=c485fe" alt="GitHub stars" /></a>
-  <a href="https://discord.gg/PUp37DG6vr"><img src="https://img.shields.io/badge/Discord-community-c485fe?style=flat&logo=discord&logoColor=white&labelColor=131313" alt="Discord" /></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-c485fe?style=flat&labelColor=131313" alt="Apache-2.0" /></a>
-  <a href="https://feega.app"><img src="https://img.shields.io/badge/Get_started-feega.app-c485fe?style=flat&labelColor=131313" alt="Get started on feega.app" /></a>
-</p>
+## What it is
 
-![feega: design, motion and AI on one canvas](./docs/readme-hero.gif)
+Feega is a VS Code extension, also available for Cursor, Windsurf and VSCodium, plus a standalone `npx feega` for any browser. It opens your running app, lets you select any element and edit size, spacing, colour, type and layout from a design panel. Feega finds the source of the element and writes the change as Tailwind classes or real CSS.
 
-**feega is an open-source infinite canvas where people and AI agents design, animate and generate
-together.** You draw frames, animate them on a timeline and export them; the chat agent, the
-[`feega` CLI and MCP server](cli/) work on the same nodes you do. Use it hosted at
-[feega.app](https://feega.app) or run the whole thing on your machine.
+It runs on macOS, Windows and Linux. Everything is local: no account, and nothing about your code or your app leaves your machine.
 
-## What you can do
-
-- **Design**: frames, shapes, text, pen and boolean tools, auto layout, components, paste from Figma
-- **Animate**: keyframes and a timeline; export PNG, JPG, WebP, SVG, PDF, GIF, MP4, Lottie
-- **Generate**: text, images, video, audio and 3D as canvas nodes wired together
-- **Delegate**: a chat agent, an MCP server and a CLI that read and edit the canvas
-- **Collaborate**: realtime multiplayer, comments, versions, organisations
-
-## Run it locally
-
-One canvas saved in one file: no account, no database, no Docker. You need Node 22.
-
-```sh
-npx feega my-canvas.feega               # http://localhost:5173
-```
-
-The first run downloads the app into `~/.feega/app/`; later starts update it when a newer one exists. From a clone,
-`npm run local -- my-canvas.feega` does the same and builds the app instead (a few minutes). The file is created if it does not exist and saved
-as you work. To continue in the cloud, import it at [feega.app](https://feega.app) with
-**Import .feega**. Sharing, comments and saved versions need the cloud and say so.
-
-To generate with your own provider keys, set them in the environment or in a `.env` in the folder
-you run `npx feega` from: the AI nodes appear, no plan or credits. Keys never enter the `.feega` file.
-
-| Provider | Variables | Generates |
+| Select | Edit | Review |
 |---|---|---|
-| Kie.ai | `KIE_API_KEY` | images, video, text |
-| OpenRouter | `OPENROUTER_API_KEY` | images, video |
-| Text LLM | `LLM_API_KEY` (`LLM_BASE_URL` for a gateway other than OpenRouter) | text, prompt safety check; also counts as the OpenRouter key |
-| Higgsfield | `HIGGSFIELD_API_KEY_ID` + `HIGGSFIELD_API_KEY_SECRET` | images, video |
-| Wiro | `WIRO_API_KEY` (+ `WIRO_API_SECRET` if your Wiro project signs requests) | 3D models |
-| ElevenLabs | `ELEVENLABS_API_KEY` (`ELEVENLABS_BASE_URL` optional) | voice-over, sound effects, music, voices |
+| <img src="docs/readme/feega-select-edit.gif" width="260" alt="Selecting and editing an element"> | <img src="docs/readme/feega-colour.gif" width="260" alt="Changing a colour"> | <img src="docs/readme/feega-diff.gif" width="260" alt="Reviewing the changes as a diff"> |
 
-Image and video prompts pass a safety check that runs on `LLM_API_KEY`; without it they are refused
-with a hint. At start the terminal says, per provider, whether its key works (a free account call,
-never a generation).
+## Install
 
-## Run it locally as an agent
+<p>
+<img src="docs/readme/logos/editor-vs-code.svg" height="22" alt="VS Code"> VS Code &nbsp; <img src="docs/readme/logos/editor-cursor.svg" height="22" alt="Cursor"> Cursor &nbsp; <img src="docs/readme/logos/editor-windsurf.svg" height="22" alt="Windsurf"> Windsurf &nbsp; <img src="docs/readme/logos/editor-vscodium.svg" height="22" alt="VSCodium"> VSCodium &nbsp; <img src="docs/readme/logos/editor-npx-feega.svg" height="22" alt="npx feega"> npx feega
+</p>
 
-The same command, then the [`feega` CLI or MCP server](cli/) against it. No `feega login`: they find
-the server on port 5173 and it answers as the local user. Every edit appears live in the open
-browser tab.
+- **VS Code**: [Marketplace](https://marketplace.visualstudio.com/items?itemName=andreabuttarelli.feega)
+- **Cursor, Windsurf, VSCodium**: [Open VSX](https://open-vsx.org/extension/AndreaButtarelli/feega)
+- **Any browser**: `npx feega`
 
-```sh
-npx feega work.feega --no-open &                   # 1. server on http://localhost:5173
-curl -s localhost:5173/api/v1/version              # 2. {"localMode":true,…}
-feega projects && feega canvases <projectId>       # 3. the one project and its one canvas
+## How it works
+
+1. Run your app, open Feega and click any element.
+2. Edit it from the design panel, including responsive sizes.
+3. Feega writes the change to your source. Every edit is a diff you can review and undo.
+
+## Frameworks
+
+<p>
+<img src="docs/readme/logos/framework-sveltekit.svg" height="22" alt="SvelteKit"> SvelteKit &nbsp; <img src="docs/readme/logos/framework-react.svg" height="22" alt="React"> React &nbsp; <img src="docs/readme/logos/framework-next-js.svg" height="22" alt="Next.js"> Next.js &nbsp; <img src="docs/readme/logos/framework-vue.svg" height="22" alt="Vue"> Vue &nbsp; <img src="docs/readme/logos/framework-tailwind.svg" height="22" alt="Tailwind"> Tailwind
+</p>
+
+SvelteKit, React, Next.js and Vue, with Tailwind or plain CSS (CSS modules, scoped `<style>`).
+
+## Works with your agent
+
+Feega has no AI of its own, so it sits next to the agent you already use: you design, your agent codes, same files, every change a diff.
+
+Teach your agent Feega ([docs](https://docs.feega.app/more/ai-agents/)):
+
+```bash
+npx skills add andreabuttarelli/feega
 ```
 
-From the MCP server, `edit` and `view` work on that canvas; `canvas_file` with `action: "save"`
-writes a copy wherever you ask. Stopping the server (Ctrl-C) saves the file. The server listens on
-127.0.0.1 only and refuses to start otherwise.
+In Claude Code:
 
-## Self-host the full app (Docker)
-
-Accounts, organisations, realtime multiplayer, every project. You need Docker (or OrbStack).
-
-```sh
-git clone https://github.com/andreabuttarelli/feega && cd feega/infra/compose
-docker compose up
+```
+/plugin install feega --marketplace andreabuttarelli/feega
 ```
 
-Open http://localhost:3000 and sign in with `demo@feega.local` / `feega-demo-2026`.
+<p>
+<img src="docs/readme/logos/agent-chatgpt.svg" height="22" alt="ChatGPT"> ChatGPT &nbsp; <img src="docs/readme/logos/agent-claude.svg" height="22" alt="Claude"> Claude &nbsp; <img src="docs/readme/logos/agent-gemini.svg" height="22" alt="Gemini"> Gemini &nbsp; <img src="docs/readme/logos/agent-opencode.svg" height="22" alt="OpenCode"> OpenCode
+</p>
 
-Non-interactive, with a check at the end, from the repository root:
+## Develop
 
-```sh
-docker info > /dev/null                                   # 1. Docker is running, or stop here
-(cd infra/compose && docker compose up -d --wait)         # 2. Supabase + schema + demo data + app
-npm ci && npx playwright install chromium && npm run smoke:selfhost   # 3. must exit 0
+The editor lives in `inspect/` (VS Code extension) and `npx/` (standalone), sharing one host core, on the [`feat/feega-inspect`](https://github.com/andreabuttarelli/feega/tree/feat/feega-inspect) branch until it lands on `main`.
+
+```bash
+cd inspect && npm install && npm test
+cd npx && node --test
 ```
 
-Step 2 pulls the prebuilt app image `ghcr.io/andreabuttarelli/feega` and starts in about a minute.
-`--wait` returns 0 only after the one-shot `migrate` service exits 0 (schema applied, demo user and
-canvas seeded) and the app is healthy. Without that image (a fork, or `APP_IMAGE` pointing at a
-tag that does not exist) compose builds it from source instead: about 28 minutes on a 7.7 GB Docker
-VM, and it can run out of memory if other containers hold that memory. Give Docker 8 GB or more,
-or stop other stacks. To rebuild from your checkout: `docker compose up -d --wait --build`.
-
-Step 3 needs Node 22. It signs in as the demo user, opens the demo canvas, draws a shape, animates
-it and exports a PNG; screenshots land in the current directory. If the app is not on port 3000,
-set `PUBLIC_APP_URL` to match.
-
-| | |
-|---|---|
-| App | http://localhost:3000 |
-| Supabase API | http://localhost:8000 |
-| Postgres | `localhost:5432`, password in `infra/compose/.env` |
-| Login | `demo@feega.local` / `feega-demo-2026` |
-| Stop / reset | `docker compose down` / `docker compose down -v` |
-
-To work on the code instead of the image, use the Supabase CLI:
-
-```sh
-supabase start && npm ci && npm run setup && npm run dev    # http://localhost:5173
-```
-
-`npm run setup` is idempotent: it writes `.env` from the running stack, applies the schema and seeds
-the demo user. The CLI and MCP server find a dev server on port 5173 by themselves; for the Docker
-app set `PUBLIC_APP_URL=http://localhost:3000`. Connecting an agent:
-[`docs/agents-quickstart.md`](docs/agents-quickstart.md).
-
-When something fails:
-
-| Signal | Fix |
-|---|---|
-| First `docker compose up` failed, every later one fails too | `docker compose down -v`, then start again |
-| macOS: the database container hangs with no error | clone outside `~/Documents`, `~/Desktop`, `~/Downloads`, or grant Docker access to that folder |
-| Port 3000, 8000 or 5432 taken | in `infra/compose/.env` set `APP_PORT`, `KONG_HTTP_PORT`, `POSTGRES_PORT`, and the URLs that carry them (`PUBLIC_APP_URL`, `SITE_URL`, `SUPABASE_PUBLIC_URL`, `API_EXTERNAL_URL` ending in `/auth/v1`); for the dev server or `npm run dev -- --port 5301` with `PUBLIC_APP_URL` set to match |
-| AI feature answers "Add … to .env" | add that key; the list by feature is in [`.env.example`](.env.example) |
-
-Nothing is credit-gated (`BILLING_PROVIDER=open`). Full guide, limits and timings:
-[`docs/SELF_HOSTING.md`](docs/SELF_HOSTING.md).
-
-## Stack
-
-TypeScript, SvelteKit, Supabase (Postgres, Auth, Storage, Realtime), Node.js 22, a WebGPU canvas
-with a WebGL fallback. The marketing site (feega.app) is a separate SvelteKit project in
-`landing/`: `npm --prefix landing ci && npm --prefix landing run dev`.
+The site is in `landing/`.
 
 ## Contributing
 
-Contributions are welcome. Please read [CONTRIBUTING.md](./CONTRIBUTING.md)
-before opening a pull request. For security vulnerabilities, follow
-[SECURITY.md](./SECURITY.md) instead of filing a public issue.
+Issues and pull requests are welcome, see [CONTRIBUTING.md](CONTRIBUTING.md). Feega Cloud (GitHub sync, collaboration, sections and templates) is coming later.
 
-feega is licensed under the [Apache License 2.0](./LICENSE).
+## License
 
-Questions and ideas are welcome in the
-[Discord community](https://discord.gg/PUp37DG6vr).
+[Apache-2.0](LICENSE)
+
+## Support
+
+[Star the repo](https://github.com/andreabuttarelli/feega), or [support Feega with a coffee](https://buy.stripe.com/5kQ00k2A97C08sd94LeME07).

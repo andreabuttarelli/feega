@@ -1,33 +1,7 @@
 {
   "installCommand": "npm ci",
-  "ignoreCommand": "bash scripts/vercel-ignore.sh . ':!cli' ':!changelog' ':!docs' ':!apps' ':!imgs' ':!supabase' ':!landing'",
+  "ignoreCommand": "bash scripts/vercel-ignore.sh . ':!docs' ':!supabase' ':!landing' ':!web-docs' ':!web-blog'",
   "headers": [
-    {
-      "source": "/motion-libs/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        },
-        {
-          "key": "Access-Control-Allow-Origin",
-          "value": "*"
-        }
-      ]
-    },
-    {
-      "source": "/motion-env/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        },
-        {
-          "key": "Access-Control-Allow-Origin",
-          "value": "*"
-        }
-      ]
-    },
     {
       "source": "/fonts/(.*)",
       "headers": [
@@ -36,76 +10,9 @@
           "value": "public, max-age=31536000, immutable"
         }
       ]
-    },
-    {
-      "source": "/badges/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
-      ]
-    },
-    {
-      "source": "/showcase-gen/(.*).webp",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
-      ]
-    },
-    {
-      "source": "/yt-(.*).webp",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
-      ]
-    },
-    {
-      "source": "/gpu-core/(.*)",
-      "has": [{ "type": "query", "key": "v" }],
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
-      ]
-    },
-    {
-      "source": "/gpu-core/(.*)",
-      "headers": [
-        {
-          "key": "Access-Control-Allow-Origin",
-          "value": "*"
-        }
-      ]
-    },
-    {
-      "source": "/gpu-text/(.*)",
-      "headers": [
-        {
-          "key": "Access-Control-Allow-Origin",
-          "value": "*"
-        }
-      ]
     }
   ],
   "crons": [
-    {
-      "path": "/api/v1/ai-models/sync",
-      "schedule": "0 */6 * * *"
-    },
-    {
-      "path": "/api/v1/videos/render/work",
-      "schedule": "*/1 * * * *"
-    },
-    {
-      "path": "/api/v1/canvas/runs/tick",
-      "schedule": "*/1 * * * *"
-    },
     {
       "path": "/api/v1/billing/seats/reconcile",
       "schedule": "17 * * * *"

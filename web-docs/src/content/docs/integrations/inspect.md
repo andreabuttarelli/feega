@@ -12,8 +12,13 @@ Feega Inspect is a small editor extension, separate from the Feega canvas. No ac
    app's dev server (the `dev`/`start` script it detects) and shows the page in a panel.
 3. Click an element. The right bar shows its tag, the component and `file:line` (click it to open
    the source), and the Properties controls: auto layout, size, spacing, typography, colour,
-   radius, opacity, shadow. Closed sections below them cover position and inset, display,
-   overflow, min/max size, aspect ratio, object fit, grid, flex child, per-side border, outline,
+   radius, opacity, shadow. Under W and H, **min/max** reveals Min W, Max W, Min H and Max H (open
+   by default when the element has one). They take px, %, rem, em, vw, vh, dvh and ch, or the
+   keywords `none`, `auto`, `fit-content`, `min-content` and `max-content`; scrub or use the arrow
+   keys like any number, and `×` clears the value. With Tailwind they write `max-w-[720px]` or the
+   theme class when one matches exactly (`max-w-prose`). W and H also take `fit-content` and
+   `auto`. At a breakpoint they write `md:max-w-[720px]` or a media query. Closed sections below
+   them cover position and inset, display, overflow, aspect ratio, object fit, grid, flex child, per-side border, outline,
    blend and blur, transform, transition, cursor, text options and list markers. A dimmed value
    is inherited (the ancestor is named next to it); `×` removes the element's own value.
 4. Change a value. With Tailwind, the one class that owns it is rewritten (or your own theme
@@ -38,7 +43,43 @@ Feega Inspect is a small editor extension, separate from the Feega canvas. No ac
    that state's value. States set by JavaScript, `:has()` and CSS nesting are not forced.
 8. **Design** (D) selects and edits; **Navigate** (N) uses the app normally. The top bar has
    back/forward/reload, the route, a dev server status dot, and device widths (keys 1–4).
-9. Cmd/Ctrl+Z restores the file. It never overwrites a change made after the edit.
+9. When text uses a font that is not installed on your machine, not loaded by the page and not
+   available from the page's own CSS, Feega shows "*Font* isn't installed or loaded. Text falls
+   back to *fallback*." as a notice over the page and under **Font** in Typography. **Load from
+   Google Fonts** appears when the family is on Google Fonts: it adds the `@import` to your global
+   stylesheet, or a `<link>` to `index.html`, `app.html` or the root layout. **Replace everywhere**
+   opens a searchable list of your installed fonts and Google Fonts; the choice rewrites that
+   family in every `font-family` and `font` declaration, CSS custom property (including Tailwind
+   `@theme`), inline style, `fontFamily` object, Tailwind `fontFamily` config and `font-['…']`
+   class of the project (`@font-face` blocks stay), and adds the Google Fonts loading when needed.
+   It is one change in the Changes list and one undo. The Google Fonts list is bundled; refresh it
+   with `node scripts/google-fonts.mjs`.
+10. Cmd/Ctrl+Z restores the file. It never overwrites a change made after the edit.
+
+## Layers, structure and shortcuts
+
+Right-click an element in the preview or a row in Layers for **Duplicate**, **Add as child**,
+**Wrap with** (Div, Section, Article, Nav, Header, Footer, Link, Button), **Unwrap** and
+**Delete**. Each is a single undo.
+
+Select several elements: Shift-click a Layers row for the range of visible rows, Cmd-click
+(Ctrl-click on Windows and Linux) to add or remove one, Shift-click in the preview to add or
+remove an element. Delete, Duplicate, Wrap and Unwrap then run on all of them as one edit, undone
+with one undo. Wrapping several elements needs adjacent siblings of the same parent; otherwise it
+is refused with the reason. Elements that cannot be edited are skipped and listed, the rest
+proceed. Styles stay single-element: the Properties controls apply to one element.
+
+| Key | Action |
+|---|---|
+| Delete / Backspace | Delete |
+| Cmd/Ctrl+D | Duplicate |
+| Cmd/Ctrl+G | Wrap in a div |
+| Shift+Cmd/Ctrl+G | Unwrap |
+| Cmd/Ctrl+A | Select the siblings |
+| Cmd/Ctrl+C | Copy for agent |
+| Enter / Shift+Enter | Select the child / the parent |
+| Tab / Shift+Tab | Select the next / the previous sibling |
+| Esc | Clear the selection |
 
 ## In the browser: `npx feega`
 
@@ -55,6 +96,9 @@ Open in editor uses `code -g` when VS Code is on the PATH, else `$VISUAL`/`$EDIT
 `file:line:col`. Settings live in `.feega/settings.json` in the app folder. Ctrl+C stops the
 editor and the dev server.
 
+`npx feega plugin add|remove|list|dev` manages third-party plugins; see
+[Write a plugin](/integrations/write-a-plugin/).
+
 ## Install the dev build
 
 ```bash
@@ -66,6 +110,11 @@ code --install-extension feega-inspect-0.1.0.vsix
 
 - Element picking needs the [source map](/integrations/source-map/). Vite, SvelteKit, React Router,
   Astro and Nuxt apps get it when Feega starts their dev server.
+- **Astro and Nuxt cannot attach to a server that already runs.** Feega must start the dev server to
+  link elements to your source files. If you attach by address (the Open from URL command or
+  `npx feega --url`), Feega refuses and offers **Start with Feega**; `npx feega --url` exits with an
+  error. If your own server is already on the port, Feega starts its own on a free one and leaves
+  yours running.
 - Select, text, style and structure edits are tested on Vite (React, Vue, plain HTML), SvelteKit,
   React Router, Astro, Nuxt and Next.js. Angular, Gatsby and Create React App are not supported.
 - `hover:`/`dark:` variants, class expressions and non-literal text are not written.

@@ -1,18 +1,60 @@
 import { Move } from '../messages';
 
-export enum SelectionKey {
-  Clear = 'clear',
-  Move = 'move'
+export enum Shortcut {
+  Delete = 'delete',
+  Duplicate = 'duplicate',
+  Wrap = 'wrap',
+  Unwrap = 'unwrap',
+  Siblings = 'siblings',
+  Copy = 'copy',
+  Escape = 'escape',
+  Parent = 'parent',
+  Child = 'child',
+  Next = 'next',
+  Previous = 'previous'
 }
 
-export type SelectionAction = { kind: SelectionKey.Clear } | { kind: SelectionKey.Move; move: Move };
+type Binding = { shortcut: Shortcut; key: string; mod: boolean; shift?: boolean };
 
-type Press = { key: string; shiftKey: boolean };
+export const BINDINGS: Binding[] = [
+  { shortcut: Shortcut.Delete, key: 'delete', mod: false },
+  { shortcut: Shortcut.Delete, key: 'backspace', mod: false },
+  { shortcut: Shortcut.Duplicate, key: 'd', mod: true },
+  { shortcut: Shortcut.Wrap, key: 'g', mod: true, shift: false },
+  { shortcut: Shortcut.Unwrap, key: 'g', mod: true, shift: true },
+  { shortcut: Shortcut.Siblings, key: 'a', mod: true },
+  { shortcut: Shortcut.Copy, key: 'c', mod: true },
+  { shortcut: Shortcut.Escape, key: 'escape', mod: false },
+  { shortcut: Shortcut.Child, key: 'enter', mod: false, shift: false },
+  { shortcut: Shortcut.Parent, key: 'enter', mod: false, shift: true },
+  { shortcut: Shortcut.Next, key: 'tab', mod: false, shift: false },
+  { shortcut: Shortcut.Previous, key: 'tab', mod: false, shift: true }
+];
 
-const SELECTION_KEYS: Record<string, (e: Press) => SelectionAction> = {
-  Escape: () => ({ kind: SelectionKey.Clear }),
-  Enter: (e) => ({ kind: SelectionKey.Move, move: e.shiftKey ? Move.Parent : Move.Child }),
-  Tab: (e) => ({ kind: SelectionKey.Move, move: e.shiftKey ? Move.Previous : Move.Next })
+export const MOVES: Partial<Record<Shortcut, Move>> = {
+  [Shortcut.Parent]: Move.Parent,
+  [Shortcut.Child]: Move.Child,
+  [Shortcut.Next]: Move.Next,
+  [Shortcut.Previous]: Move.Previous
 };
 
-export const selectionKey = (e: Press): SelectionAction | null => SELECTION_KEYS[e.key]?.(e) ?? null;
+type Press = { key: string; shiftKey: boolean; metaKey: boolean; ctrlKey: boolean };
+
+export function shortcutOf(e: Press, mac: boolean): Shortcut | null {
+  const mod = mac ? e.metaKey : e.ctrlKey;
+  const stray = mac ? e.ctrlKey : e.metaKey;
+  const key = e.key.toLowerCase();
+  if (stray) {
+    return null;
+  }
+
+  return BINDINGS.find((b) => b.key === key && b.mod === mod && (b.shift === undefined || b.shift === e.shiftKey))?.shortcut ?? null;
+}
+
+const FIELDS = new Set(['INPUT', 'TEXTAREA', 'SELECT']);
+
+export const typingIn = (target: { tagName: string; isContentEditable?: boolean } | null): boolean => target !== null && (FIELDS.has(target.tagName) || Boolean(target.isContentEditable));
+
+export const needsBareFocus = (shortcut: Shortcut): boolean => BINDINGS.some((b) => b.shortcut === shortcut && !b.mod);
+
+export const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);

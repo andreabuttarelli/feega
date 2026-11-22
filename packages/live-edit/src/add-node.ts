@@ -59,11 +59,9 @@ export function lineCol(text: string, offset: number): { line: number; col: numb
   return { line: lines.length, col: lines[lines.length - 1].length + 1 };
 }
 
-export async function addNode(read: ReadFile, at: LiveAt, req: AddRequest): Promise<Structured> {
-  return addMarkup(read, at, markupOf(req, at.file), req.place ?? AddPlace.Auto);
-}
+export const addNode = (read: ReadFile, at: LiveAt, req: AddRequest): Promise<Structured> => addMarkup(read, at, markupOf(req, at.file), req.place);
 
-export async function addMarkup(read: ReadFile, at: LiveAt, markup: string, place: AddPlace): Promise<Structured> {
+export async function addMarkup(read: ReadFile, at: LiveAt, markup: string, requested?: AddPlace): Promise<Structured> {
   const source = await read(at.file);
   if (source === null) {
     return { ok: false, reason: `${at.file}: cannot read the file` };
@@ -80,6 +78,7 @@ export async function addMarkup(read: ReadFile, at: LiveAt, markup: string, plac
     return { ok: false, reason: why, at };
   }
 
+  const place = requested ?? AddPlace.Auto;
   const holds = selected.end > selected.openEnd + 1;
   if (place === AddPlace.Child && !holds) {
     return { ok: false, reason: `<${selected.tag}> cannot hold children`, at };

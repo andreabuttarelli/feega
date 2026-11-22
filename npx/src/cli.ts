@@ -12,6 +12,8 @@ import { fileAccountStore } from '../../inspect/src/host/account';
 import { shareHost } from '../../inspect/src/host/share/share-host';
 import { cloudShare } from '../../inspect/src/host/share/share-port-factory';
 import { cloudApiOf, relayUrlOf } from './cloud';
+import { pluginsRoot } from '../../packages/plugin-store/src/registry';
+import { runPlugin, terminalIo } from './plugin-cli';
 
 declare const FEEGA_VERSION: string;
 
@@ -56,6 +58,9 @@ async function main(): Promise<number> {
     await serveMcp({ cli: __filename, version: FEEGA_VERSION, cwd: process.cwd(), env: process.env, share: shareHost({ api: cloudApiOf(process.env, fileAccountStore()), relayUrl: relayUrlOf(process.env), send: fetch }) });
     return KEEP_RUNNING;
   }
+  if (args.run === Run.Plugin) {
+    return runPlugin(terminalIo(pluginsRoot(), say), args.action, args.value);
+  }
   if (args.run === Run.Error) {
     say(`feega: ${args.reason}\n\n${USAGE}`);
     return 1;
@@ -70,7 +75,7 @@ async function main(): Promise<number> {
   const editor = await editorServer(join(__dirname, 'webview'), args.port);
   const account = fileAccountStore();
   const { share, cloud } = cloudShare({ api: cloudApiOf(process.env, account), relayUrl: relayUrlOf(process.env), send: fetch, editorUrl: async () => editor.url });
-  const host = nodePlatform({ root, launcher: join(__dirname, 'launcher'), version: FEEGA_VERSION, transport: editor.transport, print: say, account, cloud, share });
+  const host = nodePlatform({ root, launcher: join(__dirname, 'launcher'), version: FEEGA_VERSION, transport: editor.transport, print: say, account, cloud, share, plugins: { root: pluginsRoot(), dev: () => args.devPlugins ?? [] } });
   const platform = args.url ? { ...host, chooseApp: (apps: string[]) => askApp(apps.map((app) => ({ label: app || '.', app }))) } : host;
   await killOrphans(memoOf(platform));
   const session = inspectSession(platform, root);
@@ -89,6 +94,11 @@ async function main(): Promise<number> {
   say(`feega: editing ${root}`);
   say(args.url ? `feega: attaching to ${args.url}` : 'feega: starting its dev server…');
   const started = await (args.url ? session.attachUrl(args.url) : session.start());
+  if ('refused' in started && started.attachRefused) {
+    await session.stop();
+    await editor.close();
+    return 1;
+  }
   if ('refused' in started) {
     say(`feega: ${started.refused}`);
   } else {

@@ -168,7 +168,7 @@ async function hrefWritten(read: ReadFile, at: LiveAt, element: Element, href: s
   return { ok: true, changes: change.before === change.after ? [] : [change] };
 }
 
-function withAttribute(text: string, start: number, name: string, value: string | null): string {
+export function withAttribute(text: string, start: number, name: string, value: string | null): string {
   const found = attributesOf(text, start).find((a) => a.name === name);
   if (!found) {
     return value === null ? text : insertAttribute(text, start, `${name}="${value}"`);

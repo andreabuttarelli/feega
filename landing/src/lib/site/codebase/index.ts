@@ -1,18 +1,21 @@
-import { APP_URL, DOCS_URL } from '../links';
+import { GITHUB_URL } from '../links';
+import { primaryCta } from '../install';
 import type { Logo } from './logos';
 import type { ChapterCopy, Step } from '../chapters';
 
 export const CODEBASE_PATH = '/design-in-your-codebase';
 
+const cta = primaryCta();
+
 export const CODEBASE = {
-  title: 'Design Directly in Your Codebase | Feega',
+  title: 'Design in Your Codebase: a VS Code extension | Feega',
   description:
-    'Feega opens your GitHub repo or folder as an editable design: real pages, your components and colours. Change it on the canvas, ship a pull request.',
-  eyebrow: 'Code → Design → Code',
-  heading: 'Design directly in your codebase',
-  lead: 'Open your real app as an editable design. Send the changes back as a pull request.',
-  start: { href: `${APP_URL}/?utm_source=feega.app&utm_medium=site&utm_campaign=design-in-your-codebase`, label: 'Import your repo' },
-  more: { href: `${DOCS_URL}/integrations/import-from-code/`, label: 'Read the docs' }
+    'A free VS Code extension. Click any element of your running app, edit it like in Figma, and the change is written to your code. No AI, with diffs.',
+  eyebrow: 'VS Code · Cursor · Windsurf',
+  heading: 'Design in your codebase',
+  lead: 'Click any element of your running app and edit it like in Figma. The change is written to your code. No AI, no tokens, every edit a diff. Free.',
+  start: { href: cta.href, label: cta.label },
+  more: { href: GITHUB_URL, label: 'See the source' }
 } as const satisfies ChapterCopy & { title: string; description: string };
 
 export enum Glyph {
@@ -22,9 +25,9 @@ export enum Glyph {
 }
 
 export const STEPS: readonly Step<Glyph>[] = [
-  { glyph: Glyph.Import, title: 'Import your repo', text: 'GitHub or a local folder. Feega runs it.' },
-  { glyph: Glyph.Edit, title: 'Design on the canvas', text: 'Real pages, your components, your colours.' },
-  { glyph: Glyph.Ship, title: 'Ship a pull request', text: 'Or pull the latest code back in.' }
+  { glyph: Glyph.Import, title: 'Run your app', text: 'Open it in your editor as usual.' },
+  { glyph: Glyph.Edit, title: 'Click and edit', text: 'Spacing, colour, type. Like in Figma.' },
+  { glyph: Glyph.Ship, title: 'Review the diff', text: 'Written to your code, Tailwind or plain CSS.' }
 ];
 
 export type Framework = { name: string; logo: Logo };
@@ -33,18 +36,9 @@ export const TESTED: readonly Framework[] = [
   { name: 'Next.js', logo: 'Next' },
   { name: 'SvelteKit', logo: 'Svelte' },
   { name: 'React + Vite', logo: 'React' },
-  { name: 'Vue + Vite', logo: 'Vue' }
-];
-
-export const EARLY: readonly Framework[] = [
+  { name: 'Vue + Vite', logo: 'Vue' },
   { name: 'Nuxt', logo: 'Nuxt' },
+  { name: 'React Router', logo: 'ReactRouter' },
   { name: 'Astro', logo: 'Astro' },
-  { name: 'React Router / Remix', logo: 'ReactRouter' },
-  { name: 'Gatsby', logo: 'Gatsby' },
-  { name: 'Angular', logo: 'Angular' },
-  { name: 'Create React App', logo: 'CreateReactApp' },
-  { name: 'Vite', logo: 'Vite' },
-  { name: 'Solid', logo: 'Solid' }
+  { name: 'Vite', logo: 'Vite' }
 ];
-
-export const EARLY_LABEL = 'and more in early support';

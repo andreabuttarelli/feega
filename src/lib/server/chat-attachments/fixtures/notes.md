@@ -1,3 +1,0 @@
-# Notes
-
-Ship on Friday.

@@ -7,20 +7,23 @@ const place = (s: Source) => `${s.file}:${s.line}:${s.col}`;
 
 export const selectorOf = (pick: Pick) => [pick.tag, ...pick.classes.split(/\s+/).filter(Boolean)].join('.');
 
-export function agentContext(pick: Pick, view: AgentView): string {
-  const lines: (string | null)[] = [
-    'Feega selection',
-    `source: ${place(pick.source)}`,
-    `selector: ${selectorOf(pick)}`,
-    pick.component ? `component: ${place(pick.component)}` : null,
-    pick.instances > 1 ? `instance: ${pick.instanceIndex + 1} of ${pick.instances}` : null,
-    `page: ${view.route}`,
-    `preview: ${view.width}px`,
-    view.breakpoint ? `breakpoint: ${view.breakpoint}` : null,
-    view.theme ? `theme: ${view.theme}` : null,
-    view.state ? `state: ${view.state}` : null
-  ];
-  return lines.filter((line): line is string => line !== null).join('\n');
+const present = (lines: (string | null)[]): string[] => lines.filter((line): line is string => line !== null);
+
+const elementLines = (pick: Pick): string[] =>
+  present([`source: ${place(pick.source)}`, `selector: ${selectorOf(pick)}`, pick.component ? `component: ${place(pick.component)}` : null, pick.instances > 1 ? `instance: ${pick.instanceIndex + 1} of ${pick.instances}` : null]);
+
+const viewLines = (view: AgentView): string[] =>
+  present([`page: ${view.route}`, `preview: ${view.width}px`, view.breakpoint ? `breakpoint: ${view.breakpoint}` : null, view.theme ? `theme: ${view.theme}` : null, view.state ? `state: ${view.state}` : null]);
+
+export const agentContext = (pick: Pick, view: AgentView): string => ['Feega selection', ...elementLines(pick), ...viewLines(view)].join('\n');
+
+const numbered = (pick: Pick, i: number): string => elementLines(pick).map((line, at) => (at === 0 ? `${i + 1}. ${line}` : `   ${line}`)).join('\n');
+
+export function agentContexts(picks: Pick[], view: AgentView): string {
+  if (picks.length === 1) {
+    return agentContext(picks[0], view);
+  }
+  return [[`Feega selection: ${picks.length} elements`, ...viewLines(view)].join('\n'), ...picks.map(numbered)].join('\n\n');
 }
 
 export function commentContext(comment: CloudComment, replies: CloudComment[] = []): string {

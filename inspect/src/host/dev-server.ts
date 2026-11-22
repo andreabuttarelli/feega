@@ -5,6 +5,7 @@ import { basename, join } from 'node:path';
 import { devProxy } from './dev-proxy';
 import { portsServing, servesWorkspace } from './listener';
 import { Framework, PlanRefusal, planFile, runPlan, textsWanted, type Planned, type RepoFacts, type RunPlan } from '@feega/dev-run/run-plan';
+import { attachRefusal } from '@feega/dev-run/attach-rule';
 import { DepsOutcome, depsMissing, ensureDeps } from './deps';
 import { failureOf, localUrlOf, type Failed } from './dev-output';
 import { killTree } from './process-tree';
@@ -38,7 +39,7 @@ const LAUNCH: Record<Framework, Launch> = {
   [Framework.Generic]: Launch.Script
 };
 
-export type Running = { url: string; plan: RunPlan; launch: Launch; attached: boolean; pid: number | null; command: string; stop: () => void; exited: (then: () => void) => void };
+export type Running = { url: string; upstream: string; plan: RunPlan; launch: Launch; attached: boolean; pid: number | null; command: string; stop: () => void; exited: (then: () => void) => void };
 
 export enum Attach {
   IfRunning = 'if-running',
@@ -132,9 +133,9 @@ export function stopGroup(child: ChildProcess) {
 
 const has = (path: string) => access(path).then(() => true, () => false);
 
-export type StartHooks = { log: (line: string) => void; installing: (app: string) => void; spawned: (pid: number) => void; signal: AbortSignal };
+export type StartHooks = { log: (line: string) => void; installing: (app: string) => void; spawned: (pid: number) => void; declined: (text: string) => void; signal: AbortSignal };
 
-function install(dir: string, argv: string[], hooks: StartHooks): Promise<DepsOutcome | Failed> {
+export function install(dir: string, argv: string[], hooks: StartHooks): Promise<DepsOutcome | Failed> {
   const [bin, ...args] = argv;
   const child = spawn(bin, args, { cwd: dir, env: process.env, detached: process.platform !== 'win32', shell: process.platform === 'win32' });
   const seen = watchOutput(child);
@@ -171,7 +172,7 @@ function started(plan: RunPlan, appRoot: string, launch: Launch, command: string
   return spawn(bin, args, { cwd: appRoot, env: { ...env, ...preload }, shell: process.platform === 'win32', detached: GROUPED });
 }
 
-export type Refused = { refused: string; apps?: string[]; failed?: Failed };
+export type Refused = { refused: string; apps?: string[]; failed?: Failed; attachRefused?: true };
 
 const spawnedPids = new Set<number>();
 
@@ -188,7 +189,7 @@ const SKIP_NOTE: Partial<Record<Verdict, string>> = {
   [Verdict.OtherProject]: 'does not serve this project'
 };
 
-async function userServer(appRoot: string, launch: Launch, defaultPort: number, log: (line: string) => void): Promise<string | null> {
+async function userServer(appRoot: string, launch: Launch, framework: Framework, defaultPort: number, hooks: StartHooks): Promise<string | null> {
   if (!LAUNCH_ROWS[launch].attaches) {
     return null;
   }
@@ -197,11 +198,17 @@ async function userServer(appRoot: string, launch: Launch, defaultPort: number, 
   for (const port of ports) {
     const url = loopbackUrl(port);
     const verdict = await verdictOf(url, appRoot, launch);
+    const declined = attachRefusal(framework);
+    if (verdict === Verdict.Ours && declined) {
+      hooks.log(`feega: not attaching to ${url}: ${declined}\n`);
+      hooks.declined(declined);
+      continue;
+    }
     if (verdict === Verdict.Ours) {
-      log(`feega: attaching to the dev server already running on ${url}\n`);
+      hooks.log(`feega: attaching to the dev server already running on ${url}\n`);
       return url;
     }
-    log(`feega: not attaching to ${url}: it ${SKIP_NOTE[verdict]}\n`);
+    hooks.log(`feega: not attaching to ${url}: it ${SKIP_NOTE[verdict]}\n`);
   }
   return null;
 }
@@ -210,7 +217,7 @@ async function attachedTo(url: string, plan: RunPlan, appRoot: string, launcherS
   const bridgeDir = join(appRoot, LAUNCHER_DIR);
   await cp(launcherSource, bridgeDir, { recursive: true });
   const proxy = await devProxy(url, bridgeDir);
-  return { url: proxy.url, plan, launch: LAUNCH[plan.framework], attached: true, pid: null, command: `already running on ${url}`, stop: proxy.close, exited: () => undefined };
+  return { url: proxy.url, upstream: url, plan, launch: LAUNCH[plan.framework], attached: true, pid: null, command: `already running on ${url}`, stop: proxy.close, exited: () => undefined };
 }
 
 export async function attachDev(root: string, launcherSource: string, url: string, asked: string | null): Promise<Running | Refused> {
@@ -218,7 +225,14 @@ export async function attachDev(root: string, launcherSource: string, url: strin
     return { refused: `nothing answers on ${url}` };
   }
   const planned: Planned = runPlan(await factsOf(root), asked, { host: HOST, port: await freePort() });
-  return planned.ok ? attachedTo(url, planned, join(root, planned.appDir), launcherSource) : { refused: planned.reason };
+  if (!planned.ok) {
+    return { refused: planned.reason };
+  }
+  const declined = attachRefusal(planned.framework);
+  if (declined) {
+    return { refused: declined, attachRefused: true };
+  }
+  return attachedTo(url, planned, join(root, planned.appDir), launcherSource);
 }
 
 function timeline(log: (line: string) => void) {
@@ -247,7 +261,7 @@ export async function startDev(root: string, launcherSource: string, hooks: Star
   const launch = command ? Launch.Command : LAUNCH[planned.framework];
   const row = LAUNCH_ROWS[launch];
   const bridgeDir = join(appRoot, LAUNCHER_DIR);
-  const theirs = attach === Attach.IfRunning ? await userServer(appRoot, launch, planned.defaultPort, hooks.log) : null;
+  const theirs = attach === Attach.IfRunning ? await userServer(appRoot, launch, planned.framework, planned.defaultPort, hooks) : null;
   time.mark('look for a running server');
   if (theirs) {
     const attached = await attachedTo(theirs, planned, appRoot, launcherSource);
@@ -301,5 +315,5 @@ export async function startDev(root: string, launcherSource: string, hooks: Star
   const proxy = row.proxied ? await devProxy(ready, bridgeDir) : null;
   const stop = () => (proxy?.close(), stopGroup(child));
   time.done('started');
-  return { url: proxy?.url ?? ready, plan: planned, launch, attached: false, pid: child.pid ?? null, command: shown, stop, exited: (then) => child.once('exit', then) };
+  return { url: proxy?.url ?? ready, upstream: ready, plan: planned, launch, attached: false, pid: child.pid ?? null, command: shown, stop, exited: (then) => child.once('exit', then) };
 }

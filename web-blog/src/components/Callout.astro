@@ -1,0 +1,19 @@
+---
+import Pixel from './Pixel.astro';
+import { ICONS, type IconName } from './pixel-icons';
+
+interface Props {
+  icon?: IconName;
+  title: string;
+}
+
+const { icon = 'note', title } = Astro.props;
+---
+
+<aside class="callout">
+  <Pixel rows={ICONS[icon]} size={4} />
+  <div>
+    <p class="callout-title">{title}</p>
+    <slot />
+  </div>
+</aside>

@@ -7,6 +7,8 @@ const files = (map: Record<string, string>): ReadFile => async (path) => map[pat
 
 const pkg = (deps: string[]) => JSON.stringify({ dependencies: Object.fromEntries(deps.map((d) => [d, '1'])) });
 
+const KIT_ALIAS = '$' + 'lib';
+
 const TOKENS = ':root { --feega-ink: #111; }\n';
 
 const ITEM: InsertItem = {
@@ -92,7 +94,7 @@ describe('libraryInsert on SvelteKit', () => {
     expect(c['src/app.css'].after).toContain('family=Fragment+Mono:wght@400&display=swap');
     expect(c['src/app.css'].after).toContain('body { margin: 0; }');
     expect(c['src/routes/+page.svelte'].after).toBe(
-      `<script lang="ts">\n  import Pricing from '$lib/components/feega/Pricing.svelte';\n</script>\n\n<main>\n  <h1>Title</h1>\n  <Pricing />\n</main>\n`
+      `<script lang="ts">\n  import Pricing from '${KIT_ALIAS}/components/feega/Pricing.svelte';\n</script>\n\n<main>\n  <h1>Title</h1>\n  <Pricing />\n</main>\n`
     );
     expect(Object.keys(c)).toHaveLength(4);
   });
@@ -105,7 +107,7 @@ describe('libraryInsert on SvelteKit', () => {
   it('adds the import to the existing instance script', async () => {
     const page = '<script lang="ts">\n  let n = 1;\n</script>\n\n<main>\n  <h1>Title</h1>\n</main>\n';
     const out = await libraryInsert(kit({ 'src/routes/+page.svelte': page }), { file: 'src/routes/+page.svelte', line: 6, col: 3 }, AddPlace.After, ITEM, TOKENS);
-    expect(changes(out)['src/routes/+page.svelte'].after).toContain(`<script lang="ts">\n  import Pricing from '$lib/components/feega/Pricing.svelte';\n  let n = 1;\n</script>`);
+    expect(changes(out)['src/routes/+page.svelte'].after).toContain(`<script lang="ts">\n  import Pricing from '${KIT_ALIAS}/components/feega/Pricing.svelte';\n  let n = 1;\n</script>`);
   });
 
   it('skips the module script when adding the import', async () => {
@@ -136,7 +138,7 @@ describe('libraryInsert on SvelteKit', () => {
     const c = changes(out);
     expect(c['src/lib/components/feega/Pricing2.svelte'].after).toBe(ITEM.files.svelte[0].text);
     expect(c['src/lib/components/feega/Pricing.svelte']).toBeUndefined();
-    expect(c['src/routes/+page.svelte'].after).toContain("import Pricing2 from '$lib/components/feega/Pricing2.svelte';");
+    expect(c['src/routes/+page.svelte'].after).toContain(`import Pricing2 from '${KIT_ALIAS}/components/feega/Pricing2.svelte';`);
     expect(c['src/routes/+page.svelte'].after).toContain('<Pricing2 />');
   });
 
