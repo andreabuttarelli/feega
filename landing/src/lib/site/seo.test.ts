@@ -44,6 +44,17 @@ describe('structured data', () => {
     expect(types(HOME_JSON_LD)).toEqual(expect.arrayContaining(['Organization', 'SoftwareApplication', 'FAQPage']));
   });
 
+  it('the home page names the site and gives the organization a logo, for sitelinks', () => {
+    expect(types(HOME_JSON_LD)).toContain('WebSite');
+    expect(HOME_JSON_LD).toContain('"alternateName":["feega.app","Feega editor"]');
+    expect(HOME_JSON_LD).toContain('"logo":"https://www.feega.app/site/logo.png"');
+  });
+
+  it('the application is described as today’s product', () => {
+    expect(HOME_JSON_LD).not.toContain('Feega Inspect is');
+    expect(HOME_JSON_LD).toContain('npx feega');
+  });
+
   it('the FAQ markup carries every visible question, with plain-text answers', () => {
     const data = JSON.parse(faqJsonLd(FAQ).replace(/^<script[^>]*>|<\/script>$/g, ''));
     expect(data.mainEntity.map((q: { name: string }) => q.name)).toEqual(FAQ.map((f) => f.q));
