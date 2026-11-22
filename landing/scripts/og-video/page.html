@@ -34,6 +34,7 @@ body[data-mode="still"] #still, body[data-mode="video"] #video { display: block;
 #still .lockup .mark { height: 100%; }
 #still .lockup .mark svg { height: 100%; width: auto; }
 #still .lockup .name { font-weight: 600; font-size: 34px; letter-spacing: -.04em; line-height: 1; color: var(--ink); }
+#still .chip { position: absolute; right: 72px; top: 64px; height: 38px; padding: 0 16px; border: 1px solid rgb(18 17 16 / .16); border-radius: 999px; color: var(--ink); }
 #still .title { position: absolute; left: 0; right: 0; top: 150px; text-align: center; font-size: 62px; letter-spacing: -.05em; line-height: 1; }
 #still .shot { position: absolute; left: 100px; top: 265px; width: 1000px; border-radius: 12px 12px 0 0; overflow: hidden; box-shadow: 0 0 0 1px rgb(0 0 0 / .08), 0 30px 70px -20px rgb(30 20 10 / .4); background: var(--chrome); }
 #still .shot img { display: block; width: 100%; }
@@ -84,6 +85,7 @@ body[data-mode="still"] #still, body[data-mode="video"] #video { display: block;
 <body data-mode="still">
 <section id="still" class="mode">
   <div class="lockup"><span class="mark">{{MARK}}</span><span class="name">Feega</span></div>
+  <span class="eyebrow chip">free · open source</span>
   <h1 class="title">design in your codebase</h1>
   <div class="shot"><img src="data:image/webp;base64,{{SHOT}}" alt=""></div>
 </section>
