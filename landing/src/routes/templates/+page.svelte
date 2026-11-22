@@ -6,6 +6,7 @@
   import { DOWNLOAD_PATH } from '$lib/site/links';
   import { faqJsonLd } from '$lib/site/structured-data';
   import Gallery from '$lib/site/templates/Gallery.svelte';
+  import TemplatesHero from '$lib/site/templates/TemplatesHero.svelte';
   import TemplatesLayout from '$lib/site/templates/TemplatesLayout.svelte';
   import { CATEGORY_COPY, FRAMEWORK_COPY, HUB_COPY } from '$lib/site/templates/copy';
   import { collectionJsonLd } from '$lib/site/templates/jsonld';
@@ -31,9 +32,11 @@
 </svelte:head>
 
 <TemplatesLayout>
+  <TemplatesHero>
   <h1>{lower(TEMPLATES_HEADING)}</h1>
   <p class="fine">By {AUTHOR.name}, {AUTHOR.role}</p>
   <p class="intro lede">{HUB_COPY.lead}</p>
+  </TemplatesHero>
 
   <Gallery templates={TEMPLATES} />
 
