@@ -2,35 +2,36 @@ export type Rect = { x: number; y: number; w: number; h: number };
 export type Point = { x: number; y: number };
 
 export const WIN = { w: 1280, h: 760 };
-export const TAB_STRIP = 36;
 export const TOP_ROW = 40;
-export const RULER = 22;
 export const LEFT_W = 260;
 export const RIGHT_W = 300;
 export const RIGHT_X = WIN.w - RIGHT_W;
-export const BODY_Y = TAB_STRIP + TOP_ROW;
-export const PAGE: Rect = { x: LEFT_W, y: BODY_Y + RULER, w: RIGHT_X - LEFT_W, h: WIN.h - BODY_Y - RULER };
+export const BODY_Y = TOP_ROW;
+export const PAGE: Rect = { x: LEFT_W, y: BODY_Y, w: RIGHT_X - LEFT_W, h: WIN.h - BODY_Y };
 
 export const LAYER_ROW = 26;
-export const LAYERS_TOP = BODY_Y + 4;
+export const LAYERS_TOP = BODY_Y + 6;
 
-export const H1_TOP = 128;
+export const H1_TOP = 120;
 export const H1_LEFT = 40;
-export const H1_W = 560;
+export const H1_W = 470;
 export const BASE_FONT = 64;
 
 export const h1Rect = (fontSize: number): Rect => ({ x: PAGE.x + H1_LEFT, y: PAGE.y + H1_TOP, w: H1_W, h: fontSize * 2 });
 
+export const ACTIONS_GAP = 150;
+export const insertY = (fontSize: number) => PAGE.y + H1_TOP + fontSize * 2 + ACTIONS_GAP;
+
 export enum Tab {
   Properties = "Properties",
   Changes = "Changes",
-  Library = "Library",
+  Comments = "Comments",
 }
 
 export const TABS: Record<Tab, Rect> = {
-  [Tab.Properties]: { x: RIGHT_X + 8, y: TAB_STRIP + 7, w: 82, h: 26 },
-  [Tab.Changes]: { x: RIGHT_X + 92, y: TAB_STRIP + 7, w: 70, h: 26 },
-  [Tab.Library]: { x: RIGHT_X + 164, y: TAB_STRIP + 7, w: 62, h: 26 },
+  [Tab.Properties]: { x: RIGHT_X + 8, y: 7, w: 82, h: 26 },
+  [Tab.Changes]: { x: RIGHT_X + 94, y: 7, w: 74, h: 26 },
+  [Tab.Comments]: { x: RIGHT_X + 172, y: 7, w: 82, h: 26 },
 };
 
 export enum Control {
@@ -47,20 +48,18 @@ export type PropRow = { label: string; control: Control; values: string[] };
 export type PropSection = { title: string; rows: PropRow[]; badge?: string };
 
 export const TEXT_PROPS: PropSection[] = [
-  { title: "Layout", rows: [{ label: "Display", control: Control.Segmented, values: ["Block", "Flex", "Grid"] }, { label: "Gap", control: Control.Field, values: ["↔", "24", "px"] }] },
-  { title: "Size", rows: [{ label: "Size", control: Control.Pair, values: ["W", "560", "px", "H", "128", "px"] }, { label: "Min / Max", control: Control.Pair, values: ["↧", "Auto", "", "↥", "720", "px"] }] },
-  { title: "Spacing", rows: [{ label: "Padding", control: Control.Field, values: ["▢", "0", "px"] }, { label: "Margin", control: Control.Field, values: ["▢", "0 0 14", "px"] }] },
+  { title: "Size", rows: [{ label: "Size", control: Control.Pair, values: ["W", "560", "px", "H", "128", "px"] }] },
+  { title: "Spacing", rows: [{ label: "Padding", control: Control.Field, values: ["▢", "Mixed", "px"] }, { label: "Margin", control: Control.Field, values: ["▢", "0", "px"] }] },
   {
     title: "Typography",
     rows: [
-      { label: "Font", control: Control.Select, values: ["Georgia", "Medium"] },
+      { label: "Font", control: Control.Select, values: ["Georgia", "Medium 500"] },
       { label: "Size", control: Control.Triple, values: ["Aa", "64", "px", "↕", "64", "px", "↔", "-3", "%"] },
-      { label: "Align", control: Control.Segmented, values: ["≡", "☰", "≣", "▤"] },
-      { label: "Colour", control: Control.Colour, values: ["#2a1c12"] },
+      { label: "Align", control: Control.Segmented, values: ["alignStart", "alignCenter", "alignEnd", "alignJustify"] },
+      { label: "Solid", control: Control.Colour, values: ["#2a1c12"] },
     ],
   },
-  { title: "Fill", rows: [] },
-  { title: "Border", rows: [] },
+  { title: "Radius", rows: [] },
   { title: "Effects", rows: [{ label: "Opacity", control: Control.Field, values: ["◐", "100", "%"] }] },
 ];
 
@@ -71,8 +70,9 @@ export const MESH_PROPS: PropSection[] = [
   { title: "Effects", rows: [{ label: "Opacity", control: Control.Field, values: ["◐", "100", "%"] }] },
 ];
 
-export const WHAT_H = 64;
-export const SCOPE_H = 36;
+export const WHAT_H = 72;
+export const EDITING_H = 34;
+export const SCOPE_H = 38;
 export const HEAD_H = 30;
 export const ROW_H = 34;
 export const LABEL_W = 72;
@@ -81,12 +81,13 @@ export const CONTROL_X = RIGHT_X + SIDE_PAD + LABEL_W + 8;
 export const CONTROL_W = WIN.w - SIDE_PAD - CONTROL_X;
 export const FIELD_H = 28;
 export const GAP = 4;
+export const STATE_Y = BODY_Y + WHAT_H + EDITING_H + SCOPE_H;
 
 export type PlacedRow = PropRow & { y: number };
 export type PlacedSection = PropSection & { y: number; placed: PlacedRow[] };
 
 export const placeProps = (sections: PropSection[]): PlacedSection[] => {
-  let y = BODY_Y + WHAT_H + SCOPE_H;
+  let y = STATE_Y + ROW_H + 4;
 
   return sections.map((section) => {
     const top = y;
@@ -96,6 +97,7 @@ export const placeProps = (sections: PropSection[]): PlacedSection[] => {
       y += ROW_H;
       return { ...row, y: at };
     });
+    y += 4;
 
     return { ...section, y: top, placed };
   });
@@ -118,7 +120,7 @@ const rowOf = (sections: PropSection[], title: string, label: string) => {
 };
 
 export const FONT_SIZE_FIELD = controlRect(rowOf(TEXT_PROPS, "Typography", "Size"), 0, 3);
-export const COLOUR_FIELD = controlRect(rowOf(TEXT_PROPS, "Typography", "Colour"));
+export const COLOUR_FIELD = controlRect(rowOf(TEXT_PROPS, "Typography", "Solid"));
 export const BLUR_FIELD = controlRect(rowOf(MESH_PROPS, "Mesh gradient", "Blur"));
 
 export const POPOVER: Rect = { x: RIGHT_X - 236, y: COLOUR_FIELD.y - 92, w: 228, h: 96 };
@@ -126,13 +128,11 @@ export const SWATCH = 30;
 export const SWATCH_STEP = 42;
 export const swatchRect = (i: number): Rect => ({ x: POPOVER.x + 14 + i * SWATCH_STEP, y: POPOVER.y + 48, w: SWATCH, h: SWATCH });
 
-export const COPY_BUTTON: Rect = { x: RIGHT_X + SIDE_PAD, y: WIN.h - 52, w: RIGHT_W - 2 * SIDE_PAD, h: 38 };
-
-export const LIBRARY_TOP = BODY_Y + 92;
-export const LIB_W = 132;
-export const LIB_H = 104;
+export const LIBRARY_TOP = BODY_Y + 112;
+export const LIB_W = 112;
+export const LIB_H = 112;
 export const LIB_GAP = 12;
-export const libraryRect = (i: number): Rect => ({ x: RIGHT_X + SIDE_PAD + (i % 2) * (LIB_W + LIB_GAP), y: LIBRARY_TOP + Math.floor(i / 2) * (LIB_H + LIB_GAP), w: LIB_W, h: LIB_H });
+export const libraryRect = (i: number): Rect => ({ x: SIDE_PAD + (i % 2) * (LIB_W + LIB_GAP), y: LIBRARY_TOP + Math.floor(i / 2) * (LIB_H + LIB_GAP), w: LIB_W, h: LIB_H });
 
 export const MESH_BOX: Rect = { x: PAGE.x + 24, y: PAGE.y + 86, w: PAGE.w - 48, h: 360 };
 

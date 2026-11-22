@@ -157,7 +157,7 @@ export const Editors = () => {
   const frame = useCurrentFrame();
 
   return (
-    <Section tone={EDITORS_TONE} eyebrow="05 · editors">
+    <Section tone={EDITORS_TONE}>
       <Scatter specks={specks(6, 18, [ORANGE, "#004dff", "#c9c6bd"])} />
       <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: MONO, fontSize: FONT, letterSpacing: "-0.03em", color: INK, transform: `translateY(${float(frame, 0, 4)}px)` }}>
         <Words text="feega runs in" from={0} align="right" />

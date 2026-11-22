@@ -1,7 +1,7 @@
 import { useCurrentFrame } from "remotion";
 import { lift, tween } from "../../ease";
-import { APP_REST, AppShot, SWATCHES } from "../app/AppShot";
-import { APP } from "../app/appLayout";
+import { EDITOR_REST, FeegaEditor, SWATCHES } from "../editor/FeegaEditor";
+import { Tab } from "../editor/layout";
 import { Align, Headline } from "../Headline";
 import { Place, Section } from "../Section";
 import { MONO, ORANGE, PAPER, Tone } from "../style";
@@ -11,10 +11,10 @@ export const CODE_TONE = Tone.Paper;
 export const DIFF_IN = 16;
 export const DIFF_LINES_AT = 30;
 
-const APP_SCALE = 1.5;
-const CORNER = { x: 1420, y: 660 };
+const APP_SCALE = 0.98;
+const EDITOR_AT = { x: -150, y: 20 };
 const APP_SLIDE = 260;
-const DIFF_AT = { x: 840, y: 250 };
+const DIFF_AT = { x: 900, y: 330 };
 const DIFF_SLIDE = 900;
 const LINE_STAGGER = 4;
 const MUTED = "#8a8780";
@@ -71,12 +71,12 @@ export const Code = () => {
   const frame = useCurrentFrame();
   const app = tween(frame, 0, 18);
   const diff = tween(frame, DIFF_IN, 18);
-  const state = { ...APP_REST, selected: 1, headColor: SWATCHES[1] };
+  const state = { ...EDITOR_REST, tab: Tab.Changes, selected: 1, fontSize: 76, headColor: SWATCHES[1], changes: 8, saved: 1 };
 
   return (
     <Section tone={CODE_TONE}>
-      <Place x={CORNER.x - APP.w * APP_SCALE} y={CORNER.y - APP.h * APP_SCALE} style={{ transform: `translate(${(app - 1) * APP_SLIDE}px, ${(app - 1) * APP_SLIDE}px) scale(${APP_SCALE})`, transformOrigin: "0 0" }}>
-        <AppShot state={state} />
+      <Place x={EDITOR_AT.x} y={EDITOR_AT.y} style={{ transform: `translate(${(app - 1) * APP_SLIDE}px, ${(app - 1) * APP_SLIDE}px) scale(${APP_SCALE})`, transformOrigin: "0 0" }}>
+        <FeegaEditor state={state} />
       </Place>
       <Place x={DIFF_AT.x} y={DIFF_AT.y} style={{ transform: `translateX(${(1 - diff) * DIFF_SLIDE}px) rotate(${(1 - diff) * 5}deg)` }}>
         <Diff frame={frame} />

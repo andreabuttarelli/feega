@@ -60,7 +60,7 @@ export const Frameworks = () => {
   const text = lift(frame, 2, 12);
 
   return (
-    <Section tone={FRAMEWORKS_TONE} eyebrow="06 · frameworks">
+    <Section tone={FRAMEWORKS_TONE}>
       <div style={{ position: "absolute", inset: 0, transform: `scale(${1 - suck})`, transformOrigin: "50% 50%", opacity: 1 - suck }}>
         <Scatter specks={specks(7, 26, [ORANGE, "#004dff", INK])} />
       </div>

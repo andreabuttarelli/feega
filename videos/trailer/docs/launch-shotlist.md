@@ -41,22 +41,31 @@ Rules taken from it: nothing holds still longer than ≈15 f except the final ca
 then *visited* item by item; every section change is a coloured wipe (pixel dissolve or stepped
 panel) with an occasional hard cut on the beat.
 
-Feega version, `Launch` composition, 30 fps, 1224 frames (40.8 s). Motion spec per shot (scene-local frames):
+Feega version, `Launch` composition, 30 fps, 1045 frames (34.8 s). Flow: edit visually → lands in
+code → templates → insert (zoom out) → team and agents edit the inserted section → plugins →
+editors → frameworks → open source → end card. No eyebrow labels.
+
+Every editor shot uses one mockup, `editor/FeegaEditor.tsx`, rebuilt from the real webview
+(`inspect/src/webview/`) and the landing screenshots: Layers (+ Add) or Library on the left,
+toolbar with Feega menu, history, address, device group, `1140 × 860`, Theme; preview with the
+Design/Navigate bar; Properties / Changes / Comments on the right (breadcrumb, `editing: auto ·
+1140px`, This element / All, State, Size, Spacing, Typography, Radius, Effects). Density reduced,
+labels and colours kept.
 
 | # | Start | Frames | Bg | Headline (boxed) | Motion | Exit |
 |---|---|---|---|---|---|---|
-| 1 | 0 | 90 | off-white | the best **free** / Lovable alternative. | words rise+tilt, 2 f stagger; box wipes from left at f≈24 (7 f) and word grows 6 %; creatures pop in from f14, 2 f stagger, then hop; specks drift by size (parallax) | pixel dissolve → black |
-| 2 | 90 | 114 | black | click any / element of your / running **app**. | card slides in from right with 8° tilt (f4–24); cursor f26–58; hover f52, click f70; camera push-in 1.16× on the heading f50–72, pull back f96–112 | stepped panel → off-white |
-| 3 | 204 | 120 | off-white | edit it / like in **Figma**. | card slides in (f0–16); push-in 1.12× on font-size field f14–32 while scrubbing 56→80 (f26–58); pull back f62–78; push-in on swatches f80–94; swatch opens f70, colour f92 | pixel dissolve → orange |
-| 4 | 324 | 120 | orange | every edit / lands in / your **code**. | diff card slides in with −6° tilt (f6–26); lines stagger 5 f from f30; creatures pop onto the card top from f50; push-in 1.14× on the + line f66–84; green glint sweeps the line f74–90 | hard cut |
-| 5 | 444 | 120 | black | 61 free **templates**. | carousel slides left f0–92, every tile bobs and rocks, creatures under tiles hop and lag (parallax 0.18); Library card rises with 10° tilt f64–80; cursor clicks "pricing" f98 | stepped panel → off-white |
-| 6 | 564 | 105 | off-white | plugins, if you / want **more**. | mesh card enters tilted and floats; 3 points orbit, pointer drags the 4th f24–58; cube spins and hops; specks drift | pixel dissolve → black |
-| 7 | 669 | 120 | black | works where you / **already** code. | 5 tiles flip in (rotateY 85°→0, rise 160 px, 3 f stagger, from f14); each tile floats; cursor sweeps tile to tile from f40 every 10 f, each lights (lift 14 px, orange border, "connected" badge pops, icon pulses) with a tick; 2 creatures run across; tiles regroup toward centre and shrink in the last 12 f | hard cut |
-| 8 | 789 | 105 | off-white | every **framework**. | 8 tiles (React, Next.js, Vue.js, Nuxt, Svelte, Astro, React Router, Vite; 1646 px wide row, all visible) flip in 2 f stagger from f10; sweep from f34 every 6 f, "works" badge + tick each; 3 creatures run right→left; regroup | stepped panel → black |
-| 9 | 894 | 90 | black | works with / your **agent**. | 4 tiles (Claude Code, Codex wordmark, Cursor, Gemini CLI) flip in from f12; sweep from f34 every 9 f; creature row pops in under them and hops; regroup | pixel dissolve → orange |
-| 10 | 984 | 105 | orange | free and / **open source**. | chip rises f24–40; cursor clicks star f66; 9 pixel stars burst outward and spin; creature row jumps on the click | stepped panel → black |
-| 11 | 1089 | 135 | black | Feega mark + "design in your codebase." | logo scales in f4; creatures run in from both sides (3 f stagger, tilted) then hop; tagline + chip; two creatures run across from f70; hold to the end | — |
+| 1 | 0 | 84 | white | the best free / Lovable **alternative**. | words scatter in; pixel icons hop | pixel dissolve |
+| 2 | 84 | 84 | orange | edit your running app **visually**. | editor rises; click h1 f30, click Fill f46 (colour popover), orange swatch f60, "Saved to Hero.svelte:14" toast | stepped panel |
+| 3 | 168 | 96 | paper | every edit lands in your **code**. | editor on Changes tab (entries + inline diff); diff card slides in, lines stagger | hard cut |
+| 4 | 264 | 72 | black | free and premium **templates**. | pixel-framed template carousel slides left | hard cut |
+| 5 | 336 | 204 | black | collab with your / team and **agents**. | close on Library; grab Pricing f18, drag with ghost while the camera zooms out to the whole editor, drop line "after div.actions" f40, drop f54, section expands, Library closes to Layers with `section.pricing` selected; f84 editor shrinks right, Claude Code terminal slides out from behind it; headline f80; prompt "make the pricing cards 3 columns and highlight Pro" f106; thinking, diff f140; preview cards morph 2→3 columns, Pro goes dark with "popular", agent glow f152–186; teammate cursor "Maya" moves in the preview from f96 | pixel dissolve |
+| 6 | 540 | 95 | white | plugins, if you / want **more**. | mesh plugin in the editor, pointer drags a point; cube | pixel dissolve |
+| 7 | 635 | 100 | white | editors deck | editor windows swap (VS Code, Cursor, terminal…) | hard cut |
+| 8 | 735 | 95 | white | every **framework**. | tiles flip in, sweep | stepped panel |
+| 9 | 830 | 95 | orange | free and / **open source**. | star click, pixel stars | stepped panel |
+| 10 | 925 | 120 | black | Feega mark + "design in your codebase." | logo, tagline, URL chip | — |
 
-Every section also pushes in 3.5 % over its length and, in its last 12 f, slides 140 px left and
-shrinks 6 % under the wipe. SFX: pop on each word box, tap per lit list item, whoosh at each wipe
-start, click on cursor clicks, click on hard cuts, chime on the logo.
+Every section pushes in 3.5 % over its length and, in its last 12 f, slides 140 px left and
+shrinks 6 % under the wipe. SFX: pop on each word box, click on cursor clicks/grab/drop, whoosh on
+wipes and the terminal reveal, taps on diff lines, chime when the agent finishes and on the logo.
+`npm run clicks` checks every click lands inside its target.

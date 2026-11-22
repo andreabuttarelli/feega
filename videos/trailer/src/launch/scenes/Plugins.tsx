@@ -66,7 +66,7 @@ export const Plugins = () => {
   const zoom = 1 + 0.2 * tween(frame, 12, 18) - 0.2 * tween(frame, 70, 16);
 
   return (
-    <Section tone={PLUGINS_TONE} eyebrow="04 · plugins">
+    <Section tone={PLUGINS_TONE}>
       <Scatter specks={SPECKS} />
       <Place x={100} y={380}>
         <Headline lines={["plugins, if you", "want more."]} boxed="more" tone={PLUGINS_TONE} size={116} align={Align.Left} />
