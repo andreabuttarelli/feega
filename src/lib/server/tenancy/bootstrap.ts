@@ -1,4 +1,4 @@
-import { FREE_CREDITS } from '$lib/plans';
+import { CREDITS_PER_USD_GRANT } from '$lib/credit-ladder';
 import { randomBytes } from 'node:crypto';
 import type { Db } from '$lib/server/db/client';
 import { createServiceRoleDb } from '$lib/server/db/client';
@@ -116,7 +116,7 @@ async function grantSignupCredits(db: Db, input: { orgId: string; userId: string
     return;
   }
 
-  const { error } = await db.from('credit_ledger').insert({ org_id: input.orgId, kind: 'grant', source: 'promo', amount: FREE_CREDITS, created_by: input.userId, note: SIGNUP_GRANT_NOTE });
+  const { error } = await db.from('credit_ledger').insert({ org_id: input.orgId, kind: 'grant', source: 'promo', amount: CREDITS_PER_USD_GRANT, created_by: input.userId, note: SIGNUP_GRANT_NOTE });
   if (error && error.code !== UNIQUE_VIOLATION) {
     throw error;
   }

@@ -6,9 +6,7 @@
     },
     "start": {
       "title": "Welcome",
-      "titlePlan": "Welcome",
-      "sub": "Create your account with an email and password.",
-      "subPlan": "Create your account with an email and password. You start on {plan}."
+      "sub": "Create your account with an email and password."
     },
     "signin": {
       "title": "Sign in",
