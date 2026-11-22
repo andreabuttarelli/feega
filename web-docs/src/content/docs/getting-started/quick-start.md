@@ -12,6 +12,8 @@ sidebar:
 5. Change something: a colour, a padding, a font size. Double-click text to edit it in place.
 6. Open **Changes** to see the edit as a diff in your source. Undo it, or keep it.
 
+Check that your framework is in [Supported frameworks](/frameworks/supported-frameworks/). Astro and Nuxt need Feega to start the dev server.
+
 Use **Navigate** mode (key `N`) to click through your app. Switch back to **Design** (key `D`) to edit.
 
 Pick the preview width with the device bar: full, desktop, tablet or phone. At a smaller width in a Tailwind project, the edit goes to the class that applies at that width.

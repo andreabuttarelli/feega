@@ -58,7 +58,7 @@ export const VSCODE: Topic = {
     },
     {
       heading: 'Frameworks',
-      html: `<p>Feega works with React, Next.js, Svelte, SvelteKit, Vue, Astro and plain HTML, with Tailwind or plain CSS. Click-to-source is verified on React and Vue with Vite, SvelteKit and Next.js. Other setups start, but editing there is less tested. Each has a page of its own: <a href="/for/react">React</a>, <a href="/for/nextjs">Next.js</a>, <a href="/for/sveltekit">SvelteKit</a>, <a href="/for/vue">Vue</a> and <a href="/for/tailwind">Tailwind</a>.</p>`
+      html: `<p>Feega works with React, Next.js, Svelte, SvelteKit, Vue, Nuxt, React Router, Astro and Vite, with Tailwind or plain CSS. Click-to-source is verified on React and Vue with Vite, SvelteKit, Next.js, Nuxt, React Router and Astro, and on Vite without a framework. Astro and Nuxt need Feega to start the dev server. Angular, plain HTML without Vite and Create React App are not supported. Other setups start, but editing there is less tested. Each has a page of its own: <a href="/for/react">React</a>, <a href="/for/nextjs">Next.js</a>, <a href="/for/sveltekit">SvelteKit</a>, <a href="/for/vue">Vue</a> and <a href="/for/tailwind">Tailwind</a>.</p>`
     },
     {
       heading: 'Settings, privacy and telemetry',

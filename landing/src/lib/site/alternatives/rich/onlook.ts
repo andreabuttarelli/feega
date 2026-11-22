@@ -63,7 +63,7 @@ export const ONLOOK: Rich = {
   moreQuestions: [
     { q: 'Which one is more mature?', a: 'We make Feega, so we are not the right judge. Look at both repositories’ activity and try each on your project.' },
     { q: 'Can I use both on one project?', a: 'Both edit source files, so they can coexist. Commit between sessions to keep diffs easy to read.' },
-    { q: 'Does Feega support Storybook or shadcn/ui?', a: 'Onlook lists support for both. Feega works on your running app with SvelteKit, React, Next.js or Vue; we make no claim about Storybook.' },
+    { q: 'Does Feega support Storybook or shadcn/ui?', a: 'Onlook lists support for both. Feega works on your running app with SvelteKit, React, Next.js, Vue, Nuxt, React Router, Astro or Vite; we make no claim about Storybook.' },
     { q: 'Does Feega need an account?', a: 'No. It sends nothing and runs locally.' }
   ]
 };

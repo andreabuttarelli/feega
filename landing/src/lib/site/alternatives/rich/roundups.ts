@@ -42,7 +42,7 @@ export const VISUAL_EDITORS: Rich = {
       heading: 'A Properties bar in your editor',
       paragraphs: [
         'Feega is built for people who think in controls. Layers on the left, the running page in the middle, and a Properties bar for spacing, colour, type and layout.',
-        'It runs in VS Code, Cursor, Windsurf and VSCodium on any OS, or as npx feega in the browser, and works with SvelteKit, React, Next.js and Vue.'
+        'It runs in VS Code, Cursor, Windsurf and VSCodium on any OS, or as npx feega in the browser, and works with SvelteKit, React, Next.js, Vue, Nuxt, React Router, Astro and Vite.'
       ],
       visual: EDITOR_VISUAL,
       caption: 'The Feega editor inside VS Code.'
@@ -64,7 +64,7 @@ export const VISUAL_EDITORS: Rich = {
   moreQuestions: [
     { q: 'What should I test on?', a: 'Your own repo, and the tenth edit, not the first. Tools differ most on messy real code.' },
     { q: 'Do these tools replace Figma?', a: 'No. They edit what exists. Figma is for designing what does not exist yet.' },
-    { q: 'Which frameworks does Feega support?', a: 'SvelteKit, React, Next.js and Vue, with CSS or Tailwind.' }
+    { q: 'Which frameworks does Feega support?', a: 'SvelteKit, React, Next.js, Vue, Nuxt, React Router, Astro and Vite, with CSS or Tailwind.' }
   ]
 };
 
@@ -167,7 +167,7 @@ export const DESIGN_HANDOFF: Rich = {
       heading: 'The change as code, not as a spec',
       paragraphs: [
         'Each Feega edit lands in your source as a diff you can read, keep or undo. A developer reviews a diff, not a redline.',
-        'It writes CSS or Tailwind and works with SvelteKit, React, Next.js and Vue.'
+        'It writes CSS or Tailwind and works with SvelteKit, React, Next.js, Vue, Nuxt, React Router, Astro and Vite.'
       ],
       visual: BUTTON_DIFF,
       caption: 'One edit, one diff.'
@@ -279,7 +279,7 @@ export const FIREBASE_STUDIO: Rich = {
     {
       heading: 'Where Feega fits after the move',
       paragraphs: [
-        'If you move to your own repo, Feega lets you keep changing the interface by clicking, in VS Code, Cursor, Windsurf or VSCodium. It edits CSS or Tailwind in SvelteKit, React, Next.js and Vue projects.',
+        'If you move to your own repo, Feega lets you keep changing the interface by clicking, in VS Code, Cursor, Windsurf or VSCodium. It edits CSS or Tailwind in SvelteKit, React, Next.js, Vue, Nuxt, React Router, Astro and Vite projects.',
         'It is open source under Apache-2.0 and runs locally, so it adds no new lock-in.'
       ],
       visual: EDITOR_VISUAL,

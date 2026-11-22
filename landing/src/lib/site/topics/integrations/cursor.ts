@@ -40,7 +40,7 @@ export const CURSOR: Topic = {
     {
       heading: 'Known limits',
       html: `<p>Cursor gets extensions from Open VSX, so a new Feega version shows up there when we publish it to Open VSX. Users have reported Cursor's copy of the registry lagging behind Open VSX for a while. If Cursor offers an older version than the <a href="/download">download page</a> lists, wait or install the <code>.vsix</code> from Open VSX.</p>
-<p>Click-to-source is verified on React and Vue with Vite, SvelteKit and Next.js. Class names built with <code>cn()</code> or <code>clsx()</code>, which AI-written code uses a lot, are not rewritten: Feega stops and shows the line. Remote and container setups are untested.</p>
+<p>Click-to-source is verified on React and Vue with Vite, SvelteKit, Next.js, Nuxt, React Router and Astro, and on Vite without a framework. Astro and Nuxt need Feega to start the dev server. Angular, plain HTML without Vite and Create React App are not supported. Class names built with <code>cn()</code> or <code>clsx()</code>, which AI-written code uses a lot, are not rewritten: Feega stops and shows the line. Remote and container setups are untested.</p>
 <p>Cursor also has visual features of its own. We compared them in <a href="/alternatives/cursor-design-mode">Cursor design mode alternatives</a>. This page covers running Feega inside Cursor.</p>`
     }
   ],
