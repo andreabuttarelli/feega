@@ -1,0 +1,31 @@
+{
+  "id": "image-tunnel",
+  "name": "Image tunnel",
+  "description": "A 3D grid corridor of image cards that flies toward you forever. Click to pause, hold to speed up.",
+  "category": "section",
+  "tags": [
+    "gallery",
+    "3d",
+    "tunnel",
+    "animation"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    }
+  ],
+  "tier": "free"
+}
