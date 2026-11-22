@@ -14,6 +14,7 @@ export function panelHtml({ script, style, cspSource, nonce, theme }: PanelAsset
     `frame-src 'self' ${LOCAL_FRAMES}`,
     `connect-src 'self' ${LOCAL_SOCKETS}`,
     `script-src 'nonce-${nonce}'`,
+    `worker-src blob:`,
     `style-src ${cspSource} 'unsafe-inline' https://fonts.googleapis.com`,
     `font-src ${cspSource} https://fonts.gstatic.com`,
     `img-src ${cspSource} data:`

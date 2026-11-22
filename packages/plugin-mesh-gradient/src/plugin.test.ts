@@ -165,6 +165,22 @@ describe('mesh gradient plugin', () => {
     expect(JSON.stringify(plugin.proposals[0].ops)).toContain('circle at 50% 50%');
   });
 
+  it('keeps the chosen point when the same element is read again', async () => {
+    const plugin = load(MESHED);
+    await plugin.settle();
+    await plugin.control(POINTS_LIST, 'p3');
+    await plugin.select({ ...MESHED, rect: { ...MESHED.rect, width: 401 } });
+    expect(plugin.handles().find((h) => h.selected)?.id).toBe('p3');
+  });
+
+  it('forgets the chosen point when another element is picked', async () => {
+    const plugin = load(MESHED);
+    await plugin.settle();
+    await plugin.control(POINTS_LIST, 'p3');
+    await plugin.select({ ...MESHED, source: { file: 'src/Other.svelte', line: 1, col: 1 } });
+    expect(plugin.handles().find((h) => h.selected)?.id).toBe('p1');
+  });
+
   it('forgets the mesh when another element is picked', async () => {
     const plugin = load(MESHED);
     await plugin.settle();

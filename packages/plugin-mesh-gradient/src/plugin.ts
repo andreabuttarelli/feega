@@ -47,9 +47,10 @@ export function meshPlugin(api: PluginApi, rng: () => number = Math.random) {
   }
 
   async function pick(next: Selection | null) {
+    const same = next !== null && selection !== null && sourceOf(next) === sourceOf(selection);
     selection = next;
     mesh = next ? parseMesh(next.styles) : null;
-    chosen = mesh?.points[0].id ?? '';
+    chosen = same && mesh?.points.some((p) => p.id === chosen) ? chosen : (mesh?.points[0].id ?? '');
     await show();
   }
 

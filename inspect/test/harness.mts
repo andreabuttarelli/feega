@@ -6,7 +6,8 @@ import { chromium, type Page } from '@playwright/test';
 import { fileEdits } from '../src/host/file-edits.ts';
 import { stylingOf } from '../src/host/styling.ts';
 import { Attach, startDev } from '../src/host/dev-server.ts';
-import { ServerState, ToHost, ToView, type EditAsk, type Pick } from '../src/messages.ts';
+import { ServerState, ToHost, ToView, type EditAsk, type Pick, type PluginAsk } from '../src/messages.ts';
+import { pluginCalls } from '../src/host/plugin-calls.ts';
 import { liveAtOf } from '@feega/live-edit/live-ask';
 import { SETTINGS } from '../src/settings.ts';
 import { searchIcons } from '../src/host/icon-search.ts';
@@ -55,9 +56,21 @@ export async function openPanel(appRoot: string, theme = DARK, cloud?: CommentsC
   const picks = new Map<number, (p: Pick | null) => void>();
   const saves: unknown[] = [];
   const comments = commentsHost(cloud, reply);
+  const history = () => reply({ kind: ToView.History, changes: edits.history(), canUndo: edits.canUndo(), canRedo: edits.canRedo() });
+  const runPlugin = pluginCalls({
+    root: appRoot,
+    appDir: () => '',
+    fetch,
+    propose: async (proposal, appDir) => {
+      const out = await edits.proposal(proposal, appDir);
+      await history();
+      await reply(out.ok ? { kind: ToView.Edited, ok: true, written: '' } : { kind: ToView.Edited, ok: false, reason: out.reason });
+      return out;
+    }
+  });
   const previewIcons = previewQueue(fetch, (name, svg) => reply({ kind: ToView.IconPreview, name, svg }));
 
-  await page.exposeFunction('toHost', async (m: { kind: ToHost; ask?: EditAsk; id?: number | string; pick?: Pick | null; query?: string; names?: string[]; draft?: CommentDraft }) => {
+  await page.exposeFunction('toHost', async (m: { kind: ToHost; ask?: EditAsk; id?: number | string; pick?: Pick | null; query?: string; names?: string[]; draft?: CommentDraft; ask?: PluginAsk }) => {
     if (m.kind === ToHost.Ready) {
       await reply({ kind: ToView.App, url: running.url, styling, prefs: null, breakpoints: await breakpointsOf(appRoot), themes: await themesOf(appRoot) });
       await reply({ kind: ToView.Server, state: ServerState.Running });
@@ -93,7 +106,12 @@ export async function openPanel(appRoot: string, theme = DARK, cloud?: CommentsC
       await comments.resolve(m.id as string);
     }
     if (m.kind === ToHost.Undo) {
-      await edits.undo();
+      const out = await edits.undo();
+      await history();
+      await reply(out.ok ? { kind: ToView.Edited, ok: true, written: '' } : { kind: ToView.Edited, ok: false, reason: out.reason });
+    }
+    if (m.kind === ToHost.Plugin) {
+      await reply({ kind: ToView.Plugin, id: m.id as number, result: await runPlugin(m.ask!) });
     }
   });
 
