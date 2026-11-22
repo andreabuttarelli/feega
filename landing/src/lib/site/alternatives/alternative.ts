@@ -81,6 +81,14 @@ export type Section = {
   readonly image?: Shot;
 };
 
+export type Extras = {
+  readonly takeaways: readonly string[];
+  readonly tables: readonly TableBlock[];
+  readonly hero: Shot;
+  readonly sections: readonly Section[];
+  readonly sources: readonly Source[];
+};
+
 export type Article = {
   readonly kind: ArticleKind;
   readonly title: string;

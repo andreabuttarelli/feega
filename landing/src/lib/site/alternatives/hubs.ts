@@ -1,6 +1,6 @@
 import { ArticleKind, type Article, type Section } from './alternative';
 
-export const HUB_CHECKED = '2026-11-21';
+export const HUB_CHECKED = '2026-11-22';
 
 const AGENT_DOCS = 'https://docs.feega.app/more/ai-agents/';
 

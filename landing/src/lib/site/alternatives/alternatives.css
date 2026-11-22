@@ -549,3 +549,7 @@
   color: var(--sx-ink-3);
   font-size: var(--sx-fs-small);
 }
+
+.catalog .compare .shot.tall {
+  max-width: 360px;
+}

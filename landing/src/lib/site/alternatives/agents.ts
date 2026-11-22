@@ -78,7 +78,7 @@ const LOVABLE: Subject = {
     caption: 'Neutral illustration of the two paths.'
   },
   costParagraphs: [
-    'Lovable’s free plan has 5 build credits a day and Pro is $25 a month, per its plans page when we checked on 21 November 2026. Credits run per build, so count how many your edits actually take.',
+    'Lovable’s free plan has 5 build credits a day and Pro is $25 a month, per its plans page when we checked on 22 November 2026. Credits run per build, so count how many your edits actually take.',
     'Feega is free and open source under Apache-2.0, with no credits and no account. You still pay for your own agent and your own hosting, as you do now.'
   ],
   winsHeading: 'Where Lovable is still the better choice',
@@ -124,7 +124,7 @@ const FRAMER: Subject = {
     caption: 'Neutral illustration of the two paths.'
   },
   costParagraphs: [
-    'Framer’s free plan is $0 with 500 AI credits a month and a Framer domain. A custom domain needs Basic at $10 a month, and Pro is $30 a month, per its pricing page on 21 November 2026. Agents and other AI features spend credits.',
+    'Framer’s free plan is $0 with 500 AI credits a month and a Framer domain. A custom domain needs Basic at $10 a month, and Pro is $30 a month, per its pricing page on 22 November 2026. Agents and other AI features spend credits.',
     'Feega is free and open source under Apache-2.0, with no credits and no account. Hosting and your agent’s plan stay what they are today.'
   ],
   winsHeading: 'Where Framer is still the better choice',

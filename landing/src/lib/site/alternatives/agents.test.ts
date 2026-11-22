@@ -1,9 +1,15 @@
+import { existsSync, statSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { lower } from '../lower';
 import { ALTERNATIVES, alternativePath } from '.';
-import { ArticleKind, VisualKind, type Article } from './alternative';
+import { ArticleKind, CalloutTone, VisualKind, type Article } from './alternative';
 import { SITE_PATHS } from '../paths';
 
-const MIN_WORDS = 1000;
+const MIN_WORDS = 1500;
+const MAX_SAME_AGENT_OVERLAP = 0.4;
+const MAX_IMAGE_BYTES = 200 * 1024;
+const MIN_SOURCES = 5;
+const FORBIDDEN_IMAGE = '87bd2d6f';
 const TITLE_RANGE = [50, 60] as const;
 const DESCRIPTION_RANGE = [120, 155] as const;
 const MAX_SIMILARITY = 0.5;
@@ -33,7 +39,9 @@ function fullText(a: Article): string {
     r?.closing ?? '',
     ...a.pickThem.points,
     ...a.pickFeega,
-    ...a.sections.map((s) => strip(s.html)),
+    ...a.sections.flatMap((s) => [strip(s.html), s.callout?.text ?? '', s.cta?.text ?? '', s.image?.caption ?? '']),
+    ...(r?.takeaways ?? []),
+    ...(r?.tables ?? []).flatMap((tb) => [tb.heading, ...tb.head, ...tb.rows.flat().map(strip), tb.callout?.text ?? '']),
     ...a.mistakes.flatMap((m) => [m.q, m.a]),
     ...a.questions.flatMap((q) => [q.q, q.a])
   ];
@@ -104,7 +112,7 @@ describe('every alternative page is a valid search result', () => {
 });
 
 describe('the new pages are not thin', () => {
-  it.each(CHECKED_SLUGS)('%s has at least 1000 words', (slug) => {
+  it.each(CHECKED_SLUGS)('%s has at least 1500 words', (slug) => {
     expect(words(fullText(ALTERNATIVES[slug])).length).toBeGreaterThanOrEqual(MIN_WORDS);
   });
 
@@ -126,6 +134,13 @@ describe('the new pages are not thin', () => {
     for (const other of AGENT_SLUGS.filter((s) => s !== slug)) {
       expect(overlap(mine, shingles(fullText(ALTERNATIVES[other])))).toBeLessThan(MAX_SIMILARITY);
     }
+  });
+
+  it.each(AGENT_SLUGS)('%s overlaps little with the other subject on the same agent', (slug) => {
+    const [subject, agent] = slug.split('-alternative-for-');
+    const otherSubject = subject === 'lovable' ? 'framer' : 'lovable';
+    const twin = ALTERNATIVES[`${otherSubject}-alternative-for-${agent}`];
+    expect(overlap(shingles(fullText(ALTERNATIVES[slug])), shingles(fullText(twin)))).toBeLessThanOrEqual(MAX_SAME_AGENT_OVERLAP);
   });
 });
 
@@ -157,6 +172,96 @@ describe('internal links', () => {
     const links = internalLinks(ALTERNATIVES[subject]);
     for (const agent of AGENTS) {
       expect(links).toContain(alternativePath(`${subject}-alternative-for-${agent}`));
+    }
+  });
+});
+
+const callouts = (a: Article) => [...a.sections.flatMap((s) => (s.callout ? [s.callout] : [])), ...(a.rich?.tables ?? []).flatMap((tb) => (tb.callout ? [tb.callout] : []))];
+const ctas = (a: Article) => a.sections.flatMap((s) => (s.cta ? [s.cta] : []));
+const shots = (a: Article) => [...(a.rich?.hero ? [a.rich.hero] : []), ...a.sections.flatMap((s) => (s.image ? [s.image] : []))];
+const citedHtml = (a: Article) => [a.lead, a.rich?.snapshot ?? '', ...a.sections.map((s) => s.html), ...(a.rich?.tables ?? []).flatMap((tb) => tb.rows.flat())].join(' ');
+const NAMES = ['Lovable', 'Framer', 'Feega', 'Claude Code', 'Codex', 'OpenAI', 'Cursor', 'GitHub', 'VS Code', 'Tailwind', 'SvelteKit', 'Next.js', 'Grok Build'];
+
+describe('the pages carry the article blocks', () => {
+  it.each(CHECKED_SLUGS)('%s has three to five takeaways', (slug) => {
+    const n = ALTERNATIVES[slug].rich?.takeaways?.length ?? 0;
+    expect(n).toBeGreaterThanOrEqual(3);
+    expect(n).toBeLessThanOrEqual(5);
+  });
+
+  it.each(CHECKED_SLUGS)('%s has a comparison table with a header and at least five rows', (slug) => {
+    const tables = ALTERNATIVES[slug].rich?.tables ?? [];
+    expect(tables.length).toBeGreaterThanOrEqual(1);
+    expect(tables[0].rows.length).toBeGreaterThanOrEqual(5);
+    for (const row of tables[0].rows) {
+      expect(row.length).toBe(tables[0].head.length);
+    }
+  });
+
+  it.each(CHECKED_SLUGS)('%s has at least two callouts of different tones', (slug) => {
+    const tones = new Set(callouts(ALTERNATIVES[slug]).map((c) => c.tone));
+    expect(tones.size).toBeGreaterThanOrEqual(2);
+    expect([...tones].every((t) => Object.values(CalloutTone).includes(t))).toBe(true);
+  });
+
+  it.each(CHECKED_SLUGS)('%s has a download call to action and a docs one', (slug) => {
+    const hrefs = ctas(ALTERNATIVES[slug]).map((c) => c.href);
+    expect(hrefs.length).toBeGreaterThanOrEqual(2);
+    expect(hrefs).toContain('/download');
+    expect(hrefs.some((h) => h.startsWith('https://docs.feega.app'))).toBe(true);
+  });
+
+  it.each(CHECKED_SLUGS)('%s cites five sources and links them inline', (slug) => {
+    const a = ALTERNATIVES[slug];
+    expect(a.sources.length).toBeGreaterThanOrEqual(MIN_SOURCES);
+    const html = citedHtml(a);
+    const inline = a.sources.filter((s) => html.includes(`href="${s.href}"`));
+    expect(inline.length).toBeGreaterThanOrEqual(MIN_SOURCES);
+  });
+
+  it.each(CHECKED_SLUGS)('%s has real internal links to the download and pricing pages', (slug) => {
+    const links = internalLinks(ALTERNATIVES[slug]);
+    expect(links).toContain('/download');
+    expect(links).toContain('/pricing');
+    expect(links.some((l) => l.startsWith('/alternatives/'))).toBe(true);
+  });
+});
+
+describe('the images', () => {
+  it.each(CHECKED_SLUGS)('%s has captioned, sized, small webp images with alt text', (slug) => {
+    const list = shots(ALTERNATIVES[slug]);
+    expect(list.length).toBeGreaterThanOrEqual(2);
+    for (const s of list) {
+      const file = new URL(`../../../../static${s.src}`, import.meta.url);
+      expect(s.src).toMatch(/\.webp$/);
+      expect(s.src).not.toContain(FORBIDDEN_IMAGE);
+      expect(existsSync(file)).toBe(true);
+      expect(statSync(file).size).toBeLessThanOrEqual(MAX_IMAGE_BYTES);
+      expect(s.alt.length).toBeGreaterThan(20);
+      expect(s.caption.length).toBeGreaterThan(10);
+      expect(s.width).toBeGreaterThan(0);
+      expect(s.height).toBeGreaterThan(0);
+    }
+  });
+
+  it.each(AGENT_SLUGS.filter((s) => s.endsWith('claude-code')))('%s uses the Feega next to Claude Code screenshot', (slug) => {
+    expect(shots(ALTERNATIVES[slug]).some((s) => s.src.endsWith('feega-claude-code.webp'))).toBe(true);
+  });
+
+  it.each(AGENT_SLUGS.filter((s) => !s.endsWith('claude-code')))('%s marks the agent panel as illustrative', (slug) => {
+    const composite = shots(ALTERNATIVES[slug]).find((s) => /feega-(codex|cursor)\.webp$/.test(s.src));
+    expect(composite?.alt.toLowerCase()).toContain('illustrative');
+  });
+});
+
+describe('proper names keep their capitals in headings', () => {
+  it.each(CHECKED_SLUGS)('%s', (slug) => {
+    const a = ALTERNATIVES[slug];
+    const headings = [a.heading, ...a.sections.map((s) => s.heading), ...(a.rich?.tables ?? []).map((tb) => tb.heading), ...(a.rich?.highlights ?? []).map((h) => h.heading), a.rich?.stepsHeading ?? '', a.rich?.snapshotHeading ?? '', a.rich?.cost.heading ?? ''];
+    for (const heading of headings) {
+      for (const name of NAMES.filter((n) => heading.includes(n))) {
+        expect(lower(heading)).toContain(name);
+      }
     }
   });
 });
