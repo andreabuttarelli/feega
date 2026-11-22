@@ -115,6 +115,8 @@ const tabsMount = `function mount(root: HTMLElement): () => void {
   return () => stop.abort();
 }`;
 
+const jsx = (markup) => markup.replace(/class="/g, 'className="');
+
 const pad = (text, n) =>
   text
     .split('\n')
@@ -132,11 +134,6 @@ const modalBody = (on) => `  <dialog ${on.ref} aria-labelledby="fl-modal-title">
       </div>
     </form>
   </dialog>`;
-
-const TOASTS = `[
-  { id: 1, title: 'Changes saved', body: 'Your profile is up to date.', error: false },
-  { id: 2, title: 'Could not publish', body: 'Check your connection and try again.', error: true }
-]`;
 
 export const interactive = [
   {
@@ -272,78 +269,70 @@ ${C}</style>
     <p class="text"><b>${title}</b><span>${body}</span></p>
     <button class="close" type="button" aria-label="Dismiss">${close}</button>
   </div>`;
-      const plain = `<div class="fl-toast" role="region" aria-label="Notifications">
+      const plainWith = (attrs = '') => `<div class="fl-toast" role="region" aria-label="Notifications"${attrs}>
 ${one('', 'status', 'Changes saved', 'Your profile is up to date.', check)}
 ${one(' toast--error', 'alert', 'Could not publish', 'Check your connection and try again.', warn)}
 </div>`;
+      const plain = plainWith();
       const script = (typed) => `document.querySelectorAll${typed ? '<HTMLElement>' : ''}('.fl-toast .close').forEach((button) => {
   button.addEventListener('click', () => button.closest('.toast')${typed ? '?' : ''}.remove());
 });`;
+      const toastMount = `function mount(root: HTMLElement): () => void {
+  const stop = new AbortController();
+  root.addEventListener(
+    'click',
+    (event) => (event.target as Element).closest('.close')?.closest('.toast')?.remove(),
+    { signal: stop.signal }
+  );
+  return () => stop.abort();
+}`;
       return {
         html: `${plain}\n\n<script>\n${script(false)}\n</script>\n`,
         astro: `---\n---\n\n${plain}\n\n<script>\n${script(true)}\n</script>\n\n<style>\n${C}</style>\n`,
         svelte: `<script lang="ts">
-  const initial = ${TOASTS.split('\n').join('\n  ')};
+${pad(toastMount, 2)}
 
-  let toasts = $state(initial);
+  let root: HTMLElement;
 
-  function dismiss(id: number) {
-    toasts = toasts.filter((toast) => toast.id !== id);
-  }
+  $effect(() => mount(root));
 </script>
 
-<div class="fl-toast" role="region" aria-label="Notifications">
-  {#each toasts as toast (toast.id)}
-    <div class="toast" class:toast--error={toast.error} role={toast.error ? 'alert' : 'status'}>
-      <span class="mark">{#if toast.error}${warn}{:else}${check}{/if}</span>
-      <p class="text"><b>{toast.title}</b><span>{toast.body}</span></p>
-      <button class="close" type="button" aria-label="Dismiss" onclick={() => dismiss(toast.id)}>${close}</button>
-    </div>
-  {/each}
-</div>
+${plainWith(' bind:this={root}')}
 
 <style>
 ${C}</style>
 `,
-        react: `import { useState } from 'react';
+    react: `import { useEffect, useRef } from 'react';
 import './Toast.css';
 
-const initial = ${TOASTS};
+${toastMount}
 
 export function Toast() {
-  const [toasts, setToasts] = useState(initial);
+  const root = useRef<HTMLDivElement>(null);
+
+  useEffect(() => (root.current ? mount(root.current) : undefined), []);
 
   return (
-    <div className="fl-toast" role="region" aria-label="Notifications">
-      {toasts.map((toast) => (
-        <div key={toast.id} className={toast.error ? 'toast toast--error' : 'toast'} role={toast.error ? 'alert' : 'status'}>
-          <span className="mark">{toast.error ? ${warn.replace('class=', 'className=')} : ${check.replace('class=', 'className=')}}</span>
-          <p className="text"><b>{toast.title}</b><span>{toast.body}</span></p>
-          <button className="close" type="button" aria-label="Dismiss" onClick={() => setToasts(toasts.filter((t) => t.id !== toast.id))}>${close.replace('class=', 'className=')}</button>
-        </div>
-      ))}
-    </div>
+${pad(jsx(plainWith(' ref={root}')), 4)}
   );
 }
 `,
-        vue: `<script setup lang="ts">
-import { ref } from 'vue';
+    vue: `<script setup lang="ts">
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 
-const toasts = ref(${TOASTS.split('\n').join('\n')});
+${toastMount}
 
-function dismiss(id: number) {
-  toasts.value = toasts.value.filter((toast) => toast.id !== id);
-}
+const root = ref<HTMLElement | null>(null);
+let stop = () => {};
+
+onMounted(() => {
+  stop = mount(root.value as HTMLElement);
+});
+onBeforeUnmount(() => stop());
 </script>
 
 <template>
-  <div class="fl-toast" role="region" aria-label="Notifications">
-    <div v-for="toast in toasts" :key="toast.id" :class="['toast', { 'toast--error': toast.error }]" :role="toast.error ? 'alert' : 'status'">
-      <span class="mark">${warn.replace('<svg', '<svg v-if="toast.error"')}${check.replace('<svg', '<svg v-else')}</span>
-      <p class="text"><b>{{ toast.title }}</b><span>{{ toast.body }}</span></p>
-      <button class="close" type="button" aria-label="Dismiss" @click="dismiss(toast.id)">${close}</button>
-    </div>
-  </div>
+${pad(plainWith(' ref="root"'), 2)}
 </template>
 
 <style scoped>
