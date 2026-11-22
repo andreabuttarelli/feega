@@ -3,7 +3,7 @@
   import { GITHUB_URL } from '../links';
   import { primaryCta } from '../install';
   import PriceTag from './PriceTag.svelte';
-  import { CLOUD_SOON_FOR, CLOUD_SOON_LINES, EXTENSION_FOR, EXTENSION_LINES, EXTENSION_NOTE, CLOUD_SOON_NOTE, type CloudPlan } from './plan';
+  import { CLOUD_SOON_FOR, CLOUD_SOON_LINES, EXTENSION_FOR, EXTENSION_LINES, EXTENSION_NOTE, cloudSoonNote, type CloudPlan } from './plan';
 
   let { plan, details = 'hide' }: { plan: CloudPlan; details?: 'show' | 'hide' } = $props();
 
@@ -27,7 +27,7 @@
     <h3>Feega {plan.name}</h3>
     <p class="for">{lower(CLOUD_SOON_FOR)}</p>
     <PriceTag amount="coming later" unit="" cta="follow on github" href={GITHUB_URL} tone="outline" />
-    <p class="start">{lower(CLOUD_SOON_NOTE)}</p>
+    <p class="start">{lower(cloudSoonNote(plan))}</p>
     <ul>
       {#each CLOUD_SOON_LINES as line (line)}<li>{lower(line)}</li>{/each}
     </ul>
