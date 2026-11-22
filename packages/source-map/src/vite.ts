@@ -16,7 +16,9 @@ export enum Bridge {
   Proxy = 'proxy'
 }
 
-export function feegaSource(bridge: Bridge = Bridge.ViteClient): Plugin {
+export type SourceOptions = { bridge?: Bridge; root?: string };
+
+export function feegaSource({ bridge = Bridge.ViteClient, root: projectRoot }: SourceOptions = {}): Plugin {
   let root = process.cwd();
 
   return {
@@ -25,7 +27,7 @@ export function feegaSource(bridge: Bridge = Bridge.ViteClient): Plugin {
     enforce: 'pre',
 
     configResolved(config) {
-      root = config.root;
+      root = projectRoot ?? config.root;
     },
 
     config() {

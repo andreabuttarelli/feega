@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -27,7 +27,7 @@ describe('feegaSource', () => {
   });
 
   it('leaves the Vite client alone when the page gets the bridge from the proxy', () => {
-    expect(transformOf(feegaSource(Bridge.Proxy))('export const hot = 1;', VITE_CLIENT)).toBeNull();
+    expect(transformOf(feegaSource({ bridge: Bridge.Proxy }))('export const hot = 1;', VITE_CLIENT)).toBeNull();
   });
 
   it('leaves other dependencies untouched', () => {
@@ -42,6 +42,21 @@ describe('feegaSource', () => {
     try {
       const out = await server.transformRequest('/App.svelte');
       expect(out?.code).toContain('data-feega-src="App.svelte:2:1"');
+    } finally {
+      await server.close();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('names files from the project root when the framework serves from a subfolder', async () => {
+    const root = mkdtempSync(join(FIXTURES_DIR, '.src-'));
+    mkdirSync(join(root, 'app'));
+    writeFileSync(join(root, 'app', 'App.svelte'), '<button id="buy">1</button>\n');
+    const server = await createServer({ root: join(root, 'app'), configFile: false, logLevel: 'silent', server: { middlewareMode: true, hmr: false }, optimizeDeps: { noDiscovery: true }, plugins: [svelte(), feegaSource({ root })] });
+
+    try {
+      const out = await server.transformRequest('/App.svelte');
+      expect(out?.code).toContain(`data-feega-src="app/App.svelte:1:1"`);
     } finally {
       await server.close();
       rmSync(root, { recursive: true, force: true });
