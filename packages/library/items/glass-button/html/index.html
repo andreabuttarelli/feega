@@ -1,6 +1,6 @@
 <div class="fl-glass-button" data-speed="1" data-intensity="1">
   <span class="glow" aria-hidden="true"><span class="hue"></span></span>
-  <button class="glass" type="button"><span class="label">get started</span></button>
+  <button class="glass" type="button"><span class="light" aria-hidden="true"><span class="halo"><span class="ring"></span></span><span class="ring"></span><span class="tint"></span></span><span class="label">get started</span></button>
   <svg class="lens" aria-hidden="true" focusable="false">
     <filter x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
       <feImage x="0" y="0" preserveAspectRatio="none" result="map" />
@@ -58,6 +58,8 @@
     function paint() {
       root.style.setProperty('--gx', at.x + 'px');
       root.style.setProperty('--gy', at.y + 'px');
+      root.style.setProperty('--fx', at.x + glow.offsetLeft - button.offsetLeft + 'px');
+      root.style.setProperty('--fy', at.y + glow.offsetTop - button.offsetTop + 'px');
     }
 
     function step() {
