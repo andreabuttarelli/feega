@@ -35,4 +35,12 @@ describe('npx feega arguments', () => {
     expect(argsOf(['--nope'], '/w')).toEqual({ run: Run.Error, reason: 'unknown option --nope' });
     expect(argsOf(['--port', 'x'], '/w')).toEqual({ run: Run.Error, reason: 'the port must be a number' });
   });
+
+  it('the mcp command serves the Cloud tools over stdio', () => {
+    expect(argsOf(['mcp'], '/w')).toEqual({ run: Run.Mcp });
+  });
+
+  it('a folder named mcp is still a folder after a flag', () => {
+    expect(argsOf(['--no-open', 'mcp'], resolve('/w'))).toMatchObject({ run: Run.Editor, dir: resolve('/w', 'mcp') });
+  });
 });
