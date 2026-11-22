@@ -11,8 +11,7 @@ const getUser = vi.fn(async () => ({ data: { user: USER }, error: null }));
 
 vi.mock('$lib/server/repos/orgs', () => ({ listMemberships }));
 vi.mock('$lib/server/repos/profiles', () => ({
-  ensureProfile: vi.fn(async () => ({ name: 'Ada', email: 'ada@x.it', avatarUrl: null })),
-  readTourSeen: vi.fn(async () => ({ seenAt: '2020-02-01T00:00:00Z' }))
+  ensureProfile: vi.fn(async () => ({ name: 'Ada', email: 'ada@x.it', avatarUrl: null }))
 }));
 vi.mock('$lib/server/credits', () => ({ orgCreditBalance: vi.fn(async () => 42) }));
 vi.mock('$lib/server/repos/projects', () => ({
@@ -27,7 +26,6 @@ const db = {
   from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { terms_version: '2020-01-01' } }) }) }) })
 };
 vi.mock('$lib/server/db/client', () => ({ createUserDb: () => db }));
-vi.mock('$lib/server/feature-flags', () => ({ isPlanGoEnabled: () => false }));
 vi.mock('$lib/server/seline', () => ({ selineSetUser: vi.fn() }));
 
 const { GET } = await import('./+server');
