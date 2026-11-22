@@ -53,6 +53,7 @@ export type Pick = {
   inner?: string;
   page?: PageTarget;
   attributes?: { name: string; value: string }[];
+  variables?: { name: string; value: string }[];
   markup?: string;
   states?: string[];
 };

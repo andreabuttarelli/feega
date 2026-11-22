@@ -6,12 +6,14 @@ export type Css = Record<string, string>;
 
 const STYLE_LITERAL = /(\sstyle=)"([^"{}]*)"/;
 const JSX_STYLE_LITERAL = /(\sstyle=)\{\{([^{}]*)\}\}/;
-const JSX_ENTRY = /^\s*([A-Za-z]+):\s*'([^']*)'\s*$/;
+const JSX_ENTRY = /^\s*([A-Za-z]+|'--[\w-]+'):\s*'([^']*)'\s*$/;
+const CUSTOM = /^--/;
+const QUOTED = /^'(.*)'$/;
 const STYLE_ANY = /\sstyle=/;
 const JSX_FILE = /\.(t|j)sx$/;
 const REMOVED = '';
 
-const camel = (name: string) => name.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
+const camel = (name: string) => (CUSTOM.test(name) ? `'${name}'` : name.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase()));
 
 function declarations(text: string): Map<string, string> {
   const pairs = text
@@ -25,7 +27,7 @@ const cssText = (all: Map<string, string>) => [...all].map(([name, value]) => `$
 
 const jsxStyle = (css: Css) => `{{ ${Object.entries(css).map(([name, value]) => `${camel(name)}: '${value}'`).join(', ')} }}`;
 
-const kebab = (name: string) => name.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
+const kebab = (name: string) => (QUOTED.test(name) ? name.slice(1, -1) : name.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`));
 
 function jsxDeclarations(text: string): Map<string, string> | null {
   const entries = text.split(',').filter((e) => e.trim()).map((e) => e.match(JSX_ENTRY));
