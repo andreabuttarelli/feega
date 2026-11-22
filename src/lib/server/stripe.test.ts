@@ -345,6 +345,38 @@ describe('seatSubscription', () => {
 	});
 });
 
+describe('cloudSubscriptionActive', () => {
+	const sub = (status: string, priceId: string) => ({ status, items: { data: [{ id: 'si_1', price: { id: priceId, lookup_key: null } }] } });
+
+	it('is true for an active subscription on a Cloud price', async () => {
+		subscriptionsRetrieve.mockResolvedValue(sub('active', 'price_cloud_m'));
+		const { cloudSubscriptionActive } = await import('./stripe');
+
+		expect(await cloudSubscriptionActive('sub_1')).toBe(true);
+	});
+
+	it('is true while the subscription is trialing', async () => {
+		subscriptionsRetrieve.mockResolvedValue(sub('trialing', 'price_cloud_y'));
+		const { cloudSubscriptionActive } = await import('./stripe');
+
+		expect(await cloudSubscriptionActive('sub_1')).toBe(true);
+	});
+
+	it.each(['past_due', 'canceled', 'unpaid', 'incomplete'])('is false when the subscription is %s', async (status) => {
+		subscriptionsRetrieve.mockResolvedValue(sub(status, 'price_cloud_m'));
+		const { cloudSubscriptionActive } = await import('./stripe');
+
+		expect(await cloudSubscriptionActive('sub_1')).toBe(false);
+	});
+
+	it('is false for an active subscription on the old plan', async () => {
+		subscriptionsRetrieve.mockResolvedValue({ status: 'active', items: { data: [{ id: 'si_9', price: { id: 'price_old', lookup_key: 'feega_monthly_9' } }] } });
+		const { cloudSubscriptionActive } = await import('./stripe');
+
+		expect(await cloudSubscriptionActive('sub_1')).toBe(false);
+	});
+});
+
 describe('cloudPriceId', () => {
 	it('reads the monthly and the annual Stripe price from the environment', async () => {
 		const { cloudPriceId } = await import('./stripe');
