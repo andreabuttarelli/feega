@@ -2,7 +2,21 @@ name: Feega editor on every OS
 
 on:
   push:
-    branches: [feat/feega-inspect]
+    branches: [feat/feega-inspect, dev, main]
+    paths:
+      - 'inspect/**'
+      - 'npx/**'
+      - 'packages/dev-run/**'
+      - 'packages/source-map/**'
+      - 'packages/live-edit/**'
+      - 'packages/share-protocol/**'
+      - 'packages/properties-panel/**'
+      - 'packages/library/**'
+      - 'relay/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'scripts/ci-scope.*'
+      - '.github/workflows/inspect-os.yml'
   pull_request:
     paths:
       - 'inspect/**'
@@ -11,24 +25,70 @@ on:
       - 'packages/source-map/**'
       - 'packages/live-edit/**'
       - 'packages/share-protocol/**'
+      - 'packages/properties-panel/**'
+      - 'packages/library/**'
       - 'relay/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'scripts/ci-scope.*'
       - '.github/workflows/inspect-os.yml'
   workflow_dispatch:
+    inputs:
+      full:
+        description: Run every fixture on every OS
+        type: boolean
+        default: false
 
 concurrency:
   group: inspect-os-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  scope:
+    name: what to run
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.scope.outputs.matrix }}
+      e2e: ${{ steps.scope.outputs.e2e }}
+      unit: ${{ steps.scope.outputs.unit }}
+      relay: ${{ steps.scope.outputs.relay }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: scope
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          FULL: ${{ inputs.full }}
+        run: node scripts/ci-scope.mjs "$EVENT" "$BASE" "$HEAD" "$FULL"
+
+  unit:
+    needs: scope
+    if: needs.scope.outputs.unit == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npx svelte-kit sync
+      - run: npx vitest run inspect/src npx/src packages
+
   os:
     name: ${{ matrix.os }} ${{ matrix.fixture }}
+    needs: scope
+    if: needs.scope.outputs.e2e == 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
-      matrix:
-        os: ${{ fromJSON(github.event_name == 'push' && '["ubuntu-24.04"]' || '["ubuntu-24.04","windows-latest","macos-latest"]') }}
-        fixture: [react-css, next-css, vue-css, sveltekit-css, vite-vanilla, astro-css, nuxt-css, react-router-css]
+      matrix: ${{ fromJSON(needs.scope.outputs.matrix) }}
     env:
       FEEGA_E2E_APP: inspect/test/fixtures/${{ matrix.fixture }}
     steps:
@@ -40,8 +100,6 @@ jobs:
           cache: npm
       - run: npm ci --no-audit --no-fund
       - run: npx svelte-kit sync
-      - run: npx vitest run inspect/src npx/src packages
-        if: matrix.os == 'ubuntu-24.04' && matrix.fixture == 'react-css'
       - run: node npx/build.mjs
       - run: npm install --no-audit --no-fund --no-package-lock
         working-directory: inspect/test/fixtures/${{ matrix.fixture }}
@@ -57,6 +115,8 @@ jobs:
 
   relay:
     name: relay tunnel end to end
+    needs: scope
+    if: needs.scope.outputs.relay == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -73,3 +133,11 @@ jobs:
         working-directory: relay
       - run: npm run test:e2e
         working-directory: relay
+
+  inspect-ok:
+    name: inspect ok
+    needs: [scope, unit, os, relay]
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - run: test "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" = false
