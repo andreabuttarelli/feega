@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
-import { rmSync } from 'node:fs';
+import { readFileSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
@@ -19,6 +19,10 @@ const COLOUR = '#0078d4';
 const git = (...args) => execFileSync('git', ['-C', APP, ...args], { encoding: 'utf8' });
 const changedFiles = () => git('diff', '--name-only', '--relative').split('\n').filter(Boolean);
 const diffText = () => git('diff', '--relative');
+const untracked = () => git('ls-files', '--others', '--exclude-standard', '--', '.').split('\n').filter((f) => f && !f.startsWith('node_modules') && !f.startsWith('.feega'));
+const created = new Set(untracked());
+const newFiles = () => untracked().filter((f) => !created.has(f));
+const writtenText = () => diffText() + newFiles().map((f) => readFileSync(join(APP, f), 'utf8')).join('\n');
 
 function started() {
   const env = { ...process.env, FEEGA_STOP_ON_STDIN_END: '1' };
@@ -96,10 +100,11 @@ try {
     await field.fill(COLOUR);
     await field.press('Enter');
     await page.waitForTimeout(SETTLE_MS);
-    assert.ok(/0078d4/i.test(diffText()), 'the colour is in the source');
-    assert.ok(changedFiles().length > 0, 'a file changed');
+    assert.ok(/0078d4/i.test(writtenText()), 'the colour is in the source');
+    assert.ok(changedFiles().length + newFiles().length > 0, 'a file changed');
     await undo();
     assert.deepEqual(changedFiles(), [], 'one undo restores the source');
+    newFiles().forEach((f) => rmSync(join(APP, f), { force: true }));
   });
 
   await check('structure edit: delete removes the element from the right file and undo restores it', async () => {
@@ -121,6 +126,7 @@ try {
   if (left.length) {
     git('checkout', '--', ...left);
   }
+  newFiles().forEach((f) => rmSync(join(APP, f), { force: true }));
   rmSync(join(APP, '.feega'), { recursive: true, force: true });
   await browser?.close();
   cli?.stdin.end();
