@@ -92,7 +92,7 @@ const SPECS: BeatSpec[] = [
   { keys: "move the nabv⌫⌫vbar to the left", reply: "Done! Navbar moved.", kind: Reply.Done, work: 14, focus: Focus.Stack, hold: 16, lead: LEAD_IN },
   { keys: "no no, I meant to the CENTRE⌫⌫ER", reply: "Done! Navbar centered.", kind: Reply.Done, work: 14, focus: Focus.Stack, hold: 16, lead: LEAD_IN },
   { keys: "fix the title, use the rigth⌫⌫ht color!", reply: "Done! Title color fixed.", kind: Reply.Done, work: 14, focus: Focus.Stack, hold: 20, lead: LEAD_IN },
-  { keys: "NO!! blakc⌫⌫ck, like EVERY other title!!!", reply: "You've reached your usage limit.\nTry again in 5 hours.", kind: Reply.Limit, work: 20, focus: Focus.Limit, hold: 66, lead: SIGH },
+  { keys: "NO!! blakc⌫⌫ck, like EVERY other title!!!", reply: "You're out of credits.\nUpgrade to Pro ($199/mo) or wait 5 hours.", kind: Reply.Limit, work: 20, focus: Focus.Limit, hold: 66, lead: SIGH },
 ];
 
 const build = (specs: BeatSpec[]): Beat[] => {

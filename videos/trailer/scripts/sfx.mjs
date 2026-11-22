@@ -101,6 +101,27 @@ const tap = () => {
   });
 };
 
+const power = () => {
+  const noise = seeded(101);
+  let phase = 0;
+
+  return render(0.9, (t) => {
+    const p = t / 0.9;
+    phase += (2 * Math.PI * (60 + 260 * p * p)) / RATE;
+    const hum = 0.22 * Math.sin(phase) * Math.sin(Math.PI * p) * (1 + 0.3 * Math.sin(2 * Math.PI * 120 * t));
+    const snap = 0.45 * noise() * Math.exp(-t / 0.003);
+
+    return hum + snap;
+  });
+};
+
+const mouse = () => {
+  const noise = seeded(131);
+  const press = (u) => (u < 0 ? 0 : (0.5 * noise() * Math.exp(-u / 0.0015) + 0.3 * Math.sin(2 * Math.PI * 3200 * u)) * Math.exp(-u / 0.004));
+
+  return render(0.12, (t) => press(t) + 0.6 * press(t - 0.07));
+};
+
 mkdirSync(OUT, { recursive: true });
 
 const SOUNDS = {
@@ -113,6 +134,8 @@ const SOUNDS = {
   chime: chime(),
   pop: pop(),
   tap: tap(),
+  power: power(),
+  mouse: mouse(),
 };
 
 for (const [name, samples] of Object.entries(SOUNDS)) {

@@ -3,25 +3,25 @@ import { BuggyLanding } from "../components/BuggyLanding";
 import { Browser } from "../components/Browser";
 import { Camera, type Shot } from "../components/Camera";
 import { Sfx, Sound, keyClick, type Cue } from "../components/Sfx";
-import { LineKind, Terminal, type Rect, type TermLine } from "../components/Terminal";
+import { PixelgodTui, LineKind, type Rect, type TermLine } from "../components/Terminal";
+import { VSCODE, VSCodeWindow } from "../components/VSCode";
 import { lift, mix, tween } from "../ease";
 import { COLORS } from "../theme";
 import { applyKeys, BEATS, BROWSER_OPENS, BUILD, CAMERA_KEYS, Focus, Front, FRONT_KEYS, LIFT, LIMIT, NAV_CENTER, NAV_CHANGE, NAV_LEFT, Reply, Stroke, SWAPS, TITLE_FIX } from "./coldOpenTimeline";
 
 const BROWSER = { x: 470, y: 150, w: 940, h: 720 };
-export const TERMINAL = { x: 665, y: 288, w: 820, h: 640 };
 
 export const SHOTS: Record<Focus, Shot> = {
-  [Focus.Prompt]: { x: 1075, y: 608, scale: 1.4 },
+  [Focus.Prompt]: { x: 1150, y: 660, scale: 1.45 },
   [Focus.Page]: { x: 940, y: 510, scale: 1.45 },
-  [Focus.Stack]: { x: 977, y: 539, scale: 1.3 },
-  [Focus.Limit]: { x: 1075, y: 608, scale: 1.55 },
+  [Focus.Stack]: { x: 1010, y: 555, scale: 1.25 },
+  [Focus.Limit]: { x: 1204, y: 720, scale: 1.6 },
 };
 
-const SPINNER = ["·", "✢", "✳", "✶", "✻", "✽", "✻", "✶", "✳", "✢"];
+const SPINNER = ["◐", "◓", "◑", "◒"];
 const SPINNER_STEP = 3;
 const BLINK = 15;
-const BUILD_STEPS = ["Writing index.html", "Writing styles.css", "Starting dev server"];
+const BUILD_STEPS = ["Write(index.html)", "Write(styles.css)", "Bash(npm run dev)"];
 const NAV_START = 13;
 const NAV_RIGHT = 78;
 const NAV_MIDDLE = 50;
@@ -31,7 +31,7 @@ const SHADOW = { rest: 0.45, lifted: 0.7 };
 
 const buildSteps = (frame: number): TermLine[] =>
   BUILD_STEPS.filter((_, i) => frame >= BUILD.submit + ((i + 1) * BUILD.work) / (BUILD_STEPS.length + 1)).map((text) => ({
-    kind: LineKind.Status,
+    kind: LineKind.Tool,
     text,
   }));
 
@@ -50,7 +50,7 @@ const terminalLines = (frame: number): TermLine[] => {
     }
 
     if (frame < beat.replyAt) {
-      lines.push({ kind: LineKind.Spinner, text: beat === BUILD ? "Building…" : "Thinking…" });
+      lines.push({ kind: LineKind.Spinner, text: beat === BUILD ? "Manifesting…" : "Channeling taste…" });
       continue;
     }
 
@@ -164,7 +164,7 @@ export const ColdOpen = () => {
   const recolor = tween(frame, TITLE_FIX.changeAt, NAV_CHANGE);
   const titleColor = interpolateColors(Math.min(recolor, 1), [0, 1], [COLORS.pageRed, COLORS.pageBlue]);
 
-  const term = stacking(frame, TERMINAL, Front.Terminal);
+  const term = stacking(frame, VSCODE, Front.Terminal);
   const page = stacking(frame, BROWSER, Front.Browser);
 
   return (
@@ -172,15 +172,10 @@ export const ColdOpen = () => {
       <Sfx cues={CUES} />
       <Camera keys={CAMERA_KEYS} shots={SHOTS}>
         <div style={{ position: "absolute", inset: 0, zIndex: term.zIndex, transformOrigin: term.transformOrigin, transform: term.transform, filter: `brightness(${term.dim})` }}>
-          <Shadow rect={TERMINAL} shadow={term.shadow} />
-          <Terminal
-            rect={TERMINAL}
-            title="agent — ~/startup"
-            lines={terminalLines(frame)}
-            input={input}
-            cursorOn={cursorOn(frame, typing)}
-            spinnerGlyph={SPINNER[Math.floor(frame / SPINNER_STEP) % SPINNER.length]}
-          />
+          <Shadow rect={VSCODE} shadow={term.shadow} />
+          <VSCodeWindow rect={VSCODE} shell="node">
+            <PixelgodTui lines={terminalLines(frame)} input={input} cursorOn={cursorOn(frame, typing)} spinnerGlyph={SPINNER[Math.floor(frame / SPINNER_STEP) % SPINNER.length]} />
+          </VSCodeWindow>
         </div>
         {open > 0 && (
           <div style={{ position: "absolute", inset: 0, zIndex: page.zIndex, transformOrigin: page.transformOrigin, transform: page.transform }}>
