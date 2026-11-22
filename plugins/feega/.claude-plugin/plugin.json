@@ -1,0 +1,11 @@
+{
+  "name": "feega",
+  "version": "0.2.0",
+  "description": "Set up a web project for Feega visual editing, start the editor, and write markup Feega can edit back into source.",
+  "author": { "name": "Andrea Buttarelli", "url": "https://www.feega.app" },
+  "homepage": "https://docs.feega.app",
+  "repository": "https://github.com/andreabuttarelli/feega",
+  "license": "Apache-2.0",
+  "keywords": ["design", "visual-editor", "vite", "nextjs", "sveltekit", "tailwind", "vscode"],
+  "skills": ["./skills/feega"]
+}
