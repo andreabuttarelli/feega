@@ -48,6 +48,8 @@ function glass(root: HTMLElement): () => void {
   function paint() {
     root.style.setProperty('--gx', at.x + 'px');
     root.style.setProperty('--gy', at.y + 'px');
+    root.style.setProperty('--fx', at.x + glow.offsetLeft - button.offsetLeft + 'px');
+    root.style.setProperty('--fy', at.y + glow.offsetTop - button.offsetTop + 'px');
   }
 
   function step() {
@@ -188,7 +190,7 @@ export function GlassButton() {
   return (
     <div ref={root} className="fl-glass-button" data-speed="1" data-intensity="1">
       <span className="glow" aria-hidden="true"><span className="hue"></span></span>
-      <button className="glass" type="button"><span className="label">get started</span></button>
+      <button className="glass" type="button"><span className="light" aria-hidden="true"><span className="halo"><span className="ring"></span></span><span className="ring"></span><span className="tint"></span></span><span className="label">get started</span></button>
       <svg className="lens" aria-hidden="true" focusable="false">
         <filter x="0" y="0" width="100%" height="100%" colorInterpolationFilters="sRGB">
           <feImage x="0" y="0" preserveAspectRatio="none" result="map" />
