@@ -6,6 +6,7 @@ import type { SharePort } from './share/share-port-factory';
 import type { OnboardingStore } from './onboarding';
 import type { PluginsHost } from './plugins-session';
 import type { UsageHost } from './usage';
+import type { SkillHintHost } from './skill-hint';
 import type { SettingKey, SettingValue, Settings } from '../settings';
 
 export enum Stored {
@@ -13,7 +14,8 @@ export enum Stored {
   History = 'feegaInspect.history',
   App = 'feegaInspect.app',
   ShareNotice = 'feegaInspect.shareNotice',
-  Pids = 'feegaInspect.pids'
+  Pids = 'feegaInspect.pids',
+  SkillHint = 'feegaInspect.skillHint'
 }
 
 export type ChosenImage = { name: string; bytes: Uint8Array };
@@ -51,4 +53,5 @@ export type Platform = Transport & {
   share?: SharePort;
   onboarding: OnboardingStore;
   plugins?: PluginsHost;
+  skillHint?: SkillHintHost;
 };

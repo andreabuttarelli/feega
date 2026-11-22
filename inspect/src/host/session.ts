@@ -33,6 +33,7 @@ import { entriesOf, insertAskOf } from './library';
 import { pluginCalls } from './plugin-calls';
 import { pluginsSession } from './plugins-session';
 import { dependenciesOf, offerInstall } from './install-offer';
+import { HintSurface, SKILL_COMMAND, hintDue } from './skill-hint';
 import { install } from './dev-server';
 
 const START_WITH_FEEGA = 'Start with Feega';
@@ -206,6 +207,19 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
 
   async function showOnboarding() {
     await post({ kind: ToView.Onboarding, state: await platform.onboarding.read() });
+  }
+
+  async function showSkillHint() {
+    if (platform.skillHint?.surface === HintSurface.Panel && hintDue(platform, [...new Set([root, workspace])])) {
+      await post({ kind: ToView.SkillHint, command: SKILL_COMMAND });
+    }
+  }
+
+  const dismissSkillHint = () => platform.store(Stored.SkillHint, true);
+
+  async function neverSkillHint() {
+    await dismissSkillHint();
+    await platform.skillHint?.setNever?.();
   }
 
   async function signOut() {
@@ -451,7 +465,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   };
 
   const handlers: { [K in ToHost]: (m: Extract<HostMessage, { kind: K }>) => unknown } = {
-    [ToHost.Ready]: () => (showApp(), postSettings(), postHistory(), showAccount(), showOnboarding(), comments.show(), sharing.show(), pluginList?.show()),
+    [ToHost.Ready]: () => (showApp(), postSettings(), postHistory(), showAccount(), showOnboarding(), showSkillHint(), comments.show(), sharing.show(), pluginList?.show()),
     [ToHost.Edit]: (m) => edit(m.ask),
     [ToHost.Undo]: undo,
     [ToHost.Open]: (m) => platform.openSource(root, m.at),
@@ -484,6 +498,8 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.CancelSignIn]: () => signing?.abort(),
     [ToHost.SignOut]: signOut,
     [ToHost.OnboardingDone]: () => platform.onboarding.markSeen(),
+    [ToHost.SkillHintDismiss]: dismissSkillHint,
+    [ToHost.SkillHintNever]: neverSkillHint,
     [ToHost.ImageChoose]: imageChosen,
     [ToHost.ImageUpload]: (m) => imageSaved(m.name, Buffer.from(m.data, 'base64')),
     [ToHost.Wiring]: (m) => wiringShown(m.at, m.instance),

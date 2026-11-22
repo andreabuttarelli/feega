@@ -189,6 +189,7 @@
   const cloudOn = $derived(Boolean(share?.available));
   let layers = $state<LayerNode[]>([]);
   let palette = $state<Palette>({ document: [], tokens: [], fonts: [], missing: [] });
+  let skillHint = $state<string | null>(null);
   const dismissedFonts = new SvelteSet<string>();
   const fontNotice = $derived(palette.missing.find((m) => !dismissedFonts.has(m.family)) ?? null);
   let changes = $state<ChangeRow[]>([]);
@@ -583,6 +584,7 @@
     [ToView.Library]: (m) => (libraryItems = m.items),
     [ToView.Comments]: (m) => (cloud = { enabled: m.enabled, comments: m.comments, error: m.error ?? '' }),
     [ToView.Onboarding]: (m) => (onboarding = m.state),
+    [ToView.SkillHint]: (m) => (skillHint = m.command),
     [ToView.IconResults]: (m) => iconsFound({ id: m.id, library: m.library, hits: m.hits, error: m.error ?? '' }),
     [ToView.IconPreview]: (m) => iconDrawn(m.name, m.svg),
     [ToView.ImageSaved]: (m) => (imageSaved.url = m.url),
@@ -1198,6 +1200,14 @@
       {/if}
       {#if menu}<StructureMenu x={menu.x} y={menu.y} items={contextMenuItems(menuFor(selection.refs.length), plugins.contextMenu, menu.where)} onpick={pickMenu} onclose={() => (menu = null)} />{/if}
       {#if addMenu}<StructureMenu x={addMenu.x} y={addMenu.y} items={addMenuItems(picked && picked.instances > 1 ? [...ADD_ITEMS, ADD_LOOP_ITEM, LIBRARY_ITEM] : [...ADD_ITEMS, LIBRARY_ITEM], plugins.addMenu)} label="add" draggable={true} onpick={pickAdd} onclose={() => (addMenu = null)} />{/if}
+      {#if skillHint}
+        <div class="notice skillhint" data-testid="skill-hint">
+          <span>Let your agent drive Feega: <code>{skillHint}</code></span>
+          <button type="button" class="link" data-action="skill-hint-copy" onclick={() => toHost({ kind: ToHost.Copy, text: skillHint! })}>Copy command</button>
+          <button type="button" class="link" data-action="skill-hint-never" onclick={() => (toHost({ kind: ToHost.SkillHintNever }), (skillHint = null))}>Don't show again</button>
+          <button type="button" class="link" data-action="skill-hint-dismiss" onclick={() => (toHost({ kind: ToHost.SkillHintDismiss }), (skillHint = null))}>Dismiss</button>
+        </div>
+      {/if}
       {#if fontNotice}
         <div class="notice missingfont" data-testid="font-notice">
           <MissingFont missing={fontNotice} project={palette.fonts.filter((name) => !palette.missing.some((m) => m.family === name))} onreplace={replaceFont} onload={loadFont} />
@@ -1682,6 +1692,10 @@
 
   .notice.nosource {
     bottom: 64px;
+  }
+
+  .notice.skillhint {
+    bottom: 176px;
   }
 
   .notice.missingfont {

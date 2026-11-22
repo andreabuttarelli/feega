@@ -158,6 +158,8 @@ export enum ToHost {
   CancelSignIn = 'cancel-sign-in',
   SignOut = 'sign-out',
   OnboardingDone = 'onboarding-done',
+  SkillHintDismiss = 'skill-hint-dismiss',
+  SkillHintNever = 'skill-hint-never',
   ImageChoose = 'image-choose',
   ImageUpload = 'image-upload',
   Wiring = 'wiring',
@@ -197,6 +199,7 @@ export enum ToView {
   IconPreview = 'icon-preview',
   Account = 'account',
   Onboarding = 'onboarding',
+  SkillHint = 'skill-hint',
   ImageSaved = 'image-saved',
   Wiring = 'wiring',
   Comments = 'comments',
@@ -259,6 +262,8 @@ export type HostMessage =
   | { kind: ToHost.CancelSignIn }
   | { kind: ToHost.SignOut }
   | { kind: ToHost.OnboardingDone }
+  | { kind: ToHost.SkillHintDismiss }
+  | { kind: ToHost.SkillHintNever }
   | { kind: ToHost.ImageChoose }
   | { kind: ToHost.ImageUpload; name: string; data: string }
   | { kind: ToHost.Wiring; at: string; instance?: number }
@@ -293,6 +298,7 @@ export type ViewMessage =
   | { kind: ToView.IconPreview; name: string; svg: string | null }
   | { kind: ToView.Account; state: AccountState; email?: string }
   | { kind: ToView.Onboarding; state: Onboarding }
+  | { kind: ToView.SkillHint; command: string }
   | { kind: ToView.ImageSaved; url: string }
   | { kind: ToView.Wiring; at: string; instance?: number; wiring: Wiring }
   | { kind: ToView.Comments; enabled: boolean; comments: CloudComment[]; error?: string }
