@@ -109,6 +109,11 @@
           ],
           "description": "Minutes the dev server Feega started stays warm after the panel closes. 0: stop on close. Closing the window always stops it."
         },
+        "feegaInspect.cloud.enabled": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Internal. Turns on Feega Cloud features that are not released yet."
+        },
         "feegaInspect.syncSelection": {
           "type": "boolean",
           "default": true,

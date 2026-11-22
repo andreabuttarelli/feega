@@ -16,7 +16,7 @@ export enum Browser {
 
 export type Args = { run: Run.Editor; dir: string; port: number; browser: Browser; url?: string } | { run: Run.Help } | { run: Run.Version } | { run: Run.Mcp } | { run: Run.Error; reason: string };
 
-export const USAGE = `Usage: npx feega [dir] [--url <address>] [--port N] [--no-open]
+const EDITOR_USAGE = `Usage: npx feega [dir] [--url <address>] [--port N] [--no-open]
 
 Opens the Feega editor on the web app in [dir] (default: this folder):
 starts its dev server, then a design panel in your browser. Edits are
@@ -27,25 +27,29 @@ written to your source files.
   --port N     port of the editor (default: a free one)
   --no-open    do not open the browser
   --help       this text
-  --version    the version
+  --version    the version`;
+
+const MCP_USAGE = `
 
 Usage: npx feega mcp
 
 Serves the Feega Cloud tools (share, comments) to a coding agent over
 MCP on stdio. Sign in once with npx feega, or set FEEGA_API_KEY.`;
 
+export const usageOf = (cloud: boolean): string => (cloud ? EDITOR_USAGE + MCP_USAGE : EDITOR_USAGE);
+
 const MCP_COMMAND = 'mcp';
 
 const FLAGS: Record<string, Run.Help | Run.Version> = { '--help': Run.Help, '-h': Run.Help, '--version': Run.Version, '-v': Run.Version };
 
-export function argsOf(argv: string[], cwd: string): Args {
+export function argsOf(argv: string[], cwd: string, cloud = false): Args {
   let dir = cwd;
   let port = 0;
   let browser = Browser.Open;
   let url: string | undefined;
   const rest = [...argv];
 
-  if (rest[0] === MCP_COMMAND) {
+  if (cloud && rest[0] === MCP_COMMAND) {
     return { run: Run.Mcp };
   }
 
