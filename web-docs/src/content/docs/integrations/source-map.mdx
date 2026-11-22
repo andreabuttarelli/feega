@@ -1,0 +1,74 @@
+---
+title: Map elements to source
+description: Tag every element of your Vite or Next.js app with the file and line that wrote it, so Feega can open the code behind what you click.
+sidebar:
+  order: 7
+---
+
+In development, `feega-source-map` adds `data-feega-src="path/to/file.tsx:line:col"` to every HTML element your code writes. Feega reads it from a live frame and knows which file and line to change. Production builds are left untouched.
+
+## Set it up
+
+Run in your project folder:
+
+```bash
+npx feega init --dry-run   # show the changes
+npx feega init             # show them, ask, apply
+```
+
+`init` detects Vite or Next.js, adds the plugin to `vite.config.*` or wraps `next.config.*` with `withFeegaSource`, and adds `feega-source-map` to `devDependencies`. Running it again changes nothing. `-y` applies without asking.
+
+Then install dependencies (`npm install`, `pnpm install`, …) and restart the dev server. The package is [`feega-source-map` on npm](https://www.npmjs.com/package/feega-source-map).
+
+By hand, Vite:
+
+```ts
+import { feegaSource } from 'feega-source-map/vite';
+
+export default defineConfig({ plugins: [feegaSource(), react()] });
+```
+
+Next.js:
+
+```ts
+import { withFeegaSource } from 'feega-source-map/next';
+
+export default withFeegaSource(nextConfig);
+```
+
+## What gets tagged
+
+| Framework | Files | How |
+|---|---|---|
+| Vite + React | `.jsx`, `.tsx` | Vite plugin, dev server only |
+| Vite + Svelte 5, SvelteKit | `.svelte` | Vite plugin, dev server only |
+| Vite + Vue 3 | `.vue` | Vite plugin, dev server only |
+| Vite, plain pages | `index.html` and other `.html` pages | Vite plugin, dev server only |
+| React Router (framework mode) | `.jsx`, `.tsx` | Vite plugin, dev server only |
+| Astro | `.astro` | added by Feega when it starts the dev server |
+| Nuxt | `.vue` | added by Feega when it starts the dev server |
+| Next.js 15 (webpack) | `.jsx`, `.tsx`, server and client components | webpack loader, `next dev` only |
+
+Only host elements (`div`, `button`, ...) are tagged. Components, fragments and member tags like `motion.div` are not: their elements carry the line inside the component.
+
+## Asking from the canvas
+
+The plugin also loads a small bridge in the page. The parent window (the Feega canvas, around a live frame iframe) sends:
+
+```js
+iframe.contentWindow.postMessage({ type: 'feega:inspect', id: 1, x: 120, y: 40 }, '*');
+// or { type: 'feega:inspect', id: 1, selector: '#cta' }
+```
+
+and receives `{ type: 'feega:inspect:result', id: 1, result }`, where `result` holds `source` (`{ file, line, col }`), design-relevant computed `styles`, the element's `html` (truncated), its `rect`, `classes`, `text` (when it has no child elements), the page's root font size `rem`, and `component`: the nearest ancestor written in another file. The bridge announces itself with `{ type: 'feega:source-map:ready' }`.
+
+`{ type: 'feega:preview', source: 'src/App.tsx:12:5', text, style }` shows a change on every element written at that position before the file is saved; the next hot reload replaces it.
+
+With Vite the bridge loads with Vite's own client module, so it also runs in frameworks without an `index.html`, such as SvelteKit.
+
+## Limits
+
+- **Next.js with Turbopack** (`next dev --turbopack`): not tagged yet; use the default webpack dev server.
+- **MDX**: not tagged yet.
+- **Astro** and **Nuxt**: tagged only when Feega starts the dev server. Attaching to a dev server you already started does not tag them.
+- Elements created outside JSX or templates (`document.createElement`, `innerHTML`) climb to the nearest tagged ancestor.
