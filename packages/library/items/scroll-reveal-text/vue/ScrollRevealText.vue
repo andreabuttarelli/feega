@@ -1,26 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-
-const PARAS = [
-  'This is placeholder copy. Replace it with a short statement about what your product does and who it is for.',
-  'Each word lights up as the reader scrolls, so keep the sentences short and the ideas clear.',
-  'Scroll back up and the text fades again. Swap these lines for your own words.'
-];
-
-type Unit = { t: string; i: number };
-type Word = { units: Unit[] };
-type Para = { text: string; words: Word[] };
-
-function split(paras: string[], reveal: string): { paras: Para[]; total: number } {
-  let i = 0;
-  const out = paras.map((text) => ({
-    text,
-    words: text.split(' ').map((word) => ({
-      units: (reveal === 'char' ? [...word] : [word]).map((t) => ({ t, i: i++ }))
-    }))
-  }));
-  return { paras: out, total: i };
-}
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 
 const START = 0.8;
 const END = 0.4;
@@ -57,14 +36,52 @@ function track(root: HTMLElement): () => void {
   };
 }
 
-const props = withDefaults(defineProps<{ reveal?: 'word' | 'char' }>(), { reveal: 'word' });
+function build(root: HTMLElement, reveal: string) {
+  let i = 0;
+
+  root.querySelectorAll('p').forEach((p) => {
+    const text = (p.textContent ?? '').trim();
+    const hidden = document.createElement('span');
+    hidden.setAttribute('aria-hidden', 'true');
+
+    text.split(' ').forEach((word, index, all) => {
+      const w = document.createElement('span');
+      w.className = 'w';
+      (reveal === 'char' ? [...word] : [word]).forEach((t) => {
+        const u = document.createElement('span');
+        u.className = 'u';
+        u.textContent = t;
+        u.style.setProperty('--i', String(i++));
+        w.append(u);
+      });
+      hidden.append(w);
+      if (index < all.length - 1) {
+        hidden.append(' ');
+      }
+    });
+
+    const sr = document.createElement('span');
+    sr.className = 'sr';
+    sr.textContent = text;
+    p.replaceChildren(sr, hidden);
+  });
+
+  root.style.setProperty('--n', String(i));
+}
+
+function mount(root: HTMLElement): () => void {
+  if (!root.hasAttribute('data-ready')) {
+    root.setAttribute('data-ready', '');
+    build(root, root.dataset.reveal === 'char' ? 'char' : 'word');
+  }
+  return track(root);
+}
 
 const root = ref<HTMLElement | null>(null);
-const view = computed(() => split(PARAS, props.reveal));
 let stop = () => {};
 
 onMounted(() => {
-  stop = track(root.value as HTMLElement);
+  stop = mount(root.value as HTMLElement);
 });
 onBeforeUnmount(() => stop());
 </script>
@@ -72,11 +89,10 @@ onBeforeUnmount(() => stop());
 <template>
   <section class="fl-scroll-reveal-text">
     <div class="fl-container">
-      <div ref="root" class="reveal" :data-reveal="reveal" :style="{ '--n': view.total }">
-        <p v-for="para in view.paras" :key="para.text">
-          <span class="sr">{{ para.text }}</span>
-          <span aria-hidden="true"><template v-for="(word, k) in para.words" :key="word.units[0].i"><span class="w"><span v-for="unit in word.units" :key="unit.i" class="u" :style="{ '--i': unit.i }">{{ unit.t }}</span></span><template v-if="k < para.words.length - 1">{{ ' ' }}</template></template></span>
-        </p>
+      <div class="reveal" data-reveal="word" ref="root">
+        <p>This is placeholder copy. Replace it with a short statement about what your product does and who it is for.</p>
+        <p>Each word lights up as the reader scrolls, so keep the sentences short and the ideas clear.</p>
+        <p>Scroll back up and the text fades again. Swap these lines for your own words.</p>
       </div>
     </div>
   </section>

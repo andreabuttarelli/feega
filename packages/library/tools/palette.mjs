@@ -9,10 +9,6 @@ const COMMANDS = [
   ['Read the docs', 'Help', '?']
 ];
 
-const data = `const commands = [
-${COMMANDS.map(([label, group, keys]) => `  { label: '${label}', group: '${group}', keys: '${keys}' }`).join(',\n')}
-];`;
-
 const css = [
   '.fl-command-palette{padding:var(--feega-space-6) var(--feega-gutter)}',
   '.fl-command-palette .box{max-width:34rem;margin-inline:auto;overflow:hidden;border-radius:var(--feega-radius-lg);background:var(--feega-raised);box-shadow:var(--feega-shadow-float),inset 0 0 0 1px var(--feega-line);animation:fl-command-palette-in var(--feega-dur) var(--feega-ease)}',
@@ -35,7 +31,7 @@ const css = [
 
 const search = px('search');
 
-const shell = (input, list, none) => `<div class="fl-command-palette">
+const shell = (input, list, none, attrs = '') => `<div class="fl-command-palette"${attrs}>
   <div class="box">
     <label class="search">${search}${input}<kbd class="esc">esc</kbd></label>
 ${list}
@@ -47,10 +43,11 @@ const staticList = `    <ul role="listbox" id="fl-palette-list" aria-label="Comm
 ${COMMANDS.map(([l, g, k], i) => `      <li role="option" aria-selected="${i === 0}" data-label="${l.toLowerCase()}">${l}<small>${g}</small><kbd>${k}</kbd></li>`).join('\n')}
     </ul>`;
 
-const plain = shell(
+const plainWith = (attrs) => shell(
   '<input type="text" placeholder="Type a command or search" aria-label="Command" aria-controls="fl-palette-list" role="combobox" aria-expanded="true" autocomplete="off" />',
   staticList,
-  '    <p class="none" hidden>No results</p>'
+  '    <p class="none" hidden>No results</p>',
+  attrs
 );
 
 const script = (t) => `document.querySelectorAll${t ? '<HTMLElement>' : ''}('.fl-command-palette:not([data-ready])').forEach((root) => {
@@ -96,6 +93,77 @@ const script = (t) => `document.querySelectorAll${t ? '<HTMLElement>' : ''}('.fl
   }));
 });`;
 
+const mountBody = `function mount(root: HTMLElement): () => void {
+  const stop = new AbortController();
+  const { signal } = stop;
+  const input = root.querySelector<HTMLInputElement>('input')!;
+  const items = Array.from(root.querySelectorAll<HTMLLIElement>('[role="option"]'));
+  const none = root.querySelector<HTMLElement>('.none')!;
+  let active = 0;
+
+  function visible() {
+    return items.filter((item) => !item.hidden);
+  }
+
+  function paint() {
+    const shown = visible();
+    items.forEach((item) => item.setAttribute('aria-selected', String(item === shown[active])));
+    none.hidden = shown.length > 0;
+  }
+
+  input.addEventListener(
+    'input',
+    () => {
+      const query = input.value.trim().toLowerCase();
+      items.forEach((item) => {
+        item.hidden = !(item.dataset.label ?? '').includes(query);
+      });
+      active = 0;
+      paint();
+    },
+    { signal }
+  );
+
+  input.addEventListener(
+    'keydown',
+    (event) => {
+      const step = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0;
+      const count = visible().length;
+      if (step === 0 || count === 0) {
+        return;
+      }
+      event.preventDefault();
+      active = (active + step + count) % count;
+      paint();
+    },
+    { signal }
+  );
+
+  items.forEach((item) =>
+    item.addEventListener(
+      'mouseenter',
+      () => {
+        active = visible().indexOf(item);
+        paint();
+      },
+      { signal }
+    )
+  );
+
+  return () => stop.abort();
+}`;
+
+const pad = (text, n) =>
+  text
+    .split('\n')
+    .map((l) => (l ? ' '.repeat(n) + l : l))
+    .join('\n');
+
+const jsx = (markup) =>
+  markup
+    .replace(/class="/g, 'className="')
+    .replace(/autocomplete="/g, 'autoComplete="');
+
 const stepFn = (get, set, len) => `const step = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0;
     if (step === 0 || ${len} === 0) {
       return;
@@ -112,99 +180,52 @@ export const palette = {
   mods: ['px'],
   css,
   files: (C) => ({
-    html: `${plain}\n\n<script>\n${script(false)}\n</script>\n`,
-    astro: `---\n---\n\n${plain}\n\n<script>\n${script(true)}\n</script>\n\n<style>\n${C}</style>\n`,
+    html: `${plainWith('')}\n\n<script>\n${script(false)}\n</script>\n`,
+    astro: `---\n---\n\n${plainWith('')}\n\n<script>\n${script(true)}\n</script>\n\n<style>\n${C}</style>\n`,
     svelte: `<script lang="ts">
-  ${data.split('\n').join('\n  ')}
+${pad(mountBody, 2)}
 
-  let query = $state('');
-  let active = $state(0);
-  const shown = $derived(commands.filter((c) => c.label.toLowerCase().includes(query.trim().toLowerCase())));
+  let root: HTMLElement;
 
-  function onkeydown(event: KeyboardEvent) {
-    const step = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0;
-    if (step === 0 || shown.length === 0) {
-      return;
-    }
-    event.preventDefault();
-    active = (active + step + shown.length) % shown.length;
-  }
+  $effect(() => mount(root));
 </script>
 
-<div class="fl-command-palette">
-  <div class="box">
-    <label class="search">${search}<input type="text" placeholder="Type a command or search" aria-label="Command" role="combobox" aria-controls="fl-palette-list" aria-expanded="true" autocomplete="off" bind:value={query} oninput={() => (active = 0)} {onkeydown} /><kbd class="esc">esc</kbd></label>
-    <ul role="listbox" id="fl-palette-list" aria-label="Commands">
-      {#each shown as command, i (command.label)}
-        <li role="option" aria-selected={i === active} onmouseenter={() => (active = i)}>{command.label}<small>{command.group}</small><kbd>{command.keys}</kbd></li>
-      {/each}
-    </ul>
-    <p class="none" hidden={shown.length > 0}>No results</p>
-  </div>
-</div>
+${plainWith(' bind:this={root}')}
 
 <style>
 ${C}</style>
 `,
-    react: `import { useState } from 'react';
-import type { KeyboardEvent } from 'react';
+    react: `import { useEffect, useRef } from 'react';
 import './CommandPalette.css';
 
-${data}
+${mountBody}
 
 export function CommandPalette() {
-  const [query, setQuery] = useState('');
-  const [active, setActive] = useState(0);
-  const shown = commands.filter((c) => c.label.toLowerCase().includes(query.trim().toLowerCase()));
+  const root = useRef<HTMLDivElement>(null);
 
-  function onKeyDown(event: KeyboardEvent) {
-    ${stepFn('active', 'setActive', 'shown.length')}
-  }
+  useEffect(() => (root.current ? mount(root.current) : undefined), []);
 
   return (
-    <div className="fl-command-palette">
-      <div className="box">
-        <label className="search">${search.replace('class=', 'className=')}<input type="text" placeholder="Type a command or search" aria-label="Command" role="combobox" aria-controls="fl-palette-list" aria-expanded="true" autoComplete="off" value={query} onChange={(e) => { setQuery(e.target.value); setActive(0); }} onKeyDown={onKeyDown} /><kbd className="esc">esc</kbd></label>
-        <ul role="listbox" id="fl-palette-list" aria-label="Commands">
-          {shown.map((command, i) => (
-            <li key={command.label} role="option" aria-selected={i === active} onMouseEnter={() => setActive(i)}>{command.label}<small>{command.group}</small><kbd>{command.keys}</kbd></li>
-          ))}
-        </ul>
-        <p className="none" hidden={shown.length > 0}>No results</p>
-      </div>
-    </div>
+${pad(jsx(plainWith(' ref={root}')), 4)}
   );
 }
 `,
     vue: `<script setup lang="ts">
-import { computed, ref } from 'vue';
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 
-${data}
+${mountBody}
 
-const query = ref('');
-const active = ref(0);
-const shown = computed(() => commands.filter((c) => c.label.toLowerCase().includes(query.value.trim().toLowerCase())));
+const root = ref<HTMLElement | null>(null);
+let stop = () => {};
 
-function onKeydown(event: KeyboardEvent) {
-  const step = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0;
-  if (step === 0 || shown.value.length === 0) {
-    return;
-  }
-  event.preventDefault();
-  active.value = (active.value + step + shown.value.length) % shown.value.length;
-}
+onMounted(() => {
+  stop = mount(root.value as HTMLElement);
+});
+onBeforeUnmount(() => stop());
 </script>
 
 <template>
-  <div class="fl-command-palette">
-    <div class="box">
-      <label class="search">${search}<input v-model="query" type="text" placeholder="Type a command or search" aria-label="Command" role="combobox" aria-controls="fl-palette-list" aria-expanded="true" autocomplete="off" @input="active = 0" @keydown="onKeydown" /><kbd class="esc">esc</kbd></label>
-      <ul role="listbox" id="fl-palette-list" aria-label="Commands">
-        <li v-for="(command, i) in shown" :key="command.label" role="option" :aria-selected="i === active" @mouseenter="active = i">{{ command.label }}<small>{{ command.group }}</small><kbd>{{ command.keys }}</kbd></li>
-      </ul>
-      <p class="none" :hidden="shown.length > 0">No results</p>
-    </div>
-  </div>
+${pad(plainWith(' ref="root"'), 2)}
 </template>
 
 <style scoped>

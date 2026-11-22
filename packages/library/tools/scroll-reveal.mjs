@@ -15,20 +15,6 @@ const css = [
   '@media (prefers-reduced-motion:reduce){.fl-scroll-reveal-text .u{opacity:1}}'
 ];
 
-const SPLIT = `type Unit = { t: string; i: number };
-type Word = { units: Unit[] };
-type Para = { text: string; words: Word[] };
-
-function split(paras: string[], reveal: string): { paras: Para[]; total: number } {
-  let i = 0;
-  const out = paras.map((text) => ({
-    text,
-    words: text.split(' ').map((word) => ({
-      units: (reveal === 'char' ? [...word] : [word]).map((t) => ({ t, i: i++ }))
-    }))
-  }));
-  return { paras: out, total: i };
-}`;
 
 const track = (typed) => `const START = 0.8;
 const END = 0.4;
@@ -100,28 +86,23 @@ function build(root${typed ? ': HTMLElement' : ''}, reveal${typed ? ': string' :
   root.style.setProperty('--n', String(i));
 }
 
-document.querySelectorAll${typed ? '<HTMLElement>' : ''}('.fl-scroll-reveal-text .reveal:not([data-ready])').forEach((root) => {
-  root.setAttribute('data-ready', '');
-  build(root, root.dataset.reveal === 'char' ? 'char' : 'word');
-  track(root);
+function mount(root${typed ? ': HTMLElement' : ''})${typed ? ': () => void' : ''} {
+  if (!root.hasAttribute('data-ready')) {
+    root.setAttribute('data-ready', '');
+    build(root, root.dataset.reveal === 'char' ? 'char' : 'word');
+  }
+  return track(root);
+}`;
+
+const boot = (typed) => `document.querySelectorAll${typed ? '<HTMLElement>' : ''}('.fl-scroll-reveal-text .reveal:not([data-ready])').forEach((root) => {
+  mount(root);
 });`;
 
-const plain = (attr) => `<section class="fl-scroll-reveal-text">
+
+const shell = (root) => `<section class="fl-scroll-reveal-text">
   <div class="fl-container">
-    <div class="reveal" data-reveal=${attr}>
+    <div class="reveal" data-reveal="word"${root}>
 ${PARAS.map((p) => `      <p>${p}</p>`).join('\n')}
-    </div>
-  </div>
-</section>`;
-
-const paraData = `const PARAS = [
-${PARAS.map((p) => `  '${p}'`).join(',\n')}
-];`;
-
-const shell = (o) => `<section class="fl-scroll-reveal-text">
-  <div class="fl-container">
-    <div ${o.root}>
-${o.paras}
     </div>
   </div>
 </section>`;
@@ -132,6 +113,8 @@ const pad = (text, n) =>
     .map((l) => (l ? ' '.repeat(n) + l : l))
     .join('\n');
 
+const jsx = (markup) => markup.replace(/class="/g, 'className="');
+
 export const scrollReveal = {
   id: 'scroll-reveal-text',
   name: 'Scroll reveal text',
@@ -141,108 +124,52 @@ export const scrollReveal = {
   mods: ['container'],
   css,
   files: (C) => ({
-    html: `${plain('"word"')}\n\n<script>\n(() => {\n${pad(domScript(false), 2)}\n})();\n</script>\n`,
-    astro: `---\nconst { reveal = 'word' } = Astro.props;\n---\n\n${plain('{reveal}')}\n\n<script>\n${domScript(true)}\n</script>\n\n<style is:global>\n${C}</style>\n`,
+    html: `${shell('')}\n\n<script>\n(() => {\n${pad(domScript(false), 2)}\n\n${pad(boot(false), 2)}\n})();\n</script>\n`,
+    astro: `---\n---\n\n${shell('')}\n\n<script>\n${domScript(true)}\n\n${boot(true)}\n</script>\n\n<style is:global>\n${C}</style>\n`,
     svelte: `<script lang="ts">
-${pad(paraData, 2)}
+${pad(domScript(true), 2)}
 
-${pad(SPLIT, 2)}
-
-${pad(track(true), 2)}
-
-  let { reveal = 'word' }: { reveal?: 'word' | 'char' } = $props();
-
-  const view = $derived(split(PARAS, reveal));
   let root: HTMLElement;
 
-  $effect(() => track(root));
+  $effect(() => mount(root));
 </script>
 
-${shell({
-  root: 'class="reveal" data-reveal={reveal} style="--n:{view.total}" bind:this={root}',
-  paras: `      {#each view.paras as para}
-        <p><span class="sr">{para.text}</span><span aria-hidden="true">{#each para.words as word, k}<span class="w">{#each word.units as unit}<span class="u" style="--i:{unit.i}">{unit.t}</span>{/each}</span>{#if k < para.words.length - 1}{' '}{/if}{/each}</span></p>
-      {/each}`
-})}
+${shell(' bind:this={root}')}
 
 <style>
 ${C}</style>
 `,
-    react: `import { useEffect, useMemo, useRef } from 'react';
-import type { CSSProperties } from 'react';
+    react: `import { useEffect, useRef } from 'react';
 import './ScrollRevealText.css';
 
-${paraData}
+${domScript(true)}
 
-${SPLIT}
-
-${track(true)}
-
-export function ScrollRevealText({ reveal = 'word' }: { reveal?: 'word' | 'char' }) {
+export function ScrollRevealText() {
   const root = useRef<HTMLDivElement>(null);
-  const view = useMemo(() => split(PARAS, reveal), [reveal]);
 
-  useEffect(() => (root.current ? track(root.current) : undefined), []);
+  useEffect(() => (root.current ? mount(root.current) : undefined), []);
 
   return (
-${pad(
-  shell({
-    root: 'ref={root} className="reveal" data-reveal={reveal} style={{ \'--n\': view.total } as CSSProperties}',
-    paras: `      {view.paras.map((para) => (
-        <p key={para.text}>
-          <span className="sr">{para.text}</span>
-          <span aria-hidden="true">
-            {para.words.map((word, k) => (
-              <span key={word.units[0].i}>
-                <span className="w">
-                  {word.units.map((unit) => (
-                    <span key={unit.i} className="u" style={{ '--i': unit.i } as CSSProperties}>{unit.t}</span>
-                  ))}
-                </span>
-                {k < para.words.length - 1 ? ' ' : null}
-              </span>
-            ))}
-          </span>
-        </p>
-      ))}`
-  }),
-  4
-)}
+${pad(jsx(shell(' ref={root}')), 4)}
   );
 }
 `,
     vue: `<script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 
-${paraData}
-
-${SPLIT}
-
-${track(true)}
-
-const props = withDefaults(defineProps<{ reveal?: 'word' | 'char' }>(), { reveal: 'word' });
+${domScript(true)}
 
 const root = ref<HTMLElement | null>(null);
-const view = computed(() => split(PARAS, props.reveal));
 let stop = () => {};
 
 onMounted(() => {
-  stop = track(root.value as HTMLElement);
+  stop = mount(root.value as HTMLElement);
 });
 onBeforeUnmount(() => stop());
 </script>
 
 <template>
-${pad(
-  shell({
-    root: 'ref="root" class="reveal" :data-reveal="reveal" :style="{ \'--n\': view.total }"',
-    paras: `      <p v-for="para in view.paras" :key="para.text">
-        <span class="sr">{{ para.text }}</span>
-        <span aria-hidden="true"><template v-for="(word, k) in para.words" :key="word.units[0].i"><span class="w"><span v-for="unit in word.units" :key="unit.i" class="u" :style="{ '--i': unit.i }">{{ unit.t }}</span></span><template v-if="k < para.words.length - 1">{{ ' ' }}</template></template></span>
-      </p>`
-  }),
-  2
-)}
+${pad(shell(' ref="root"'), 2)}
 </template>
 
 <style scoped>
