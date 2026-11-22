@@ -33,7 +33,8 @@ One undoable step:
 
 - adds the `three` package to `package.json` (and `@types/three` in TypeScript projects). Feega
   then offers **Install now**, which runs your package manager (npm, pnpm, yarn or bun, from your
-  lockfile). Astro restarts its dev server after a `package.json` change: reload the page;
+  lockfile). If the dev server restarts after that, Feega shows "Restarting dev server…" and
+  reloads the preview by itself, keeping your scroll, selection and open panel;
 - writes `src/feega/Scene3D` (`.svelte`, `.vue`, `.astro`, `.tsx` or `.jsx`, matching the file you
   add it to) and `src/feega/mount-scene.ts`, the three.js code;
 - imports the component and places it in the selected element;

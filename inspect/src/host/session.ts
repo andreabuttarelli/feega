@@ -13,6 +13,8 @@ import { mcpIcon, searchIcons } from './icon-search';
 import { previewQueue } from './icon-previews';
 import { appOfSource, firstStampedFile, urlOf } from './attach-url';
 import { Attach, attachDev, factsOf, startDev, type Refused, type Running } from './dev-server';
+import { RestartWatch, Signal, Step } from './restart-watch';
+import { shownFor, watchServer } from './server-watch';
 import { commentsHost } from './comments';
 import { shareSession } from './share/share-session';
 import { copyImage } from './image-copy';
@@ -266,6 +268,15 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     return picked;
   }
 
+  const restarts = new RestartWatch();
+
+  function carryOut(step: Step, started: Running) {
+    shownFor(step, infoOf(started), lastError).forEach(post);
+    if (step === Step.Respawn) {
+      void startServer();
+    }
+  }
+
   function adopt(started: Running, current: () => boolean) {
     running = started;
     started.exited(() => {
@@ -273,9 +284,10 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
         forget(pids, started.pid);
       }
       if (current() && running === started) {
-        post({ kind: ToView.Server, state: ServerState.Stopped, reason: lastError || 'the dev server exited', info: infoOf(started) });
+        carryOut(restarts.feed(Signal.Exited, Date.now()), started);
       }
     });
+    void watchServer({ started, restarts, current: () => current() && running === started, act: (step) => carryOut(step, started) });
   }
 
   async function startServer(attach = Attach.IfRunning): Promise<Running | Refused> {

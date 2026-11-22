@@ -88,6 +88,7 @@
   const writtenThemeName = $derived(writtenTheme(themeName));
   let reach = $state(FOLLOW);
   let server = $state(ServerState.Detecting);
+  let restarting = $state(false);
   let serverReason = $state('');
   let serverInfo = $state<ServerInfo | null>(null);
   let bridged = $state(false);
@@ -250,6 +251,7 @@
       }
       bridged = true;
       server = ServerState.Running;
+      restarting = false;
       visited(path);
       bridge.mode(mode);
       showTheme();
@@ -387,6 +389,13 @@
     savePrefs();
   }
 
+  function reloadAfterRestart() {
+    if (!url || !frame) {
+      return;
+    }
+    frame.src = new URL(route, url).toString();
+  }
+
   function go(path: string | null) {
     if (path === null || !url) {
       return;
@@ -488,7 +497,8 @@
         size = preset;
       }
     },
-    [ToView.Server]: (m) => ((server = m.state), (serverReason = m.reason ?? ''), (serverInfo = m.info ?? serverInfo)),
+    [ToView.Server]: (m) => ((server = m.state), (restarting = restarting ? m.state !== ServerState.Stopped : m.state === ServerState.Restarting), (serverReason = m.reason ?? ''), (serverInfo = m.info ?? serverInfo)),
+    [ToView.Reload]: () => reloadAfterRestart(),
     [ToView.Status]: (m) => (problem = { text: m.text }),
     [ToView.Edited]: (m) => {
       const unsavedText = textPending;
@@ -958,6 +968,7 @@
     <div class="backdrop" role="presentation" bind:clientWidth={stage.w} bind:clientHeight={stage.h} onpointermove={resizeFrame} onpointerup={endDrag}>
       <div class="frame" class:framed={size !== Size.Full} style={`width:${fit.width * fit.scale}px;height:${fit.height * fit.scale}px`}>
         {#if url}<iframe bind:this={frame} src={start} title="App" data-testid="app-frame" style={`width:${fit.width}px;height:${fit.height}px;transform:scale(${fit.scale})`}></iframe>{/if}
+        {#if restarting}<div class="restarting" data-testid="restarting" role="status"><span class="server-dot-inline amber"></span>Restarting dev server…</div>{/if}
         {#if mode === Mode.Design && bridged && !editing}
           <div class="overlay" role="presentation" onpointerdown={pressOverlay} onpointermove={dragOverlay} onpointerleave={() => (hover = null)} onclick={onPick} oncontextmenu={onMenu} ondragover={overAdd} ondragleave={() => (addSpot = null)} ondrop={dropAdd} ondblclick={onDouble} onwheel={(e) => bridge.scroll(e.deltaX / fit.scale, e.deltaY / fit.scale)}>
             {#if hover}<div class="outline hover" style={box(hover)}></div>{/if}
@@ -1672,6 +1683,20 @@
     word-break: break-word;
   }
 
+  .restarting {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: color-mix(in srgb, var(--ui-panel) 70%, transparent);
+    backdrop-filter: blur(2px);
+    color: var(--ui-text);
+    font-size: var(--ui-text-sm);
+    pointer-events: none;
+  }
   .server-card {
     position: absolute;
     inset: 0;

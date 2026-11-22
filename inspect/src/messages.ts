@@ -76,6 +76,7 @@ export enum ServerState {
   Starting = 'starting',
   Running = 'running',
   Reloading = 'reloading',
+  Restarting = 'restarting',
   Stopped = 'stopped'
 }
 
@@ -187,7 +188,8 @@ export enum ToView {
   Wiring = 'wiring',
   Comments = 'comments',
   Share = 'share',
-  Plugin = 'plugin'
+  Plugin = 'plugin',
+  Reload = 'reload'
 }
 
 export enum ShareState {
@@ -272,7 +274,8 @@ export type ViewMessage =
   | { kind: ToView.Wiring; at: string; instance?: number; wiring: Wiring }
   | { kind: ToView.Comments; enabled: boolean; comments: CloudComment[]; error?: string }
   | { kind: ToView.Share; state: ShareState; available: boolean; name: string; canEdit: boolean; url?: string; expiresAt?: string; visitors: Present[]; notice: boolean; error?: string }
-  | { kind: ToView.Plugin; id: number; result: PluginResult };
+  | { kind: ToView.Plugin; id: number; result: PluginResult }
+  | { kind: ToView.Reload };
 
 export const INSPECT = 'feega:inspect';
 export const INSPECT_RESULT = 'feega:inspect:result';

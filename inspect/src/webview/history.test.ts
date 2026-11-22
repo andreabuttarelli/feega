@@ -38,6 +38,6 @@ describe('browseHistory', () => {
 
 describe('serverLook', () => {
   it('every state has a colour and a label', () => {
-    expect(Object.values(ServerState).map((s) => serverLook(s).dot)).toEqual(['grey', 'amber', 'amber', 'green', 'amber', 'red']);
+    expect(Object.values(ServerState).map((s) => serverLook(s).dot)).toEqual(['grey', 'amber', 'amber', 'green', 'amber', 'amber', 'red']);
   });
 });

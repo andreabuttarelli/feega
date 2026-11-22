@@ -47,10 +47,21 @@ try {
   check('the Add menu has a 3D object category', (await page.locator('[data-testid=add-submenu] [role=menuitem]').allInnerTexts()).join('|') === 'Cube|Sphere|Torus knot|3D text|Model (.glb)…');
   check('plugin items can be dragged from the Add menu', (await page.locator('[data-testid=add-submenu] [role=menuitem]').first().getAttribute('draggable')) === 'true');
   await page.screenshot({ path: join(SHOTS, `3d-${name}-01-add-menu.png`) });
+  await page.evaluate(() => {
+    new MutationObserver(() => {
+      if (document.querySelector('[data-testid=restarting]')) {
+        (window as unknown as { sawRestart: boolean }).sawRestart = true;
+      }
+    }).observe(document.body, { childList: true, subtree: true });
+  });
   await page.locator('[data-testid=add-submenu] [role=menuitem]', { hasText: 'Torus knot' }).click();
   await settle(9000);
-  await page.locator('button[title^="Reload"]').click();
+  const reloaded = await page.locator('[data-testid=restarting]').waitFor({ state: 'detached', timeout: 90_000 }).then(() => true, () => false);
+  check('the preview reloads by itself after the restart', reloaded);
+  const announced = await page.evaluate(() => Boolean((window as unknown as { sawRestart?: boolean }).sawRestart));
+  check('the restart is announced over the preview', announced || name !== 'astro');
   await settle(6000);
+  check('the selection survives the automatic reload', (await page.locator('.outline.picked').count()) === 1);
 
   check('the component file is written', existsSync(join(APP, run.component)));
   check('the runtime file is written', existsSync(join(APP, 'src/feega/mount-scene.ts')));

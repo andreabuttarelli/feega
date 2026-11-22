@@ -8,6 +8,8 @@ import { stylingOf } from '../src/host/styling.ts';
 import { Attach, startDev } from '../src/host/dev-server.ts';
 import { ServerState, ToHost, ToView, type EditAsk, type Pick, type PluginAsk } from '../src/messages.ts';
 import { pluginCalls } from '../src/host/plugin-calls.ts';
+import { RestartWatch } from '../src/host/restart-watch.ts';
+import { shownFor, watchServer } from '../src/host/server-watch.ts';
 import { liveAtOf } from '@feega/live-edit/live-ask';
 import { SETTINGS } from '../src/settings.ts';
 import { searchIcons } from '../src/host/icon-search.ts';
@@ -53,6 +55,8 @@ export async function openPanel(appRoot: string, theme = DARK, cloud?: CommentsC
     page.on('pageerror', (e) => console.log('pageerror', e.message));
   }
   const reply = (m: unknown) => page.evaluate((msg) => window.postMessage(msg, '*'), m);
+  let closed = false;
+  void watchServer({ started: running, restarts: new RestartWatch(), current: () => !closed, act: (step) => shownFor(step, undefined, '').forEach(reply) });
   const picks = new Map<number, (p: Pick | null) => void>();
   const saves: unknown[] = [];
   const comments = commentsHost(cloud, reply);
@@ -130,6 +134,7 @@ export async function openPanel(appRoot: string, theme = DARK, cloud?: CommentsC
   }
 
   const close = async () => {
+    closed = true;
     await browser.close();
     server.close();
     running.stop();
