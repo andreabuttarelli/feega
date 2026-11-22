@@ -1,0 +1,73 @@
+{
+  "shots": {
+    "overview": {
+      "page": "saas",
+      "files": [
+        "overview.webp",
+        "crop-overview.webp"
+      ]
+    },
+    "selected": {
+      "page": "portfolio",
+      "files": [
+        "selected.webp",
+        "crop-selected.webp"
+      ]
+    },
+    "changes": {
+      "page": "shop",
+      "files": [
+        "changes.webp",
+        "crop-changes.webp"
+      ]
+    },
+    "layers-menu": {
+      "page": "dashboard",
+      "files": [
+        "layers-menu.webp",
+        "crop-layers-menu.webp"
+      ]
+    },
+    "tablet": {
+      "page": "blog",
+      "files": [
+        "tablet.webp",
+        "crop-responsive.webp"
+      ]
+    },
+    "phone": {
+      "page": "login",
+      "files": [
+        "phone.webp"
+      ]
+    },
+    "react": {
+      "page": "agency",
+      "files": [
+        "react.webp",
+        "crop-react.webp"
+      ]
+    },
+    "vue": {
+      "page": "docs",
+      "files": [
+        "vue.webp",
+        "crop-vue.webp"
+      ]
+    },
+    "sveltekit": {
+      "page": "event",
+      "files": [
+        "sveltekit.webp",
+        "crop-sveltekit.webp"
+      ]
+    },
+    "nuxt": {
+      "page": "cafe",
+      "files": [
+        "nuxt.webp",
+        "crop-nuxt.webp"
+      ]
+    }
+  }
+}

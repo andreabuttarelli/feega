@@ -1,0 +1,117 @@
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+  --feega-bg: #f7f6f2;
+  --feega-surface: #efede7;
+  --feega-raised: #ffffff;
+  --feega-input: #ffffff;
+  --feega-fg: #121212;
+  --feega-fg-muted: #5c5a55;
+  --feega-fg-subtle: #6d6a63;
+  --feega-line: #e2dfd7;
+  --feega-line-strong: #cdc9bf;
+  --feega-dot: #d3cfc5;
+  --feega-accent: #ff4f00;
+  --feega-accent-hover: #ff6a26;
+  --feega-accent-fg: #121212;
+  --feega-accent-soft: #ffe8dc;
+  --feega-accent-text: #b83800;
+  --feega-danger: #c0231a;
+  --feega-danger-fg: #ffffff;
+  --feega-danger-soft: #fde6e3;
+  --feega-success: #12703a;
+  --feega-success-soft: #e0f3e6;
+  --feega-focus: #ff4f00;
+  --feega-overlay: rgb(18 18 18 / 0.4);
+  --feega-shadow: 0 1px 2px rgb(18 18 18 / 0.05), 0 8px 24px -8px rgb(18 18 18 / 0.12);
+  --feega-shadow-float: 0 2px 4px rgb(18 18 18 / 0.06), 0 24px 48px -12px rgb(18 18 18 / 0.22);
+  --feega-radius-xs: 2px;
+  --feega-radius-sm: 6px;
+  --feega-radius-md: 10px;
+  --feega-radius-lg: 16px;
+  --feega-radius-full: 999px;
+  --feega-font: "Inter Tight", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --feega-font-display: var(--feega-font);
+  --feega-font-mono: "Fragment Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --feega-tracking: -0.02em;
+  --feega-tracking-tight: -0.05em;
+  --feega-text-xs: 0.75rem;
+  --feega-text-sm: 0.875rem;
+  --feega-text-body: 1rem;
+  --feega-text-lg: clamp(1.0625rem, 1.6vw, 1.25rem);
+  --feega-text-xl: 1.5rem;
+  --feega-text-title: clamp(2.5rem, 6vw, 4.5rem);
+  --feega-text-display: clamp(3rem, 9.5vw, 7rem);
+  --feega-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --feega-dur-fast: 160ms;
+  --feega-dur: 420ms;
+  --feega-space-1: 0.25rem;
+  --feega-space-2: 0.5rem;
+  --feega-space-3: 0.75rem;
+  --feega-space-4: 1rem;
+  --feega-space-6: 1.5rem;
+  --feega-space-8: 2rem;
+  --feega-space-12: 3rem;
+  --feega-space-16: 4rem;
+  --feega-space-section: clamp(4.5rem, 11vw, 9rem);
+  --feega-gutter: clamp(1rem, 4vw, 2rem);
+  --feega-max-width: 76rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --feega-bg: #050505;
+    --feega-surface: #121212;
+    --feega-raised: #1a1a1a;
+    --feega-input: #0d0d0d;
+    --feega-fg: #f0eee9;
+    --feega-fg-muted: #a3a09a;
+    --feega-fg-subtle: #8a877f;
+    --feega-line: #232323;
+    --feega-line-strong: #363636;
+    --feega-dot: #2c2c2c;
+    --feega-accent: #ff5a14;
+    --feega-accent-hover: #ff7333;
+    --feega-accent-fg: #121212;
+    --feega-accent-soft: #2b1206;
+    --feega-accent-text: #ff7a3d;
+    --feega-danger: #ff6b5e;
+    --feega-danger-fg: #121212;
+    --feega-danger-soft: #2e0f0c;
+    --feega-success: #4cc47a;
+    --feega-success-soft: #0d2617;
+    --feega-focus: #ff5a14;
+    --feega-overlay: rgb(0 0 0 / 0.7);
+    --feega-shadow: 0 1px 2px rgb(0 0 0 / 0.5), 0 8px 24px -8px rgb(0 0 0 / 0.6);
+    --feega-shadow-float: 0 2px 4px rgb(0 0 0 / 0.5), 0 24px 48px -12px rgb(0 0 0 / 0.8);
+  }
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --feega-bg: #050505;
+  --feega-surface: #121212;
+  --feega-raised: #1a1a1a;
+  --feega-input: #0d0d0d;
+  --feega-fg: #f0eee9;
+  --feega-fg-muted: #a3a09a;
+  --feega-fg-subtle: #8a877f;
+  --feega-line: #232323;
+  --feega-line-strong: #363636;
+  --feega-dot: #2c2c2c;
+  --feega-accent: #ff5a14;
+  --feega-accent-hover: #ff7333;
+  --feega-accent-fg: #121212;
+  --feega-accent-soft: #2b1206;
+  --feega-accent-text: #ff7a3d;
+  --feega-danger: #ff6b5e;
+  --feega-danger-fg: #121212;
+  --feega-danger-soft: #2e0f0c;
+  --feega-success: #4cc47a;
+  --feega-success-soft: #0d2617;
+  --feega-focus: #ff5a14;
+  --feega-overlay: rgb(0 0 0 / 0.7);
+  --feega-shadow: 0 1px 2px rgb(0 0 0 / 0.5), 0 8px 24px -8px rgb(0 0 0 / 0.6);
+  --feega-shadow-float: 0 2px 4px rgb(0 0 0 / 0.5), 0 24px 48px -12px rgb(0 0 0 / 0.8);
+}

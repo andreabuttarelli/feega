@@ -1,0 +1,8 @@
+html[data-theme]{
+  color-scheme:dark;
+  --feega-bg:#0e0d0a;--feega-surface:#1a1913;--feega-raised:#23211a;--feega-input:#23211a;
+  --feega-fg:#f6f2e4;--feega-fg-muted:#bdb7a0;--feega-fg-subtle:#a39d86;
+  --feega-line:#2e2c22;--feega-line-strong:#47432f;--feega-dot:#47432f;
+  --feega-accent:#facc15;--feega-accent-hover:#fcd93f;--feega-accent-fg:#1a1500;
+  --feega-accent-soft:#2e2705;--feega-accent-text:#fde047;--feega-focus:#facc15;
+}

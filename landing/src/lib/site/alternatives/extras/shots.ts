@@ -19,7 +19,7 @@ export const EDITOR_PROPERTIES: Shot = {
 
 export const OVERVIEW_SHOT: Shot = {
   src: '/img/editor/overview.webp',
-  alt: 'The Feega editor: the Layers tree on the left, a running coffee shop page in the middle with a button selected, and the Properties bar on the right',
+  alt: 'The Feega editor: the Layers tree on the left, a release monitoring landing page in the middle with its hero button selected, and the Properties bar on the right',
   width: 1440,
   height: 900,
   caption: 'The Feega editor on a running page: Layers, the page itself and Properties.'
@@ -27,7 +27,7 @@ export const OVERVIEW_SHOT: Shot = {
 
 export const SELECTED_SHOT: Shot = {
   src: '/img/editor/selected.webp',
-  alt: 'The Feega editor with the page heading selected: size, spacing, typography, fill and radius rows in the Properties bar, and the source file and line under the selection',
+  alt: 'The Feega editor on a photographer portfolio with the page heading selected: size, spacing, typography, fill and radius rows in the Properties bar, and the source file and line under the selection',
   width: 1440,
   height: 900,
   caption: 'A selected element with its Properties and the source line under it.'
@@ -35,7 +35,7 @@ export const SELECTED_SHOT: Shot = {
 
 export const CHANGES_SHOT: Shot = {
   src: '/img/editor/changes.webp',
-  alt: 'The Changes tab of the Feega editor after one edit: one file changed, a border-radius of 999px with Show diff and Revert buttons',
+  alt: 'The Changes tab of the Feega editor on a home goods shop after one edit: one file changed, a border-radius of 12px with Show diff and Revert buttons',
   width: 1440,
   height: 900,
   caption: 'The Changes tab after one edit: the file touched, with Show diff and Revert.'
