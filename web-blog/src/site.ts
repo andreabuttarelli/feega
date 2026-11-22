@@ -1,12 +1,19 @@
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { getCollection, type CollectionEntry } from 'astro:content';
 
 export const SITE_TITLE = 'Feega blog';
 export const SITE_DESCRIPTION = 'Notes from building Feega, the free, open-source VS Code extension to design in your codebase.';
 
+const OG_IMAGE_FILE = resolve(process.cwd(), '../landing/static/og.png');
+const VERSION_LENGTH = 8;
+const OG_IMAGE_VERSION = createHash('sha256').update(readFileSync(OG_IMAGE_FILE)).digest('hex').slice(0, VERSION_LENGTH);
+
 export const SOCIAL_PREVIEW = {
-  image: 'https://feega.app/og.png',
-  video: 'https://feega.app/og.mp4',
-  alt: 'Feega: Design in your codebase. A heading selected in a running app inside the Feega editor, next to a code diff where its size changes from 64px to 88px.',
+  image: `https://www.feega.app/og.png?v=${OG_IMAGE_VERSION}`,
+  video: 'https://www.feega.app/og.mp4',
+  alt: 'Feega: Design in your codebase. The Feega logo top left, a free and open source chip top right, and a large screenshot of the editor below with the Layers panel, a heading selected in the app and the Properties panel.',
   width: 1200,
   height: 630
 } as const;

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -164,6 +165,11 @@ describe('social preview', () => {
     expect(statSync(staticFile(OG.image.url)).size).toBeLessThan(300 * KB);
   });
 
+  it('the image url carries the content hash of og.png, so platforms refetch on change', () => {
+    const hash = createHash('sha256').update(readFileSync(staticFile(OG.image.url))).digest('hex').slice(0, 8);
+    expect(new URL(OG.image.url).searchParams.get('v')).toBe(hash);
+  });
+
   it('the video is an MP4 of the declared size, under 4 MB', () => {
     expect(OG.video.type).toBe('video/mp4');
     expect(mp4Size(staticFile(OG.video.url))).toEqual({ width: OG.video.width, height: OG.video.height });
@@ -177,6 +183,13 @@ describe('social preview', () => {
       expect(LAYOUT).toContain(`"${tag}"`);
     }
     expect(LAYOUT).toContain('content="summary_large_image"');
+  });
+
+  it('the alt text describes the image, not a code diff it does not show', () => {
+    expect(OG.image.alt).not.toMatch(/diff|64px|88px/i);
+    expect(OG.image.alt).toMatch(/logo/i);
+    expect(OG.image.alt).toMatch(/open source/i);
+    expect(OG.image.alt).toMatch(/screenshot/i);
   });
 
   it('the alt text says what Feega is, in the hero headline', () => {

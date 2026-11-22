@@ -14,3 +14,4 @@ declare module '*.sh?raw' {
 }
 
 declare const __FEEGA_VERSION__: string;
+declare const __OG_IMAGE_VERSION__: string;
