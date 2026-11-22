@@ -18,7 +18,8 @@ const css = [
 
 const ENGINE = (typed) => {
   const t = (annotation) => (typed ? annotation : '');
-  return `${typed ? 'type RevealImage = { src: string; srcset?: string };\n\n' : ''}const EASE = 9;
+  return `const DEFAULT_RADIUS = ${RADIUS};
+const EASE = 9;
 const TRAIL = 0.8;
 const IDLE = 2;
 const SOFT = 0.35;
@@ -26,7 +27,8 @@ const MAX_DPR = 2;
 const MAX_STEP = 0.05;
 const DRIFT = { x: 0.32, y: 0.26, fx: 0.37, fy: 0.53 };
 
-function reveal(root${t(': HTMLElement')}, radius${t(': number')})${t(': () => void')} {
+function reveal(root${t(": HTMLElement")})${t(": () => void")} {
+  const radius = Number(root.dataset.radius) || DEFAULT_RADIUS;
   const lit = root.querySelector${t('<HTMLImageElement>')}('img.lit')${t('!')};
   const canvas = root.querySelector${t('<HTMLCanvasElement>')}('canvas')${t('!')};
   const ctx = canvas.getContext('2d');
@@ -189,24 +191,21 @@ const pad = (text, n) =>
     .map((l) => (l ? ' '.repeat(n) + l : l))
     .join('\n');
 
-const staticShell = `<section class="fl-hover-reveal" aria-label="${HEADING}" data-theme="dark" data-radius="${RADIUS}">
-  <img class="dark" src="${DARK.src}" srcset="${DARK.srcset}" sizes="100vw" alt="${ALT}">
-  <img class="lit" src="${LIT.src}" srcset="${LIT.srcset}" sizes="100vw" alt="" aria-hidden="true">
+const shell = (root, close) => `<section class="fl-hover-reveal" data-theme="dark" data-radius="${RADIUS}"${root}>
+  <img class="dark" src="${DARK.src}" srcset="${DARK.srcset}" sizes="100vw" alt="${ALT}"${close}>
+  <img class="lit" src="${LIT.src}" srcset="${LIT.srcset}" sizes="100vw" alt="" aria-hidden="true"${close}>
   <canvas aria-hidden="true"></canvas>
   <div class="overlay"><h2>${HEADING}</h2></div>
 </section>`;
+
+const jsx = (markup) => markup.replace(/class="/g, 'className="').replace(/srcset=/g, 'srcSet=');
 
 const boot = (typed) => `${ENGINE(typed)}
 
 document.querySelectorAll${typed ? '<HTMLElement>' : ''}('.fl-hover-reveal:not([data-ready])').forEach((root) => {
   root.setAttribute('data-ready', '');
-  reveal(root, Number(root.dataset.radius));
+  reveal(root);
 });`;
-
-const DEFAULTS = `const LIT: RevealImage = ${JSON.stringify(LIT)};
-const DARK: RevealImage = ${JSON.stringify(DARK)};`;
-
-const PROPS = 'lit?: RevealImage; dark?: RevealImage; alt?: string; heading?: string; radius?: number';
 
 export const hoverReveal = {
   id: 'hover-reveal',
@@ -219,21 +218,11 @@ export const hoverReveal = {
   mods: [],
   css,
   files: (C) => ({
-    html: `${staticShell}\n\n<script>\n(() => {\n${pad(boot(false), 2)}\n})();\n</script>\n`,
+    html: `${shell('', '')}\n\n<script>\n(() => {\n${pad(boot(false), 2)}\n})();\n</script>\n`,
     astro: `---
-type RevealImage = { src: string; srcset?: string };
-
-${DEFAULTS}
-
-const { lit = LIT, dark = DARK, alt = '${ALT}', heading = '${HEADING}', radius = ${RADIUS} }: { ${PROPS} } = Astro.props;
 ---
 
-<section class="fl-hover-reveal" aria-label={heading} data-theme="dark" data-radius={radius}>
-  <img class="dark" src={dark.src} srcset={dark.srcset} sizes="100vw" alt={alt} />
-  <img class="lit" src={lit.src} srcset={lit.srcset} sizes="100vw" alt="" aria-hidden="true" />
-  <canvas aria-hidden="true"></canvas>
-  {heading && <div class="overlay"><h2>{heading}</h2></div>}
-</section>
+${shell('', ' /')}
 
 <script>
 ${boot(true)}
@@ -245,23 +234,12 @@ ${C}</style>
     svelte: `<script lang="ts">
 ${pad(ENGINE(true), 2)}
 
-${pad(DEFAULTS, 2)}
-
-  let { lit = LIT, dark = DARK, alt = '${ALT}', heading = '${HEADING}', radius = ${RADIUS} }: { ${PROPS} } = $props();
-
   let root: HTMLElement;
 
-  $effect(() => reveal(root, radius));
+  $effect(() => reveal(root));
 </script>
 
-<section bind:this={root} class="fl-hover-reveal" aria-label={heading} data-theme="dark">
-  <img class="dark" src={dark.src} srcset={dark.srcset} sizes="100vw" {alt} />
-  <img class="lit" src={lit.src} srcset={lit.srcset} sizes="100vw" alt="" aria-hidden="true" />
-  <canvas aria-hidden="true"></canvas>
-  {#if heading}
-    <div class="overlay"><h2>{heading}</h2></div>
-  {/if}
-</section>
+${shell(' bind:this={root}', ' /')}
 
 <style>
   :global {
@@ -273,53 +251,32 @@ import './HoverReveal.css';
 
 ${ENGINE(true)}
 
-${DEFAULTS}
-
-export function HoverReveal({ lit = LIT, dark = DARK, alt = '${ALT}', heading = '${HEADING}', radius = ${RADIUS} }: { ${PROPS} }) {
+export function HoverReveal() {
   const root = useRef<HTMLElement>(null);
 
-  useEffect(() => (root.current ? reveal(root.current, radius) : undefined), [radius]);
+  useEffect(() => (root.current ? reveal(root.current) : undefined), []);
 
   return (
-    <section ref={root} className="fl-hover-reveal" aria-label={heading} data-theme="dark">
-      <img className="dark" src={dark.src} srcSet={dark.srcset} sizes="100vw" alt={alt} />
-      <img className="lit" src={lit.src} srcSet={lit.srcset} sizes="100vw" alt="" aria-hidden="true" />
-      <canvas aria-hidden="true"></canvas>
-      {heading && (
-        <div className="overlay">
-          <h2>{heading}</h2>
-        </div>
-      )}
-    </section>
+${pad(jsx(shell(' ref={root}', ' /')), 4)}
   );
 }
 `,
     vue: `<script setup lang="ts">
-import { ref, watchEffect } from 'vue';
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 
 ${ENGINE(true)}
 
-const props = withDefaults(defineProps<{ ${PROPS} }>(), { lit: () => (${JSON.stringify(LIT)}), dark: () => (${JSON.stringify(DARK)}), alt: '${ALT}', heading: '${HEADING}', radius: ${RADIUS} });
-
 const root = ref<HTMLElement | null>(null);
+let stop = () => {};
 
-watchEffect(
-  (onCleanup) => {
-    if (root.value) {
-      onCleanup(reveal(root.value, props.radius));
-    }
-  },
-  { flush: 'post' }
-);
+onMounted(() => {
+  stop = reveal(root.value as HTMLElement);
+});
+onBeforeUnmount(() => stop());
 </script>
 
 <template>
-  <section ref="root" class="fl-hover-reveal" :aria-label="props.heading" data-theme="dark">
-    <img class="dark" :src="props.dark.src" :srcset="props.dark.srcset" sizes="100vw" :alt="props.alt" />
-    <img class="lit" :src="props.lit.src" :srcset="props.lit.srcset" sizes="100vw" alt="" aria-hidden="true" />
-    <canvas aria-hidden="true"></canvas>
-    <div v-if="props.heading" class="overlay"><h2>{{ props.heading }}</h2></div>
-  </section>
+${pad(shell(' ref="root"', ' /'), 2)}
 </template>
 
 <style>
