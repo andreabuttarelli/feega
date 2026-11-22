@@ -1,35 +1,72 @@
 import { useEffect, useRef } from 'react';
 import './HoverReveal.css';
 
-const DEFAULT_RADIUS = 200;
-const EASE = 9;
-const TRAIL = 0.8;
+const DEFAULT_RADIUS = 220;
+const EASE = 7;
+const TRAIL = 1.4;
 const IDLE = 2;
-const SOFT = 0.35;
 const MAX_DPR = 2;
 const MAX_STEP = 0.05;
+const MASK_SCALE = 0.25;
+const SPRITE = 64;
+const SPACING = 0.18;
+const DEPOSIT = 0.16;
 const DRIFT = { x: 0.32, y: 0.26, fx: 0.37, fy: 0.53 };
+const BLOBS = [
+  { size: 1.25, reach: 0.18, alpha: 0.55, seed: 0 },
+  { size: 0.9, reach: 0.42, alpha: 0.45, seed: 1.7 },
+  { size: 0.75, reach: 0.55, alpha: 0.4, seed: 3.1 },
+  { size: 1.05, reach: 0.35, alpha: 0.35, seed: 4.6 }
+];
+
+function wobble(time: number, seed: number): number {
+  return Math.sin(time * 0.61 + seed * 1.3) * 0.5 + Math.sin(time * 1.17 + seed * 2.9) * 0.3 + Math.sin(time * 1.93 + seed * 5.1) * 0.2;
+}
+
+function glow(): HTMLCanvasElement {
+  const sprite = document.createElement('canvas');
+  sprite.width = sprite.height = SPRITE;
+  const g = sprite.getContext('2d')!;
+  const half = SPRITE / 2;
+  const pixels = g.createImageData(SPRITE, SPRITE);
+  for (let i = 0; i < SPRITE * SPRITE; i++) {
+    const r = Math.min(1, Math.hypot((i % SPRITE) - half + 0.5, Math.floor(i / SPRITE) - half + 0.5) / half);
+    pixels.data.fill(255, i * 4, i * 4 + 3);
+    pixels.data[i * 4 + 3] = 255 * Math.exp(-4.5 * r * r) * (1 - r);
+  }
+  g.putImageData(pixels, 0, 0);
+  return sprite;
+}
+
+function fade(age: number): number {
+  const left = 1 - age;
+  return left * left * (1 + 2 * age);
+}
 
 function reveal(root: HTMLElement): () => void {
   const radius = Number(root.dataset.radius) || DEFAULT_RADIUS;
   const lit = root.querySelector<HTMLImageElement>('img.lit')!;
   const canvas = root.querySelector<HTMLCanvasElement>('canvas')!;
   const ctx = canvas.getContext('2d');
+  const mask = document.createElement('canvas');
+  const mctx = mask.getContext('2d');
+  const sprite = glow();
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const life = reduced ? 0 : TRAIL;
   let size = { w: 0, h: 0, dpr: 1 };
   let target = { x: 0, y: 0 };
   let spot = { x: 0, y: 0 };
-  let trail: { x: number; y: number; t: number }[] = [];
+  let last = { x: 0, y: 0 };
+  let trail: { x: number; y: number; t: number; seed: number }[] = [];
+  let seeds = 0;
   let pointed = -Infinity;
   let clock = 0;
   let visible = false;
   let frame = 0;
   let then = 0;
 
-  if (!ctx) {
+  if (!ctx || !mctx) {
     root.dataset.mode = 'mask';
-    root.style.setProperty('--r', radius + 'px');
+    root.style.setProperty('--r', radius * 1.6 + 'px');
   }
 
   function resize() {
@@ -37,9 +74,12 @@ function reveal(root: HTMLElement): () => void {
     size = { w: root.clientWidth, h: root.clientHeight, dpr };
     canvas.width = Math.round(size.w * dpr);
     canvas.height = Math.round(size.h * dpr);
+    mask.width = Math.max(1, Math.round(size.w * MASK_SCALE));
+    mask.height = Math.max(1, Math.round(size.h * MASK_SCALE));
     if (!trail.length) {
       spot = { x: size.w / 2, y: size.h / 2 };
       target = { ...spot };
+      last = { ...spot };
     }
     wake();
   }
@@ -61,28 +101,60 @@ function reveal(root: HTMLElement): () => void {
     };
   }
 
+  function stamp(g: CanvasRenderingContext2D, x: number, y: number, extent: number, alpha: number) {
+    g.globalAlpha = Math.min(1, alpha);
+    g.drawImage(sprite, x - extent, y - extent, extent * 2, extent * 2);
+  }
+
+  function lay() {
+    const step = radius * SPACING;
+    const dx = spot.x - last.x;
+    const dy = spot.y - last.y;
+    const steps = Math.floor(Math.hypot(dx, dy) / step);
+    if (!steps) {
+      return;
+    }
+    for (let i = 1; i <= steps; i++) {
+      trail.push({ x: last.x + (dx * i) / steps, y: last.y + (dy * i) / steps, t: clock, seed: seeds++ });
+    }
+    last = { ...spot };
+  }
+
+  function light(g: CanvasRenderingContext2D) {
+    const time = reduced ? 0 : clock;
+    for (const point of trail) {
+      const age = (clock - point.t) / TRAIL;
+      const x = point.x + radius * 0.3 * wobble(time, point.seed);
+      const y = point.y + radius * 0.3 * wobble(time, point.seed + 9);
+      stamp(g, x, y, radius * (0.9 + 0.3 * wobble(time, point.seed + 4)), DEPOSIT * fade(age));
+    }
+    for (const blob of BLOBS) {
+      const x = spot.x + radius * blob.reach * wobble(time, blob.seed);
+      const y = spot.y + radius * blob.reach * wobble(time, blob.seed + 7);
+      const extent = radius * 1.6 * blob.size * (1 + 0.15 * wobble(time, blob.seed + 3));
+      stamp(g, x, y, extent, blob.alpha);
+    }
+  }
+
   function paint() {
-    if (!ctx) {
+    if (!ctx || !mctx) {
       root.style.setProperty('--x', spot.x + 'px');
       root.style.setProperty('--y', spot.y + 'px');
       return;
     }
     ctx.setTransform(size.dpr, 0, 0, size.dpr, 0, 0);
     ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
     ctx.clearRect(0, 0, size.w, size.h);
     if (!lit.complete || !lit.naturalWidth) {
       return;
     }
-    for (const point of trail) {
-      const age = life ? (clock - point.t) / life : 0;
-      const gradient = ctx.createRadialGradient(point.x, point.y, radius * SOFT, point.x, point.y, radius);
-      gradient.addColorStop(0, 'white');
-      gradient.addColorStop(1, 'transparent');
-      ctx.globalAlpha = 1 - age;
-      ctx.fillStyle = gradient;
-      ctx.fillRect(point.x - radius, point.y - radius, radius * 2, radius * 2);
-    }
-    ctx.globalAlpha = 1;
+    mctx.setTransform(MASK_SCALE, 0, 0, MASK_SCALE, 0, 0);
+    mctx.globalAlpha = 1;
+    mctx.clearRect(0, 0, size.w, size.h);
+    light(mctx);
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(mask, 0, 0, size.w, size.h);
     ctx.globalCompositeOperation = 'source-in';
     const box = cover();
     ctx.drawImage(lit, box.x, box.y, box.w, box.h);
@@ -98,7 +170,10 @@ function reveal(root: HTMLElement): () => void {
     }
     const pull = reduced ? 1 : 1 - Math.exp(-EASE * dt);
     spot = { x: spot.x + (target.x - spot.x) * pull, y: spot.y + (target.y - spot.y) * pull };
-    trail = [...trail.filter((point) => clock - point.t < life), { x: spot.x, y: spot.y, t: clock }];
+    trail = reduced ? [] : trail.filter((point) => clock - point.t < TRAIL);
+    if (!reduced) {
+      lay();
+    }
     paint();
     if (!reduced) {
       wake();
@@ -173,7 +248,7 @@ export function HoverReveal() {
   useEffect(() => (root.current ? reveal(root.current) : undefined), []);
 
   return (
-    <section className="fl-hover-reveal" data-theme="dark" data-radius="200" ref={root}>
+    <section className="fl-hover-reveal" data-theme="dark" data-radius="220" ref={root}>
       <img className="dark" src="https://www.feega.app/templates-assets/hover-reveal/dark-1670.webp" srcSet="https://www.feega.app/templates-assets/hover-reveal/dark-960.webp 960w, https://www.feega.app/templates-assets/hover-reveal/dark-1670.webp 1670w" sizes="100vw" alt="A moonlit jungle with floating islands" />
       <img className="lit" src="https://www.feega.app/templates-assets/hover-reveal/lit-1670.webp" srcSet="https://www.feega.app/templates-assets/hover-reveal/lit-960.webp 960w, https://www.feega.app/templates-assets/hover-reveal/lit-1670.webp 1670w" sizes="100vw" alt="" aria-hidden="true" />
       <canvas aria-hidden="true"></canvas>
