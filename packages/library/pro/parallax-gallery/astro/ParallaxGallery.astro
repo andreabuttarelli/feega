@@ -1,26 +1,44 @@
 ---
-const { images = [] } = Astro.props;
 ---
 
-<section class="fl-parallax-gallery" aria-label="Gallery" data-images={JSON.stringify(images)}>
-  <div class="field" role="application" tabindex="0" aria-label="Image gallery. Drag, swipe or use the arrow keys to move it."></div>
+<section class="fl-parallax-gallery" aria-label="Gallery" data-drift="24" data-inertia="3.5">
+  <div class="field" role="application" tabindex="0" aria-label="Image gallery. Drag, swipe or use the arrow keys to move it.">
+    <div class="layer" data-depth="far">
+      <figure class="card" style="left:980px;top:120px;width:130px"><img src="https://www.feega.app/templates-assets/parallax-gallery/11.webp" width="560" height="420" alt="A red mushroom glowing at night" draggable="false" decoding="async"></figure>
+      <figure class="card" style="left:360px;top:560px;width:110px"><img src="https://www.feega.app/templates-assets/parallax-gallery/02.webp" width="560" height="442" alt="A starry sky through jungle branches" draggable="false" decoding="async"></figure>
+      <figure class="card" style="left:1700px;top:520px;width:96px"><img src="https://www.feega.app/templates-assets/parallax-gallery/06.webp" width="560" height="560" alt="A teal planet over floating islands" draggable="false" decoding="async"></figure>
+      <figure class="card" style="left:700px;top:1000px;width:120px"><img src="https://www.feega.app/templates-assets/parallax-gallery/03.webp" width="560" height="527" alt="A waterfall in a moonlit jungle" draggable="false" decoding="async"></figure>
+      <figure class="card" style="left:180px;top:1120px;width:140px"><img src="https://www.feega.app/templates-assets/parallax-gallery/01.webp" width="560" height="440" alt="Glowing violet mushrooms in a night jungle" draggable="false" decoding="async"></figure>
+      <figure class="card" style="left:1180px;top:420px;width:100px"><img src="https://www.feega.app/templates-assets/parallax-gallery/10.webp" width="560" height="593" alt="Ferns lit in teal" draggable="false" decoding="async"></figure>
+      <figure class="card" style="left:1500px;top:1180px;width:118px"><img src="https://www.feega.app/templates-assets/parallax-gallery/08.webp" width="560" height="436" alt="Pink mushrooms in violet light" draggable="false" decoding="async"></figure>
+      <figure class="card" style="left:560px;top:380px;width:120px"><img src="https://www.feega.app/templates-assets/parallax-gallery/12.webp" width="560" height="402" alt="Green floating islands" draggable="false" decoding="async"></figure>
+      <figure class="card" style="left:860px;top:820px;width:90px"><img src="https://www.feega.app/templates-assets/parallax-gallery/05.webp" width="560" height="805" alt="Glowing flower fronds at night" draggable="false" decoding="async"></figure>
+    </div>
+    <div class="layer" data-depth="mid">
+      <figure class="card" style="left:560px;top:40px;width:210px"><img src="https://www.feega.app/templates-assets/parallax-gallery/01.webp" width="560" height="440" alt="Glowing violet mushrooms in a night jungle" draggable="false" decoding="async"></figure>
+      <figure class="card" style="left:760px;top:330px;width:200px"><img src="https://www.feega.app/templates-assets/parallax-gallery/03.webp" width="560" height="527" alt="A waterfall in a moonlit jungle" draggable="false" decoding="async"></figure>
+      <figure class="card" style="left:1240px;top:20px;width:220px"><img src="https://www.feega.app/templates-assets/parallax-gallery/12.webp" width="560" height="402" alt="Green floating islands" draggable="false" decoding="async"></figure>
+      <figure class="card" style="left:420px;top:720px;width:180px"><img src="https://www.feega.app/templates-assets/parallax-gallery/04.webp" width="560" height="784" alt="Luminous blue grass stems" draggable="false" decoding="async"></figure>
+      <figure class="card" style="left:1560px;top:760px;width:200px"><img src="https://www.feega.app/templates-assets/parallax-gallery/10.webp" width="560" height="593" alt="Ferns lit in teal" draggable="false" decoding="async"></figure>
+      <figure class="card" style="left:40px;top:820px;width:190px"><img src="https://www.feega.app/templates-assets/parallax-gallery/06.webp" width="560" height="560" alt="A teal planet over floating islands" draggable="false" decoding="async"></figure>
+      <figure class="card" style="left:1300px;top:1060px;width:210px"><img src="https://www.feega.app/templates-assets/parallax-gallery/08.webp" width="560" height="436" alt="Pink mushrooms in violet light" draggable="false" decoding="async"></figure>
+      <figure class="card" style="left:40px;top:470px;width:170px"><img src="https://www.feega.app/templates-assets/parallax-gallery/11.webp" width="560" height="420" alt="A red mushroom glowing at night" draggable="false" decoding="async"></figure>
+      <figure class="card" style="left:620px;top:880px;width:190px"><img src="https://www.feega.app/templates-assets/parallax-gallery/02.webp" width="560" height="442" alt="A starry sky through jungle branches" draggable="false" decoding="async"></figure>
+    </div>
+    <div class="layer" data-depth="near">
+      <figure class="card" style="left:140px;top:120px;width:300px"><img src="https://www.feega.app/templates-assets/parallax-gallery/09.webp" width="560" height="678" alt="An old tree at night" draggable="false" decoding="async"></figure>
+      <figure class="card" style="left:1020px;top:640px;width:270px"><img src="https://www.feega.app/templates-assets/parallax-gallery/05.webp" width="560" height="805" alt="Glowing flower fronds at night" draggable="false" decoding="async"></figure>
+      <figure class="card" style="left:1480px;top:160px;width:320px"><img src="https://www.feega.app/templates-assets/parallax-gallery/07.webp" width="560" height="300" alt="A river under glowing plants" draggable="false" decoding="async"></figure>
+    </div>
+  </div>
 </section>
 
 <script>
-type GalleryImage = { src: string; alt: string };
-
-const LAYERS = [
-  { depth: 0.55, width: 0.5, speed: 0.55 },
-  { depth: 0.78, width: 0.66, speed: 0.78 },
-  { depth: 1, width: 0.82, speed: 1 }
-];
-const VISIBLE_COLUMNS = 6;
-const MIN_PITCH = 120;
-const RATIOS = [1.25, 0.8, 1.5, 1, 0.75, 1.33];
-const TONES = 4;
-const GAP = 0.18;
-const DRIFT = 26;
-const FRICTION = 3.5;
+const DEPTHS: Record<string, number> = { far: 0.42, mid: 0.7, near: 1 };
+const TILE = { w: 1800, h: 1300 };
+const MARGIN = { x: 340, y: 420 };
+const DESIGN_WIDTH = 1280;
+const MIN_SCALE = 0.75;
 const STILL = 30;
 const RESUME = 1.4;
 const KEY_PUSH = 900;
@@ -29,10 +47,14 @@ const KEYS: Record<string, [number, number]> = { ArrowLeft: [1, 0], ArrowRight: 
 
 const wrap = (value: number, size: number) => ((value % size) + size) % size;
 
-function gallery(root: HTMLElement, images: GalleryImage[]): () => void {
+function gallery(root: HTMLElement): () => void {
   const field = root.querySelector<HTMLElement>('.field')!;
+  const layers = [...field.querySelectorAll<HTMLElement>('.layer')];
+  const speed = Number(root.dataset.drift ?? 0);
+  const friction = Number(root.dataset.inertia ?? 1);
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let cards: { el: HTMLElement; layer: number; x: number; y: number; h: number; wrap: number; span: number; margin: number; flow: number }[] = [];
+  let cards: { el: HTMLElement; depth: number; x: number; y: number }[] = [];
+  let scale = 1;
   let pan = { x: 0, y: 0 };
   let velocity = { x: 0, y: 0 };
   let drift = 0;
@@ -43,62 +65,20 @@ function gallery(root: HTMLElement, images: GalleryImage[]): () => void {
   let frame = 0;
   let then = 0;
 
-  function card(index: number, width: number, height: number): HTMLElement {
-    const el = document.createElement('div');
-    el.className = 'card';
-    el.style.width = width + 'px';
-    el.style.height = height + 'px';
-    const image = images.length ? images[index % images.length] : null;
-    if (!image) {
-      el.dataset.tone = String(index % TONES);
-      return el;
-    }
-    const img = document.createElement('img');
-    img.src = image.src;
-    img.alt = image.alt;
-    img.draggable = false;
-    img.loading = 'lazy';
-    el.append(img);
-    return el;
-  }
-
-  function build() {
-    const width = field.clientWidth;
-    const height = field.clientHeight;
-    const pitch = Math.max(MIN_PITCH, width / VISIBLE_COLUMNS) * LAYERS.length / 2;
-    const columns = Math.ceil(width / pitch) + 2;
-    cards = [];
-    field.replaceChildren(
-      ...LAYERS.map((layer, l) => {
-        const el = document.createElement('div');
-        el.className = 'layer';
-        el.dataset.depth = String(l);
-        const w = (pitch * layer.width * 2) / LAYERS.length;
-        for (let c = 0; c < columns; c++) {
-          const column = [];
-          let y = 0;
-          for (let k = 0; y < height + w * 3; k++) {
-            const h = w * RATIOS[(c * 2 + k + l) % RATIOS.length];
-            column.push({ y, h, index: l * 17 + c * 5 + k });
-            y += h + w * GAP;
-          }
-          for (const entry of column) {
-            const node = card(entry.index, w, entry.h);
-            el.append(node);
-            cards.push({ el: node, layer: l, x: c * pitch + (l * pitch * 2) / LAYERS.length / 2 + ((l % 2) * pitch) / 2, y: entry.y - ((c + l) % 3) * w * 0.4, h: entry.h, wrap: y, span: columns * pitch, margin: pitch, flow: 1 + 0.12 * ((c % 3) - 1) });
-          }
-        }
-        return el;
-      })
-    );
+  function measure() {
+    scale = Math.max(MIN_SCALE, field.clientWidth / DESIGN_WIDTH);
+    cards = layers.flatMap((layer) => {
+      layer.style.transform = 'scale(' + scale + ')';
+      const depth = DEPTHS[layer.dataset.depth ?? 'near'] ?? 1;
+      return [...layer.querySelectorAll<HTMLElement>('.card')].map((el) => ({ el, depth, x: el.offsetLeft, y: el.offsetTop }));
+    });
     place();
   }
 
   function place() {
     for (const c of cards) {
-      const layer = LAYERS[c.layer];
-      const x = wrap(c.x + pan.x * layer.depth + c.margin, c.span) - c.margin;
-      const y = wrap(c.y + (pan.y + drift * layer.speed * c.flow) * layer.depth + c.h, c.wrap) - c.h;
+      const x = wrap(c.x + (pan.x * c.depth) / scale + MARGIN.x, TILE.w) - MARGIN.x - c.x;
+      const y = wrap(c.y + ((pan.y + drift) * c.depth) / scale + MARGIN.y, TILE.h) - MARGIN.y - c.y;
       c.el.style.transform = 'translate3d(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px,0)';
     }
   }
@@ -112,13 +92,13 @@ function gallery(root: HTMLElement, images: GalleryImage[]): () => void {
     if (!dragging) {
       pan.x += velocity.x * dt;
       pan.y += velocity.y * dt;
-      const decay = Math.exp(-FRICTION * dt);
+      const decay = Math.exp(-friction * dt);
       velocity.x *= decay;
       velocity.y *= decay;
     }
     const target = reduced || dragging || Math.hypot(velocity.x, velocity.y) > STILL ? 0 : 1;
     flow += (target - flow) * Math.min(1, dt * RESUME);
-    drift -= DRIFT * flow * dt;
+    drift -= speed * flow * dt;
     place();
     if (!idle()) {
       wake();
@@ -161,6 +141,7 @@ function gallery(root: HTMLElement, images: GalleryImage[]): () => void {
     pan.y += dy;
     velocity = { x: velocity.x * 0.6 + (dx / dt) * 0.4, y: velocity.y * 0.6 + (dy / dt) * 0.4 };
     last = { x: event.clientX, y: event.clientY, time: event.timeStamp };
+    place();
   }
 
   function onUp() {
@@ -198,7 +179,7 @@ function gallery(root: HTMLElement, images: GalleryImage[]): () => void {
     }
     sleep();
   });
-  const resize = new ResizeObserver(() => build());
+  const resize = new ResizeObserver(() => measure());
 
   field.addEventListener('pointerdown', onDown);
   field.addEventListener('pointermove', onMove);
@@ -208,7 +189,7 @@ function gallery(root: HTMLElement, images: GalleryImage[]): () => void {
   document.addEventListener('visibilitychange', onVisibility);
   sight.observe(field);
   resize.observe(field);
-  build();
+  measure();
 
   return () => {
     sleep();
@@ -220,13 +201,15 @@ function gallery(root: HTMLElement, images: GalleryImage[]): () => void {
     field.removeEventListener('pointercancel', onUp);
     field.removeEventListener('keydown', onKey);
     document.removeEventListener('visibilitychange', onVisibility);
-    field.replaceChildren();
+    for (const c of cards) {
+      c.el.style.transform = '';
+    }
   };
 }
 
 document.querySelectorAll<HTMLElement>('.fl-parallax-gallery:not([data-ready])').forEach((root) => {
   root.setAttribute('data-ready', '');
-  gallery(root, JSON.parse(root.dataset.images || '[]'));
+  gallery(root);
 });
 </script>
 
@@ -241,15 +224,11 @@ document.querySelectorAll<HTMLElement>('.fl-parallax-gallery:not([data-ready])')
 .fl-parallax-gallery .field[data-dragging]{cursor:grabbing}
 .fl-parallax-gallery .field:focus-visible{outline-offset:-4px}
 .fl-parallax-gallery .field::before,.fl-parallax-gallery .field::after{content:"";position:absolute;inset:0;z-index:4;pointer-events:none}
-.fl-parallax-gallery .field::before{background:linear-gradient(90deg,var(--feega-bg),transparent 14%,transparent 86%,var(--feega-bg))}
-.fl-parallax-gallery .field::after{background:linear-gradient(180deg,var(--feega-bg),transparent 7%,transparent 93%,var(--feega-bg))}
-.fl-parallax-gallery .layer{position:absolute;inset:0}
-.fl-parallax-gallery .card{position:absolute;top:0;left:0;overflow:hidden;border-radius:var(--feega-radius-md);background:var(--feega-surface)}
-.fl-parallax-gallery .layer[data-depth="2"] .card{box-shadow:var(--feega-shadow)}
-.fl-parallax-gallery .card img{display:block;width:100%;height:100%;object-fit:cover;pointer-events:none}
-.fl-parallax-gallery .card[data-tone="0"]{background:linear-gradient(135deg,var(--feega-accent-soft),var(--feega-surface))}
-.fl-parallax-gallery .card[data-tone="1"]{background:linear-gradient(160deg,var(--feega-success-soft),var(--feega-raised))}
-.fl-parallax-gallery .card[data-tone="2"]{background:linear-gradient(200deg,var(--feega-surface),var(--feega-line-strong))}
-.fl-parallax-gallery .card[data-tone="3"]{background:linear-gradient(120deg,var(--feega-danger-soft),var(--feega-accent-soft))}
+.fl-parallax-gallery .field::before{background:linear-gradient(90deg,var(--feega-bg),transparent 18%,transparent 82%,var(--feega-bg))}
+.fl-parallax-gallery .field::after{background:linear-gradient(180deg,var(--feega-bg),transparent 8%,transparent 92%,var(--feega-bg))}
+.fl-parallax-gallery .layer{position:absolute;top:0;left:0;width:1800px;height:1300px;transform-origin:0 0}
+.fl-parallax-gallery .card{position:absolute;margin:0;overflow:hidden;border-radius:var(--feega-radius-md);background:var(--feega-surface);will-change:transform}
+.fl-parallax-gallery .layer[data-depth="near"] .card{box-shadow:var(--feega-shadow)}
+.fl-parallax-gallery .card img{display:block;width:100%;height:auto;pointer-events:none}
 @media (prefers-reduced-motion:reduce){:where([class^="fl-"]) *,:where([class^="fl-"]) *::before,:where([class^="fl-"]) *::after{animation:none!important;transition:none!important}}
 </style>
