@@ -6,7 +6,8 @@ export enum Sound {
   ClickC = "click-c",
   Enter = "enter",
   Whoosh = "whoosh",
-  Thud = "thud",
+  Backspace = "backspace",
+  Chime = "chime",
   Pop = "pop",
 }
 

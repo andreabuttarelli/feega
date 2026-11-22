@@ -162,6 +162,9 @@ export const Terminal = ({ rect, title, lines, input, cursorOn, spinnerGlyph }: 
           borderRadius: 10,
           padding: "16px 18px",
           whiteSpace: "pre",
+          overflow: "hidden",
+          fontVariantLigatures: "none",
+          fontKerning: "none",
         }}
       >
         <span style={{ color: COLORS.muted }}>&gt; </span>

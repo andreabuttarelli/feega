@@ -11,13 +11,16 @@ export const settle = (p: number) => {
   return expoInOut(t) + SETTLE * Math.sin(Math.PI * tail);
 };
 
-export const tween = (frame: number, start: number, duration: number) => {
-  const p = interpolate(frame, [start, start + duration], [0, 1], {
+const glideInOut = Easing.bezier(0.7, 0, 0.3, 1);
+
+const progress = (frame: number, start: number, duration: number) =>
+  interpolate(frame, [start, start + duration], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
 
-  return settle(p);
-};
+export const tween = (frame: number, start: number, duration: number) => settle(progress(frame, start, duration));
+
+export const glide = (frame: number, start: number, duration: number) => glideInOut(progress(frame, start, duration));
 
 export const mix = (a: number, b: number, t: number) => a + (b - a) * t;

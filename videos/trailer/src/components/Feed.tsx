@@ -42,6 +42,7 @@ const MEDIA = 260;
 const POST_PAD = 32;
 const ACTIONS = 44;
 const HOOK_EXTRA = 0;
+const STAT_WIDTH = 74;
 
 const postHeight = (post: Post) => {
   const lines = post.text ? post.text.split("\n").length : 0;
@@ -83,7 +84,7 @@ const Avatar = ({ hue, size }: { hue: number; size: number }) => (
 );
 
 export const PostCard = ({ post, scale = 1, liked = 0 }: { post: Post; scale?: number; liked?: number }) => {
-  const big = post === HOOK;
+  const big = post.handle === HOOK.handle;
   const fs = (n: number) => n * scale;
 
   return (
@@ -111,9 +112,9 @@ export const PostCard = ({ post, scale = 1, liked = 0 }: { post: Post; scale?: n
             }}
           />
         )}
-        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 12 * scale, color: "#71767b", fontSize: fs(13), maxWidth: 440 * scale }}>
+        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 12 * scale, color: "#71767b", fontSize: fs(13), maxWidth: 440 * scale, fontVariantNumeric: "tabular-nums" }}>
           {ICONS.map((d, i) => (
-            <span key={i} style={{ display: "flex", alignItems: "center", gap: 6, color: i === 2 && liked > 0.5 ? "#f91880" : undefined }}>
+            <span key={i} style={{ display: "flex", alignItems: "center", gap: 6, minWidth: STAT_WIDTH * scale, color: i === 2 && liked > 0.5 ? "#f91880" : undefined }}>
               <Icon d={d} />
               {post.stats[i]}
             </span>

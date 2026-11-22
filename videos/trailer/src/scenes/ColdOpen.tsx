@@ -6,8 +6,7 @@ import { Sfx, Sound, keyClick, type Cue } from "../components/Sfx";
 import { LineKind, Terminal, type TermLine } from "../components/Terminal";
 import { mix, tween } from "../ease";
 import { COLORS } from "../theme";
-import { FRAMES_PER_CHAR } from "../timing";
-import { applyKeys, BEATS, BUILD, CAMERA_KEYS, Focus, LIMIT, NAV_CENTER, NAV_CHANGE, NAV_LEFT, Reply, TITLE_FIX } from "./coldOpenTimeline";
+import { applyKeys, BEATS, BUILD, CAMERA_KEYS, Focus, LIMIT, NAV_CENTER, NAV_CHANGE, NAV_LEFT, Reply, Stroke, TITLE_FIX } from "./coldOpenTimeline";
 
 export const TERMINAL = { x: 100, y: 150, w: 760, h: 780 };
 const BROWSER = { x: 900, y: 180, w: 940, h: 720 };
@@ -67,9 +66,9 @@ const typedInput = (frame: number) => {
     return { input: "", typing: false };
   }
 
-  const count = Math.floor((frame - beat.typeStart) / FRAMES_PER_CHAR);
+  const typed = beat.strokes.filter((s) => s.at <= frame).map((s) => s.key);
 
-  return { input: applyKeys([...beat.keys].slice(0, count).join("")), typing: true };
+  return { input: applyKeys(typed.join("")), typing: true };
 };
 
 const cursorOn = (frame: number, typing: boolean) => {
@@ -92,13 +91,40 @@ const navCenter = (frame: number) => {
 
 const CUES: Cue[] = [
   ...BEATS.flatMap((beat) => [
-    ...[...beat.keys].map((_, i) => keyClick(beat.typeStart + i * FRAMES_PER_CHAR, i)),
-    { at: beat.submit - 2, sound: Sound.Enter, volume: 0.5 },
+    ...beat.strokes.map((s, i) => (s.stroke === Stroke.Backspace ? { at: s.at, sound: Sound.Backspace, volume: 0.4 } : keyClick(s.at, i))),
+    { at: beat.submit, sound: Sound.Enter, volume: 0.5 },
   ]),
-  ...CAMERA_KEYS.filter((key) => key.at > 0).map((key) => ({ at: key.at, sound: Sound.Whoosh, volume: 0.22 })),
+  ...CAMERA_KEYS.filter((key) => key.at > 0).map((key) => ({ at: key.at, sound: Sound.Whoosh, volume: 0.38 })),
   { at: BUILD.replyAt - BROWSER_LEAD, sound: Sound.Pop, volume: 0.4 },
-  { at: LIMIT.replyAt, sound: Sound.Thud, volume: 0.7 },
+  { at: LIMIT.replyAt, sound: Sound.Chime, volume: 0.6 },
 ];
+
+const SHAKE = [
+  { x: 14, y: -4, hue: 40 },
+  { x: -18, y: 6, hue: -60 },
+  { x: 9, y: 0, hue: 25 },
+  { x: -6, y: -8, hue: 0 },
+  { x: 22, y: 3, hue: -35 },
+  { x: -4, y: 2, hue: 0 },
+];
+const FREEZE_DELAY = 10;
+const FREEZE_LENGTH = 26;
+
+const pageShake = (frame: number) => {
+  const step = SHAKE[frame - TITLE_FIX.changeAt];
+
+  if (!step) {
+    return undefined;
+  }
+
+  return { transform: `translate(${step.x}px, ${step.y}px)`, filter: `hue-rotate(${step.hue}deg)` };
+};
+
+const frozen = (frame: number) => {
+  const t = tween(frame, LIMIT.replyAt + FREEZE_DELAY, FREEZE_LENGTH);
+
+  return `grayscale(${t}) brightness(${1 - 0.45 * t})`;
+};
 
 const glitches = (frame: number) => ({
   button: tween(frame, NAV_LEFT.changeAt, NAV_CHANGE),
@@ -126,9 +152,11 @@ export const ColdOpen = () => {
           spinnerGlyph={SPINNER[Math.floor(frame / SPINNER_STEP) % SPINNER.length]}
         />
         {open > 0 && (
+          <div style={{ position: "absolute", inset: 0, filter: frozen(frame), ...pageShake(frame) }}>
           <Browser rect={BROWSER} url="localhost:3000" tab="Lumen — Home" opacity={Math.min(open, 1)} scale={mix(0.92, 1, open)}>
             <BuggyLanding navCenter={navCenter(frame)} titleColor={titleColor} glitches={glitches(frame)} />
           </Browser>
+          </div>
         )}
       </Camera>
     </AbsoluteFill>

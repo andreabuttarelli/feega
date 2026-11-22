@@ -40,7 +40,7 @@ const T = {
   terminalOpen: 240,
   toPrompt: 256,
   stage: 248,
-  end: 282,
+  end: 290,
 };
 
 export const INTRO_FRAMES = T.end;
@@ -60,23 +60,23 @@ const CAMERA_KEYS = [
 
 const CUES: Cue[] = [
   { at: T.browserOpen, sound: Sound.Pop, volume: 0.35 },
-  { at: T.scroll + 6, sound: Sound.Whoosh, volume: 0.35 },
-  { at: T.zoom, sound: Sound.Whoosh, volume: 0.22 },
+  { at: T.scroll + 6, sound: Sound.Whoosh, volume: 0.5 },
+  { at: T.zoom, sound: Sound.Whoosh, volume: 0.38 },
   { at: T.like, sound: Sound.Pop, volume: 0.25 },
-  { at: T.zoomOut, sound: Sound.Whoosh, volume: 0.18 },
+  { at: T.zoomOut, sound: Sound.Whoosh, volume: 0.32 },
   { at: T.close, sound: Sound.Pop, volume: 0.25 },
   { at: T.terminalOpen, sound: Sound.Pop, volume: 0.35 },
-  { at: T.toPrompt, sound: Sound.Whoosh, volume: 0.22 },
+  { at: T.toPrompt, sound: Sound.Whoosh, volume: 0.38 },
 ];
 
 const scrollAt = (frame: number) => SCROLL_END * tween(frame, T.scroll, T.scrollLength);
 
-const COUNT_FROM = 0.55;
+const COUNT_GROWTH = 1.8;
 const HOOK_TOTALS = [12.4, 48.1, 391, 18.2];
 const HOOK_UNITS = ["K", "K", "K", "M"];
 
 const hookStats = (frame: number): [string, string, string, string] => {
-  const k = mix(COUNT_FROM, 1, tween(frame, T.count, T.countLength));
+  const k = mix(1, COUNT_GROWTH, tween(frame, T.count, T.countLength));
   const digits = (v: number) => (v >= 100 ? Math.round(v).toString() : v.toFixed(1));
 
   return HOOK_TOTALS.map((v, i) => digits(v * k) + HOOK_UNITS[i]) as [string, string, string, string];

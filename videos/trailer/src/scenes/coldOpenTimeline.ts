@@ -1,4 +1,4 @@
-import { CAMERA_MOVE, ENTER_PAUSE, FRAMES_PER_CHAR } from "../timing";
+import { CAMERA_MOVE, ENTER_PAUSE } from "../timing";
 
 export enum Focus {
   Prompt = "prompt",
@@ -14,6 +14,32 @@ export enum Reply {
 
 export const BACKSPACE = "⌫";
 
+export enum Stroke {
+  Char = "char",
+  Backspace = "backspace",
+}
+
+export type Keystroke = { at: number; key: string; stroke: Stroke };
+
+const KEY_GAPS = [2, 1, 2, 2, 1, 3, 1, 2, 2, 1, 2, 3];
+const TYPO_NOTICE = 6;
+const BACKSPACE_GAP = 3;
+
+const keystrokes = (keys: string, start: number): Keystroke[] => {
+  let at = start;
+  let previous = "";
+
+  return [...keys].map((key, i) => {
+    const stroke = key === BACKSPACE ? Stroke.Backspace : Stroke.Char;
+    const noticed = stroke === Stroke.Backspace && previous !== BACKSPACE;
+
+    at += i === 0 ? 0 : noticed ? TYPO_NOTICE : stroke === Stroke.Backspace ? BACKSPACE_GAP : KEY_GAPS[i % KEY_GAPS.length];
+    previous = key;
+
+    return { at, key, stroke };
+  });
+};
+
 type BeatSpec = {
   keys: string;
   reply: string;
@@ -26,6 +52,7 @@ type BeatSpec = {
 
 export type Beat = BeatSpec & {
   prompt: string;
+  strokes: Keystroke[];
   start: number;
   typeStart: number;
   submit: number;
@@ -58,7 +85,8 @@ const build = (specs: BeatSpec[]): Beat[] => {
   return specs.map((spec) => {
     const start = cursor;
     const typeStart = start + spec.lead;
-    const submit = typeStart + Math.round([...spec.keys].length * FRAMES_PER_CHAR) + ENTER_PAUSE;
+    const strokes = keystrokes(spec.keys, typeStart);
+    const submit = strokes[strokes.length - 1].at + ENTER_PAUSE;
     const replyAt = submit + spec.work;
     const cameraAt = replyAt + REVEAL_LAG;
     const changeAt = cameraAt + CAMERA_MOVE;
@@ -66,7 +94,7 @@ const build = (specs: BeatSpec[]): Beat[] => {
 
     cursor = end;
 
-    return { ...spec, prompt: applyKeys(spec.keys), start, typeStart, submit, replyAt, cameraAt, changeAt, end };
+    return { ...spec, prompt: applyKeys(spec.keys), strokes, start, typeStart, submit, replyAt, cameraAt, changeAt, end };
   });
 };
 

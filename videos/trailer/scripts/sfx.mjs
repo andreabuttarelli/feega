@@ -59,19 +59,26 @@ const whoosh = () => {
   });
 };
 
-const thud = () => {
-  const noise = seeded(3);
-  let phase = 0;
+const CHIME_NOTES = [
+  { at: 0, freq: 880 },
+  { at: 0.16, freq: 659.25 },
+];
 
-  return render(0.9, (t) => {
-    phase += (2 * Math.PI * (38 + 60 * Math.exp(-t / 0.08))) / RATE;
-    const body = Math.sin(phase) * Math.exp(-t / 0.22);
-    const hit = noise() * Math.exp(-t / 0.01) * 0.3;
-    const buzz = t > 0.06 && t < 0.42 ? 0.08 * Math.sign(Math.sin(2 * Math.PI * 110 * t)) * Math.exp(-(t - 0.06) / 0.15) : 0;
+const chime = () =>
+  render(1.0, (t) =>
+    CHIME_NOTES.reduce((sum, { at, freq }) => {
+      const u = t - at;
 
-    return 0.9 * body + hit + buzz;
-  });
-};
+      if (u < 0) {
+        return sum;
+      }
+
+      const env = Math.min(1, u / 0.005) * Math.exp(-u / 0.2);
+      const tone = Math.sin(2 * Math.PI * freq * u) + 0.3 * Math.sin(2 * Math.PI * 2 * freq * u) * Math.exp(-u / 0.08) + 0.12 * Math.sin(2 * Math.PI * 3 * freq * u) * Math.exp(-u / 0.05);
+
+      return sum + 0.4 * env * tone;
+    }, 0),
+  );
 
 const pop = () => {
   let phase = 0;
@@ -91,7 +98,8 @@ const SOUNDS = {
   "click-c": click(37, 2100),
   enter: click(51, 1500),
   whoosh: whoosh(),
-  thud: thud(),
+  backspace: click(67, 1100),
+  chime: chime(),
   pop: pop(),
 };
 
