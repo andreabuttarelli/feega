@@ -16,7 +16,14 @@ import { CATEGORY_SLUGS, HUB_FRAMEWORKS, TEMPLATES_PATH, categoryPath, framework
 import type { Category } from './templates/template';
 import { topicPath } from './topics/topic';
 
-const SUMMARY = 'Feega is a free, open-source (Apache-2.0) VS Code extension to design in your codebase: click any element of your running app, edit it like in Figma, and the change is written to your code. No AI, no tokens, with diffs and undo. React, Next.js, SvelteKit, Vue, Nuxt, React Router, Astro and Vite, with Tailwind or plain CSS. Works in VS Code, Cursor, Windsurf and VSCodium on macOS, Windows and Linux, or in the browser with npx feega. Feega Cloud (GitHub sync, collaboration, sections and templates) is coming later.';
+const SUMMARY = 'Feega is a free, open-source (Apache-2.0) tool to design in your codebase: click any element of your running app, edit it like in Figma, and the change is written to your code. No AI, no tokens, with diffs and undo. React, Next.js, SvelteKit, Vue, Nuxt, React Router, Astro and Vite, with Tailwind or plain CSS. Runs as a VS Code extension, or from any terminal with npx feega. Feega Cloud is coming soon.';
+
+const SURFACES = [
+  '- VS Code extension: the same editor inside VS Code, and inside VS Code-based editors Cursor, Windsurf and VSCodium. VS Code installs from the Visual Studio Marketplace; Cursor, Windsurf and VSCodium install from Open VSX. macOS, Windows and Linux.',
+  '- Terminal: `npx feega` in the app folder opens the same editor in your browser, no IDE needed. It finds the app, starts its dev server and opens the editor.',
+  '- Desktop app: coming soon, in beta.',
+  '- Feega Cloud: coming soon, paid, €15 per editor a month (€12 a month billed annually, €144 a year), viewers free. It adds GitHub sync, collaboration, sections and templates, and all Pro templates. The extension and npx feega stay free.'
+].join('\n');
 
 const HOW_IT_WORKS = [
   '- Run "Feega: Open from current workspace" in the command palette, or `npx feega` in the app folder. Feega starts your dev server and opens the app beside your code.',
@@ -79,6 +86,8 @@ export const llmsTxt = () =>
   [
     '# Feega',
     `> ${SUMMARY}`,
+    '## Where it runs',
+    SURFACES,
     '## How it works',
     HOW_IT_WORKS,
     '## What it writes to your code',
@@ -103,6 +112,8 @@ export const llmsFullTxt = () =>
   [
     '# Feega',
     `> ${SUMMARY}`,
+    '## Where it runs',
+    SURFACES,
     '## How it works',
     HOW_IT_WORKS,
     '## What it writes to your code',

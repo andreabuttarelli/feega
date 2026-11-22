@@ -3,7 +3,7 @@ import { SITE_URL } from './links';
 
 export const HOME_META = {
   title: 'Feega: design in your codebase',
-  description: 'Feega: design in your codebase. A free VS Code extension: click any element of your running app, edit it like in Figma, and the change is written to your code.'
+  description: 'Feega is free, in VS Code or with npx feega: click an element of your running app, edit it like in Figma, and the change lands in your code.'
 } as const;
 
 export const OG_IMAGE_ALT = `Feega: ${HERO_HEADLINE} An isometric canvas where code becomes a design, a layout gets a timeline and a prompt wires into image and video nodes.`;
@@ -15,7 +15,7 @@ export const OG = {
 
 export const PRICING_META = {
   title: 'Pricing: the Feega extension is free | Feega',
-  description: 'The Feega VS Code extension is free. Feega Cloud, with GitHub sync, collaboration, sections and templates, is coming later.'
+  description: 'The Feega VS Code extension is free. Feega Cloud, with GitHub sync, collaboration, sections and templates, is coming soon.'
 } as const;
 
 export const PLUGINS_META = {
