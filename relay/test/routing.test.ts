@@ -7,7 +7,7 @@ const BASE = 'localhost:8787';
 describe('routeOf', () => {
   it('sends /host on any other host to the host endpoint', () => {
     expect(routeOf(new URL('http://127.0.0.1:8787/host?token=x'), BASE)).toEqual({ kind: Route.Host });
-    expect(routeOf(new URL('https://relay.s.feega.app/host'), 's.feega.app')).toEqual({ kind: Route.Host });
+    expect(routeOf(new URL('https://relay.sessions.test/host'), 'sessions.test')).toEqual({ kind: Route.Host });
   });
 
   it('sends a sid host to the visitor path', () => {
@@ -24,7 +24,7 @@ describe('routeOf', () => {
 
   it('knows nothing else', () => {
     expect(routeOf(new URL('http://127.0.0.1:8787/'), BASE)).toEqual({ kind: Route.None });
-    expect(routeOf(new URL('https://evil.com/host'), 's.feega.app')).toEqual({ kind: Route.Host });
+    expect(routeOf(new URL('https://evil.com/host'), 'sessions.test')).toEqual({ kind: Route.Host });
   });
 });
 

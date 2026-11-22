@@ -3,8 +3,8 @@ main = "src/index.ts"
 compatibility_date = "2026-04-07"
 
 [vars]
-VISITOR_BASE = "s.feega.app"
-WEB_ORIGIN = "https://oh.feega.app"
+VISITOR_BASE = "localhost:8787"
+WEB_ORIGIN = "http://localhost:5173"
 
 [[durable_objects.bindings]]
 name = "SESSION"
@@ -13,11 +13,3 @@ class_name = "Session"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Session"]
-
-[[routes]]
-pattern = "relay.s.feega.app/*"
-zone_name = "feega.app"
-
-[[routes]]
-pattern = "*.s.feega.app/*"
-zone_name = "feega.app"

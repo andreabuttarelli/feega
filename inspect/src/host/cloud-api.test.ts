@@ -17,7 +17,7 @@ const comment = { id: 'c1', sessionId: 's1', authorId: 'u1', authorName: 'Ada', 
 
 describe('cloud api client', () => {
   it('starts a session with the bearer token and the visitor role', async () => {
-    const { api, calls } = recorder(201, { id: 's1', url: 'https://s1.s.feega.app', hostToken: 'h', expiresAt: '2026-11-21T22:00:00Z' });
+    const { api, calls } = recorder(201, { id: 's1', url: 'https://s1.sessions.test', hostToken: 'h', expiresAt: '2026-11-21T22:00:00Z' });
 
     const started = await api.startSession('shop', VisitorRole.Editor);
 

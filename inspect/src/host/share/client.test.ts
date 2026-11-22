@@ -10,7 +10,7 @@ import { shareClient, type ShareClient } from './client';
 const WAIT_MS = 3000;
 const ada = { userId: 'ada', name: 'Ada', role: 'editor' as const };
 const vera = { userId: 'vera', name: 'Vera', role: 'viewer' as const };
-const VISITOR_ORIGIN = 'https://abcdefghij.s.feega.app';
+const VISITOR_ORIGIN = 'https://abcdefghij.sessions.test';
 
 const waitFor = async <T>(read: () => T | undefined | false, what = 'condition'): Promise<T> => {
   const deadline = Date.now() + WAIT_MS;
@@ -90,7 +90,7 @@ async function rig(options: { visitorsCanEdit?: boolean; appUrl?: string | null;
   return { editor, app, relay, client };
 }
 
-const reqHead = (id: number, path: string, headers: Record<string, string> = {}, method = 'GET') => jsonFrame(id, FrameType.ReqHead, { method, path, headers: { 'x-feega-visitor': encodeVisitor(ada), host: 'abcdefghij.s.feega.app', ...headers } });
+const reqHead = (id: number, path: string, headers: Record<string, string> = {}, method = 'GET') => jsonFrame(id, FrameType.ReqHead, { method, path, headers: { 'x-feega-visitor': encodeVisitor(ada), host: 'abcdefghij.sessions.test', ...headers } });
 
 async function fetchVia(relay: Awaited<ReturnType<typeof fakeRelay>>, id: number, path: string, headers: Record<string, string> = {}) {
   await relay.send(reqHead(id, path, headers));

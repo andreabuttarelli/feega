@@ -14,7 +14,7 @@ function rig(over: { control?: Partial<ShareControl>; editorUrl?: string | null;
   const requests: unknown[] = [];
   let hooks: ShareHooks | null = null;
   const control: ShareControl = {
-    start: async (request) => (requests.push(request), { id: 'sess-1', url: 'https://abcdefghij.s.feega.app', expiresAt: '2026-11-22T00:00:00Z' }),
+    start: async (request) => (requests.push(request), { id: 'sess-1', url: 'https://abcdefghij.sessions.test', expiresAt: '2026-11-22T00:00:00Z' }),
     stop: async () => undefined,
     kick: () => undefined,
     ...over.control
@@ -49,7 +49,7 @@ describe('shareSession', () => {
 
     expect(requests).toEqual([{ dir: '/work/My App', projectName: 'Landing', editorUrl: 'http://127.0.0.1:9/', appUrl: 'http://127.0.0.1:5173/', visitorsCanEdit: true }]);
     expect(posted[0]).toMatchObject({ state: ShareState.Starting, name: 'Landing' });
-    expect(last()).toMatchObject({ state: ShareState.Live, url: 'https://abcdefghij.s.feega.app', expiresAt: '2026-11-22T00:00:00Z', canEdit: true });
+    expect(last()).toMatchObject({ state: ShareState.Live, url: 'https://abcdefghij.sessions.test', expiresAt: '2026-11-22T00:00:00Z', canEdit: true });
   });
 
   it('remembers that the notice was seen', async () => {

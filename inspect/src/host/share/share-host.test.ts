@@ -24,7 +24,7 @@ async function relay(accept: boolean) {
 function apiStub(over: Partial<ShareApi> = {}) {
   const calls: { started: [string, VisitorRole][]; closed: string[] } = { started: [], closed: [] };
   const api: ShareApi = {
-    startSession: async (name, role) => (calls.started.push([name, role]), { id: 'sess-1', url: 'https://abcdefghij.s.feega.app', hostToken: 'host-jwt', expiresAt: '2026-11-22T00:00:00Z' }),
+    startSession: async (name, role) => (calls.started.push([name, role]), { id: 'sess-1', url: 'https://abcdefghij.sessions.test', hostToken: 'host-jwt', expiresAt: '2026-11-22T00:00:00Z' }),
     closeSession: async (id) => (calls.closed.push(id), { snapshotUploadUrl: 'https://storage.test/upload?sig=1' }),
     ...over
   };
@@ -39,7 +39,7 @@ describe('shareHost', () => {
 
     const info = await host.start({ dir: '/work/My App', editorUrl: 'http://127.0.0.1:1/', visitorsCanEdit: true });
 
-    expect(info).toEqual({ id: 'sess-1', url: 'https://abcdefghij.s.feega.app', expiresAt: '2026-11-22T00:00:00Z' });
+    expect(info).toEqual({ id: 'sess-1', url: 'https://abcdefghij.sessions.test', expiresAt: '2026-11-22T00:00:00Z' });
     expect(calls.started).toEqual([['My App', VisitorRole.Editor]]);
     expect(tokens).toEqual(['host-jwt']);
     await host.stop('sess-1');

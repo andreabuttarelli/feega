@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ServerState, ToView } from '../../messages';
 import { viewForVisitor } from './view-filter';
 
-const ORIGIN = 'https://abcdefghij.s.feega.app';
+const ORIGIN = 'https://abcdefghij.sessions.test';
 const asText = (value: unknown) => JSON.stringify(value);
 
 describe('viewForVisitor', () => {

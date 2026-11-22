@@ -38,17 +38,17 @@ describe('sid', () => {
   });
 
   it('reads the sid from the visitor host', () => {
-    expect(sidOfHost('abcdefghij.s.feega.app', 's.feega.app')).toBe('abcdefghij');
+    expect(sidOfHost('abcdefghij.sessions.test', 'sessions.test')).toBe('abcdefghij');
     expect(sidOfHost('abcdefghij.localhost:8787', 'localhost:8787')).toBe('abcdefghij');
-    expect(sidOfHost('ABCDEFGHIJ.s.feega.app', 's.feega.app')).toBe('abcdefghij');
+    expect(sidOfHost('ABCDEFGHIJ.sessions.test', 'sessions.test')).toBe('abcdefghij');
   });
 
   it('refuses hosts that are not a sid under the base domain', () => {
-    expect(sidOfHost('relay.s.feega.app', 's.feega.app')).toBeNull();
-    expect(sidOfHost('s.feega.app', 's.feega.app')).toBeNull();
-    expect(sidOfHost('abcdefghij.evil.com', 's.feega.app')).toBeNull();
-    expect(sidOfHost('x.abcdefghij.s.feega.app', 's.feega.app')).toBeNull();
-    expect(sidOfHost('abcdefghijs.feega.app', 's.feega.app')).toBeNull();
-    expect(sidOfHost(null, 's.feega.app')).toBeNull();
+    expect(sidOfHost('relay.sessions.test', 'sessions.test')).toBeNull();
+    expect(sidOfHost('sessions.test', 'sessions.test')).toBeNull();
+    expect(sidOfHost('abcdefghij.evil.com', 'sessions.test')).toBeNull();
+    expect(sidOfHost('x.abcdefghij.sessions.test', 'sessions.test')).toBeNull();
+    expect(sidOfHost('abcdefghijsessions.test', 'sessions.test')).toBeNull();
+    expect(sidOfHost(null, 'sessions.test')).toBeNull();
   });
 });

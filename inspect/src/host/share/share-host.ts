@@ -17,7 +17,7 @@ export type ShareHostDeps = {
 
 export type ShareControl = ShareHost & { kick: (id: string, userId: string) => void };
 
-export const RELAY_URL = 'wss://relay.s.feega.app/host';
+export const RELAY_URL = 'ws://127.0.0.1:8787/host';
 
 const HTTP_PUT = 'PUT';
 const ZIP_TYPE = 'application/zip';
