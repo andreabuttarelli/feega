@@ -1,11 +1,6 @@
 import terms from './terms.html?raw';
 import privacy from './privacy.html?raw';
 import cookies from './cookies.html?raw';
-import acceptableUse from './acceptable-use.html?raw';
-import aiTransparency from './ai-transparency.html?raw';
-import legalNotice from './legal-notice.html?raw';
-import dpa from './dpa.html?raw';
-import subprocessors from './subprocessors.html?raw';
 
 export type LegalDoc = {
   readonly label: string;
@@ -32,36 +27,6 @@ export const LEGAL_DOCS = {
     title: 'Cookie Policy — Feega',
     description: 'The cookies, browser storage and trackers Feega uses, why, for how long, and how consent works.',
     html: cookies
-  },
-  'acceptable-use': {
-    label: 'Acceptable use',
-    title: 'Acceptable Use Policy — Feega',
-    description: 'What you may not create, share or publish with Feega, how we enforce it and how to report abuse.',
-    html: acceptableUse
-  },
-  'ai-transparency': {
-    label: 'AI transparency',
-    title: 'AI Transparency — Feega',
-    description: 'Which AI features Feega has, which models power them, how outputs are marked and how requests are moderated.',
-    html: aiTransparency
-  },
-  dpa: {
-    label: 'DPA',
-    title: 'Data Processing Agreement — Feega',
-    description: 'The GDPR Art. 28 data processing agreement between Feega and its business customers.',
-    html: dpa
-  },
-  subprocessors: {
-    label: 'Sub-processors',
-    title: 'Sub-processors — Feega',
-    description: 'The providers Feega uses to run the service, what data they process, where, and under which transfer mechanism.',
-    html: subprocessors
-  },
-  'legal-notice': {
-    label: 'Legal notice',
-    title: 'Legal Notice — Feega',
-    description: 'Who operates Feega: company details, contacts and legal documents.',
-    html: legalNotice
   }
 } as const satisfies Record<string, LegalDoc>;
 

@@ -1,7 +1,4 @@
-import { AGENT_MAX_DURATION_S } from '$lib/server/brand-agent/limits';
-
-const TURN_MARGIN_S = 5 * 60;
-const MIN_TOKEN_LIFE_S = AGENT_MAX_DURATION_S + TURN_MARGIN_S;
+const MIN_TOKEN_LIFE_S = 35 * 60;
 
 export function outlivesTurn(session: { expires_at?: number }, nowS = Math.floor(Date.now() / 1000)): boolean {
   if (session.expires_at === undefined) {

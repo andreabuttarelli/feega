@@ -520,12 +520,17 @@ function truncate(text, max) {
   return text.length <= max ? text : `${text.slice(0, max)}…`;
 }
 
+const LAYOUT_FILE = /(^|\/)(\+layout\.svelte|layout\.[jt]sx?|_app\.[jt]sx?|root\.[jt]sx?)$/;
+
 function componentBoundary(element, file) {
+  let root = parseSource(element.getAttribute(SOURCE_ATTR));
   for (let node = element.parentElement?.closest(`[${SOURCE_ATTR}]`); node; node = node.parentElement?.closest(`[${SOURCE_ATTR}]`)) {
     const source = parseSource(node.getAttribute(SOURCE_ATTR));
-    if (source && source.file !== file) {
-      return source;
+    if (!source || source.file === file) {
+      root = source ?? root;
+      continue;
     }
+    return LAYOUT_FILE.test(source.file) && !LAYOUT_FILE.test(file) ? root : source;
   }
   return null;
 }

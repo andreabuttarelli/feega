@@ -5,10 +5,8 @@ import { sendEmail, passwordResetEmailSubject, passwordResetEmailHtml, passwordR
 import { emailLocale } from '$lib/server/email-i18n';
 import { sanitizeWebsiteParam } from '$lib/website-param';
 import { appOrigin } from '$lib/server/app-url';
-import { takeOAuthReturn } from '$lib/server/oauth';
 import { INVITE_ERROR_PARAM, INVITE_PARAM, inviteTokenIn, landingPath } from '$lib/server/tenancy/landing';
 import { signInErrorIn } from './sign-in-error';
-import { peekStartUrl } from '$lib/server/onboarding/start-url-cookie';
 import { START_URL_PARAM, startUrlOf } from '$lib/start-url';
 import { NATIVE_AUTH_BASE, isNativeShell } from '$lib/native-shell';
 import { appleSignInFlag, appleSignInShown } from '$lib/apple-sign-in/visibility';
@@ -64,8 +62,6 @@ export const load: PageServerLoad = async ({ url, request, cookies, locals: { sa
     return { ...page, homeHref: await landingPath(client, user, cookies, null) };
   }
 
-  const oauthReturn = takeOAuthReturn(cookies);
-  if (oauthReturn) throw redirect(303, oauthReturn);
   if (cliPort) throw redirect(303, `/cli/callback?cli_port=${cliPort}&cli_state=${cliState}`);
   throw redirect(303, await landingPath(client, user, cookies, inviteToken));
 };
@@ -85,10 +81,6 @@ async function routeAfterAuth(
   cookies: Cookies,
   locals: RequestEvent['locals']
 ): Promise<never> {
-  // An interrupted /oauth/authorize resumes here (MCP client connect → login → consent).
-  const oauthReturn = takeOAuthReturn(cookies);
-  if (oauthReturn) throw redirect(303, oauthReturn);
-
   if (cliPort) {
     throw redirect(303, `/cli/callback?cli_port=${encodeURIComponent(cliPort)}&cli_state=${encodeURIComponent(cliState)}`);
   }
@@ -171,7 +163,7 @@ export const actions: Actions = {
       const hashed = link?.properties?.hashed_token;
       if (!error && hashed) {
         const base = appBase(url);
-        const confirmUrl = `${base}/auth/confirm?token_hash=${encodeURIComponent(hashed)}&type=recovery&next=${encodeURIComponent(resetPasswordPath(inviteTokenIn(data), peekStartUrl(cookies)))}`;
+        const confirmUrl = `${base}/auth/confirm?token_hash=${encodeURIComponent(hashed)}&type=recovery&next=${encodeURIComponent(resetPasswordPath(inviteTokenIn(data), null))}`;
         await sendEmail({
           to: email,
           subject: passwordResetEmailSubject(locale),
@@ -244,7 +236,7 @@ async function oauthSignIn({ request, cookies, locals: { supabase }, url }: Requ
   const cliPort = String(data.get('cli_port') ?? '');
   const cliState = String(data.get('cli_state') ?? '');
   const authBase = isNativeShell(request.headers.get('user-agent')) ? NATIVE_AUTH_BASE : `${appBase(url)}/auth`;
-  const redirectTo = buildRedirectTo(authBase, cliPort, cliState, inviteTokenIn(data), peekStartUrl(cookies));
+  const redirectTo = buildRedirectTo(authBase, cliPort, cliState, inviteTokenIn(data), null);
   const { data: oauth, error } = await supabase.auth.signInWithOAuth({ provider, options: { redirectTo } });
 
   if (error || !oauth?.url) return fail(400, { error: error?.message ?? `Could not start ${provider} sign-in` });

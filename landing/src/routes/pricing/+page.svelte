@@ -20,7 +20,7 @@
 <div class="raised">
 <main class="page site-wide">
   <h1>pricing</h1>
-  <p class="lead">Feega Cloud adds real-time collaboration and AI models with no keys to manage. the editor itself is free on your own computer, with your own AI keys.</p>
+  <p class="lead">the Feega extension is free. Feega Cloud, with GitHub sync, collaboration, sections and templates, is coming soon.</p>
 
   <PriceGrid plan={PLAN} details="show" />
 

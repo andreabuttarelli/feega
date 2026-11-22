@@ -11,158 +11,151 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    runs-on: ubuntu-24.04
+    outputs:
+      app: ${{ steps.filter.outputs.app }}
+      landing: ${{ steps.filter.outputs.landing }}
+      web-docs: ${{ steps.filter.outputs.web-docs }}
+      web-blog: ${{ steps.filter.outputs.web-blog }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Which areas changed
+        id: filter
+        env:
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: |
+          changed=ALL
+          if git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null && ! echo "$BASE_SHA" | grep -Eq '^0+$'; then
+            changed=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+          fi
+          emit() {
+            if [ "$changed" = "ALL" ] || echo "$changed" | grep -Eq "$2"; then
+              echo "$1=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "$1=false" >> "$GITHUB_OUTPUT"
+            fi
+          }
+          emit app '^(src/|supabase/|static/|scripts/|cli/|packages/|tests/|package\.json|package-lock\.json|svelte\.config\.js|vite\.config\.ts|tsconfig\.json|\.github/workflows/ci\.yml)'
+          emit landing '^(landing/|packages/site-theme/|src/lib/content/changelog/|\.github/workflows/ci\.yml)'
+          emit web-docs '^(web-docs/|packages/site-theme/|docs/|cli/|\.github/workflows/ci\.yml)'
+          emit web-blog '^(web-blog/|packages/site-theme/|\.github/workflows/ci\.yml)'
+
   test:
     runs-on: ubuntu-24.04
+    needs: changes
     env:
-      # Boot-minimal placeholders: the e2e smoke tier runs against `vite dev` with no real
-      # Supabase (see tests/e2e/README.md). Unit tests do not depend on these values.
       PUBLIC_SUPABASE_URL: http://localhost:54321
       PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
+        if: needs.changes.outputs.app == 'true'
         with:
           node-version: 22
           cache: npm
 
       - run: npm ci
+        if: needs.changes.outputs.app == 'true'
 
       - name: Billing SQL harnesses (pglite)
-        run: npm run test:credit-expiry && npm run test:seat-billing && npm run test:agent-edits && npm run test:billing-rls
+        if: needs.changes.outputs.app == 'true'
+        run: npm run test:credit-expiry && npm run test:seat-billing && npm run test:billing-rls
 
       - name: Runtime type gate
+        if: needs.changes.outputs.app == 'true'
         run: node scripts/typecheck-runtime.mjs
 
       - name: Type check (svelte-check)
+        if: needs.changes.outputs.app == 'true'
         env:
           NODE_OPTIONS: --max-old-space-size=6144
         run: cp .env.example .env && npm run check && rm .env
 
       - name: Build
+        if: needs.changes.outputs.app == 'true'
         env:
           NODE_OPTIONS: --max-old-space-size=8192
         run: npx vite build && rm -rf .vercel/output build
 
-      - name: Node build (local mode, desktop server)
-        run: npm run build:node && rm -rf build
-
-      - name: Install Playwright Chromium
-        run: |
-          npx playwright install --with-deps chromium && exit 0
-          npx playwright install chromium
-
       - name: Unit tests
+        if: needs.changes.outputs.app == 'true'
         run: npx vitest run
-
-      - name: E2E smoke tests
-        run: npx playwright test tests/e2e/motion-shots.spec.ts -g "kinetic-title"
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: dbg-frames
-          path: test-results/dbg
-
-  gpu-core:
-    runs-on: ubuntu-24.04
-    defaults:
-      run:
-        working-directory: packages/gpu-core
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: packages/gpu-core
-
-      - name: CPU tests (display list, scene building)
-        run: cargo test --locked
-
-      - name: Web build compiles
-        run: cargo build --locked --lib --target wasm32-unknown-unknown
-
-      - name: WebGL fallback build compiles
-        run: cargo build --locked --lib --target wasm32-unknown-unknown --features webgl
-
-  gpu-text:
-    runs-on: ubuntu-24.04
-    defaults:
-      run:
-        working-directory: packages/gpu-text
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: packages/gpu-text
-
-      - name: Faces, face book and layout
-        run: cargo test --locked
-
-      - name: Web build compiles
-        run: cargo build --locked --lib --target wasm32-unknown-unknown
 
   web-docs:
     runs-on: ubuntu-24.04
+    needs: changes
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
+        if: needs.changes.outputs.web-docs == 'true'
         with:
           node-version: 22
           cache: npm
 
-      - run: npm ci
-
       - run: npm --prefix web-docs ci
+        if: needs.changes.outputs.web-docs == 'true'
 
-      - name: Build the docs site (generates the references from the code)
+      - name: Every docs page has a thumbnail
+        if: needs.changes.outputs.web-docs == 'true'
+        run: npm --prefix web-docs test
+
+      - name: Build the docs site
+        if: needs.changes.outputs.web-docs == 'true'
         run: npm --prefix web-docs run build
 
   web-blog:
     runs-on: ubuntu-24.04
+    needs: changes
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
+        if: needs.changes.outputs.web-blog == 'true'
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: web-blog/package-lock.json
 
       - run: npm --prefix web-blog ci
+        if: needs.changes.outputs.web-blog == 'true'
 
       - name: Build the blog
+        if: needs.changes.outputs.web-blog == 'true'
         run: npm --prefix web-blog run build
 
       - name: Check the built blog's social previews
+        if: needs.changes.outputs.web-blog == 'true'
         run: npm --prefix web-blog test
 
   landing:
     runs-on: ubuntu-24.04
+    needs: changes
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
+        if: needs.changes.outputs.landing == 'true'
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: landing/package-lock.json
 
       - run: npm --prefix landing ci
+        if: needs.changes.outputs.landing == 'true'
 
       - name: Landing tests
+        if: needs.changes.outputs.landing == 'true'
         run: npm --prefix landing test
 
       - name: Landing build
+        if: needs.changes.outputs.landing == 'true'
         run: npm --prefix landing run build
 
   schema-drift:

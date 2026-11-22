@@ -1,0 +1,40 @@
+---
+import Search from 'virtual:starlight/components/Search';
+import SiteNav from './theme/SiteNav.astro';
+---
+
+<SiteNav current="docs">
+  <Search slot="search" />
+</SiteNav>
+
+<script>
+  const mobile = window.matchMedia('(max-width: 999px)');
+
+  const place = () => {
+    const controls = document.querySelector('.sx-page-controls');
+    const search = document.querySelector('site-search');
+    const menu = document.querySelector('starlight-menu-button');
+    const actions = document.querySelector('.sx-actions');
+    const sidebar = document.querySelector('#starlight__sidebar');
+
+    if (!controls || !search || !actions) {
+      return;
+    }
+
+    if (mobile.matches) {
+      controls.append(search);
+      if (menu) {
+        controls.append(menu);
+      }
+      return;
+    }
+
+    actions.prepend(search);
+    if (menu && sidebar) {
+      sidebar.before(menu);
+    }
+  };
+
+  place();
+  mobile.addEventListener('change', place);
+</script>

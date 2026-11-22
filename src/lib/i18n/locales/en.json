@@ -1,9 +1,4 @@
 {
-  "landing": {
-    "nav": {
-      "brandAria": "feega — pronounced oh to one"
-    }
-  },
   "login": {
     "reset": {
       "sentTitle": "Check your inbox",
@@ -11,9 +6,7 @@
     },
     "start": {
       "title": "Welcome",
-      "titlePlan": "Welcome",
-      "sub": "Create your account with an email and password.",
-      "subPlan": "Create your account with an email and password. You start on {plan}."
+      "sub": "Create your account with an email and password."
     },
     "signin": {
       "title": "Sign in",
@@ -74,24 +67,13 @@
       "dismiss": "Dismiss"
     },
     "legal": {
-      "notice": "By continuing, you agree to feega's {terms} and {acceptableUse} and acknowledge the {privacy} and {cookies}."
+      "notice": "By continuing, you agree to feega's {terms} and acknowledge the {privacy} and {cookies}."
     }
   },
   "legal": {
     "terms": "Terms of Service",
-    "acceptableUse": "Acceptable Use Policy",
     "privacy": "Privacy Policy",
-    "cookies": "Cookie Policy",
-    "refunds": "Refund Policy",
-    "aiTransparency": "AI Transparency",
-    "dpa": "Data Processing Agreement",
-    "subprocessors": "Sub-processors",
-    "legalNotice": "Legal Notice",
-    "menuLabel": "Legal",
-    "updated": {
-      "title": "We updated our Terms",
-      "action": "Review"
-    }
+    "cookies": "Cookie Policy"
   },
   "meta": {
     "login": {
@@ -100,85 +82,11 @@
     }
   },
   "app": {
-    "nav2": {
-      "layers": "Layers",
-      "components": "Components",
-      "history": "History",
-      "styles": "Styles",
-      "ai": "AI generation",
-      "materials": "Assets",
-      "influencers": "Influencers"
-    },
     "nav": {
-      "settings": "Settings",
-      "workspace": "Workspace",
-      "sectionAccount": "Account",
-      "sectionProject": "Project"
-    },
-    "shell": {
-      "rail": "Sections",
-      "pages": "Pages",
-      "closePanel": "Close panel",
-      "resizeChat": "Resize chat",
-      "collapseChat": "Collapse chat",
-      "expandChat": "Show chat",
-      "share": "Share",
-      "shareAnyone": "Anyone with the link can view",
-      "shareCopy": "Copy",
-      "shareCopied": "Copied",
-      "shareNewLink": "New link (old one stops working)",
-      "chatTab": "Chat",
-      "guideTab": "Guides",
-      "guideBack": "Back to guides",
-      "guideSearch": "Search guides",
-      "guideNewTab": "Open in new tab",
-      "guideOffline": "Guides need a connection. Open them at",
-      "guideEmpty": "No guide matches.",
-      "mobile": {
-        "canvas": "Canvas",
-        "chat": "Chat",
-        "properties": "Properties",
-        "backToCanvas": "Back to canvas",
-        "switchView": "Canvas, properties or chat",
-        "projects": "Projects"
-      },
-      "canvasActions": {
-        "new": "New canvas",
-        "rename": "Rename",
-        "delete": "Delete",
-        "save": "Save",
-        "confirmDeleteTitle": "Delete this canvas?",
-        "confirmDeleteBody": "It leaves the project. Nothing on it is lost — nodes, generations and posts made from it stay put.",
-        "confirmDeleteCta": "Delete",
-        "confirmDeleteCancel": "Cancel",
-        "lastCanvas": "A project keeps at least one canvas",
-        "renameProject": "Rename project",
-        "more": "More actions",
-        "searchProjects": "Find a project…",
-        "noMatch": "No project matches"
-      },
-      "menu": {
-        "open": "Menu",
-        "pages": "Pages",
-        "home": "Dashboard",
-        "shortcuts": "Keyboard shortcuts",
-        "settings": "Settings",
-        "billing": "Billing & credits",
-        "changelog": "Changelog",
-        "report": "Report content",
-        "logout": "Sign out",
-        "navigate": "Navigate",
-        "help": "Help",
-        "account": "Account"
-      }
+      "settings": "Settings"
     },
     "settings": {
-      "team": {
-        "title": "Team"
-      },
-      "keep": "Keep",
       "save": "Save",
-      "close": "Close",
       "profile": {
         "title": "Profile",
         "photo": "Profile photo",
@@ -191,30 +99,6 @@
         "lastName": "Last name",
         "session": "Session",
         "signOutDesc": "Sign out of feega on this device.",
-        "figmaTitle": "Figma",
-        "figmaDesc": "Paste a personal access token so pasting from Figma brings its images too. Layers and text paste without one.",
-        "figmaToken": "Personal access token",
-        "figmaTokenSet": "A token is saved. Paste a new one to replace it.",
-        "figmaTokenHint": "Figma, Settings, Security, Personal access tokens. The token is stored encrypted and never shown again.",
-        "figmaSave": "Save token",
-        "figmaTest": "Test",
-        "figmaRemove": "Remove",
-        "figmaSaved": "Figma token saved.",
-        "figmaTested": "Connected to Figma.",
-        "figmaTestedScope": "Figma accepted the token. It has no Current user scope, so the account name is hidden; images still work.",
-        "figmaRemoved": "Figma token removed.",
-        "figmaInvalid": "Paste a valid Figma token.",
-        "figmaRejected": "Figma did not accept this token.",
-        "figmaNone": "Save a token first.",
-        "figmaUnavailable": "Figma tokens are not available yet.",
-        "cloudTitle": "Google Drive and Dropbox",
-        "cloudDesc": "Import files onto the canvas and export back. Connect from the file picker on the canvas.",
-        "cloudConnected": "Connected",
-        "cloudNotConnected": "Not connected",
-        "cloudNotConfigured": "Not set up on this server",
-        "cloudDisconnect": "Disconnect",
-        "cloudDisconnected": "Disconnected.",
-        "cloudInvalid": "Unknown provider.",
         "saved": "Profile saved.",
         "avatarSaved": "Profile photo updated.",
         "avatarRemoved": "Profile photo removed.",
@@ -229,168 +113,90 @@
         "deleteConfirmLabel": "Type DELETE or your email to confirm",
         "deleteConfirmError": "Type DELETE or your email exactly.",
         "deleteReauth": "For safety, sign in again (within the last 15 minutes) and retry.",
-        "deleteTransfer": "You are the only owner of a workspace with other members. Make someone else owner, or remove the members, first.",
-        "memoryTitle": "Your memory",
-        "memoryDesc": "What the Feega chat knows about you: who you are, your taste, how you like to work. Paste what your AI already knows, or write it yourself.",
-        "memoryPlaceholder": "Copy the prompt, paste it into Claude, ChatGPT or Gemini, and paste what it writes here.",
-        "memoryCopy": "Copy the prompt",
-        "memoryCopied": "Copied",
-        "memorySaved": "Memory saved. The chat uses it from your next message.",
-        "memoryTooLong": "That is too long. Keep it under 20,000 characters."
-      },
-      "appearance": {
-        "title": "Appearance",
-        "theme": "Theme",
-        "themeDesc": "Choose light or dark mode for the feega interface."
+        "deleteTransfer": "You are the only owner of a workspace with other members. Make someone else owner, or remove the members, first."
       },
       "billing": {
-        "title": "Plan & billing",
-        "membersNotice": "For security reasons, invited members can't manage billing — only the workspace owner can.",
-        "retentionApplied": "🎉 Done — 50% off your next 2 months. Your plan stays active.",
-        "canceledOn": "Your plan will cancel on {date}. You keep full access until then.",
-        "canceledNoDate": "Your plan will cancel. You keep full access until then.",
-        "invoices": "Invoices",
-        "changePayment": "Change payment method"
-      },
-      "models": {
-        "title": "Models",
-        "subtitle": "Choose which image, video and 3D models your organization can generate with. A medium with nothing checked offers every model.",
-        "image": "Image",
-        "video": "Video",
-        "model3d": "3D",
-        "save": "Save",
-        "saved": "Saved.",
-        "adminOnly": "Only owners and admins can change this.",
-        "unavailable": "Could not save. Try again later."
-      },
-      "fonts": {
-        "title": "Fonts",
-        "subtitle": "Fonts uploaded here can be used by everyone in the organization, in every frame, code frame and video export.",
-        "upload": "Upload font",
-        "uploading": "Uploading…",
-        "hint": "TTF, OTF, WOFF or WOFF2, up to 10MB. Upload only fonts your licence allows.",
-        "empty": "No uploaded fonts yet.",
-        "delete": "Delete",
-        "confirmDelete": "Delete this font for everyone in the organization? Frames using it fall back to a system font.",
-        "preview": "The quick brown fox jumps over the lazy dog",
-        "styles": "styles"
-      },
-      "spend": {
-        "title": "Billing limits",
-        "subtitle": "Stop spending once a limit is reached. Spending is counted from your AI usage; a monthly limit starts again on the first of the month.",
-        "orgMember": "Each member, in every project",
-        "projectMember": "Each member, in this project",
-        "projectTotal": "This project, everyone together",
-        "amount": "Limit in USD",
-        "reset": "Resets",
-        "resetNone": "Never",
-        "resetMonthly": "Monthly",
-        "save": "Save",
-        "remove": "Remove",
-        "none": "No limit",
-        "saved": "Saved.",
-        "removed": "Limit removed.",
-        "adminOnly": "Only owners and admins can change this.",
-        "invalid": "Enter an amount above zero.",
-        "unavailable": "Could not save. Try again later."
-      },
-      "apiKeys": {
-        "title": "API Keys",
-        "subtitle": "Generate long-lived keys for custom integrations. Keys have full read & write access. Use them as Bearer tokens in your scripts, CI/CD, or automation tools.",
-        "scopes": "Permissions",
-        "created": "Created",
-        "lastUsed": "Last used",
-        "never": "Never",
-        "revoke": "Revoke",
-        "createKey": "Create API Key",
-        "keyName": "Key name",
-        "keyNamePlaceholder": "e.g. My CI pipeline",
-        "read": "Read",
-        "write": "Write",
-        "keyRevoked": "API key revoked.",
-        "copyKey": "Copy key",
-        "copied": "Copied!",
-        "warning": "This is the only time the full key will be shown. Store it securely.",
-        "noKeys": "No API keys yet. Create one to get started with the API."
-      },
-      "project": {
-        "title": "Project"
-      },
-      "content": {
-        "title": "Content policy"
-      }
-    },
-    "account": {
-      "signOut": "Sign out",
-      "billing": {
-        "poolDesc": "Credits belong to the workspace: one plan and one balance for every project in it.",
-        "planPrice": "€{price} / editor / month",
-        "planTotal": "€{price} × {editors, plural, one {# editor} other {# editors}} = €{total} / month",
-        "planFlat": "€{price} / month",
-        "agentEdits": "Agent edits this week",
-        "cancelWarning": "Cancelling turns {editors, plural, one {# editor into a viewer} other {# editors into viewers}} at the end of the period.",
-        "creditsIncluded": "{credits} credits / mo",
-        "subscribe": "Subscribe",
-        "currentPlan": "Current plan",
-        "manage": "Manage",
-        "topUpsTitle": "Top-ups",
-        "topUpsDesc": "One-time purchase, added to the balance. Never expires.",
-        "topUp": "€{price} · {credits} credits",
-        "paymentReceived": "Payment received, credits will appear in a moment.",
-        "checkoutCanceled": "Checkout canceled. Nothing was charged.",
-        "purchasesNotReady": "Purchases open soon.",
-        "restorePurchases": "Restore purchases",
-        "storeUnavailable": "In-app purchases are not available in this version of the app.",
-        "storeFailed": "The purchase did not go through. Nothing was charged.",
-        "storePurchased": "Purchase complete. Your credits appear here in a few seconds.",
-        "yourPlan": "Your plan",
-        "planFree": "Free",
-        "planPaid": "Plan",
-        "freeSummary": "1 editor and {limit} agent edits a week. Spend credits from top-ups.",
-        "paidSummary": "{credits} credits a month and unlimited agent edits.",
-        "renewsOn": "Renews on {date}",
-        "freePrice": "€0",
-        "perEditorMonth": "€{price} / editor / month",
-        "compareTitle": "What the plan adds",
-        "featAgentEditsFree": "{limit} agent edits a week",
-        "featAgentEditsPlan": "Unlimited agent edits",
-        "featCreditsFree": "No monthly credits",
-        "featCreditsPlan": "{credits} credits per editor every month",
-        "featEditorsFree": "1 editor, unlimited viewers",
-        "featEditorsPlan": "Add editors at €{price} each, unlimited viewers",
-        "featNeverExpire": "Credits never expire",
-        "balanceTitle": "Credit balance",
-        "balanceEuro": "Worth €{euros} · 100 credits = €1",
-        "balanceBuys": "At your average cost over the last 30 days, that is about",
-        "buysImages": "{count, plural, one {# image} other {# images}}",
-        "buysVideos": "{count, plural, one {# video} other {# videos}}",
-        "agentEditsOf": "{used} of {limit} used",
-        "agentEditsResets": "Room frees up from {date}",
-        "agentEditsFresh": "The count covers the last 7 days.",
-        "agentEditsCapped": "Your own edits are never capped. Subscribe for unlimited agent edits.",
-        "topUpCredits": "{credits} credits",
-        "topUpBuy": "Buy",
-        "usageTitle": "Usage, last 30 days",
-        "usageTotal": "{credits} credits spent",
-        "usageByProject": "By project",
-        "usageByKind": "By kind",
-        "usageNoProject": "Outside a project",
-        "usageEmpty": "No credits spent in the last 30 days.",
-        "kind": {
-          "image": "Images",
-          "video": "Videos",
-          "audio": "Audio",
-          "agent": "Agent",
-          "chat": "Chat"
+        "title": "Billing",
+        "subtitle": "Your plan, seats and invoices.",
+        "current": "current",
+        "editorFor": "The local editor, on your machine.",
+        "editorUnit": "forever",
+        "editorCta": "free for everyone",
+        "editorLine1": "VS Code, npx feega or desktop",
+        "editorLine2": "Unlimited edits, written to your source",
+        "editorLine3": "No account needed to edit",
+        "planFree": "Free editor",
+        "planCloud": "Feega Cloud",
+        "freeLine": "The local editor is free, for everyone, forever.",
+        "cloudLine": "Billed per editor seat. Viewers are always free.",
+        "statusActive": "active",
+        "statusPastDue": "payment failed",
+        "statusEnding": "ending",
+        "seatsPaid": "editor seats paid",
+        "editors": "editors in your team",
+        "viewersFree": "viewers are free",
+        "renews": "renews",
+        "endsOn": "ends",
+        "noRenewal": "no renewal",
+        "pastDueNote": "Your last payment failed. Update your card in manage billing to keep Cloud.",
+        "endingNote": "Cloud is canceled and stays on until the end of the period.",
+        "monthly": "monthly",
+        "annual": "annual",
+        "save": "save {percent}%",
+        "intervalLabel": "billing interval",
+        "perEditorMonth": "per editor / month",
+        "billedMonthly": "billed monthly",
+        "billedYearly": "billed {amount} per editor, yearly",
+        "upgrade": "upgrade to Cloud",
+        "upgrading": "opening Stripe…",
+        "manage": "manage billing",
+        "managing": "opening Stripe…",
+        "manageHint": "Invoices, card and cancel, on Stripe.",
+        "currentPlan": "current plan",
+        "seatsOfEditors": "seats paid / editors",
+        "perEditorBilledYearly": "per editor / month, billed yearly",
+        "perEditorBilledMonthly": "per editor / month, billed monthly",
+        "askOwner": "ask the owner to manage billing",
+        "downgrade": "downgrade to free",
+        "downgradeHint": "Opens Stripe. Cancel there and Cloud stays on until the end of the period.",
+        "ownerOnly": "Only the workspace owner can change billing. You can see the plan here.",
+        "cloudTitle": "Feega Cloud",
+        "cloudFor": "For teams that design together.",
+        "include1": "Shared sessions, one link to review live",
+        "include2": "Comments on elements, from your phone",
+        "include3": "MCP for agents",
+        "include4": "Unlimited viewers, free",
+        "faqTitle": "questions",
+        "faq1q": "Who pays?",
+        "faq1a": "Editors. Every owner, admin and member takes a seat.",
+        "faq2q": "Are viewers free?",
+        "faq2a": "Yes. Invite as many viewers as you want, they never take a seat.",
+        "faq3q": "Is the local editor free?",
+        "faq3a": "Yes. The VS Code extension and npx feega stay free.",
+        "faq4q": "Can I cancel?",
+        "faq4a": "Anytime, in manage billing. Cloud stays on until the end of the period you paid.",
+        "paid": "Payment received. Cloud turns on in a moment.",
+        "canceled": "Checkout canceled. Nothing was charged.",
+        "error": {
+          "not_owner": "Only the workspace owner can do this.",
+          "not_configured": "Cloud checkout is not open yet.",
+          "already_subscribed": "This workspace is already on Cloud. Use manage billing.",
+          "no_customer": "There is nothing to manage yet.",
+          "unavailable": "Stripe is unavailable. Try again in a minute."
         }
       }
     },
-    "orgs": {
-      "label": "Organisation",
-      "new": "New organisation",
-      "namePlaceholder": "Organisation name",
-      "create": "Create",
-      "cancel": "Cancel"
+    "account": {
+      "settings": "Account",
+      "signOut": "Sign out",
+      "billing": "Billing"
+    },
+    "dashboard": {
+      "greeting": "hi, {name}!",
+      "greetingAnon": "hi!",
+      "cloud": "Feega Cloud is coming. For now, Feega lives in your editor.",
+      "extension": "Get the extension",
+      "github": "Star on GitHub"
     }
   },
   "cookie": {
@@ -407,156 +213,6 @@
     "marketing": "Marketing",
     "marketingHint": "Meta Pixel and the Google gtag.js conversion tag.",
     "settings": "Cookie settings"
-  },
-  "chat": {
-    "leave": {
-      "title": "The assistant is still working. Leave anyway?",
-      "stay": "Stay",
-      "leave": "Leave"
-    },
-    "panel": {
-      "log": "Conversation",
-      "agent": "Agent",
-      "you": "You",
-      "noScope": "Open a project to start chatting.",
-      "emptyTitle": "What are we making?",
-      "emptyBody": "The agent reads and edits this project's canvases: it adds nodes, connects them and runs generations.",
-      "suggestions": [
-        "What's on my canvases right now?",
-        "Add a text node with three hook ideas for a product launch",
-        "Create an image node for a minimal hero shot and connect it to my text",
-        "Summarise the assets this project has produced"
-      ],
-      "motion": {
-        "emptyTitle": "What should this video do?",
-        "emptyBody": "The agent edits this video: clips, text, keyframes, masks, audio. It checks its work on real frames.",
-        "suggestions": [
-          "Make the opening title bigger and blue",
-          "Add a 3-second end card with our URL",
-          "Tighten the cuts to the beat of the music",
-          "Check the frames for overflowing text"
-        ]
-      },
-      "placeholder": "Ask the agent…",
-      "hint": "Enter to send · Shift+Enter for a new line",
-      "selection": {
-        "list": "Selected on the canvas",
-        "remove": "Do not send {name}",
-        "more": "+{count}"
-      },
-      "attach": {
-        "button": "Attach files or images",
-        "drop": "Drop files to attach",
-        "remove": "Remove {name}",
-        "list": "Attachments",
-        "uploading": "Uploading {name}",
-        "error": {
-          "attachment_empty": "The file is empty.",
-          "attachment_too_large": "Too large: 20 MB at most.",
-          "attachment_unsupported": "Not supported: images, videos (MP4, MOV, WebM), PDF, DOCX, PPTX, XLSX, CSV, TXT, MD or HTML.",
-          "too_many_attachments": "10 attachments per message at most.",
-          "attachment_unreadable": "No text could be read from this file.",
-          "attachment_refused": "Refused by the safety review.",
-          "attachment_not_found": "The upload was lost: try again.",
-          "attachment_invalid_path": "The upload was lost: try again.",
-          "upload_failed": "Upload failed: try again."
-        }
-      },
-      "send": "Send",
-      "stop": "Stop generating",
-      "jump": "Jump to latest",
-      "thinking": "Working…",
-      "brief": {
-        "title": "Research and script",
-        "go": "Build it",
-        "edit": "Change it",
-        "countdown": "Building in {seconds} s",
-        "held": "Waiting for your changes",
-        "storyboard": "Open storyboard"
-      },
-      "cut": {
-        "title": "First cut: critic {score}/10",
-        "sheet": "Contact sheet of the whole video",
-        "apply": "Apply fixes",
-        "always": "Apply, and stop asking",
-        "ship": "Keep it as is"
-      },
-      "budget": {
-        "title": "Video budget used: ${spent} spent",
-        "body": "The work is saved. Continue to let the agent spend up to ${raise} more on this video.",
-        "continue": "Continue (+${raise})"
-      },
-      "pick": {
-        "label": "Pick references",
-        "hint": "Tap once to follow, twice to avoid",
-        "follow": "Follow",
-        "avoid": "Avoid",
-        "neutral": "Not marked",
-        "note": "Anything else about your taste? (optional)",
-        "go": "Continue",
-        "count": "{follow} to follow · {avoid} to avoid",
-        "answered": "Your pick",
-        "passed": "Not answered",
-        "reject": "None of these, search again",
-        "query": "What to look for instead? (optional)",
-        "avoidAll": "Avoid these too",
-        "back": "Back",
-        "search": "Search again",
-        "rejected": "None fit",
-        "searchedFor": "Searching again for: {query}",
-        "searchedOwn": "Searching again with a new query"
-      },
-      "model": "Model",
-      "reasoning": "Reasoning",
-      "reasoningTrace": "Thinking",
-      "price": "${input} in · ${output} out per 1M tokens",
-      "effort": {
-        "default": "Default",
-        "none": "Off",
-        "minimal": "Minimal",
-        "low": "Low",
-        "medium": "Medium",
-        "high": "High",
-        "xhigh": "Extra high",
-        "max": "Max"
-      },
-      "responding": "Agent is responding",
-      "reconnecting": "Reconnecting… the agent keeps working.",
-      "retry": "Retry",
-      "buyCredits": "Get credits",
-      "openOnCanvas": "Open on canvas",
-      "input": "Input",
-      "output": "Result",
-      "tools": "{count, plural, one {# action} other {# actions}}",
-      "tool": {
-        "running": "Running",
-        "done": "Done",
-        "error": "Failed"
-      },
-      "failure": {
-        "load": "Couldn't load the conversation.",
-        "send": "The agent didn't answer.",
-        "empty": "The agent returned an empty reply.",
-        "credits": "You're out of credits.",
-        "agentCap": "This free team used its agent edits for the week. Subscribe for unlimited; your own edits are never capped.",
-        "blocked": "This message was blocked by feega's content rules."
-      }
-    },
-    "toolJob": {
-      "analytics_review": "Performance review",
-      "create_campaign": "Campaign",
-      "create_motion_video": "Motion video",
-      "discover_competitors": "Competitors",
-      "generate_content": "Content",
-      "generate_editorial_plan": "Editorial plan",
-      "generate_person": "Person",
-      "generate_strategy": "Strategy",
-      "produce_week": "Week's drafts",
-      "seo_add_initiatives": "SEO initiatives",
-      "seo_geo_audit": "SEO & GEO audit",
-      "seo_plan": "SEO plan",
-      "sync_social_history": "Social sync"
-    }
   },
   "error": {
     "toApp": "Back to the app",

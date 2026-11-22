@@ -9,14 +9,12 @@ const ensureSubscriptionCanceled = vi.fn();
 const ensureOrgCustomer = vi.fn();
 const createSubscriptionCheckout = vi.fn();
 const subscriptionPriceId = vi.fn();
-const gateCredits = vi.fn();
-const structured = vi.fn();
+const cloudPriceId = vi.fn();
 const billingGrantsReady = vi.fn();
 
 vi.mock('$lib/server/cli-auth', () => ({
 	openOrg: vi.fn(),
-	checkApiKeyWriteAccess: vi.fn(() => undefined),
-	gateOrgAiAction: vi.fn()
+	checkApiKeyWriteAccess: vi.fn(() => undefined)
 }));
 vi.mock('$lib/server/org-billing', () => ({
 	orgBillingById: (...args: unknown[]) => orgBillingById(...args),
@@ -29,22 +27,17 @@ vi.mock('$lib/server/stripe', () => ({
 	ensureSubscriptionCanceled: (...args: unknown[]) => ensureSubscriptionCanceled(...args),
 	ensureOrgCustomer: (...args: unknown[]) => ensureOrgCustomer(...args),
 	createSubscriptionCheckout: (...args: unknown[]) => createSubscriptionCheckout(...args),
-	subscriptionPriceId: (...args: unknown[]) => subscriptionPriceId(...args)
-}));
-vi.mock('$lib/server/credits', () => ({
-	gateCredits: (...args: unknown[]) => gateCredits(...args),
-	CreditsExhaustedError: class extends Error {}
+	subscriptionPriceId: (...args: unknown[]) => subscriptionPriceId(...args),
+	cloudPriceId: (...args: unknown[]) => cloudPriceId(...args)
 }));
 vi.mock('$lib/server/billing-readiness', () => ({
 	billingGrantsReady: (...args: unknown[]) => billingGrantsReady(...args)
 }));
 vi.mock('$lib/server/team/seat-billing', () => ({ editorCount: async () => 2 }));
-vi.mock('$lib/server/research', () => ({ structured: (...args: unknown[]) => structured(...args) }));
 vi.mock('$lib/server/app-url', () => ({ appOrigin: () => 'https://feega.test' }));
-vi.mock('$lib/server/feature-flags', () => ({ isPlanGoEnabled: () => false }));
 
 import { POST } from './+server';
-import { openOrg, checkApiKeyWriteAccess, gateOrgAiAction } from '$lib/server/cli-auth';
+import { openOrg, checkApiKeyWriteAccess } from '$lib/server/cli-auth';
 
 const CHECKOUT_URL = 'https://checkout.stripe.com/c/pay/cs_live_plan';
 const PLANS = [{ credits: 500, label: '€9 / editor / month' }];
@@ -83,7 +76,41 @@ beforeEach(() => {
 	ensureOrgCustomer.mockResolvedValue('cus_org');
 	createSubscriptionCheckout.mockResolvedValue(CHECKOUT_URL);
 	subscriptionPriceId.mockResolvedValue('price_sub_9');
+	cloudPriceId.mockImplementation((interval: string) => (interval === 'annual' ? 'price_cloud_y' : 'price_cloud_m'));
 	billingGrantsReady.mockResolvedValue(true);
+});
+
+describe('POST /api/v1/org/billing/checkout with an interval', () => {
+	it('checks out the monthly Cloud price', async () => {
+		const { res } = await call({ interval: 'monthly' });
+
+		expect(res.status).toBe(200);
+		expect(createSubscriptionCheckout).toHaveBeenCalledWith(expect.objectContaining({ priceId: 'price_cloud_m', quantity: 2 }));
+		expect(subscriptionPriceId).not.toHaveBeenCalled();
+	});
+
+	it('checks out the annual Cloud price', async () => {
+		await call({ interval: 'annual' });
+
+		expect(createSubscriptionCheckout).toHaveBeenCalledWith(expect.objectContaining({ priceId: 'price_cloud_y' }));
+	});
+
+	it('refuses with subscriptions_not_configured while the price env is unset', async () => {
+		cloudPriceId.mockReturnValue(undefined);
+
+		const { res, body } = await call({ interval: 'annual' });
+
+		expect(res.status).toBe(409);
+		expect(body.error).toBe('subscriptions_not_configured');
+		expect(createSubscriptionCheckout).not.toHaveBeenCalled();
+	});
+
+	it('refuses an unknown interval', async () => {
+		const { res } = await call({ interval: 'weekly' });
+
+		expect(res.status).toBe(400);
+		expect(createSubscriptionCheckout).not.toHaveBeenCalled();
+	});
 });
 
 describe('POST /api/v1/org/billing/checkout', () => {
@@ -102,8 +129,8 @@ describe('POST /api/v1/org/billing/checkout', () => {
 			priceId: 'price_sub_9',
 			credits: 500,
 			quantity: 2,
-			successUrl: 'https://feega.test/app/credits?checkout=success&session_id={CHECKOUT_SESSION_ID}',
-			cancelUrl: 'https://feega.test/app/credits?checkout=canceled'
+			successUrl: 'https://feega.test/app/settings/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}',
+			cancelUrl: 'https://feega.test/app/settings/billing?checkout=canceled'
 		});
 	});
 
@@ -130,7 +157,7 @@ describe('POST /api/v1/org/billing/checkout', () => {
 
 		expect(res.status).toBe(409);
 		expect(body.error).toBe('already_subscribed');
-		expect(body.app_billing_url).toBe('https://feega.test/app/credits');
+		expect(body.app_billing_url).toBe('https://feega.test/app/settings/billing');
 		expect(createSubscriptionCheckout).not.toHaveBeenCalled();
 		expect(createBillingPortalSession).not.toHaveBeenCalled();
 	});
@@ -147,14 +174,6 @@ describe('POST /api/v1/org/billing/checkout', () => {
 		expect(cancelSubscriptionAtPeriodEnd).not.toHaveBeenCalled();
 		expect(applyRetentionCoupon).not.toHaveBeenCalled();
 		expect(ensureSubscriptionCanceled).not.toHaveBeenCalled();
-	});
-
-	it('never gates on credits: whoever ran out is exactly who needs this link', async () => {
-		await call();
-
-		expect(gateOrgAiAction).not.toHaveBeenCalled();
-		expect(gateCredits).not.toHaveBeenCalled();
-		expect(structured).not.toHaveBeenCalled();
 	});
 
 	it('refuses a caller who does not own the org billing', async () => {
@@ -174,7 +193,7 @@ describe('POST /api/v1/org/billing/checkout', () => {
 
 		expect(res.status).toBe(409);
 		expect(body.error).toBe('subscriptions_not_configured');
-		expect(body.app_billing_url).toBe('https://feega.test/app/credits');
+		expect(body.app_billing_url).toBe('https://feega.test/app/settings/billing');
 		expect(createSubscriptionCheckout).not.toHaveBeenCalled();
 	});
 

@@ -1,5 +1,0 @@
-# Postgres data directory and uploaded files — local runtime state, never committed.
-volumes/db/data/*
-!volumes/db/data/.gitkeep
-volumes/storage/*
-!volumes/storage/.gitkeep

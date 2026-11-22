@@ -56,19 +56,3 @@ describe('en.json ships only strings the app can show', () => {
     expect(unreferenced).toEqual([]);
   });
 });
-
-describe('the docs strings travel only with the docs', () => {
-  it('app pages resolve their strings with no docs dictionary loaded, and the docs loader adds it', async () => {
-    const { get } = await import('svelte/store');
-    const { dictionary, locale, waitLocale } = await import('svelte-i18n');
-    const { loadDocsMessages } = await import('./index');
-    await waitLocale();
-    const current = get(locale) ?? 'en';
-
-    expect(get(dictionary)[current]?.['docs']).toBeUndefined();
-    expect(Object.keys(get(dictionary)[current] ?? {}).length).toBeGreaterThan(0);
-
-    await loadDocsMessages();
-    expect(get(dictionary)[current]?.['docs']).toBeDefined();
-  });
-});

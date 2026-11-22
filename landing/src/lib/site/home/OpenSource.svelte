@@ -1,13 +1,8 @@
-<script lang="ts">
-  import { AGENT_LOGOS } from '../home';
-  import { APP_URL } from '../links';
-</script>
+<script lang="ts"></script>
 
 <section class="open site-wide">
   <h2 data-agent-id="open-title">
-    open the Feega VS Code extension in your codebase, design directly in your real app with your
-    <span class="tail">agents<span class="logos" data-agent-id="open-logos">{#each AGENT_LOGOS as logo (logo.file)}<img src="/site/home/{logo.file}" alt={logo.name} width={logo.width} height="32" />{/each}</span>,</span>
-    then move to <a href={APP_URL}>Feega Cloud</a> to collaborate in real time.
+    click any element of your running app, design it like in Figma, and the change lands in your code. in VS Code, Cursor and Windsurf. free, no AI, with diffs.
   </h2>
 </section>
 
@@ -24,31 +19,9 @@
     font-weight: 400;
     text-align: center;
     text-wrap: balance;
-    max-width: 1000px;
+    max-width: var(--site-max);
     margin-inline: auto;
     overflow-wrap: break-word;
-  }
-
-  h2 a {
-    text-decoration: underline;
-    text-underline-offset: 0.15em;
-  }
-
-  .tail {
-    white-space: nowrap;
-  }
-
-  .logos {
-    display: inline-flex;
-    gap: 0.25em;
-    margin-left: 0.3em;
-    vertical-align: baseline;
-  }
-
-  .logos img {
-    height: 0.72em;
-    width: auto;
-    align-self: baseline;
   }
 
   @media (min-width: 810px) {

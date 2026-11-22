@@ -28,7 +28,7 @@ for (const path of ['.', 'tags', ...subdirs('tags')]) {
     assert.equal(meta(html, 'og:video'), SHARED_VIDEO);
     assert.equal(meta(html, 'og:image:width'), '1200');
     assert.equal(meta(html, 'og:image:height'), '630');
-    assert.match(meta(html, 'og:image:alt'), /^Feega: Design inside your code/);
+    assert.match(meta(html, 'og:image:alt'), /^Feega: Design in your codebase/);
   });
 }
 
