@@ -21,7 +21,7 @@ values
     'Feega',
     'free',
     '1.0.0',
-    '{"id":"feega.object-3d","name":"3D object","version":"1.0.0","permissions":["selection","project","edit.insert","edit.attributes","edit.dependency","edit.asset","file.pick","network:cdn.jsdelivr.net"],"contributions":{"addMenu":[{"id":"shape:cube","title":"Cube","category":"3D object"},{"id":"shape:sphere","title":"Sphere","category":"3D object"},{"id":"shape:torus","title":"Torus knot","category":"3D object"},{"id":"shape:text","title":"3D text","category":"3D object"},{"id":"shape:model","title":"Model (.glb)…","category":"3D object"}],"rightBar":[{"id":"scene","title":"3D object"}]}}'::jsonb
+    '{"id":"feega.object-3d","name":"3D object","version":"1.0.0","permissions":["selection","project","edit.insert","edit.attributes","edit.dependency","edit.asset","file.pick"],"contributions":{"addMenu":[{"id":"shape:cube","title":"Cube","category":"3D object"},{"id":"shape:sphere","title":"Sphere","category":"3D object"},{"id":"shape:torus","title":"Torus knot","category":"3D object"},{"id":"shape:text","title":"3D text","category":"3D object"},{"id":"shape:model","title":"Model (.glb)…","category":"3D object"}],"rightBar":[{"id":"scene","title":"3D object"}]}}'::jsonb
   )
 on conflict (id) do update
 set
