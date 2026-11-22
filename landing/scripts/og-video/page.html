@@ -30,7 +30,10 @@ body[data-mode="still"] #still, body[data-mode="video"] #video { display: block;
 .eyebrow::before { content: ''; width: 9px; height: 9px; background: var(--orange); }
 .title { font-weight: 600; letter-spacing: -.055em; line-height: .9; color: var(--ink); }
 
-#still .lockup { position: absolute; left: 72px; top: 64px; height: 38px; }
+#still .lockup { position: absolute; left: 72px; top: 64px; height: 38px; display: flex; align-items: center; gap: 10px; }
+#still .lockup .mark { height: 100%; }
+#still .lockup .mark svg { height: 100%; width: auto; }
+#still .lockup .name { font-weight: 600; font-size: 34px; letter-spacing: -.04em; line-height: 1; color: var(--ink); }
 #still .eyebrow { position: absolute; left: 74px; top: 316px; font-size: 13px; gap: 9px; }
 #still .eyebrow::before { width: 8px; height: 8px; }
 #still .title { position: absolute; left: 69px; top: 347px; font-size: 82px; }
@@ -87,7 +90,7 @@ body[data-mode="still"] #still, body[data-mode="video"] #video { display: block;
 </head>
 <body data-mode="still">
 <section id="still" class="mode">
-  <div class="lockup">{{LOCKUP}}</div>
+  <div class="lockup"><span class="mark">{{MARK}}</span><span class="name">Feega</span></div>
   <p class="eyebrow">free · open source · vs code</p>
   <h1 class="title">design in<br>your<br>codebase</h1>
   <div class="shot"><img src="data:image/webp;base64,{{SHOT}}" alt=""></div>
