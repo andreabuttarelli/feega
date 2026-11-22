@@ -8,7 +8,7 @@ import { ICONS, Pixel, hop } from "../pixel";
 import { Place, Section } from "../Section";
 import { INK, ORANGE, Tone } from "../style";
 
-export const TEMPLATES_FRAMES = 72;
+export const TEMPLATES_FRAMES = 69;
 export const TEMPLATES_TONE = Tone.Ink;
 
 const SPRITE_PARALLAX = 0.18;

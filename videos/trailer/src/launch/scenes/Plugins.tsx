@@ -12,7 +12,7 @@ import { ICON_PICK, OBJECT_PICK, Plugin, PluginInsert, PluginPanel, gridCell, pl
 import { Section } from "../Section";
 import { BLUE, INK, ORANGE, Tone } from "../style";
 
-export const PLUGINS_FRAMES = 200;
+export const PLUGINS_FRAMES = 208;
 export const PLUGINS_TONE = Tone.White;
 
 const WORD = "plugins";

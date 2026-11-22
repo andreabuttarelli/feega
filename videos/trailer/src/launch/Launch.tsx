@@ -1,6 +1,7 @@
 import type { FC } from "react";
 import { AbsoluteFill, Audio, Series, interpolate, staticFile } from "remotion";
 import { Sfx, Sound, type Cue } from "../components/Sfx";
+import { FPS } from "../timing";
 import { MUSIC, SceneOrigin, onBeat, sfxGain } from "./beat";
 import { assembleTicks, boxPopAt } from "./Headline";
 import { COLLAB_CUES, COLLAB_FRAMES, COLLAB_TONE, Collab } from "./scenes/Collab";
@@ -44,9 +45,9 @@ const rawStarts = SHOTS.map((_, i) => SHOTS.slice(0, i).reduce((sum, shot) => su
 
 const starts = rawStarts.map((at, i) => (i === 0 ? 0 : onBeat(at)));
 
-const lengths = starts.map((at, i) => (i + 1 < starts.length ? starts[i + 1] : RAW_TOTAL) - at);
+export const LAUNCH_FRAMES = onBeat(RAW_TOTAL);
 
-export const LAUNCH_FRAMES = RAW_TOTAL;
+const lengths = starts.map((at, i) => (i + 1 < starts.length ? starts[i + 1] : LAUNCH_FRAMES) - at);
 
 const exitCue = (shot: Shot, frames: number): Cue[] => {
   if (shot.exit === Exit.Cut) {
@@ -62,7 +63,7 @@ const CUES = SHOTS.flatMap((shot, i) => [...shot.cues, ...exitCue(shot, lengths[
 
 const musicVolume = (frame: number) => MUSIC.volume * interpolate(frame, [LAUNCH_FRAMES - MUSIC.fadeOut, LAUNCH_FRAMES], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
 
-const Music = () => (MUSIC.file ? <Audio src={staticFile(`music/${MUSIC.file}`)} volume={musicVolume} /> : null);
+const Music = () => (MUSIC.file ? <Audio src={staticFile(`music/${MUSIC.file}`)} startFrom={Math.round(MUSIC.startFrom * FPS)} volume={musicVolume} /> : null);
 
 const nextColor = (i: number) => TONES[SHOTS[Math.min(i + 1, SHOTS.length - 1)].tone].bg;
 

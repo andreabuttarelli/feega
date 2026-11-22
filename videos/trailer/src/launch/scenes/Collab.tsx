@@ -11,7 +11,7 @@ import { Pointer, pointerAt, type Click } from "../Pointer";
 import { Place, Section } from "../Section";
 import { MONO, Tone, UI } from "../style";
 
-export const COLLAB_FRAMES = 204;
+export const COLLAB_FRAMES = 222;
 export const COLLAB_TONE = Tone.Ink;
 
 const GRAB_AT = 18;

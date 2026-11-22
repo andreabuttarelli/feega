@@ -7,7 +7,7 @@ import { Pointer, pointerAt, type Click } from "../Pointer";
 import { Place, Section } from "../Section";
 import { Tone } from "../style";
 
-export const SELECT_FRAMES = 84;
+export const SELECT_FRAMES = 83;
 export const SELECT_TONE = Tone.Orange;
 export const SELECT_CLICK = 30;
 export const COLOUR_CLICK = 46;

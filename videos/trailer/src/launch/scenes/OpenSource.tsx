@@ -9,7 +9,7 @@ import { Press, pressAmount } from "../editor/FeegaEditor";
 import { Place, Section } from "../Section";
 import { INK, ORANGE, PAPER, Tone, UI } from "../style";
 
-export const OPEN_SOURCE_FRAMES = 95;
+export const OPEN_SOURCE_FRAMES = 97;
 export const STAR_CLICK = 66;
 export const OPEN_SOURCE_TONE = Tone.Orange;
 

@@ -72,11 +72,18 @@ wipes and the terminal reveal, taps on diff lines, chime when the agent finishes
 
 ## Music
 
-1. Drop the track in `public/music/` (e.g. `public/music/track.mp3`).
+Track: "The Classic Groove" by BOSNOW, 130 BPM, first downbeat at 0.875 s, 16-beat phrases
+(one lighter bar, three full). The mp3 is not in git (`public/music/*.mp3` is ignored): copy it
+locally to `public/music/classic-groove.mp3` before rendering.
+
+1. Drop the track in `public/music/`.
 2. In `src/launch/beat.ts` set `MUSIC`: `file` (name inside `public/music/`), `bpm`, `firstBeat`
-   (frame of the first downbeat at 30 fps), `volume`, `fadeOut` (frames), `sfxDuck` (SFX gain
-   while music plays).
-3. Render. Scene boundaries (cuts and wipes), boxed-word pops and the editor flips snap to the
-   nearest half-beat; total length stays the same.
+   (frame of the first downbeat in the video at 30 fps), `startFrom` (seconds into the track where
+   the video starts: 2.72 s, the first full bar), `volume`, `fadeOut` (frames), `sfxDuck` (SFX
+   gain while music plays).
+3. Render. Scene boundaries, boxed-word pops and the editor flips snap to the nearest beat; the
+   total snaps to a beat too. Scene lengths are whole beats (13.85 frames): Code, Collab, Plugins
+   and the end card start on bars; the video is 21 bars (1163 frames).
+4. Master to -14 LUFS, true peak <= -1 dBTP (two-pass `loudnorm`).
 
 With `file: null` nothing snaps and only the generated SFX play.

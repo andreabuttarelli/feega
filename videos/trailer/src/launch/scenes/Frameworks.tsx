@@ -9,7 +9,7 @@ import { Scatter, specks } from "../pixel";
 import { Section } from "../Section";
 import { INK, MONO, ORANGE, PAPER, Tone } from "../style";
 
-export const FRAMEWORKS_FRAMES = 95;
+export const FRAMEWORKS_FRAMES = 97;
 export const FRAMEWORKS_TONE = Tone.White;
 
 const ENTER_FROM = 0;

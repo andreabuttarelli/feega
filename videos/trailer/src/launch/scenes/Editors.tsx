@@ -10,7 +10,7 @@ import { Heading, Tumble, Scatter, specks } from "../pixel";
 import { Section } from "../Section";
 import { INK, MONO, ORANGE, Tone } from "../style";
 
-export const EDITORS_FRAMES = 100;
+export const EDITORS_FRAMES = 97;
 export const EDITORS_TONE = Tone.White;
 
 const GAP_OPEN = 8;

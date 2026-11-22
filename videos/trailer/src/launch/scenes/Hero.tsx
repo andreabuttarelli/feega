@@ -5,7 +5,7 @@ import { Place, Section } from "../Section";
 import { BLUE, ORANGE, Tone, WHITE } from "../style";
 
 export const HERO_LINES = ["design in your", "codebase."];
-export const HERO_FRAMES = 84;
+export const HERO_FRAMES = 83;
 export const HERO_TONE = Tone.White;
 
 const SPECKS = specks(1, 22, [ORANGE, BLUE, "#ff8a3d"]);

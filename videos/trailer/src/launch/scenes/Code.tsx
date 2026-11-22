@@ -6,7 +6,7 @@ import { Align, Headline } from "../Headline";
 import { Place, Section } from "../Section";
 import { MONO, ORANGE, PAPER, Tone } from "../style";
 
-export const CODE_FRAMES = 96;
+export const CODE_FRAMES = 97;
 export const CODE_TONE = Tone.Paper;
 export const DIFF_IN = 16;
 export const DIFF_LINES_AT = 30;
