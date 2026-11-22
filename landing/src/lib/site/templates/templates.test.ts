@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { PAGE_TITLES, llmsFullTxt, llmsTxt } from '../llms';
@@ -9,15 +9,17 @@ import { CATEGORY_COPY, FRAMEWORK_COPY, HUB_COPY } from './copy';
 import { factsOf, relatedTo, tokensUsed } from './guide';
 import { TEMPLATE_PATHS } from './index';
 import { collectionJsonLd, templateJsonLd } from './jsonld';
-import { TEMPLATES, templateById } from './library';
+import { PREVIEWABLE, TEMPLATES, templateById } from './library';
 import { HUB_META, MAX_DESCRIPTION, MAX_TITLE, categoryMeta, frameworkMeta, templateMeta } from './meta';
-import { CATEGORY_SLUGS, HUB_FRAMEWORKS, HUB_SLUGS, frameworkPath, shotPath, templatePath } from './paths';
+import { CATEGORY_SLUGS, HUB_FRAMEWORKS, HUB_SLUGS, VideoFormat, frameworkPath, proPosterPath, proVideoPath, shotPath, templatePath } from './paths';
 import { previewDocument } from './preview';
 import { TOKENS_CSS, codeOf, previewParts } from './sources';
 import { Category, Framework, Theme, Tier } from './template';
 
 const STATIC = resolve(import.meta.dirname, '../../../../static');
-const LIBRARY_SIZE = 62;
+const LIBRARY = resolve(import.meta.dirname, '../../../../../packages/library');
+const LIBRARY_SIZE = ['items', 'pro'].flatMap((dir) => readdirSync(resolve(LIBRARY, dir))).length;
+const PRO_ID = 'parallax-gallery';
 const CATEGORY_WORDS = { min: 150, max: 300 };
 const FRAMEWORK_WORDS = { min: 400, max: 700 };
 
@@ -143,9 +145,9 @@ describe('what each item page says', () => {
     expect(tokens[0]).toMatchObject({ token: '--feega-fg', uses: 2 });
   });
 
-  it.each(TEMPLATES.map((t) => t.id))('%s has facts of its own and six related templates', async (id) => {
+  it.each(TEMPLATES.filter((t) => t.tier === Tier.Free).map((t) => t.id))('%s has facts of its own and six related templates', async (id) => {
     const template = templateById(id)!;
-    const [parts, code] = await Promise.all([previewParts(id), codeOf(template)]);
+    const [parts, code] = await Promise.all([previewParts(template), codeOf(template)]);
     const facts = factsOf(template, parts, code);
     expect(facts.intro).toContain(template.name);
     expect(facts.tokens.length).toBeGreaterThan(0);
@@ -156,16 +158,47 @@ describe('what each item page says', () => {
 
   it('says an item with a script has behaviour, and one without has none', async () => {
     const [tabs, card] = ['tabs', 'card'].map((id) => templateById(id)!);
-    const describeOf = async (t: typeof tabs) => factsOf(t, await previewParts(t.id), await codeOf(t)).behaviour;
+    const describeOf = async (t: typeof tabs) => factsOf(t, await previewParts(t), await codeOf(t)).behaviour;
     expect(await describeOf(tabs)).toMatch(/has behaviour/);
     expect(await describeOf(card)).toMatch(/no script/);
+  });
+});
+
+describe('a pro item', () => {
+  const pro = templateById(PRO_ID)!;
+
+  it('is read from the library as pro', () => {
+    expect(pro.tier).toBe(Tier.Pro);
+  });
+
+  it('has no live preview page, so its html never ships', () => {
+    expect(PREVIEWABLE.map((t) => t.id)).not.toContain(PRO_ID);
+    expect(PREVIEWABLE).toHaveLength(TEMPLATES.length - 1);
+  });
+
+  it('has no source to read, not even for the facts', async () => {
+    expect(await previewParts(pro)).toEqual({ markup: '', css: '' });
+    const facts = factsOf(pro, await previewParts(pro), await codeOf(pro));
+    expect(facts.intro).toContain('Feega Cloud');
+    expect(facts.intro).not.toMatch(/free/i);
+  });
+
+  it('is not called free in its title or description', () => {
+    const meta = templateMeta(pro);
+    expect(`${meta.title} ${meta.description}`).not.toMatch(/free/i);
+  });
+
+  it('has a looping preview video and a poster', () => {
+    for (const file of [proVideoPath(PRO_ID, VideoFormat.Webm), proVideoPath(PRO_ID, VideoFormat.Mp4), proPosterPath(PRO_ID)]) {
+      expect(existsSync(resolve(STATIC, file.slice(1))), file).toBe(true);
+    }
   });
 });
 
 describe('the preview document', () => {
   it('is noindex, themed from the hash and loads the item markup and tokens', async () => {
     const template = templateById('hero-centered')!;
-    const html = previewDocument(template, await previewParts(template.id), TOKENS_CSS);
+    const html = previewDocument(template, await previewParts(template), TOKENS_CSS);
     expect(html).toContain('name="robots" content="noindex"');
     expect(html).toContain("location.hash === '#light'");
     expect(html).toContain('--feega-accent');

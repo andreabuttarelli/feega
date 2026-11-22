@@ -41,7 +41,7 @@ jobs:
             fi
           }
           emit app '^(src/|supabase/|static/|scripts/|cli/|packages/|tests/|package\.json|package-lock\.json|svelte\.config\.js|vite\.config\.ts|tsconfig\.json|\.github/workflows/ci\.yml)'
-          emit landing '^(landing/|packages/site-theme/|src/lib/content/changelog/|\.github/workflows/ci\.yml)'
+          emit landing '^(landing/|packages/site-theme/|packages/library/|src/lib/content/changelog/|\.github/workflows/ci\.yml)'
           emit web-docs '^(web-docs/|packages/site-theme/|docs/|cli/|\.github/workflows/ci\.yml)'
           emit web-blog '^(web-blog/|packages/site-theme/|\.github/workflows/ci\.yml)'
 
@@ -157,6 +157,10 @@ jobs:
       - name: Landing build
         if: needs.changes.outputs.landing == 'true'
         run: npm --prefix landing run build
+
+      - name: No pro source in the landing build
+        if: needs.changes.outputs.landing == 'true'
+        run: node landing/scripts/no-pro-source.mjs
 
   schema-drift:
     runs-on: ubuntu-24.04

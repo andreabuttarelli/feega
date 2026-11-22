@@ -1,5 +1,5 @@
 import { CATEGORY_COPY, FRAMEWORK_COPY } from './copy';
-import { Category, type HubFramework, type Template } from './template';
+import { Category, TIER_WORD, Tier, type HubFramework, type Template } from './template';
 import { TEMPLATES } from './library';
 
 export const MAX_TITLE = 60;
@@ -15,22 +15,29 @@ const NOUN: Readonly<Record<Category, string>> = {
   [Category.App]: 'app UI'
 };
 
+const KIND: Readonly<Record<Tier, (noun: string) => string>> = {
+  [Tier.Free]: (noun) => `free ${noun}`,
+  [Tier.Pro]: (noun) => `${noun} in ${TIER_WORD[Tier.Pro]}`
+};
+
+const capital = (text: string) => text[0].toUpperCase() + text.slice(1);
+
 export function templateMeta(template: Template): Meta {
-  const noun = NOUN[template.category];
+  const kind = KIND[template.tier](NOUN[template.category]);
   const title = firstFitting(
     [
-      `${template.name}: free ${noun} for Svelte, React, Vue | Feega`,
-      `${template.name}: free ${noun} for React and Svelte | Feega`,
-      `${template.name}: free ${noun} | Feega`,
+      `${template.name}: ${kind} for Svelte, React, Vue | Feega`,
+      `${template.name}: ${kind} for React and Svelte | Feega`,
+      `${template.name}: ${kind} | Feega`,
       `${template.name} | Feega`
     ],
     MAX_TITLE
   );
   const description = firstFitting(
     [
-      `${template.description} Free ${noun} in Svelte, React, Vue, Astro and HTML, with light and dark themes.`,
-      `${template.description} Free ${noun} in Svelte, React, Vue, Astro and HTML.`,
-      `${template.description} Free ${noun} for Svelte, React and Vue.`,
+      `${template.description} ${capital(kind)} in Svelte, React, Vue, Astro and HTML, with light and dark themes.`,
+      `${template.description} ${capital(kind)} in Svelte, React, Vue, Astro and HTML.`,
+      `${template.description} ${capital(kind)} for Svelte, React and Vue.`,
       template.description
     ],
     MAX_DESCRIPTION

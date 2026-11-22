@@ -10,20 +10,24 @@ import { blocks } from './blocks.mjs';
 import { pieces } from './pieces.mjs';
 import { palette } from './palette.mjs';
 import { scrollReveal } from './scroll-reveal.mjs';
+import { parallaxGallery } from './parallax-gallery.mjs';
 
-const ITEMS = join(dirname(fileURLToPath(import.meta.url)), '..', 'items');
+const PACKAGE = join(dirname(fileURLToPath(import.meta.url)), '..');
+const TIER_DIRS = { free: join(PACKAGE, 'items'), pro: join(PACKAGE, 'pro') };
 const FRAMEWORKS = ['html', 'svelte', 'react', 'vue', 'astro'];
 const SANS = { family: 'Inter Tight', weights: [400, 500, 600] };
 const MONO = { family: 'Fragment Mono', weights: [400] };
 
 const name = (id) => id.split('-').map((p) => p[0].toUpperCase() + p.slice(1)).join('');
-const put = (id, fw, file, text) => {
-  mkdirSync(join(ITEMS, id, fw), { recursive: true });
-  writeFileSync(join(ITEMS, id, fw, file), text);
+const tierOf = (item) => item.tier ?? 'free';
+const dirOf = (item) => join(TIER_DIRS[tierOf(item)], item.id);
+const put = (item, fw, file, text) => {
+  mkdirSync(join(dirOf(item), fw), { recursive: true });
+  writeFileSync(join(dirOf(item), fw, file), text);
 };
 
 function manifest(item, C) {
-  const file = join(ITEMS, item.id, 'manifest.json');
+  const file = join(dirOf(item), 'manifest.json');
   const old = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : {};
   const fonts = C.includes('--feega-font-mono') ? [SANS, MONO] : [SANS];
   const next = {
@@ -35,27 +39,28 @@ function manifest(item, C) {
     frameworks: FRAMEWORKS,
     dependencies: [],
     fonts,
-    tier: 'free'
+    tier: tierOf(item),
+    ...(item.preview ? { preview: item.preview } : {})
   };
   writeFileSync(file, JSON.stringify(next, null, 2) + '\n');
 }
 
-function emit(id, C, f) {
-  const N = name(id);
-  put(id, 'html', 'index.html', f.html.endsWith('\n') ? f.html : f.html + '\n');
-  put(id, 'html', 'style.css', C);
-  put(id, 'svelte', `${N}.svelte`, f.svelte);
-  put(id, 'vue', `${N}.vue`, f.vue);
-  put(id, 'astro', `${N}.astro`, f.astro);
-  put(id, 'react', `${N}.tsx`, f.react);
-  put(id, 'react', `${N}.css`, C);
+function emit(item, C, f) {
+  const N = name(item.id);
+  put(item, 'html', 'index.html', f.html.endsWith('\n') ? f.html : f.html + '\n');
+  put(item, 'html', 'style.css', C);
+  put(item, 'svelte', `${N}.svelte`, f.svelte);
+  put(item, 'vue', `${N}.vue`, f.vue);
+  put(item, 'astro', `${N}.astro`, f.astro);
+  put(item, 'react', `${N}.tsx`, f.react);
+  put(item, 'react', `${N}.css`, C);
 }
 
 for (const item of [...sections, ...app, ...components, ...variants, ...blocks, ...pieces]) {
   const C = css(`fl-${item.id}`, item.mods, item.css);
   const N = name(item.id);
   const m = item.markup.trim();
-  emit(item.id, C, {
+  emit(item, C, {
     html: m,
     svelte: `${m}\n\n<style>\n${C}</style>\n`,
     vue: `<template>\n${indent(m, 2)}\n</template>\n\n<style scoped>\n${C}</style>\n`,
@@ -65,9 +70,9 @@ for (const item of [...sections, ...app, ...components, ...variants, ...blocks, 
   manifest(item, C);
 }
 
-for (const item of [...interactive, palette, scrollReveal]) {
+for (const item of [...interactive, palette, scrollReveal, parallaxGallery]) {
   const C = css(`fl-${item.id}`, item.mods, item.css);
-  emit(item.id, C, item.files(C));
+  emit(item, C, item.files(C));
   manifest(item, C);
 }
 

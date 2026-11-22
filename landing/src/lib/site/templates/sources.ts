@@ -26,8 +26,13 @@ export async function codeOf(template: Template): Promise<FrameworkCode> {
   return Object.fromEntries(frameworks.map((f, i) => [f, lists[i]])) as FrameworkCode;
 }
 
-export async function previewParts(id: string): Promise<{ markup: string; css: string }> {
-  const [markup, css] = await Promise.all(['index.html', 'style.css'].map((name) => FILES[`${PREFIX}${id}/html/${name}`]()));
+const NO_PARTS = { markup: '', css: '' };
+
+export async function previewParts(template: Template): Promise<{ markup: string; css: string }> {
+  if (template.tier === Tier.Pro) {
+    return NO_PARTS;
+  }
+  const [markup, css] = await Promise.all(['index.html', 'style.css'].map((name) => FILES[`${PREFIX}${template.id}/html/${name}`]()));
 
   return { markup, css };
 }
