@@ -17,6 +17,7 @@ export type EditorShot = ShotFile & { readonly alt: string; readonly narrow: Sho
 const DIR = '/img/editor';
 const DESKTOP = { width: 1440, height: 900 } as const;
 const HALF = 2;
+const PHONE_CROP = { width: 800, height: 720 } as const;
 
 const file = (name: string, width: number, height: number): ShotFile => ({ src: `${DIR}/${name}.webp`, width, height });
 const crop = (name: string, width: number, height: number): ShotFile => file(name, width / HALF, height / HALF);
@@ -25,24 +26,24 @@ const full = (name: string): ShotFile => file(name, DESKTOP.width, DESKTOP.heigh
 const frameworkShot = (id: EditorShotId, framework: string, page: string, source: string): EditorShot => ({
   ...full(id),
   alt: `The Feega editor on a ${framework} project: the Layers tree, ${page} with its heading selected, and the Properties bar showing ${source} under the selection`,
-  narrow: crop(`crop-${id}`, 600, 440)
+  narrow: crop(`crop-${id}`, PHONE_CROP.width, PHONE_CROP.height)
 });
 
 export const EDITOR_SHOTS: Readonly<Record<EditorShotId, EditorShot>> = {
   [EditorShotId.Overview]: {
     ...full(EditorShotId.Overview),
     alt: 'The Feega editor: the Layers tree on the left, a release monitoring landing page in the middle with its hero button selected, and the Properties bar on the right',
-    narrow: crop('crop-overview', 600, 1420)
+    narrow: crop('crop-overview', PHONE_CROP.width, PHONE_CROP.height)
   },
   [EditorShotId.Selected]: {
     ...full(EditorShotId.Selected),
     alt: 'The Feega editor on a photographer portfolio with the page heading selected: size, spacing, typography, fill and radius rows in the Properties bar, and the source file and line under the selection',
-    narrow: crop('crop-selected', 600, 1420)
+    narrow: crop('crop-selected', PHONE_CROP.width, PHONE_CROP.height)
   },
   [EditorShotId.Changes]: {
     ...full(EditorShotId.Changes),
     alt: 'The Changes tab of the Feega editor on a home goods shop after one edit: one file changed, a border-radius of 12px with Show diff and Revert buttons',
-    narrow: crop('crop-changes', 600, 330)
+    narrow: crop('crop-changes', PHONE_CROP.width, PHONE_CROP.height)
   },
   [EditorShotId.LayersMenu]: {
     ...full(EditorShotId.LayersMenu),
