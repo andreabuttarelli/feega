@@ -6,7 +6,7 @@ export const HOME_META = {
   description: 'Feega is free, in VS Code or with npx feega: click an element of your running app, edit it like in Figma, and the change lands in your code.'
 } as const;
 
-export const OG_IMAGE_ALT = `Feega: ${HERO_HEADLINE} An isometric canvas where code becomes a design, a layout gets a timeline and a prompt wires into image and video nodes.`;
+export const OG_IMAGE_ALT = `Feega: ${HERO_HEADLINE}. A heading selected in a running app inside the Feega editor, next to a code diff where its size changes from 64px to 88px.`;
 
 export const OG = {
   image: { url: `${SITE_URL}/og.png`, type: 'image/png', width: 1200, height: 630, alt: OG_IMAGE_ALT },
