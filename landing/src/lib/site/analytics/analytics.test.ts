@@ -154,3 +154,17 @@ describe('key CTAs carry their data attributes', () => {
     expect(allEventsValid(body)).toBe(true);
   });
 });
+
+describe('install menu options', () => {
+  it('tags every option with the target the visitor picked', async () => {
+    const { installOptionAttrs } = await import('./nav');
+    expect(installOptionAttrs({ label: 'VS Code' }, 'hero')).toEqual({
+      'data-event': 'download_click',
+      'data-props': JSON.stringify({ target: 'vs code', place: 'hero' })
+    });
+    expect(installOptionAttrs({ label: 'Terminal', command: 'npx feega' }, 'nav')).toEqual({
+      'data-event': 'download_click',
+      'data-props': JSON.stringify({ target: 'npx feega', place: 'nav' })
+    });
+  });
+});

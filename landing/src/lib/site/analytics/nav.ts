@@ -9,3 +9,8 @@ const TRACKED_LINKS: Readonly<Record<string, (place: string) => Attrs>> = {
 };
 
 export const navAttrs = (href: string, place: string): Attrs => TRACKED_LINKS[href]?.(place) ?? {};
+
+type MenuOption = { label: string; command?: string };
+
+export const installOptionAttrs = (option: MenuOption, place: string): Attrs =>
+  eventAttrs('download_click', { target: (option.command ?? option.label).toLowerCase(), place });

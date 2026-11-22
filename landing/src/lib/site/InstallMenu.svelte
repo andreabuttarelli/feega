@@ -3,6 +3,7 @@
   import { EDITOR_ICONS } from './editor-icons';
   import CommandField from './CommandField.svelte';
   import { eventAttrs } from './analytics/attrs';
+  import { installOptionAttrs } from './analytics/nav';
   import { APPLE_ICON } from './social-icons';
   import { DESKTOP_DMGS, DESKTOP_INSTALL_COMMAND, DESKTOP_PUBLISHED, DOWNLOAD_PATH } from './links';
 
@@ -43,7 +44,7 @@
   {#if open}
     <div class="menu" role="menu">
       {#each options as option (option.label)}
-        <button role="menuitem" type="button" onclick={() => choose(option)} {...(option.command ? eventAttrs('install_copy', { command: option.command }) : {})}>
+        <button role="menuitem" type="button" onclick={() => choose(option)} {...installOptionAttrs(option, place)}>
           <span class="logo">{@html EDITOR_ICONS[option.label] ?? ''}</span>
           <span>{(option.command ?? option.label).toLowerCase()}</span>
           {#if option.command && copied}<span class="done">copied</span>{/if}
@@ -53,7 +54,7 @@
         <p class="section"><img src="/img/feega-desktop.png" alt="" width="20" height="20" />desktop app (beta)</p>
         <div class="field"><CommandField command={DESKTOP_INSTALL_COMMAND} /></div>
         {#each DESKTOP_DMGS as dmg (dmg.arch)}
-          <a role="menuitem" href={dmg.href} {...eventAttrs('download_click', { target: 'dmg', place })}><span class="logo">{@html APPLE_ICON}</span><span>dmg · {dmg.arch.toLowerCase()}</span></a>
+          <a role="menuitem" href={dmg.href} {...eventAttrs('download_click', { target: `dmg ${dmg.arch.toLowerCase()}`, place })}><span class="logo">{@html APPLE_ICON}</span><span>dmg · {dmg.arch.toLowerCase()}</span></a>
         {/each}
         <p class="hint">macOS blocks the dmg. allow it in privacy & security, open anyway.</p>
       {/if}
