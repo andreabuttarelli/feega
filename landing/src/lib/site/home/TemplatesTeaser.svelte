@@ -9,7 +9,7 @@
 
 <section class="teaser site-wide" aria-labelledby="teaser-title">
   <p class="eyebrow">{lower(TEASER_EYEBROW)}</p>
-  <h2 id="teaser-title" data-agent-id="templates-title">{lower(teaserTitle(count))}</h2>
+  <h2 id="teaser-title" data-agent-id="templates-title">{lower(teaserTitle())}</h2>
   <p class="copy">{lower(TEASER_COPY)}</p>
 
   <ul class="shots">

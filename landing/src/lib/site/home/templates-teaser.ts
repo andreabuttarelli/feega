@@ -12,7 +12,7 @@ export const TEASER_COPY = 'Svelte, React, Vue and Astro. Insert one from the ed
 
 export const TEASER_CTA = { label: 'browse templates', href: TEMPLATES_PATH } as const;
 
-export const teaserTitle = (freeCount: number): string => `${freeCount} free templates, ready to drop in`;
+export const teaserTitle = (): string => 'free templates, ready to drop in';
 
 export type TeaserShot = { id: string; name: string; href: string; src: string; alt: string; width: number; height: number };
 
