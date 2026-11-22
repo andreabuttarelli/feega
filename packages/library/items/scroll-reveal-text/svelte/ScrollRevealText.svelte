@@ -1,25 +1,4 @@
 <script lang="ts">
-  const PARAS = [
-    'This is placeholder copy. Replace it with a short statement about what your product does and who it is for.',
-    'Each word lights up as the reader scrolls, so keep the sentences short and the ideas clear.',
-    'Scroll back up and the text fades again. Swap these lines for your own words.'
-  ];
-
-  type Unit = { t: string; i: number };
-  type Word = { units: Unit[] };
-  type Para = { text: string; words: Word[] };
-
-  function split(paras: string[], reveal: string): { paras: Para[]; total: number } {
-    let i = 0;
-    const out = paras.map((text) => ({
-      text,
-      words: text.split(' ').map((word) => ({
-        units: (reveal === 'char' ? [...word] : [word]).map((t) => ({ t, i: i++ }))
-      }))
-    }));
-    return { paras: out, total: i };
-  }
-
   const START = 0.8;
   const END = 0.4;
 
@@ -55,20 +34,58 @@
     };
   }
 
-  let { reveal = 'word' }: { reveal?: 'word' | 'char' } = $props();
+  function build(root: HTMLElement, reveal: string) {
+    let i = 0;
 
-  const view = $derived(split(PARAS, reveal));
+    root.querySelectorAll('p').forEach((p) => {
+      const text = (p.textContent ?? '').trim();
+      const hidden = document.createElement('span');
+      hidden.setAttribute('aria-hidden', 'true');
+
+      text.split(' ').forEach((word, index, all) => {
+        const w = document.createElement('span');
+        w.className = 'w';
+        (reveal === 'char' ? [...word] : [word]).forEach((t) => {
+          const u = document.createElement('span');
+          u.className = 'u';
+          u.textContent = t;
+          u.style.setProperty('--i', String(i++));
+          w.append(u);
+        });
+        hidden.append(w);
+        if (index < all.length - 1) {
+          hidden.append(' ');
+        }
+      });
+
+      const sr = document.createElement('span');
+      sr.className = 'sr';
+      sr.textContent = text;
+      p.replaceChildren(sr, hidden);
+    });
+
+    root.style.setProperty('--n', String(i));
+  }
+
+  function mount(root: HTMLElement): () => void {
+    if (!root.hasAttribute('data-ready')) {
+      root.setAttribute('data-ready', '');
+      build(root, root.dataset.reveal === 'char' ? 'char' : 'word');
+    }
+    return track(root);
+  }
+
   let root: HTMLElement;
 
-  $effect(() => track(root));
+  $effect(() => mount(root));
 </script>
 
 <section class="fl-scroll-reveal-text">
   <div class="fl-container">
-    <div class="reveal" data-reveal={reveal} style="--n:{view.total}" bind:this={root}>
-      {#each view.paras as para}
-        <p><span class="sr">{para.text}</span><span aria-hidden="true">{#each para.words as word, k}<span class="w">{#each word.units as unit}<span class="u" style="--i:{unit.i}">{unit.t}</span>{/each}</span>{#if k < para.words.length - 1}{' '}{/if}{/each}</span></p>
-      {/each}
+    <div class="reveal" data-reveal="word" bind:this={root}>
+      <p>This is placeholder copy. Replace it with a short statement about what your product does and who it is for.</p>
+      <p>Each word lights up as the reader scrolls, so keep the sentences short and the ideas clear.</p>
+      <p>Scroll back up and the text fades again. Swap these lines for your own words.</p>
     </div>
   </div>
 </section>

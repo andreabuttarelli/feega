@@ -1,10 +1,9 @@
 ---
-const { reveal = 'word' } = Astro.props;
 ---
 
 <section class="fl-scroll-reveal-text">
   <div class="fl-container">
-    <div class="reveal" data-reveal={reveal}>
+    <div class="reveal" data-reveal="word">
       <p>This is placeholder copy. Replace it with a short statement about what your product does and who it is for.</p>
       <p>Each word lights up as the reader scrolls, so keep the sentences short and the ideas clear.</p>
       <p>Scroll back up and the text fades again. Swap these lines for your own words.</p>
@@ -81,10 +80,16 @@ function build(root: HTMLElement, reveal: string) {
   root.style.setProperty('--n', String(i));
 }
 
+function mount(root: HTMLElement): () => void {
+  if (!root.hasAttribute('data-ready')) {
+    root.setAttribute('data-ready', '');
+    build(root, root.dataset.reveal === 'char' ? 'char' : 'word');
+  }
+  return track(root);
+}
+
 document.querySelectorAll<HTMLElement>('.fl-scroll-reveal-text .reveal:not([data-ready])').forEach((root) => {
-  root.setAttribute('data-ready', '');
-  build(root, root.dataset.reveal === 'char' ? 'char' : 'word');
-  track(root);
+  mount(root);
 });
 </script>
 
