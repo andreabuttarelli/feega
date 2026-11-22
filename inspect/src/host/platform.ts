@@ -1,5 +1,7 @@
 import type { HostMessage, Source, ViewMessage } from '../messages';
 import type { AccountStore } from './account';
+import type { CommentsCloud } from './comments';
+import type { SharePort } from './share/share-port-factory';
 import type { OnboardingStore } from './onboarding';
 import type { UsageHost } from './usage';
 import type { SettingKey, SettingValue, Settings } from '../settings';
@@ -8,6 +10,7 @@ export enum Stored {
   Prefs = 'feegaInspect.prefs',
   History = 'feegaInspect.history',
   App = 'feegaInspect.app',
+  ShareNotice = 'feegaInspect.shareNotice',
   Pids = 'feegaInspect.pids'
 }
 
@@ -37,8 +40,11 @@ export type Platform = Transport & {
   openSettings: (key: SettingKey) => unknown;
   sourceControl: () => unknown;
   notify: (text: string) => unknown;
+  warn: (text: string, action?: string) => Promise<boolean>;
   pickImage?: () => Promise<ChosenImage | null>;
   usage?: UsageHost;
   account: AccountStore;
+  cloud?: CommentsCloud;
+  share?: SharePort;
   onboarding: OnboardingStore;
 };

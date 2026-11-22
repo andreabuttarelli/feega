@@ -521,4 +521,15 @@ describe('fileEdits in an element state', () => {
 
     expect(out.ok).toBe(false);
   });
+
+  it('in un file Astro il colore va in una regola del blocco style, non nell attributo style', async () => {
+    const root = app(PLAIN);
+    writeFileSync(join(root, 'src/Page.astro'), '---\nconst title = 1;\n---\n<main>\n  <h1>Hello</h1>\n</main>\n');
+    await fileEdits(root).edit({ at: 'src/Page.astro:5:3', prop: LiveProp.Color, value: '#ff0000', css: { color: '#ff0000' } });
+    const page = readFileSync(join(root, 'src/Page.astro'), 'utf8');
+
+    expect(page).toContain('<style>');
+    expect(page).toContain('color: #ff0000');
+    expect(page).not.toContain('style="');
+  });
 });

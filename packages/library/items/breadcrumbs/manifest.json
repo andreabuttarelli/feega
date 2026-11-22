@@ -1,0 +1,29 @@
+{
+  "id": "breadcrumbs",
+  "name": "Breadcrumbs",
+  "description": "Trail of links ending at the current page; middle items hide on phones.",
+  "category": "component",
+  "tags": [
+    "breadcrumbs",
+    "navigation"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    }
+  ],
+  "tier": "free"
+}

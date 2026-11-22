@@ -14,6 +14,8 @@ import type { LinkEdit, LinkRead } from '@feega/live-edit/link-edit';
 import type { OffsetSide } from '@feega/live-edit/authored-offsets';
 import type { Breakpoints } from '@feega/live-edit/breakpoints';
 import type { Theme } from '@feega/live-edit/themes';
+import type { CloudComment, CommentDraft } from './host/cloud-api';
+import type { Present, VisitorRole } from '../../packages/share-protocol/src/frame';
 import type { ReportFacts, SettingKey, SettingValue, Settings } from './settings';
 
 export enum IconSource {
@@ -97,7 +99,9 @@ export type ColourPick = { css: string; token?: string };
 
 export type FontChoice = { family: string; google: boolean };
 
-export type Palette = { document: string[]; tokens: { name: string; value: string }[]; fonts: string[] };
+export type MissingFont = { family: string; fallback: string; declared: boolean };
+
+export type Palette = { document: string[]; tokens: { name: string; value: string }[]; fonts: string[]; missing: MissingFont[] };
 
 export enum Mode {
   Design = 'design',
@@ -121,6 +125,8 @@ export enum ToHost {
   Server = 'server',
   Redo = 'redo',
   Font = 'font',
+  FontReplace = 'font-replace',
+  FontLoad = 'font-load',
   SaveVariable = 'save-variable',
   Revert = 'revert',
   Diff = 'diff',
@@ -142,7 +148,14 @@ export enum ToHost {
   Link = 'link',
   Go = 'go',
   Selected = 'selected',
-  Copy = 'copy'
+  Copy = 'copy',
+  Comments = 'comments',
+  CommentAdd = 'comment-add',
+  CommentResolve = 'comment-resolve',
+  ShareStart = 'share-start',
+  ShareStop = 'share-stop',
+  ShareKick = 'share-kick',
+  ShareRole = 'share-role'
 }
 
 export type ChangeRow = { id: number; at: string; prop: string; value: string; scope: string; files: string[]; time: number };
@@ -163,7 +176,15 @@ export enum ToView {
   Account = 'account',
   Onboarding = 'onboarding',
   ImageSaved = 'image-saved',
-  Wiring = 'wiring'
+  Wiring = 'wiring',
+  Comments = 'comments',
+  Share = 'share'
+}
+
+export enum ShareState {
+  Idle = 'idle',
+  Starting = 'starting',
+  Live = 'live'
 }
 
 export enum Onboarding {
@@ -195,6 +216,8 @@ export type HostMessage =
   | { kind: ToHost.Server; action: ServerAction }
   | { kind: ToHost.Redo }
   | { kind: ToHost.Font; ask: EditAsk; google: boolean }
+  | { kind: ToHost.FontReplace; from: string; to: string; google: boolean }
+  | { kind: ToHost.FontLoad; family: string }
   | { kind: ToHost.SaveVariable; ask: EditAsk; name: string }
   | { kind: ToHost.Revert; id: number | null }
   | { kind: ToHost.Diff; id: number }
@@ -216,7 +239,14 @@ export type HostMessage =
   | { kind: ToHost.Link; at: string; edit: LinkEdit; instance?: number }
   | { kind: ToHost.Go; at: string; ask: GoAsk }
   | { kind: ToHost.Selected; at: Source | null }
-  | { kind: ToHost.Copy; text: string };
+  | { kind: ToHost.Copy; text: string }
+  | { kind: ToHost.Comments }
+  | { kind: ToHost.CommentAdd; draft: CommentDraft }
+  | { kind: ToHost.CommentResolve; id: string }
+  | { kind: ToHost.ShareStart; name: string; canEdit: boolean }
+  | { kind: ToHost.ShareStop }
+  | { kind: ToHost.ShareKick; userId: string }
+  | { kind: ToHost.ShareRole; userId: string; role: VisitorRole };
 
 export type ViewMessage =
   | { kind: ToView.App; url: string; styling: Styling; prefs: Prefs | null; route?: string; breakpoints: Breakpoints; themes: Theme[] }
@@ -232,7 +262,9 @@ export type ViewMessage =
   | { kind: ToView.Account; state: AccountState; email?: string }
   | { kind: ToView.Onboarding; state: Onboarding }
   | { kind: ToView.ImageSaved; url: string }
-  | { kind: ToView.Wiring; at: string; instance?: number; wiring: Wiring };
+  | { kind: ToView.Wiring; at: string; instance?: number; wiring: Wiring }
+  | { kind: ToView.Comments; enabled: boolean; comments: CloudComment[]; error?: string }
+  | { kind: ToView.Share; state: ShareState; available: boolean; name: string; canEdit: boolean; url?: string; expiresAt?: string; visitors: Present[]; notice: boolean; error?: string };
 
 export const INSPECT = 'feega:inspect';
 export const INSPECT_RESULT = 'feega:inspect:result';

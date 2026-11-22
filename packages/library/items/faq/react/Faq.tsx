@@ -1,0 +1,32 @@
+import './Faq.css';
+
+export function Faq() {
+  return (
+    <section className="fl-faq">
+      <div className="fl-container grid">
+        <div className="head">
+          <h2 className="fl-title">questions, answered</h2>
+          <p className="fl-lead">Still stuck? <a href="#">Write to support</a>, a person replies within a day.</p>
+        </div>
+        <div className="list">
+          <details name="fl-faq" open>
+            <summary>Is there a free plan?<svg className="fl-px" viewBox="0 0 6 6" aria-hidden="true"><path d="M2 0h1v1h-1zM3 0h1v1h-1zM2 1h1v1h-1zM3 1h1v1h-1zM0 2h1v1h-1zM1 2h1v1h-1zM2 2h1v1h-1zM3 2h1v1h-1zM4 2h1v1h-1zM5 2h1v1h-1zM0 3h1v1h-1zM1 3h1v1h-1zM2 3h1v1h-1zM3 3h1v1h-1zM4 3h1v1h-1zM5 3h1v1h-1zM2 4h1v1h-1zM3 4h1v1h-1zM2 5h1v1h-1zM3 5h1v1h-1z" /></svg></summary>
+            <p>Yes. The starter plan is free forever and has every core feature. Upgrade only when you need more seats or storage.</p>
+          </details>
+          <details name="fl-faq">
+            <summary>Can I cancel anytime?<svg className="fl-px" viewBox="0 0 6 6" aria-hidden="true"><path d="M2 0h1v1h-1zM3 0h1v1h-1zM2 1h1v1h-1zM3 1h1v1h-1zM0 2h1v1h-1zM1 2h1v1h-1zM2 2h1v1h-1zM3 2h1v1h-1zM4 2h1v1h-1zM5 2h1v1h-1zM0 3h1v1h-1zM1 3h1v1h-1zM2 3h1v1h-1zM3 3h1v1h-1zM4 3h1v1h-1zM5 3h1v1h-1zM2 4h1v1h-1zM3 4h1v1h-1zM2 5h1v1h-1zM3 5h1v1h-1z" /></svg></summary>
+            <p>Yes. Cancel from settings in two clicks. You keep access until the end of the billing period.</p>
+          </details>
+          <details name="fl-faq">
+            <summary>Where is my data stored?<svg className="fl-px" viewBox="0 0 6 6" aria-hidden="true"><path d="M2 0h1v1h-1zM3 0h1v1h-1zM2 1h1v1h-1zM3 1h1v1h-1zM0 2h1v1h-1zM1 2h1v1h-1zM2 2h1v1h-1zM3 2h1v1h-1zM4 2h1v1h-1zM5 2h1v1h-1zM0 3h1v1h-1zM1 3h1v1h-1zM2 3h1v1h-1zM3 3h1v1h-1zM4 3h1v1h-1zM5 3h1v1h-1zM2 4h1v1h-1zM3 4h1v1h-1zM2 5h1v1h-1zM3 5h1v1h-1z" /></svg></summary>
+            <p>In encrypted storage in the region you pick at sign up. You can export everything at any time.</p>
+          </details>
+          <details name="fl-faq">
+            <summary>Do you offer discounts for education?<svg className="fl-px" viewBox="0 0 6 6" aria-hidden="true"><path d="M2 0h1v1h-1zM3 0h1v1h-1zM2 1h1v1h-1zM3 1h1v1h-1zM0 2h1v1h-1zM1 2h1v1h-1zM2 2h1v1h-1zM3 2h1v1h-1zM4 2h1v1h-1zM5 2h1v1h-1zM0 3h1v1h-1zM1 3h1v1h-1zM2 3h1v1h-1zM3 3h1v1h-1zM4 3h1v1h-1zM5 3h1v1h-1zM2 4h1v1h-1zM3 4h1v1h-1zM2 5h1v1h-1zM3 5h1v1h-1z" /></svg></summary>
+            <p>Students, teachers and non-profits get the pro plan at half price. Write to support with proof of status.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+  );
+}

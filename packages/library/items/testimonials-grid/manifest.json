@@ -1,0 +1,36 @@
+{
+  "id": "testimonials-grid",
+  "name": "Testimonials grid",
+  "description": "Masonry of short quotes, every one a clearly marked placeholder to replace.",
+  "category": "section",
+  "tags": [
+    "testimonials",
+    "social-proof",
+    "quotes"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    },
+    {
+      "family": "Fragment Mono",
+      "weights": [
+        400
+      ]
+    }
+  ],
+  "tier": "free"
+}

@@ -32,6 +32,7 @@
   import FeegaMenu from './FeegaMenu.svelte';
   import OnboardingDialog from './Onboarding.svelte';
   import ServerPopover from './ServerPopover.svelte';
+  import SharePanel from './SharePanel.svelte';
   import LayersTree from './LayersTree.svelte';
   import { hasSourceInfo } from './source-info';
   import ChangesList from './ChangesList.svelte';
@@ -41,6 +42,8 @@
   import { Tabs } from 'bits-ui';
   import { Tab } from './tabs';
   import { fontCss } from './fonts';
+  import MissingFont from './MissingFont.svelte';
+  import { SvelteSet } from 'svelte/reactivity';
   import { layerState, passThrough, type LayerFlag, type SavedLayers } from './layer-state';
   import { ClassFamily } from '@feega/live-edit/live-fields';
   import Breadcrumb from './Breadcrumb.svelte';
@@ -51,7 +54,10 @@
   import { Place } from '@feega/live-edit/move-node';
   import { StructureOp } from '@feega/live-edit/structure';
   import StructureMenu from './StructureMenu.svelte';
-  import { agentContexts } from './agent-context';
+  import { agentContexts, commentContext } from './agent-context';
+  import CommentsList from './CommentsList.svelte';
+  import type { CloudComment, CommentDraft } from '../host/cloud-api';
+  import { pinIdOf, pinSlot, pinsOf, sourceOfComment, threadsOf } from './comments';
   import { AddKind, AddPlace } from '@feega/live-edit/add-node';
   import { WrapTag } from '@feega/live-edit/wrap-node';
   import { ADD_DRAG_TYPE, insertSpot, type InsertSpot } from './insert-drop';
@@ -160,8 +166,20 @@
   let drop = $state<Drop | null>(null);
 
   let tab = $state(Tab.Properties);
+  let share = $state<Extract<ViewMessage, { kind: ToView.Share }> | null>(null);
+  let cloud = $state<{ enabled: boolean; comments: CloudComment[]; error: string }>({ enabled: false, comments: [], error: '' });
+  let composing = $state(false);
+  let pinRects = $state<Record<string, Pick['rect']>>({});
+  let pinned = new Set<string>();
+  const COMMENTS_POLL_MS = 15_000;
+  const PIN_SIZE_PX = 20;
+  const PIN_STACK_PX = 22;
+  const pins = $derived(pinsOf(threadsOf(cloud.comments, false)));
+  const openComments = $derived(pins.length);
   let layers = $state<LayerNode[]>([]);
-  let palette = $state<Palette>({ document: [], tokens: [], fonts: [] });
+  let palette = $state<Palette>({ document: [], tokens: [], fonts: [], missing: [] });
+  const dismissedFonts = new SvelteSet<string>();
+  const fontNotice = $derived(palette.missing.find((m) => !dismissedFonts.has(m.family)) ?? null);
   let changes = $state<ChangeRow[]>([]);
   let canUndo = $state(false);
   let canRedo = $state(false);
@@ -264,10 +282,17 @@
       refresh();
       bridge.track(Slot.Selected, untrack(() => picked?.source) ?? null, untrack(() => picked?.instanceIndex));
       bridge.track(Slot.Hovered, untrack(() => hover?.source) ?? null, untrack(() => hover?.instanceIndex));
+      pinned.clear();
+      trackPins();
     },
     moved: (path) => (visited(path), bridge.tree()),
-    tree: (tree) => (layers = tree),
+    tree: (tree) => ((layers = tree), askPalette()),
     tracked: (slot, rect) => {
+      const pin = pinIdOf(slot);
+      if (pin) {
+        pinRects[pin] = rect;
+        return;
+      }
       const target = slot === Slot.Selected ? picked : hover;
       if (target) {
         target.rect = rect;
@@ -289,6 +314,73 @@
       toHost({ kind: ToHost.Edit, ask: { at: source, prop: LiveProp.Text, value: text, was, instance: picked?.instanceIndex } });
     }
   });
+
+  function trackPins() {
+    const wanted = new Set(pins.map((pin) => pin.id));
+    for (const pin of pins) {
+      if (!pinned.has(pin.id)) {
+        bridge.track(pinSlot(pin.id), pin.source);
+      }
+    }
+    for (const id of pinned) {
+      if (!wanted.has(id)) {
+        bridge.track(pinSlot(id), null);
+        delete pinRects[id];
+      }
+    }
+    pinned = wanted;
+  }
+
+  $effect(() => {
+    pins;
+    if (bridged) {
+      untrack(trackPins);
+    }
+  });
+
+  $effect(() => {
+    if (!cloud.enabled) {
+      return;
+    }
+    const timer = setInterval(() => toHost({ kind: ToHost.Comments }), COMMENTS_POLL_MS);
+    return () => clearInterval(timer);
+  });
+
+  function startComment() {
+    if (!picked) {
+      return;
+    }
+    if (!cloud.enabled) {
+      showToast('Comments need a shared session');
+      return;
+    }
+    barClosed = false;
+    tab = Tab.Comments;
+    composing = true;
+  }
+
+  function sendComment(draft: CommentDraft) {
+    toHost({ kind: ToHost.CommentAdd, draft });
+    composing = false;
+  }
+
+  function copyComment(comment: CloudComment, replies: CloudComment[]) {
+    const text = commentContext(comment, replies);
+    if (inVscode) {
+      toHost({ kind: ToHost.Copy, text });
+    } else {
+      void navigator.clipboard?.writeText(text);
+    }
+    showToast('Copied for your agent');
+  }
+
+  function openPin(id: string) {
+    const thread = threadsOf(cloud.comments, true).find((t) => t.root.id === id);
+    if (thread) {
+      select(sourceOfComment(thread.root));
+    }
+    tab = Tab.Comments;
+  }
 
   function visited(path: string) {
     route = path;
@@ -445,6 +537,8 @@
       }, SETTLE_MS);
     },
     [ToView.Account]: (m) => (account = { state: m.state, email: m.email }),
+    [ToView.Share]: (m) => (share = m),
+    [ToView.Comments]: (m) => (cloud = { enabled: m.enabled, comments: m.comments, error: m.error ?? '' }),
     [ToView.Onboarding]: (m) => (onboarding = m.state),
     [ToView.IconResults]: (m) => iconsFound({ id: m.id, library: m.library, hits: m.hits, error: m.error ?? '' }),
     [ToView.IconPreview]: (m) => iconDrawn(m.name, m.svg),
@@ -861,6 +955,27 @@
     return true;
   }
 
+  const FONT_RECHECK_MS = 1500;
+  const PALETTE_DEBOUNCE_MS = 400;
+  let paletteTimer: ReturnType<typeof setTimeout> | undefined;
+
+  function askPalette() {
+    clearTimeout(paletteTimer);
+    paletteTimer = setTimeout(() => bridge.palette(), PALETTE_DEBOUNCE_MS);
+  }
+
+  function replaceFont(from: string, to: FontChoice) {
+    toHost({ kind: ToHost.FontReplace, from, to: to.family, google: to.google });
+    setTimeout(() => bridge.palette(), FONT_RECHECK_MS);
+  }
+
+  function loadFont(family: string) {
+    toHost({ kind: ToHost.FontLoad, family });
+    setTimeout(() => bridge.palette(), FONT_RECHECK_MS);
+  }
+
+  const COMMENT_KEY = 'c';
+
   function onKey(e: KeyboardEvent) {
     const cmd = e.metaKey || e.ctrlKey;
     if (runShortcut(e, shortcutOf(e, isMac))) {
@@ -887,6 +1002,11 @@
       return;
     }
     if (cmd || typing(e)) {
+      return;
+    }
+    if (e.key.toLowerCase() === COMMENT_KEY && picked && mode === Mode.Design && !editing) {
+      e.preventDefault();
+      startComment();
       return;
     }
     const next = modeOfKey(e.key);
@@ -931,6 +1051,7 @@
       {#if themes.length > 1}<ThemeBar {themes} choice={themeName} onchoose={chooseTheme} />{/if}
       {#if fit.scale < 1}<span class="zoom" data-testid="zoom">{Math.round(fit.scale * 100)}%</span>{/if}
       <button type="button" class="icon" title="Open in browser" onclick={() => toHost({ kind: ToHost.External, url: new URL(route, url).toString() })}><ExternalLink size={14} /></button>
+      <SharePanel view={share} onstart={(name, canEdit) => toHost({ kind: ToHost.ShareStart, name, canEdit })} onstop={() => toHost({ kind: ToHost.ShareStop })} onkick={(userId) => toHost({ kind: ToHost.ShareKick, userId })} onrole={(userId, role) => toHost({ kind: ToHost.ShareRole, userId, role })} />
       <button type="button" class="icon" class:on={!barClosed} title="Properties (⌘\)" onclick={toggleBar} data-testid="bar-toggle"><PanelRight size={15} /></button>
     </header>
 
@@ -948,6 +1069,12 @@
           {#if picked && hint}{#each hintBoxes(picked, hint) as area, i (i)}<div class="hint {hint.group}" style={`left:${area.x * fit.scale}px;top:${area.y * fit.scale}px;width:${area.w * fit.scale}px;height:${area.h * fit.scale}px`}></div>{/each}{/if}
           {#each others as other (keyOf(refOf(other.source, other.instanceIndex)))}<div class="outline picked" data-testid="selected-outline" style={box(other)}></div>{/each}
           {#if picked}<div class="outline picked" style={box(picked)}><span class="label"><Breadcrumb pick={picked} onselect={select} compact state={elementState} /></span></div>{/if}
+          {#each pins as pin (pin.id)}
+            {@const rect = pinRects[pin.id]}
+            {#if rect}
+              <button type="button" class="pin" data-testid="comment-pin" title="Open comment" style={`left:${(rect.x + rect.width) * fit.scale - PIN_SIZE_PX / 2}px;top:${rect.y * fit.scale - PIN_SIZE_PX / 2 + pin.stack * PIN_STACK_PX}px`} onpointerdown={(e) => e.stopPropagation()} onclick={(e) => (e.stopPropagation(), openPin(pin.id))}>{pin.number}</button>
+            {/if}
+          {/each}
           </div>
         {/if}
         {#if size !== Size.Full}
@@ -981,6 +1108,12 @@
       {/if}
       {#if menu}<StructureMenu x={menu.x} y={menu.y} items={menuFor(selection.refs.length)} onpick={pickMenu} onclose={() => (menu = null)} />{/if}
       {#if addMenu}<StructureMenu x={addMenu.x} y={addMenu.y} items={picked && picked.instances > 1 ? [...ADD_ITEMS, ADD_LOOP_ITEM] : ADD_ITEMS} label="add" draggable={true} onpick={(id) => (id === StructureOp.AddItem ? restructure(StructureOp.AddItem) : addElement(id as AddKind))} onclose={() => (addMenu = null)} />{/if}
+      {#if fontNotice}
+        <div class="notice missingfont" data-testid="font-notice">
+          <MissingFont missing={fontNotice} project={palette.fonts.filter((name) => !palette.missing.some((m) => m.family === name))} onreplace={replaceFont} onload={loadFont} />
+          <button type="button" class="link" onclick={() => dismissedFonts.add(fontNotice!.family)}>Dismiss</button>
+        </div>
+      {/if}
       {#if toast}<div class="toast" role="status">{toast}</div>{/if}
       <div class="float" class:moving bind:clientWidth={bar.w} bind:clientHeight={bar.h} style={`left:${barAt.x}px;top:${barAt.y}px`} data-anchor={anchor}>
         <button type="button" class="grip" title="Drag to move (arrow keys)" aria-label="Move the bar" onpointerdown={grabBar} onpointermove={dragBar} onpointerup={dropBar} onkeydown={onHandleKey}>
@@ -1015,6 +1148,7 @@
       <Tabs.List class="tab-list">
         <Tabs.Trigger value={Tab.Properties} class="tab">Properties</Tabs.Trigger>
         <Tabs.Trigger value={Tab.Changes} class="tab" data-testid="changes-tab">Changes{changes.length ? ` ${changes.length}` : ''}</Tabs.Trigger>
+        <Tabs.Trigger value={Tab.Comments} class="tab" data-testid="comments-tab">Comments{openComments ? ` ${openComments}` : ''}</Tabs.Trigger>
       </Tabs.List>
       <Tabs.Content value={Tab.Properties}>
         {#if several}
@@ -1032,7 +1166,7 @@
         {:else if picked}
           <div class="what" data-testid="selection">
             <Breadcrumb pick={picked} onselect={select} state={elementState} />
-            <span class="where">{#if picked.component}in {picked.component.file.split('/').pop()} · {/if}<button type="button" class="link" onclick={() => toHost({ kind: ToHost.Open, at: picked!.source })}>{picked.source.file.split('/').pop()}:{picked.source.line}</button> · <button type="button" class="link" data-testid="copy-for-agent" title="Copy file, selector and view for your coding agent" onclick={copyForAgent}>Copy for agent</button></span>
+            <span class="where">{#if picked.component}in {picked.component.file.split('/').pop()} · {/if}<button type="button" class="link" onclick={() => toHost({ kind: ToHost.Open, at: picked!.source })}>{picked.source.file.split('/').pop()}:{picked.source.line}</button> · <button type="button" class="link" data-testid="copy-for-agent" title="Copy file, selector and view for your coding agent" onclick={copyForAgent}>Copy for agent</button> · <button type="button" class="link" data-testid="comment-start" title="Comment on this element (C)" onclick={startComment}>Comment</button></span>
             {#if authored(picked.classes)}<code class="classes">{authored(picked.classes)}</code>{/if}
           </div>
           <BreakpointBar badge={reachBadge} theme={themeBadge(themeName)} items={reachItems(breakpoints)} choice={reach} onchoose={(id) => (reach = id)} />
@@ -1040,7 +1174,7 @@
             <button type="button" class:on={scope === Scope.Element} onclick={() => (scope = Scope.Element)} title="Only this element (every instance of its component: {picked.instances})">This element{picked.instances > 1 ? ` ×${picked.instances}` : ''}</button>
             <button type="button" class:on={scope === Scope.Class} disabled={!picked.classCount || styling === Styling.Tailwind} onclick={() => (scope = Scope.Class)} title={styling === Styling.Tailwind ? 'Class scope needs CSS rules, not Tailwind' : `Every element with this class: ${picked.classCount}`}>All .{picked.classes.split(' ')[0] || 'class'}{picked.classCount ? ` (${picked.classCount})` : ''}</button>
           </div>
-          <Properties pick={picked} {breakpoints} {palette} {elementState} {baseline} onstate={chooseState} onpreview={preview} onchange={change} onsavevar={saveVar} onhint={(h) => (hint = h)} onfont={pickFont} onnotice={showToast} />
+          <Properties pick={picked} {breakpoints} {palette} {elementState} {baseline} onstate={chooseState} onpreview={preview} onchange={change} onsavevar={saveVar} onhint={(h) => (hint = h)} onfont={pickFont} onfontreplace={replaceFont} onfontload={loadFont} onnotice={showToast} />
           <Interactions pick={picked} {changes} />
         {:else}
           <p class="empty">{bridged ? 'Click an element to edit it. Double-click text to rewrite it.' : 'The page has no Feega source map: element picking needs the feega-source-map plugin.'}</p>
@@ -1048,6 +1182,9 @@
       </Tabs.Content>
       <Tabs.Content value={Tab.Changes}>
         <ChangesList {changes} onselect={select} onopen={(at) => toHost({ kind: ToHost.Open, at })} ondiff={(id) => toHost({ kind: ToHost.Diff, id })} onrevert={(id) => toHost({ kind: ToHost.Revert, id })} onrevertall={() => toHost({ kind: ToHost.Revert, id: null })} onscm={() => toHost({ kind: ToHost.SourceControl })} />
+      </Tabs.Content>
+      <Tabs.Content value={Tab.Comments}>
+        <CommentsList {cloud} {picked} {composing} onsubmit={(draft) => (draft.parentId ? toHost({ kind: ToHost.CommentAdd, draft }) : sendComment(draft))} oncancel={() => (composing = false)} onresolve={(id) => toHost({ kind: ToHost.CommentResolve, id })} onselect={select} oncopy={copyComment} />
       </Tabs.Content>
     </Tabs.Root>
   </aside>
@@ -1215,6 +1352,25 @@
   .outline {
     position: absolute;
     pointer-events: none;
+  }
+
+  .pin {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 1.5px solid #fff;
+    border-radius: var(--ui-radius-full);
+    background: var(--ui-accent);
+    color: #fff;
+    font: inherit;
+    font-size: 10px;
+    font-weight: 600;
+    cursor: pointer;
   }
 
   .hover {
@@ -1410,6 +1566,10 @@
 
   .notice.nosource {
     bottom: 64px;
+  }
+
+  .notice.missingfont {
+    bottom: 120px;
   }
 
   .attach {

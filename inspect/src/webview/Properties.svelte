@@ -15,10 +15,12 @@
   import Check from '@lucide/svelte/icons/check';
   import Icon from './Icon.svelte';
   import FontPicker from './FontPicker.svelte';
+  import MissingFont from './MissingFont.svelte';
+  import { missingIn } from './missing-font';
   import { UI_ICON_SVG, UiIcon } from './ui-icons';
   import ScanLine from '@lucide/svelte/icons/square-dashed';
   import { MIXED, type Shared } from '@feega/properties-panel/mixed';
-  import { CSS_ROWS, shownRows, Control, Group, ROWS, Section, SideMode, GROUP_MODES, type Hint, type NumberRow, type Row } from './controls';
+  import { CSS_ROWS, SIZE_LIMITS, limitsSet, shownRows, Control, Group, ROWS, Section, SideMode, GROUP_MODES, type Hint, type NumberRow, type Row } from './controls';
   import { Role, roleOf, sectionsOf } from './roles';
   import { paintOf } from './colour';
   import Field from './Field.svelte';
@@ -37,9 +39,12 @@
   import { DEFAULT_BREAKPOINTS, type Breakpoints } from '@feega/live-edit/breakpoints';
   import { overrideTitle, rowOverrides } from './responsive';
 
-  type Props = { pick: Pick; onpreview: (row: Row, value: string) => void; onchange: (row: Row, value: string, token?: string) => void; onsavevar: (row: Row, name: string, css: string) => void; onhint: (hint: Hint | null) => void; onfont: (font: FontChoice) => void; onnotice: (text: string) => void; palette: Palette; elementState?: ElementState; baseline?: Record<string, string> | null; onstate?: (state: ElementState) => void; breakpoints?: Breakpoints };
+  type Props = { pick: Pick; onpreview: (row: Row, value: string) => void; onchange: (row: Row, value: string, token?: string) => void; onsavevar: (row: Row, name: string, css: string) => void; onhint: (hint: Hint | null) => void; onfont: (font: FontChoice) => void; onfontreplace: (from: string, to: FontChoice) => void; onfontload: (family: string) => void; onnotice: (text: string) => void; palette: Palette; elementState?: ElementState; baseline?: Record<string, string> | null; onstate?: (state: ElementState) => void; breakpoints?: Breakpoints };
 
-  let { pick, onpreview, onchange, onhint, onfont, onnotice, palette, onsavevar, elementState = ElementState.Default, baseline = null, onstate, breakpoints = DEFAULT_BREAKPOINTS }: Props = $props();
+  let { pick, onpreview, onchange, onhint, onfont, onfontreplace, onfontload, onnotice, palette, onsavevar, elementState = ElementState.Default, baseline = null, onstate, breakpoints = DEFAULT_BREAKPOINTS }: Props = $props();
+
+  const missingHere = $derived(missingIn(pick.styles['font-family'] ?? '', palette.missing));
+  const presentFonts = $derived(palette.fonts.filter((name) => !palette.missing.some((m) => m.family === name)));
 
   const differs = $derived(changedKeys(ROWS, pick.styles, baseline));
   const changed = (key: string) => isChanged(differs, key);
@@ -75,10 +80,11 @@
   const SIDE_PREFIX: Record<string, string> = { all: '', x: '↔', y: '↕', top: 'T', right: 'R', bottom: 'B', left: 'L', tl: '◜', tr: '◝', br: '◞', bl: '◟' };
   const DEFAULT_PAINT = '#d9d9d9';
 
-  const EXTRA_SECTIONS = [...new Set(CSS_ROWS.map((s) => s.section))];
+  const EXTRA_SECTIONS = [...new Set(CSS_ROWS.map((s) => s.section))].filter((s) => s !== Section.Size);
   const READS: Record<string, string> = Object.fromEntries(CSS_ROWS.map((s) => [s.name, s.reads[0]]));
 
   let sizeLinked = $state(true);
+  let limitsChoice = $state<{ source: string; open: boolean }>({ source: '', open: false });
   let closed = $state<Record<string, boolean>>(Object.fromEntries(EXTRA_SECTIONS.map((s) => [s, true])));
   let modes = $state<Record<string, SideMode>>({ [Group.Padding]: SideMode.All, [Group.Margin]: SideMode.All, [Group.Radius]: SideMode.All });
 
@@ -107,6 +113,7 @@
     onchange(num(side), flipOffset({ on, px: Math.round(parseFloat(pick.styles[side] ?? '0') || 0) }));
   }
 
+  const limitsOpen = $derived(limitsChoice.source === offsetKey ? limitsChoice.open : limitsSet(pick.styles));
   const readOf = (name: string) => byName(name).read(pick.styles) as string;
 
   function shared(row: NumberRow): Shared<number> {
@@ -175,7 +182,7 @@
 
 {#snippet field(r: NumberRow, prefix = r.label, iconSvg = '', compact = false, twin: NumberRow | null = null)}
   {#snippet glyph()}<Icon svg={iconSvg} />{/snippet}
-  <Field name={r.name} override={overrideOf(r.name)} {prefix} icon={iconSvg ? glyph : undefined} {compact} px={shared(r)} units={r.units} unit={r.units ? '' : r.unit} {context} min={r.range.min} max={r.range.max} onpreview={(v) => (onpreview(r, v), twin && onpreview(twin, v))} onchange={(v) => (onchange(r, v), twin && onchange(twin, v))} />
+  <Field name={r.name} override={overrideOf(r.name)} css={SIZE_LIMITS.includes(r.name) ? (pick.styles[READS[r.name]] ?? '') : ''} {prefix} icon={iconSvg ? glyph : undefined} {compact} px={shared(r)} units={r.units} unit={r.units ? '' : r.unit} {context} min={r.range.min} max={r.range.max} onpreview={(v) => (onpreview(r, v), twin && onpreview(twin, v))} onchange={(v) => (onchange(r, v), twin && onchange(twin, v))} />
 {/snippet}
 
 {#snippet segmented(r: Row, options: { value: string; label: string; icon: IconComponent }[])}
@@ -319,6 +326,24 @@
         </div>
       {/snippet}
       {@render header(Section.Size, wh, true)}
+      {#if limitsOpen}
+        {#each SIZE_LIMITS as name (name)}
+          {@const r = num(name)}
+          <div class="row" class:differs={changed(name)} data-row={name}>
+            <span class="label">{r.label}{#if overrideOf(name)}<span class="override-dot inline" title={overrideOf(name)} aria-label={overrideOf(name)} data-override></span>{/if}</span>
+            <div class="control reset-pair">
+              {@render field(r, '', '', true)}
+              <button type="button" class="icon reset" title={`Clear ${r.label.toLowerCase()}`} aria-label={`Clear ${r.label.toLowerCase()}`} onclick={() => onchange(r, '')}>×</button>
+            </div>
+          </div>
+        {/each}
+      {/if}
+      <div class="row limits-toggle" data-row="size-limits">
+        <span class="label"></span>
+        <div class="control">
+          <button type="button" class="link" aria-expanded={limitsOpen} data-field="size-limits" onclick={() => (limitsChoice = { source: offsetKey, open: !limitsOpen })}>{#if !limitsOpen}<Plus size={12} />{/if}{limitsOpen ? 'Hide min/max' : 'min/max'}</button>
+        </div>
+      </div>
     </section>
   {/if}
 
@@ -345,6 +370,7 @@
           </div>
         {/snippet}
         {@render row('Font', font, 'font')}
+        {#if missingHere}<div class="font-warning"><MissingFont missing={missingHere} project={presentFonts} onreplace={onfontreplace} onload={onfontload} /></div>{/if}
         {#snippet metrics()}<div class="triple">{@render field(num('font-size'), 'Aa', '', true)}{@render field(num('line-height'), '↕', '', true)}{@render field(num('letter-spacing'), '↔', '', true)}</div>{/snippet}
         {@render row('Size', metrics, 'type-size')}
         {#snippet ta()}{@render segmented(byName('text-align'), TEXT_ALIGN)}{/snippet}
@@ -436,6 +462,23 @@
   .properties :global(.row.differs > .label),
   .properties :global(.head.differs > .label) {
     color: var(--ui-accent);
+  }
+
+  .limits-toggle .link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--ui-text-3);
+    font: inherit;
+    font-size: var(--ui-text-xs);
+    cursor: pointer;
+  }
+
+  .limits-toggle .link:hover {
+    color: var(--ui-text);
   }
 
   .reset.slot-only {
@@ -682,6 +725,10 @@
 
   .triple {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .font-warning {
+    padding: 4px 12px 8px;
   }
 
   .sides {

@@ -18,7 +18,8 @@ function postMessageLink(post: (message: HostMessage) => void): Link {
 }
 
 function socketLink(): Link {
-  const socket = new WebSocket(`ws://${location.host}${SOCKET_PATH}`);
+  const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
+  const socket = new WebSocket(`${scheme}://${location.host}${SOCKET_PATH}`);
   const queued: string[] = [];
   socket.addEventListener('open', () => queued.splice(0).forEach((text) => socket.send(text)));
   socket.addEventListener('close', () => document.body.setAttribute('data-host', 'closed'));

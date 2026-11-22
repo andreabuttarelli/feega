@@ -1,0 +1,30 @@
+{
+  "id": "notification-list",
+  "name": "Notification list",
+  "description": "Inbox-style list with unread dots, actor, action, time and a mark-all link.",
+  "category": "app",
+  "tags": [
+    "notifications",
+    "list",
+    "inbox"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    }
+  ],
+  "tier": "free"
+}

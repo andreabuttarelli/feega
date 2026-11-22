@@ -1,0 +1,36 @@
+{
+  "id": "steps",
+  "name": "How it works",
+  "description": "Three numbered steps joined by a line, each with a short title and sentence.",
+  "category": "section",
+  "tags": [
+    "steps",
+    "process",
+    "onboarding"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    },
+    {
+      "family": "Fragment Mono",
+      "weights": [
+        400
+      ]
+    }
+  ],
+  "tier": "free"
+}

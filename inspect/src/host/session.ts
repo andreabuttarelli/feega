@@ -12,7 +12,10 @@ import { currentIcon } from './icon-current';
 import { mcpIcon, searchIcons } from './icon-search';
 import { previewQueue } from './icon-previews';
 import { appOfSource, firstStampedFile, urlOf } from './attach-url';
+import { serverInfo } from './server-info';
 import { Attach, attachDev, factsOf, startDev, type Refused, type Running } from './dev-server';
+import { commentsHost } from './comments';
+import { shareSession } from './share/share-session';
 import { copyImage } from './image-copy';
 import { fileEdits, type Snapshot, type Written } from './file-edits';
 import type { KeptServers } from './kept-servers';
@@ -25,6 +28,7 @@ import { usageSession } from './usage';
 import { selectionSync } from './selection-sync';
 import { wiringOf } from './wiring';
 
+const START_WITH_FEEGA = 'Start with Feega';
 const PICK_TIMEOUT_MS = 3000;
 const SYNC_SELECTION_DELAY_MS = 200;
 const LATER_EDITS = 'later edits depend on this change: undo them first';
@@ -121,6 +125,9 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     await edits.structure({ op: StructureOp.Add, at, add: { kind: AddKind.Image, src: copied.url, place } }).then((out) => edited(out, null));
   }
 
+  const comments = commentsHost(platform.cloud, post);
+  const sharing = shareSession({ platform, workspace, appUrl: () => running?.url ?? null, post });
+
   const postAccount = (state: AccountState, email?: string) => post({ kind: ToView.Account, state, email });
 
   async function showAccount() {
@@ -193,7 +200,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   const keptMinutes = () => Number(platform.settings()[SettingKey.KeepServerAlive]) || 0;
 
   function infoOf(now: Running) {
-    return { keptMinutes: kept ? keptMinutes() : 0, url: now.url, framework: now.plan.framework, command: now.command, pid: now.pid, port: Number(new URL(now.url).port), attached: now.attached, startedAt, lastError };
+    return serverInfo({ url: now.url, framework: now.plan.framework, command: now.command, pid: now.pid, attached: now.attached }, { keptMinutes: kept ? keptMinutes() : 0, startedAt, lastError });
   }
 
   function logLine(line: string) {
@@ -259,6 +266,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
       log: logLine,
       installing: (dir: string) => current() && post({ kind: ToView.Server, state: ServerState.Installing, reason: `Installing dependencies for ${dir} (first run)…` }),
       spawned: (pid: number) => remember(pids, pid, root),
+      declined: (text: string) => void platform.warn(text),
       signal
     };
     const started = await startDev(workspace, platform.launcher, hooks, String(platform.settings()[SettingKey.DevCommand]), attach, app);
@@ -310,6 +318,10 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     const started = await attachDev(workspace, platform.launcher, url, app);
     if (starts !== mine) {
       return started;
+    }
+    if ('refused' in started && started.attachRefused) {
+      refuse(started.refused);
+      return (await platform.warn(started.refused, START_WITH_FEEGA)) ? startServer(Attach.Never) : started;
     }
     if ('refused' in started) {
       return refuse(started.refused);
@@ -377,7 +389,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   };
 
   const handlers: { [K in ToHost]: (m: Extract<HostMessage, { kind: K }>) => unknown } = {
-    [ToHost.Ready]: () => (showApp(), postSettings(), postHistory(), showAccount(), showOnboarding()),
+    [ToHost.Ready]: () => (showApp(), postSettings(), postHistory(), showAccount(), showOnboarding(), comments.show(), sharing.show()),
     [ToHost.Edit]: (m) => edit(m.ask),
     [ToHost.Undo]: undo,
     [ToHost.Open]: (m) => platform.openSource(root, m.at),
@@ -388,6 +400,8 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.Server]: (m) => SERVER_ACTIONS[m.action](),
     [ToHost.SaveVariable]: (m) => edits.saveVariable(m.ask, m.name).then((out) => edited(out, m.ask)),
     [ToHost.Font]: (m) => edits.font(m.ask, m.google).then((out) => edited(out, m.ask)),
+    [ToHost.FontReplace]: (m) => edits.replaceFont(m.from, m.to, m.google).then((out) => edited(out, null)),
+    [ToHost.FontLoad]: (m) => edits.loadFont(m.family).then((out) => edited(out, null)),
     [ToHost.Redo]: () => edits.redo().then((out) => edited(out, null)),
     [ToHost.Revert]: (m) => revert(m.id),
     [ToHost.Diff]: (m) => showDiff(m.id),
@@ -414,7 +428,14 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.Link]: (m) => edits.link(m.at, m.edit, m.instance).then((out) => edited(out, null)),
     [ToHost.Go]: (m) => edits.go(m.at, m.ask).then((out) => edited(out, null)),
     [ToHost.Selected]: (m) => syncSelection(m.at),
-    [ToHost.Copy]: (m) => platform.copyText?.(m.text)
+    [ToHost.Copy]: (m) => platform.copyText?.(m.text),
+    [ToHost.Comments]: comments.show,
+    [ToHost.CommentAdd]: (m) => comments.add(m.draft),
+    [ToHost.CommentResolve]: (m) => comments.resolve(m.id),
+    [ToHost.ShareStart]: (m) => sharing.start(m.name, m.canEdit),
+    [ToHost.ShareStop]: sharing.stop,
+    [ToHost.ShareKick]: (m) => sharing.kick(m.userId),
+    [ToHost.ShareRole]: (m) => sharing.setRole(m.userId, m.role)
   };
 
   platform.receive((message) => (handlers[message.kind] as (m: HostMessage) => unknown)(message));
@@ -441,9 +462,10 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     start: () => startServer(),
     attachUrl,
     addPlugin: installPlugin,
-    stop: () => {
+    stop: async () => {
       close();
-      return usage?.end() ?? Promise.resolve();
+      await sharing.stop();
+      await usage?.end();
     },
     usageChanged: () => usage?.recheck(),
     url: () => running?.url ?? null,

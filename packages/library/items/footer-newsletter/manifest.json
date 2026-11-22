@@ -1,0 +1,36 @@
+{
+  "id": "footer-newsletter",
+  "name": "Footer, columns and newsletter",
+  "description": "Link columns next to an email signup, with a legal row underneath.",
+  "category": "section",
+  "tags": [
+    "footer",
+    "newsletter",
+    "form"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    },
+    {
+      "family": "Fragment Mono",
+      "weights": [
+        400
+      ]
+    }
+  ],
+  "tier": "free"
+}

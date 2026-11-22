@@ -1,0 +1,36 @@
+{
+  "id": "not-found",
+  "name": "404 page",
+  "description": "Big pixel 404, one line of help and two ways back.",
+  "category": "section",
+  "tags": [
+    "404",
+    "error",
+    "page"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    },
+    {
+      "family": "Fragment Mono",
+      "weights": [
+        400
+      ]
+    }
+  ],
+  "tier": "free"
+}

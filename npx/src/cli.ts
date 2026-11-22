@@ -6,7 +6,12 @@ import { nodePlatform } from '../../inspect/src/host/node-platform';
 import { killOrphans } from '../../inspect/src/host/orphans';
 import { inspectSession, memoOf } from '../../inspect/src/host/session';
 import { Browser, Run, USAGE, argsOf } from './args';
-import { editorServer } from './editor-server';
+import { editorServer } from '../../inspect/src/host/editor-server';
+import { serveMcp } from './mcp/run';
+import { fileAccountStore } from '../../inspect/src/host/account';
+import { shareHost } from '../../inspect/src/host/share/share-host';
+import { cloudShare } from '../../inspect/src/host/share/share-port-factory';
+import { cloudApiOf, relayUrlOf } from './cloud';
 
 declare const FEEGA_VERSION: string;
 
@@ -47,6 +52,10 @@ async function main(): Promise<number> {
     say(FEEGA_VERSION);
     return 0;
   }
+  if (args.run === Run.Mcp) {
+    await serveMcp({ cli: __filename, version: FEEGA_VERSION, cwd: process.cwd(), env: process.env, share: shareHost({ api: cloudApiOf(process.env, fileAccountStore()), relayUrl: relayUrlOf(process.env), send: fetch }) });
+    return KEEP_RUNNING;
+  }
   if (args.run === Run.Error) {
     say(`feega: ${args.reason}\n\n${USAGE}`);
     return 1;
@@ -59,7 +68,9 @@ async function main(): Promise<number> {
   }
 
   const editor = await editorServer(join(__dirname, 'webview'), args.port);
-  const host = nodePlatform({ root, launcher: join(__dirname, 'launcher'), version: FEEGA_VERSION, transport: editor.transport, print: say });
+  const account = fileAccountStore();
+  const { share, cloud } = cloudShare({ api: cloudApiOf(process.env, account), relayUrl: relayUrlOf(process.env), send: fetch, editorUrl: async () => editor.url });
+  const host = nodePlatform({ root, launcher: join(__dirname, 'launcher'), version: FEEGA_VERSION, transport: editor.transport, print: say, account, cloud, share });
   const platform = args.url ? { ...host, chooseApp: (apps: string[]) => askApp(apps.map((app) => ({ label: app || '.', app }))) } : host;
   await killOrphans(memoOf(platform));
   const session = inspectSession(platform, root);
@@ -78,6 +89,11 @@ async function main(): Promise<number> {
   say(`feega: editing ${root}`);
   say(args.url ? `feega: attaching to ${args.url}` : 'feega: starting its dev server…');
   const started = await (args.url ? session.attachUrl(args.url) : session.start());
+  if ('refused' in started && started.attachRefused) {
+    await session.stop();
+    await editor.close();
+    return 1;
+  }
   if ('refused' in started) {
     say(`feega: ${started.refused}`);
   } else {

@@ -15,6 +15,12 @@ import type { Running } from './dev-server';
 import { appOf, inspectSession, type Session } from './session';
 import { signInFromUri } from './sign-in';
 import { beforeProvider, vsCodePlatform, type VsCodeHost } from './vscode-platform';
+import { cloudApi } from './cloud-api';
+import { editorServer } from './editor-server';
+import type { Platform } from './platform';
+import { RELAY_URL } from './share/share-host';
+import { cloudShare } from './share/share-port-factory';
+import { withRemoteEditor } from './share/remote-editor';
 
 const VIEW_TYPE = 'feegaInspect.panel';
 const TITLE = 'Feega';
@@ -40,6 +46,20 @@ function panelOf(context: vscode.ExtensionContext): vscode.WebviewPanel {
   const panel = vscode.window.createWebviewPanel(VIEW_TYPE, TITLE, vscode.ViewColumn.Beside, { enableScripts: true, retainContextWhenHidden: true, localResourceRoots: [mediaOf(context)] });
   render(panel, context);
   return panel;
+}
+
+const WEB_URL_VAR = 'FEEGA_WEB_URL';
+const RELAY_URL_VAR = 'FEEGA_RELAY_URL';
+const ANY_PORT = 0;
+
+function cloudPlatform(context: vscode.ExtensionContext, base: Platform): { platform: Platform; stopRemote: () => Promise<void> } {
+  const remote = withRemoteEditor(base, () => editorServer(vscode.Uri.joinPath(mediaOf(context)).fsPath, ANY_PORT));
+  const token = async () => {
+    const account = await base.account.read();
+    return account && account.expires_at > Math.floor(Date.now() / 1000) ? account.access_token : null;
+  };
+  const { share, cloud } = cloudShare({ api: cloudApi({ base: process.env[WEB_URL_VAR], token }), relayUrl: process.env[RELAY_URL_VAR] ?? RELAY_URL, send: fetch, editorUrl: remote.editorUrl });
+  return { platform: { ...base, ...remote.transport, share, cloud }, stopRemote: remote.stop };
 }
 
 const tree: Tree = {
@@ -84,12 +104,12 @@ async function open(context: vscode.ExtensionContext, target?: vscode.Uri) {
   }
 
   const panel = panelOf(context);
-  const platform = vsCodePlatform(host, panel, befores);
+  const { platform, stopRemote } = cloudPlatform(context, vsCodePlatform(host, panel, befores));
   const workspace = workspaceOf(target) ?? root;
   const session = inspectSession(platform, workspace, appOf(platform, workspace, root), route, kept);
   opened = { panel, session };
   panel.onDidDispose(() => {
-    session.stop();
+    session.stop().then(stopRemote);
     opened = null;
   });
   await session.start();
@@ -109,11 +129,11 @@ async function openFromUrl(context: vscode.ExtensionContext) {
   opened?.panel.dispose();
 
   const panel = panelOf(context);
-  const platform = vsCodePlatform(host, panel, befores);
+  const { platform, stopRemote } = cloudPlatform(context, vsCodePlatform(host, panel, befores));
   const session = inspectSession(platform, workspace, appOf(platform, workspace, workspace), undefined, kept);
   opened = { panel, session };
   panel.onDidDispose(() => {
-    session.stop();
+    session.stop().then(stopRemote);
     opened = null;
   });
   await session.attachUrl(url);

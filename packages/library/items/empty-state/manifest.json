@@ -1,0 +1,29 @@
+{
+  "id": "empty-state",
+  "name": "Empty state",
+  "description": "Icon, message and one action for a list with nothing in it yet.",
+  "category": "app",
+  "tags": [
+    "empty",
+    "feedback"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    }
+  ],
+  "tier": "free"
+}

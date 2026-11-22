@@ -1,10 +1,11 @@
+import type { CloudComment } from '../host/cloud-api';
 import type { Pick, Source } from '../messages';
 
 export type AgentView = { route: string; width: number; breakpoint?: string; theme?: string; state?: string };
 
 const place = (s: Source) => `${s.file}:${s.line}:${s.col}`;
 
-const selectorOf = (pick: Pick) => [pick.tag, ...pick.classes.split(/\s+/).filter(Boolean)].join('.');
+export const selectorOf = (pick: Pick) => [pick.tag, ...pick.classes.split(/\s+/).filter(Boolean)].join('.');
 
 const present = (lines: (string | null)[]): string[] => lines.filter((line): line is string => line !== null);
 
@@ -23,4 +24,16 @@ export function agentContexts(picks: Pick[], view: AgentView): string {
     return agentContext(picks[0], view);
   }
   return [[`Feega selection: ${picks.length} elements`, ...viewLines(view)].join('\n'), ...picks.map(numbered)].join('\n\n');
+}
+
+export function commentContext(comment: CloudComment, replies: CloudComment[] = []): string {
+  const lines = [
+    'Feega comment',
+    `author: ${comment.authorName}`,
+    `comment: ${comment.body}`,
+    ...replies.map((reply) => `reply from ${reply.authorName}: ${reply.body}`),
+    `source: ${place({ file: comment.sourceFile, line: comment.sourceLine, col: comment.sourceCol })}`,
+    `selector: ${comment.selector}`
+  ];
+  return lines.join('\n');
 }

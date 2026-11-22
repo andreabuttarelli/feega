@@ -1,4 +1,5 @@
 import { readFile, rm, writeFile } from 'node:fs/promises';
+import { relative } from 'node:path';
 import { stylePatch, type LiveAt } from '@feega/live-edit/class-patch';
 import { cssModuleRule } from '@feega/live-edit/css-module';
 import type { FileChange, ReadFile } from '@feega/live-edit/files';
@@ -8,6 +9,7 @@ import { LiveProp } from '@feega/live-edit/live-fields';
 import { literalText } from '@feega/live-edit/literal-text';
 import { moveNode, type Place } from '@feega/live-edit/move-node';
 import { globalSheetOf, googleFontImport, googleFontLink } from '@feega/live-edit/font-wiring';
+import { replaceEverywhere } from '@feega/live-edit/font-replace';
 import { VariableHome, saveVariable, variableName } from '@feega/live-edit/save-variable';
 import { addedCss, AddKind, AddPlace, AddStyle } from '@feega/live-edit/add-node';
 import { wrapperCss, type WrapTag } from '@feega/live-edit/wrap-node';
@@ -31,6 +33,7 @@ import { StylingChoice } from '../settings';
 import { stylingOf } from './styling';
 import { breakpointsOf } from './breakpoints';
 import { themesOf } from './themes';
+import { scanProject } from './project-scan';
 
 export type StructureAsk = { op: StructureOp; at: string; to?: string; usage?: Usage; loop?: LoopMove; instance?: number; add?: { kind: AddKind; src?: string; place?: AddPlace }; wrap?: WrapTag };
 
@@ -62,6 +65,7 @@ const INLINE: CssWriter = {
 const CSS_WRITERS: Record<string, CssWriter> = {
   svelte: SCOPED,
   vue: SCOPED,
+  astro: SCOPED,
   jsx: MODULE,
   tsx: MODULE
 };
@@ -92,6 +96,8 @@ export type Change = { id: number; at: string; prop: string; value: string; scop
 const NOTHING_TO_UNDO = 'nothing to undo';
 const NOTHING_TO_REDO = 'nothing to redo';
 const CHANGED_SINCE = 'a file changed after the edit: not restored';
+const FONT_NOT_LOADED = 'no global stylesheet or page head found: the font is named but not loaded';
+const FONT_CONFIGS = ['tailwind.config.mjs', 'tailwind.config.cjs'];
 
 export type Snapshot = { steps: { step: Step; change: Change }[]; undone: { step: Step; change: Change }[] };
 
@@ -184,12 +190,44 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     return out.files.length || extra.length ? written(out.files, token ?? '') : { ok: true, path: at.file, written: token ?? '' };
   }
 
+  async function fontWiring(read: ReadFile, family: string, google: boolean): Promise<{ changes: FileChange[]; unloaded: boolean }> {
+    if (!google) {
+      return { changes: [], unloaded: false };
+    }
+    const sheet = await globalSheetOf(read);
+    const wiring = sheet ? await googleFontImport(read, sheet, family) : await googleFontLink(read, family);
+    return { changes: wiring ? [wiring] : [], unloaded: !sheet && !wiring };
+  }
+
   async function fontEdited(ask: EditAsk, google: boolean): Promise<Written> {
-    const sheet = google ? await globalSheetOf(reader(root)) : null;
-    const linked = google && !sheet ? await googleFontLink(reader(root), ask.value ?? '') : null;
-    const wiring = sheet ? await googleFontImport(reader(root), sheet, ask.value ?? '') : linked;
-    const out = await edited(ask, wiring ? [wiring] : []);
-    return out.ok && google && !sheet && !linked ? { ...out, note: 'no global stylesheet or page head found: the font is named but not loaded' } : out;
+    const wiring = await fontWiring(reader(root), ask.value ?? '', google);
+    const out = await edited(ask, wiring.changes);
+    return out.ok && wiring.unloaded ? { ...out, note: FONT_NOT_LOADED } : out;
+  }
+
+  async function projectSources(): Promise<{ path: string; text: string }[]> {
+    const scan = await scanProject(root, Infinity);
+    const paths = [...new Set([...scan.sheets, ...scan.sources].map((full) => relative(root, full)).concat(FONT_CONFIGS))];
+    const read = reader(root);
+    const files = await Promise.all(paths.map(async (path) => ({ path, text: await read(path) })));
+    return files.filter((f): f is { path: string; text: string } => f.text !== null);
+  }
+
+  async function fontReplaced(from: string, to: string, google: boolean): Promise<Written> {
+    meta = { at: '', prop: 'font-family', value: to, scope: 'project' };
+    const replaced = replaceEverywhere(await projectSources(), from, to);
+    if (!replaced.length) {
+      return { ok: false, reason: `${from} is not named in any source file` };
+    }
+    const wiring = await fontWiring(afterChanges(reader(root), replaced), to, google);
+    const count = `Replaced ${from} with ${to} in ${replaced.length} ${replaced.length === 1 ? 'file' : 'files'}`;
+    return writtenAll(mergedChanges(replaced, wiring.changes), to, wiring.unloaded ? `${count}. ${FONT_NOT_LOADED}` : count);
+  }
+
+  async function fontLoaded(family: string): Promise<Written> {
+    meta = { at: '', prop: 'font-load', value: family, scope: 'project' };
+    const wiring = await fontWiring(reader(root), family, true);
+    return writtenAll(wiring.changes, family, wiring.unloaded ? FONT_NOT_LOADED : undefined);
   }
 
   async function iconSwapped(rawAt: string, name: string): Promise<Written> {
@@ -359,6 +397,8 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     icon: (at: string, name: string) => inTurn(() => iconSwapped(at, name)),
     svg: (at: string, markup: string, inner?: string) => inTurn(() => svgWritten(at, markup, inner)),
     font: (ask: EditAsk, google: boolean) => inTurn(() => fontEdited(ask, google)),
+    replaceFont: (from: string, to: string, google: boolean) => inTurn(() => fontReplaced(from, to, google)),
+    loadFont: (family: string) => inTurn(() => fontLoaded(family)),
     link: (at: string, edit: LinkEdit, instance?: number) => inTurn(() => linkWritten(at, edit, instance)),
     go: (at: string, ask: GoAsk) => inTurn(() => goWritten(at, ask)),
     undo: () => inTurn(undoStep),

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { LiveProp } from '@feega/live-edit/live-fields';
-import { CSS_ROWS, ROWS, Control, shownRows, type NumberRow } from './controls';
+import { CSS_ROWS, ROWS, Control, Section, limitsSet, shownRows, type NumberRow } from './controls';
 import { Unit } from './units';
 
 const row = (name: string) => ROWS.find((r) => r.name === name)!;
@@ -14,6 +14,47 @@ describe('css rows', () => {
   it('write the standard utility where an exact one exists', () => {
     expect(row('cursor').change('grab').value).toBe('cursor-grab');
     expect(row('min-width').change('240px').value).toBe('min-w-[240px]');
+  });
+
+  it('min and max sizes sit in the Size section, under width and height', () => {
+    const names = ROWS.filter((r) => r.section === Section.Size).map((r) => r.name);
+    expect(names).toEqual(['width', 'height', 'min-width', 'max-width', 'min-height', 'max-height']);
+    expect(ROWS.filter((r) => r.section === Section.Constraints).map((r) => r.name)).toEqual(['aspect-ratio']);
+  });
+
+  it.each([
+    ['min-width', '240px', 'min-w-[240px]', { minWidth: '240px' }],
+    ['max-width', '65ch', 'max-w-prose', { maxWidth: '65ch' }],
+    ['max-width', 'none', 'max-w-none', { maxWidth: 'none' }],
+    ['min-height', '100dvh', 'min-h-dvh', { minHeight: '100dvh' }],
+    ['max-height', '50vh', 'max-h-[50vh]', { maxHeight: '50vh' }]
+  ])('%s writes %s as %s', (name, value, token, preview) => {
+    expect(row(name).change(value)).toEqual({ prop: LiveProp.Class, family: `arbitrary:${name}`, value: token });
+    expect(row(name).preview(value)).toEqual(preview);
+  });
+
+  it('clearing a limit writes an empty class', () => {
+    expect(row('max-width').change('').value).toBe('');
+    expect(row('max-width').preview('')).toEqual({ maxWidth: '' });
+  });
+
+  it('width and height write the keyword utilities', () => {
+    expect(row('width').change('100%').value).toBe('w-full');
+    expect(row('width').change('fit-content').value).toBe('w-fit');
+    expect(row('height').change('auto').value).toBe('h-auto');
+    expect(row('width').change('320px').value).toBe('w-[320px]');
+  });
+
+  it('a limit is set once the element has any of the four', () => {
+    expect(limitsSet({ 'min-width': 'auto', 'max-width': 'none', 'min-height': '0px', 'max-height': 'none' })).toBe(true);
+    expect(limitsSet({ 'min-width': 'auto', 'max-width': 'none', 'min-height': 'auto', 'max-height': 'none' })).toBe(false);
+    expect(limitsSet({ 'max-width': '720px' })).toBe(true);
+    expect(limitsSet({})).toBe(false);
+  });
+
+  it('read a limit that is a keyword as no number', () => {
+    expect((row('max-width') as NumberRow).read({ 'max-width': 'none' })).toBe(0);
+    expect((row('max-width') as NumberRow).read({ 'max-width': '720px' })).toBe(720);
   });
 
   it('write one arbitrary property per edit, spaces as underscores', () => {

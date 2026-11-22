@@ -21,7 +21,7 @@ const LINUX_OPENER = ['xdg-open'];
 
 export type Launch = (command: string, args: string[]) => Promise<boolean>;
 
-export type NodeHost = { root: string; launcher: string; version: string; transport: Transport; print: (line: string) => void; launch?: Launch; env?: NodeJS.ProcessEnv; account?: AccountStore; onboarding?: OnboardingStore; install?: InstallStore };
+export type NodeHost = { root: string; launcher: string; version: string; transport: Transport; print: (line: string) => void; launch?: Launch; env?: NodeJS.ProcessEnv; account?: AccountStore; onboarding?: OnboardingStore; install?: InstallStore; cloud?: Platform['cloud']; share?: Platform['share'] };
 
 export const launchDetached: Launch = (command, args) =>
   new Promise((resolve) => {
@@ -43,7 +43,7 @@ const stateDirFor = (root: string, env: NodeJS.ProcessEnv) => {
   return join(env.XDG_CACHE_HOME || join(homedir(), '.cache'), CACHE_DIR, key);
 };
 
-export function nodePlatform({ root, launcher, version, transport, print, launch = launchDetached, env = process.env, account = fileAccountStore(), onboarding = fileOnboardingStore(), install = fileInstallStore() }: NodeHost): Platform {
+export function nodePlatform({ root, launcher, version, transport, print, launch = launchDetached, env = process.env, account = fileAccountStore(), onboarding = fileOnboardingStore(), install = fileInstallStore(), cloud, share }: NodeHost): Platform {
   const dir = join(root, FEEGA_DIR);
   const settingsPath = join(dir, SETTINGS_FILE);
   const stateDir = stateDirFor(root, env);
@@ -105,7 +105,10 @@ export function nodePlatform({ root, launcher, version, transport, print, launch
     },
     sourceControl: () => print(`feega: review the changes with \`git -C ${root} diff\``),
     notify: (text) => print(`feega: ${text}`),
+    warn: async (text) => (print(`feega: ${text}`), false),
     account,
+    cloud,
+    share,
     onboarding,
     usage: {
       identity: () => ({ installId: installIdOf(install), version, editor: Editor.Npx, os: process.platform, arch: process.arch, device: Device.Cli }),

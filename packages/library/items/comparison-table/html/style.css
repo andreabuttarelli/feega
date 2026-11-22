@@ -1,0 +1,26 @@
+.fl-comparison-table{font-family:var(--feega-font);font-size:var(--feega-text-body);line-height:1.5;letter-spacing:var(--feega-tracking);color:var(--feega-fg);background:var(--feega-bg);-webkit-font-smoothing:antialiased}
+:where(.fl-comparison-table) *,:where(.fl-comparison-table) *::before,:where(.fl-comparison-table) *::after{box-sizing:border-box}
+:where(.fl-comparison-table) :is(h1,h2,h3,h4,p,ul,ol,figure,blockquote,dl,dd){margin:0}
+:where(.fl-comparison-table) a{color:inherit;text-decoration:none}
+:where(.fl-comparison-table) :focus-visible{outline:2px solid var(--feega-focus);outline-offset:3px}
+.fl-container{width:min(var(--feega-max-width),100% - 2 * var(--feega-gutter));margin-inline:auto}
+.fl-px{display:block;flex:none;width:1em;height:auto;fill:currentColor;shape-rendering:crispEdges}
+.fl-title{font-family:var(--feega-font-display);font-size:var(--feega-text-title);font-weight:500;line-height:0.95;letter-spacing:var(--feega-tracking-tight);text-wrap:balance}
+.fl-lead{max-width:34rem;font-size:var(--feega-text-lg);line-height:1.4;color:var(--feega-fg-muted);text-wrap:pretty}
+.fl-eyebrow{display:inline-flex;align-items:center;gap:var(--feega-space-2);font-family:var(--feega-font-mono);font-size:var(--feega-text-xs);letter-spacing:0.02em;color:var(--feega-fg-muted);text-transform:uppercase}
+.fl-eyebrow::before{content:"";width:6px;height:6px;background:var(--feega-accent)}
+.fl-comparison-table{padding-block:var(--feega-space-section)}
+.fl-comparison-table .head{display:flex;flex-direction:column;align-items:flex-start;gap:var(--feega-space-6);margin-bottom:var(--feega-space-12)}
+.fl-comparison-table .scroll{overflow-x:auto;border-radius:var(--feega-radius-lg);background:var(--feega-raised);box-shadow:inset 0 0 0 1px var(--feega-line)}
+.fl-comparison-table table{width:100%;min-width:34rem;border-collapse:collapse;font-size:var(--feega-text-sm)}
+.fl-comparison-table th,.fl-comparison-table td{padding:16px 20px;border-bottom:1px solid var(--feega-line);text-align:center}
+.fl-comparison-table tbody tr:last-child > *{border-bottom:0}
+.fl-comparison-table th[scope="row"],.fl-comparison-table thead th:first-child{text-align:left;font-weight:500}
+.fl-comparison-table thead th{font-family:var(--feega-font-mono);font-size:var(--feega-text-xs);font-weight:400;color:var(--feega-fg-muted);text-transform:uppercase}
+.fl-comparison-table .us{background:var(--feega-accent-soft);color:var(--feega-accent-text);font-weight:600}
+.fl-comparison-table td .fl-px{display:inline-block;width:12px}
+.fl-comparison-table .yes{color:var(--feega-success)}
+.fl-comparison-table .us .yes{color:var(--feega-accent-text)}
+.fl-comparison-table .no{width:9px!important;color:var(--feega-fg-subtle)}
+.fl-comparison-table .note{margin-top:var(--feega-space-3);color:var(--feega-fg-subtle);font-size:var(--feega-text-xs)}
+@media (prefers-reduced-motion:reduce){:where([class^="fl-"]) *,:where([class^="fl-"]) *::before,:where([class^="fl-"]) *::after{animation:none!important;transition:none!important}}

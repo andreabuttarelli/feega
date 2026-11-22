@@ -1,0 +1,21 @@
+import './TestimonialsGrid.css';
+
+export function TestimonialsGrid() {
+  return (
+    <section className="fl-testimonials-grid">
+      <div className="fl-container head">
+        <p className="fl-eyebrow">testimonials</p>
+        <h2 className="fl-title">what people say</h2>
+        <p className="fl-lead">Placeholder quotes. Use real words from real customers, with permission.</p>
+      </div>
+      <ul className="fl-container grid">
+        <li><blockquote>Placeholder quote. Replace with a short, specific line from a customer.</blockquote><p className="who"><span className="fl-avatar" aria-hidden="true">NS</span><span><b>Name Surname</b><small>Role, Company A</small></span></p></li>
+        <li><blockquote>Placeholder. One concrete result beats three adjectives: what got faster, cheaper or simpler.</blockquote><p className="who"><span className="fl-avatar" aria-hidden="true">FL</span><span><b>First Last</b><small>Role, Company B</small></span></p></li>
+        <li><blockquote>Placeholder quote.</blockquote><p className="who"><span className="fl-avatar" aria-hidden="true">AE</span><span><b>Alex Example</b><small>Role, Company C</small></span></p></li>
+        <li><blockquote>Placeholder. Keep the customer’s own words and tone; edit only for length.</blockquote><p className="who"><span className="fl-avatar" aria-hidden="true">SP</span><span><b>Sam Placeholder</b><small>Role, Company D</small></span></p></li>
+        <li><blockquote>Placeholder quote about the moment it clicked.</blockquote><p className="who"><span className="fl-avatar" aria-hidden="true">RS</span><span><b>Robin Sample</b><small>Role, Company E</small></span></p></li>
+        <li><blockquote>Placeholder. Name the thing they used before, and why they stopped.</blockquote><p className="who"><span className="fl-avatar" aria-hidden="true">KD</span><span><b>Kai Demo</b><small>Role, Company F</small></span></p></li>
+      </ul>
+    </section>
+  );
+}
