@@ -64,6 +64,7 @@ We share personal data with these categories of recipients, each acting as our p
 | Product analytics | understanding how the Service is used (consent) |
 | Advertising measurement | measuring which ads lead to sign-ups (consent) |
 | Age verification | one-time 18+ check for age-restricted features (Didit, EU) |
+| Bot protection | checking that a sign-up or password-reset request comes from a person (Cloudflare Turnstile; a challenge token, your IP address and browser signals go to Cloudflare) |
 
 The current list of sub-processors is available at [https://feega.app/subprocessors](./SUBPROCESSORS.md).
 

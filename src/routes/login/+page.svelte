@@ -13,9 +13,11 @@
   import { nativeAppleSignIn, NativeAppleOutcome, type AppleIdToken } from '$lib/apple-sign-in/native';
   import { nativeBridge } from '$lib/native-bridge';
   import { nativeKeys } from '$lib/native-keys';
+  import TurnstileWidget from '$lib/components/TurnstileWidget.svelte';
   let { form, data } = $props();
   let loading = $state(false);
   let showPassword = $state(false);
+  let challengeResets = $state(0);
 
   // Auth mode: sign-in (default), sign-up, or forgot-password.
   // Homepage/ads URL CTAs and pricing plan CTAs land on create-account (server sets preferSignup).
@@ -245,6 +247,7 @@
             return async ({ update }) => {
               await update();
               loading = false;
+              challengeResets += 1;
             };
           }}
         >
@@ -278,6 +281,9 @@
                 {showPassword ? $_('login.form.hide') : $_('login.form.show')}
               </button>
             </div>
+          {/if}
+          {#if mode !== 'signin' && data.turnstileSiteKey}
+            <TurnstileWidget siteKey={data.turnstileSiteKey} resetSignal={challengeResets} />
           {/if}
           {#if mode === 'signin'}
             <div class="row">

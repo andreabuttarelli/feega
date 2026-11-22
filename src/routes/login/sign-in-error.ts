@@ -1,6 +1,7 @@
 export enum SignInError {
   OAuth = 'oauth',
-  Link = 'link'
+  Link = 'link',
+  BlockedDomain = 'blockedDomain'
 }
 
 export const SIGN_IN_ERROR_PARAM = 'error';
