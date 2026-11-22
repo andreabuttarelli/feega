@@ -518,6 +518,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.ImageUpload]: (m) => imageSaved(m.name, Buffer.from(m.data, 'base64')),
     [ToHost.Wiring]: (m) => wiringShown(m.at, m.instance),
     [ToHost.Link]: (m) => edits.link(m.at, m.edit, m.instance).then((out) => edited(out, null)),
+    [ToHost.Attribute]: (m) => edits.attribute(m.at, m.name, m.value).then((out) => edited(out, null)),
     [ToHost.Go]: (m) => edits.go(m.at, m.ask).then((out) => edited(out, null)),
     [ToHost.Selected]: (m) => syncSelection(m.at),
     [ToHost.Copy]: (m) => platform.copyText?.(m.text),

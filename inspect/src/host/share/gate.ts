@@ -42,6 +42,7 @@ const RULES: Partial<Record<string, Rule>> = {
   [ToHost.IconMarkup]: onElement(at),
   [ToHost.IconGet]: onElement(at),
   [ToHost.Link]: onElement(at),
+  [ToHost.Attribute]: onElement(at),
   [ToHost.Go]: onElement(at),
   [ToHost.Undo]: EDIT,
   [ToHost.Redo]: EDIT,
