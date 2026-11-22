@@ -66,6 +66,11 @@ code --install-extension feega-inspect-0.1.0.vsix
 
 - Element picking needs the [source map](/integrations/source-map/). Vite, SvelteKit, React Router,
   Astro and Nuxt apps get it when Feega starts their dev server.
+- **Astro and Nuxt cannot attach to a server that already runs.** Feega must start the dev server to
+  link elements to your source files. If you attach by address (the Open from URL command or
+  `npx feega --url`), Feega refuses and offers **Start with Feega**; `npx feega --url` exits with an
+  error. If your own server is already on the port, Feega starts its own on a free one and leaves
+  yours running.
 - Select, text, style and structure edits are tested on Vite (React, Vue, plain HTML), SvelteKit,
   React Router, Astro, Nuxt and Next.js. Angular, Gatsby and Create React App are not supported.
 - `hover:`/`dark:` variants, class expressions and non-literal text are not written.
