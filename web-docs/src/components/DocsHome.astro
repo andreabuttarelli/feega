@@ -29,7 +29,6 @@ const GROUPS = [
   { title: 'account and help', icon: 'help', dirs: ['more'] }
 ];
 
-const COLUMNS = [[0, 3], [1], [2]];
 
 const entries = await getCollection('docs');
 const pages = entries.filter((e) => e.id !== 'index' && e.id.includes('/') && !e.id.startsWith('integrations/'));
@@ -74,30 +73,24 @@ const groups = GROUPS.map((g) => ({
 
   <section class="dir">
     <p class="home-label">every page</p>
-    <div class="dir-grid">
-      {
-        COLUMNS.map((col) => (
-          <div class="dir-stack">
-            {col.map((i) => (
-              <div class="dir-col">
-                <h2><Pixel rows={ICONS[groups[i].icon]} size={4} />{groups[i].title}</h2>
-                <ul>
-                  {groups[i].pages.map((p) => (
-                    <li>
-                      <a href={`/${p.id}/`}>
-                        <img class="thumb" src={coverUrl(p.id, 'webp')} alt="" width={COVER_WIDTH} height={COVER_HEIGHT} loading="lazy" decoding="async" />
-                        <strong>{p.data.title}</strong>
-                        <span>{p.data.description}</span>
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+    {
+      groups.map((g) => (
+        <div class="group">
+          <h2 class="group-title"><Pixel rows={ICONS[g.icon]} size={4} />{g.title}</h2>
+          <ul class="group-grid">
+            {g.pages.map((p) => (
+              <li>
+                <a href={`/${p.id}/`}>
+                  <img class="thumb" src={coverUrl(p.id, 'webp')} alt="" width={COVER_WIDTH} height={COVER_HEIGHT} loading="lazy" decoding="async" />
+                  <strong>{p.data.title}</strong>
+                  <span>{p.data.description}</span>
+                </a>
+              </li>
             ))}
-          </div>
-        ))
-      }
-    </div>
+          </ul>
+        </div>
+      ))
+    }
   </section>
 </div>
 
@@ -188,7 +181,7 @@ const groups = GROUPS.map((g) => ({
   }
 
   .home-label {
-    margin: 0 0 var(--sx-s6);
+    margin: 0 0 var(--sx-s8);
     color: var(--sx-ink-3);
     font-family: var(--sx-mono);
     font-size: var(--sx-fs-mono);
@@ -254,47 +247,29 @@ const groups = GROUPS.map((g) => ({
     line-height: 1.5;
   }
 
-  .dir-grid {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--sx-s8) var(--sx-s6);
+  .new-grid > *,
+  .group > *,
+  .home li {
+    margin-top: 0 !important;
   }
 
-  .new-grid > *,
-  .dir-grid > *,
-  .dir-stack > *,
   .home > * {
     margin-top: 0;
   }
 
-  .new,
-  .dir {
-    margin-top: var(--sx-section);
+  .home .new,
+  .home .dir {
+    margin-top: calc(var(--sx-section) * 1.75);
   }
 
   .home .band {
-    margin-top: var(--sx-s8);
-  }
-
-  .dir-stack {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sx-s8);
-  }
-
-  .dir-col h2 {
-    display: flex;
-    align-items: center;
-    gap: var(--sx-s3);
-    margin: 0 0 var(--sx-s4);
-    padding-bottom: var(--sx-s4);
-    border-bottom: 1px solid var(--sx-line);
-    font-size: 24px;
-    font-weight: var(--sx-w-title);
-    letter-spacing: var(--sx-track-title);
+    margin-top: calc(var(--sx-section) * 1.25);
   }
 
   ul {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sx-s6);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -302,10 +277,13 @@ const groups = GROUPS.map((g) => ({
 
   li a {
     display: grid;
-    grid-template-columns: 96px minmax(0, 1fr);
-    grid-template-rows: auto 1fr;
+    grid-template-columns: 112px minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    align-content: start;
     column-gap: var(--sx-s4);
-    row-gap: 2px;
+    row-gap: var(--sx-s1);
+    height: 100%;
+    box-sizing: border-box;
     margin: 0 calc(-1 * var(--sx-s3));
     padding: var(--sx-s3);
     border-radius: var(--sx-radius-lg);
@@ -321,8 +299,10 @@ const groups = GROUPS.map((g) => ({
   li .thumb {
     grid-row: 1 / 3;
     align-self: start;
-    width: 96px;
+    width: 112px;
     height: auto;
+    aspect-ratio: 1200 / 630;
+    object-fit: cover;
     border-radius: var(--sx-radius-sm);
   }
 
@@ -333,30 +313,69 @@ const groups = GROUPS.map((g) => ({
   }
 
   li strong {
+    overflow: hidden;
     font-size: 18px;
     font-weight: 600;
+    line-height: 1.3;
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
 
   li span {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    min-height: calc(2 * 1.45em);
     color: var(--sx-ink-3);
     font-size: var(--sx-fs-small);
     line-height: 1.45;
+  }
+
+  .home ul.group-grid > li {
+    margin: 0 !important;
+  }
+
+  .home .group + .group {
+    margin-top: var(--sx-s10) !important;
+  }
+
+  .group-title {
+    display: flex;
+    align-items: center;
+    gap: var(--sx-s3);
+    margin: 0 0 var(--sx-s7);
+    padding-bottom: var(--sx-s5);
+    border-bottom: 1px solid var(--sx-line);
+    font-size: 24px;
+    font-weight: var(--sx-w-title);
+    letter-spacing: var(--sx-track-title);
+  }
+
+  .home ul.group-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sx-s6) var(--sx-s8);
+    align-items: stretch;
+  }
+
+  @media (min-width: 810px) {
+    .home ul.group-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (min-width: 1200px) {
+    .home ul.group-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
   }
 
   @media (min-width: 810px) {
     .new-grid {
       grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: var(--sx-s5);
-    }
-
-    .dir-grid {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-  }
-
-  @media (min-width: 1200px) {
-    .dir-grid {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
     }
   }
 </style>

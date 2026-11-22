@@ -1,5 +1,6 @@
 export enum SettingsSection {
-  Profile = 'profile'
+  Profile = 'profile',
+  Billing = 'billing'
 }
 
 export const DASHBOARD_SETTINGS_API = '/api/v1/me/settings';

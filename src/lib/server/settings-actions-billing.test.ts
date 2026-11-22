@@ -64,7 +64,7 @@ function formEvent(fields: Record<string, string> = {}) {
 		request: { formData: async () => data },
 		params: {},
 		cookies: { get: () => undefined },
-		url: new URL('https://feega.test/app/credits'),
+		url: new URL('https://feega.test/app/settings/billing'),
 		locals: { supabase: ownerSupabase() }
 	} as never;
 }
@@ -92,8 +92,8 @@ describe('subscribe — the one plan', () => {
 				priceId: 'price_sub_9',
 				credits: 500,
 				quantity: 2,
-				successUrl: 'https://feega.test/app/credits?checkout=success&session_id={CHECKOUT_SESSION_ID}',
-				cancelUrl: 'https://feega.test/app/credits?checkout=canceled'
+				successUrl: 'https://feega.test/app/settings/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}',
+				cancelUrl: 'https://feega.test/app/settings/billing?checkout=canceled'
 			})
 		);
 	});

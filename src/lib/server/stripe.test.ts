@@ -12,7 +12,9 @@ const pricesList = vi.fn();
 
 vi.mock('$env/dynamic/private', () => ({
 	env: {
-		STRIPE_SECRET_KEY: 'sk_test_123'
+		STRIPE_SECRET_KEY: 'sk_test_123',
+		STRIPE_PRICE_CLOUD_MONTHLY: 'price_cloud_m',
+		STRIPE_PRICE_CLOUD_ANNUAL: 'price_cloud_y'
 	}
 }));
 
@@ -313,7 +315,7 @@ describe('seatSubscription', () => {
 		subscriptionsRetrieve.mockResolvedValue({
 			status: 'active',
 			cancel_at: 1735689600,
-			items: { data: [{ id: 'si_1', quantity: 3, current_period_end: 1738368000, price: { lookup_key: 'feega_monthly_9' } }] }
+			items: { data: [{ id: 'si_1', quantity: 3, current_period_end: 1738368000, price: { lookup_key: 'feega_monthly_9', recurring: { interval: 'year' } } }] }
 		});
 		const { seatSubscription } = await import('./stripe');
 
@@ -321,10 +323,18 @@ describe('seatSubscription', () => {
 			itemId: 'si_1',
 			quantity: 3,
 			perEditor: true,
+			interval: 'annual',
 			status: 'active',
 			endsAt: new Date(1735689600 * 1000).toISOString(),
 			periodEnd: new Date(1738368000 * 1000).toISOString()
 		});
+	});
+
+	it('reads a monthly price as the monthly interval', async () => {
+		subscriptionsRetrieve.mockResolvedValue({ status: 'active', cancel_at: null, items: { data: [{ id: 'si_m', quantity: 1, price: { lookup_key: 'feega_monthly_9', recurring: { interval: 'month' } } }] } });
+		const { seatSubscription } = await import('./stripe');
+
+		expect(await seatSubscription('sub_1')).toMatchObject({ interval: 'monthly' });
 	});
 
 	it('marks a subscription on a retired price as not per editor', async () => {
@@ -332,6 +342,23 @@ describe('seatSubscription', () => {
 		const { seatSubscription } = await import('./stripe');
 
 		expect(await seatSubscription('sub_1')).toMatchObject({ perEditor: false, endsAt: null });
+	});
+});
+
+describe('cloudPriceId', () => {
+	it('reads the monthly and the annual Stripe price from the environment', async () => {
+		const { cloudPriceId } = await import('./stripe');
+		const { CloudInterval } = await import('$lib/cloud-pricing');
+
+		expect(cloudPriceId(CloudInterval.Monthly)).toBe('price_cloud_m');
+		expect(cloudPriceId(CloudInterval.Annual)).toBe('price_cloud_y');
+	});
+
+	it('treats a subscription on a Cloud price as per editor', async () => {
+		subscriptionsRetrieve.mockResolvedValue({ status: 'active', cancel_at: null, items: { data: [{ id: 'si_c', quantity: 2, price: { id: 'price_cloud_y', lookup_key: null } }] } });
+		const { seatSubscription } = await import('./stripe');
+
+		expect(await seatSubscription('sub_1')).toMatchObject({ perEditor: true, quantity: 2 });
 	});
 });
 

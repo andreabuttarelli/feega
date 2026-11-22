@@ -77,7 +77,7 @@ describe('POST /api/v1/org/billing/portal', () => {
 		expect(orgBillingById).toHaveBeenCalledWith(expect.anything(), 'org-1');
 		expect(createBillingPortalSession).toHaveBeenCalledWith({
 			customerId: 'cus_org',
-			returnUrl: 'https://feega.test/app/credits',
+			returnUrl: 'https://feega.test/app/settings/billing',
 			flow: undefined
 		});
 	});
@@ -121,7 +121,7 @@ describe('POST /api/v1/org/billing/portal', () => {
 
 		expect(res.status).toBe(409);
 		expect(body.error).toBe('no_customer');
-		expect(body.app_billing_url).toBe('https://feega.test/app/credits');
+		expect(body.app_billing_url).toBe('https://feega.test/app/settings/billing');
 		expect(createBillingPortalSession).not.toHaveBeenCalled();
 	});
 
