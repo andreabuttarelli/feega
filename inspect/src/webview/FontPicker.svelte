@@ -6,37 +6,38 @@
 
   const MAX_SHOWN = 60;
 
-  let { family, project = [], onpick }: { family: string; project?: string[]; onpick: (font: FontChoice) => void } = $props();
+  let { family, project = [], system = [], placeholder = 'Font', onpick }: { family: string; project?: string[]; system?: string[]; placeholder?: string; onpick: (font: FontChoice) => void } = $props();
 
   let query = $state('');
   let open = $state(false);
   const match = (name: string) => name.toLowerCase().includes(query.trim().toLowerCase());
   const inProject = $derived(project.filter(match));
-  const google = $derived(GOOGLE_FONTS.filter((f) => match(f.family) && !project.includes(f.family)).slice(0, MAX_SHOWN));
+  const installed = $derived(system.filter((name) => match(name) && !project.includes(name)));
+  const google = $derived(GOOGLE_FONTS.filter((f) => match(f.family) && !project.includes(f.family) && !system.includes(f.family)).slice(0, MAX_SHOWN));
 
   $effect(() => {
-    if (!open || document.getElementById('feega-font-preview')) {
+    if (!open || !google.length) {
       return;
     }
     const link = document.createElement('link');
-    link.id = 'feega-font-preview';
     link.rel = 'stylesheet';
-    link.href = previewUrl(GOOGLE_FONTS.map((f) => f.family));
+    link.href = previewUrl(google.map((f) => f.family));
     document.head.append(link);
+    return () => link.remove();
   });
 
   function choose(value: string | undefined) {
     if (!value) {
       return;
     }
-    onpick({ family: value, google: !project.includes(value) });
+    onpick({ family: value, google: !project.includes(value) && !system.includes(value) });
     query = '';
   }
 </script>
 
 <Combobox.Root type="single" bind:open value={family} onValueChange={choose}>
   <div class="font-field">
-    <Combobox.Input class="font-input" aria-label="Font family" placeholder={family || 'Font'} oninput={(e) => (query = e.currentTarget.value)} defaultValue={family} />
+    <Combobox.Input class="font-input" aria-label="Font family" placeholder={family || placeholder} oninput={(e) => (query = e.currentTarget.value)} defaultValue={family} />
     <Combobox.Trigger class="font-trigger" aria-label="Show fonts"><ChevronDown size={12} /></Combobox.Trigger>
   </div>
   <Combobox.Portal>
@@ -47,6 +48,12 @@
           <Combobox.Item class="font-item" value={name} label={name}><span style={`font-family: '${name}'`}>{name}</span></Combobox.Item>
         {/each}
       {/if}
+      {#if installed.length}
+        <div class="group-label">Installed</div>
+        {#each installed as name (name)}
+          <Combobox.Item class="font-item" value={name} label={name}><span style={`font-family: '${name}'`}>{name}</span></Combobox.Item>
+        {/each}
+      {/if}
       <div class="group-label">Google Fonts</div>
       {#each google as f (f.family)}
         <Combobox.Item class="font-item" value={f.family} label={f.family}>
@@ -54,7 +61,7 @@
           <span class="category">{f.category}</span>
         </Combobox.Item>
       {/each}
-      {#if !inProject.length && !google.length}<div class="empty">No font named “{query}”</div>{/if}
+      {#if !inProject.length && !installed.length && !google.length}<div class="empty">No font named “{query}”</div>{/if}
     </Combobox.Content>
   </Combobox.Portal>
 </Combobox.Root>

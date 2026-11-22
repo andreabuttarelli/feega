@@ -41,6 +41,8 @@
   import { Tabs } from 'bits-ui';
   import { Tab } from './tabs';
   import { fontCss } from './fonts';
+  import MissingFont from './MissingFont.svelte';
+  import { SvelteSet } from 'svelte/reactivity';
   import { layerState, passThrough, type LayerFlag, type SavedLayers } from './layer-state';
   import { ClassFamily } from '@feega/live-edit/live-fields';
   import Breadcrumb from './Breadcrumb.svelte';
@@ -149,7 +151,9 @@
   const pins = $derived(pinsOf(threadsOf(cloud.comments, false)));
   const openComments = $derived(pins.length);
   let layers = $state<LayerNode[]>([]);
-  let palette = $state<Palette>({ document: [], tokens: [], fonts: [] });
+  let palette = $state<Palette>({ document: [], tokens: [], fonts: [], missing: [] });
+  const dismissedFonts = new SvelteSet<string>();
+  const fontNotice = $derived(palette.missing.find((m) => !dismissedFonts.has(m.family)) ?? null);
   let changes = $state<ChangeRow[]>([]);
   let canUndo = $state(false);
   let canRedo = $state(false);
@@ -256,7 +260,7 @@
       trackPins();
     },
     moved: (path) => (visited(path), bridge.tree()),
-    tree: (tree) => (layers = tree),
+    tree: (tree) => ((layers = tree), askPalette()),
     tracked: (slot, rect) => {
       const pin = pinIdOf(slot);
       if (pin) {
@@ -823,6 +827,25 @@
     toHost({ kind: ToHost.Font, google: font.google, ask: { at: sourceText(picked.source), prop: LiveProp.Class, family: ClassFamily.FontFamily, value: `font-['${font.family.replace(/\s+/g, '_')}']`, css: { 'font-family': css }, rem: picked.rem, viewport: picked.viewport, scope, breakpoint: target, theme: writtenThemeName } });
   }
 
+  const FONT_RECHECK_MS = 1500;
+  const PALETTE_DEBOUNCE_MS = 400;
+  let paletteTimer: ReturnType<typeof setTimeout> | undefined;
+
+  function askPalette() {
+    clearTimeout(paletteTimer);
+    paletteTimer = setTimeout(() => bridge.palette(), PALETTE_DEBOUNCE_MS);
+  }
+
+  function replaceFont(from: string, to: FontChoice) {
+    toHost({ kind: ToHost.FontReplace, from, to: to.family, google: to.google });
+    setTimeout(() => bridge.palette(), FONT_RECHECK_MS);
+  }
+
+  function loadFont(family: string) {
+    toHost({ kind: ToHost.FontLoad, family });
+    setTimeout(() => bridge.palette(), FONT_RECHECK_MS);
+  }
+
   const COMMENT_KEY = 'c';
 
   function onKey(e: KeyboardEvent) {
@@ -970,6 +993,12 @@
       {/if}
       {#if menu}<StructureMenu x={menu.x} y={menu.y} items={MENU_ITEMS} onpick={pickMenu} onclose={() => (menu = null)} />{/if}
       {#if addMenu}<StructureMenu x={addMenu.x} y={addMenu.y} items={picked && picked.instances > 1 ? [...ADD_ITEMS, ADD_LOOP_ITEM] : ADD_ITEMS} label="add" draggable={true} onpick={(id) => (id === StructureOp.AddItem ? restructure(StructureOp.AddItem) : addElement(id as AddKind))} onclose={() => (addMenu = null)} />{/if}
+      {#if fontNotice}
+        <div class="notice missingfont" data-testid="font-notice">
+          <MissingFont missing={fontNotice} project={palette.fonts.filter((name) => !palette.missing.some((m) => m.family === name))} onreplace={replaceFont} onload={loadFont} />
+          <button type="button" class="link" onclick={() => dismissedFonts.add(fontNotice!.family)}>Dismiss</button>
+        </div>
+      {/if}
       {#if toast}<div class="toast" role="status">{toast}</div>{/if}
       <div class="float" class:moving bind:clientWidth={bar.w} bind:clientHeight={bar.h} style={`left:${barAt.x}px;top:${barAt.y}px`} data-anchor={anchor}>
         <button type="button" class="grip" title="Drag to move (arrow keys)" aria-label="Move the bar" onpointerdown={grabBar} onpointermove={dragBar} onpointerup={dropBar} onkeydown={onHandleKey}>
@@ -1018,7 +1047,7 @@
             <button type="button" class:on={scope === Scope.Element} onclick={() => (scope = Scope.Element)} title="Only this element (every instance of its component: {picked.instances})">This element{picked.instances > 1 ? ` ×${picked.instances}` : ''}</button>
             <button type="button" class:on={scope === Scope.Class} disabled={!picked.classCount || styling === Styling.Tailwind} onclick={() => (scope = Scope.Class)} title={styling === Styling.Tailwind ? 'Class scope needs CSS rules, not Tailwind' : `Every element with this class: ${picked.classCount}`}>All .{picked.classes.split(' ')[0] || 'class'}{picked.classCount ? ` (${picked.classCount})` : ''}</button>
           </div>
-          <Properties pick={picked} {breakpoints} {palette} {elementState} {baseline} onstate={chooseState} onpreview={preview} onchange={change} onsavevar={saveVar} onhint={(h) => (hint = h)} onfont={pickFont} onnotice={showToast} />
+          <Properties pick={picked} {breakpoints} {palette} {elementState} {baseline} onstate={chooseState} onpreview={preview} onchange={change} onsavevar={saveVar} onhint={(h) => (hint = h)} onfont={pickFont} onfontreplace={replaceFont} onfontload={loadFont} onnotice={showToast} />
           <Interactions pick={picked} {changes} />
         {:else}
           <p class="empty">{bridged ? 'Click an element to edit it. Double-click text to rewrite it.' : 'The page has no Feega source map: element picking needs the feega-source-map plugin.'}</p>
@@ -1410,6 +1439,10 @@
 
   .notice.nosource {
     bottom: 64px;
+  }
+
+  .notice.missingfont {
+    bottom: 120px;
   }
 
   .attach {
