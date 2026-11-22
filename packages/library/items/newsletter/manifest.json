@@ -1,0 +1,30 @@
+{
+  "id": "newsletter",
+  "name": "Newsletter signup",
+  "description": "Headline and an inline email form with consent note.",
+  "category": "section",
+  "tags": [
+    "newsletter",
+    "form",
+    "conversion"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    }
+  ],
+  "tier": "free"
+}

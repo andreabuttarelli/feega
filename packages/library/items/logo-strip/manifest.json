@@ -1,0 +1,35 @@
+{
+  "id": "logo-strip",
+  "name": "Logo strip",
+  "description": "A row of logo placeholders; swap the svg for real logos.",
+  "category": "section",
+  "tags": [
+    "social-proof",
+    "logos"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    },
+    {
+      "family": "Fragment Mono",
+      "weights": [
+        400
+      ]
+    }
+  ],
+  "tier": "free"
+}

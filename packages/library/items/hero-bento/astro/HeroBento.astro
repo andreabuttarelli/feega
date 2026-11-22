@@ -1,0 +1,70 @@
+---
+---
+
+<section class="fl-hero-bento">
+  <div class="fl-container grid">
+    <div class="tile main">
+      <p class="tag">yourbrand / 2026</p>
+      <h1>build the page your team keeps asking for</h1>
+      <div class="cta"><a class="fl-btn fl-btn--primary" href="#">start free</a><a class="fl-btn" href="#">see examples</a></div>
+    </div>
+    <div class="tile metric"><b>4.2×</b><span>faster to ship, placeholder figure</span></div>
+    <div class="tile art fl-dots" aria-hidden="true"><div class="sel" aria-hidden="true"><span class="tag">div.card</span><i></i><i></i><i></i><i></i></div><span class="box"></span></div>
+    <div class="tile note"><p>“Replace with a short customer line.”</p><span>Name Surname, Company</span></div>
+    <a class="tile go" href="#"><span>read the launch post</span><svg class="fl-px" viewBox="0 0 7 5" aria-hidden="true"><path d="M4 0h1v1h-1zM5 1h1v1h-1zM0 2h1v1h-1zM1 2h1v1h-1zM2 2h1v1h-1zM3 2h1v1h-1zM4 2h1v1h-1zM5 2h1v1h-1zM6 2h1v1h-1zM5 3h1v1h-1zM4 4h1v1h-1z" /></svg></a>
+  </div>
+</section>
+
+<style>
+.fl-hero-bento{font-family:var(--feega-font);font-size:var(--feega-text-body);line-height:1.5;letter-spacing:var(--feega-tracking);color:var(--feega-fg);background:var(--feega-bg);-webkit-font-smoothing:antialiased}
+:where(.fl-hero-bento) *,:where(.fl-hero-bento) *::before,:where(.fl-hero-bento) *::after{box-sizing:border-box}
+:where(.fl-hero-bento) :is(h1,h2,h3,h4,p,ul,ol,figure,blockquote,dl,dd){margin:0}
+:where(.fl-hero-bento) a{color:inherit;text-decoration:none}
+:where(.fl-hero-bento) :focus-visible{outline:2px solid var(--feega-focus);outline-offset:3px}
+.fl-container{width:min(var(--feega-max-width),100% - 2 * var(--feega-gutter));margin-inline:auto}
+.fl-px{display:block;flex:none;width:1em;height:auto;fill:currentColor;shape-rendering:crispEdges}
+.fl-btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--feega-space-2);min-height:44px;padding:0 var(--feega-space-6);border:1px solid var(--feega-line-strong);border-radius:var(--feega-radius-full);background:transparent;color:var(--feega-fg);font:inherit;font-size:0.9375rem;font-weight:500;letter-spacing:var(--feega-tracking);white-space:nowrap;text-decoration:none;cursor:pointer;transition:background-color var(--feega-dur-fast) var(--feega-ease),border-color var(--feega-dur-fast) var(--feega-ease),color var(--feega-dur-fast) var(--feega-ease),transform var(--feega-dur-fast) var(--feega-ease)}
+.fl-btn:hover{border-color:var(--feega-fg-subtle);background:var(--feega-surface)}
+.fl-btn:active{transform:scale(0.97)}
+.fl-btn--primary{border-color:var(--feega-accent);background:var(--feega-accent);color:var(--feega-accent-fg)}
+.fl-btn--primary:hover{border-color:var(--feega-accent-hover);background:var(--feega-accent-hover)}
+.fl-btn--ink{border-color:var(--feega-fg);background:var(--feega-fg);color:var(--feega-bg)}
+.fl-btn--ink:hover{border-color:var(--feega-fg-muted);background:var(--feega-fg-muted)}
+.fl-btn--ghost{border-color:transparent}
+.fl-btn--sm{min-height:36px;padding:0 var(--feega-space-4);font-size:var(--feega-text-sm)}
+.fl-btn .fl-px{width:10px;transition:transform var(--feega-dur) var(--feega-ease)}
+.fl-btn:hover .fl-px{transform:translateX(3px)}
+.fl-btn[disabled]{opacity:0.45;cursor:not-allowed}
+.fl-dots{background-image:radial-gradient(var(--feega-dot) 1px,transparent 1.5px);background-size:14px 14px}
+.fl-hero-bento{padding-block:var(--feega-space-12)}
+.fl-hero-bento .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-rows:minmax(10rem,auto);gap:var(--feega-space-3)}
+.fl-hero-bento .tile{position:relative;display:flex;flex-direction:column;justify-content:space-between;gap:var(--feega-space-4);padding:var(--feega-space-6);border-radius:var(--feega-radius-lg);background:var(--feega-surface)}
+.fl-hero-bento .main{grid-column:span 3;grid-row:span 2;padding:clamp(1.5rem,4vw,3rem);background:var(--feega-fg);color:var(--feega-bg)}
+.fl-hero-bento .tag{font-family:var(--feega-font-mono);font-size:var(--feega-text-xs);color:var(--feega-fg-subtle);text-transform:uppercase}
+.fl-hero-bento h1{max-width:13ch;font-family:var(--feega-font-display);font-size:clamp(2.75rem,7vw,6rem);font-weight:500;line-height:0.92;letter-spacing:var(--feega-tracking-tight);text-wrap:balance}
+.fl-hero-bento .cta{display:flex;flex-wrap:wrap;gap:var(--feega-space-3)}
+.fl-hero-bento .main .fl-btn:not(.fl-btn--primary){border-color:var(--feega-fg-muted);color:var(--feega-bg)}
+.fl-hero-bento .main .fl-btn:not(.fl-btn--primary):hover{background:transparent;border-color:var(--feega-bg)}
+.fl-hero-bento .metric{background:var(--feega-accent);color:var(--feega-accent-fg)}
+.fl-hero-bento .metric b{font-size:clamp(3rem,6vw,4.5rem);font-weight:500;line-height:1;letter-spacing:var(--feega-tracking-tight)}
+.fl-hero-bento .metric span{font-size:var(--feega-text-sm);font-weight:500}
+.fl-hero-bento .art{display:grid;place-items:center;background-color:var(--feega-surface)}
+.fl-hero-bento .art .box{position:absolute;inset:28% 20%;border-radius:var(--feega-radius-sm);background:var(--feega-raised);box-shadow:var(--feega-shadow)}
+.fl-hero-bento .sel{inset:28% 20%;z-index:1;position:absolute;border:1px solid var(--feega-accent);pointer-events:none}
+.fl-hero-bento .sel .tag{position:absolute;bottom:100%;left:-1px;margin-bottom:4px;padding:2px 6px;border-radius:var(--feega-radius-xs);background:var(--feega-accent);color:var(--feega-accent-fg);font-family:var(--feega-font-mono);font-size:10px;letter-spacing:0;white-space:nowrap}
+.fl-hero-bento .sel i{position:absolute;width:7px;height:7px;border:1px solid var(--feega-accent);background:var(--feega-raised)}
+.fl-hero-bento .sel i:nth-of-type(1){top:-4px;left:-4px}
+.fl-hero-bento .sel i:nth-of-type(2){top:-4px;right:-4px}
+.fl-hero-bento .sel i:nth-of-type(3){bottom:-4px;left:-4px}
+.fl-hero-bento .sel i:nth-of-type(4){right:-4px;bottom:-4px}
+.fl-hero-bento .note p{font-size:var(--feega-text-xl);font-weight:500;line-height:1.1;letter-spacing:-0.04em}
+.fl-hero-bento .note span{color:var(--feega-fg-muted);font-size:var(--feega-text-sm)}
+.fl-hero-bento .note{grid-column:span 2}
+.fl-hero-bento .go{grid-column:span 2;flex-direction:row;align-items:flex-end;font-size:var(--feega-text-xl);font-weight:500;letter-spacing:-0.04em;transition:background-color var(--feega-dur-fast) var(--feega-ease)}
+.fl-hero-bento .go:hover{background:var(--feega-line)}
+.fl-hero-bento .go .fl-px{width:18px;transition:transform var(--feega-dur) var(--feega-ease)}
+.fl-hero-bento .go:hover .fl-px{transform:translateX(6px)}
+@media (max-width:900px){.fl-hero-bento .grid{grid-template-columns:repeat(2,minmax(0,1fr))}.fl-hero-bento .main{grid-column:1/-1;grid-row:auto;min-height:24rem}.fl-hero-bento .note,.fl-hero-bento .go{grid-column:1/-1}}
+@media (max-width:480px){.fl-hero-bento .grid{grid-template-columns:minmax(0,1fr)}.fl-hero-bento .art{min-height:10rem}}
+@media (prefers-reduced-motion:reduce){:where([class^="fl-"]) *,:where([class^="fl-"]) *::before,:where([class^="fl-"]) *::after{animation:none!important;transition:none!important}}
+</style>

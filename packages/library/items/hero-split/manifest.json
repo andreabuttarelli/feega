@@ -1,0 +1,36 @@
+{
+  "id": "hero-split",
+  "name": "Hero, split",
+  "description": "Headline and actions on the left, image placeholder on the right; stacks on small screens.",
+  "category": "section",
+  "tags": [
+    "hero",
+    "landing",
+    "image"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    },
+    {
+      "family": "Fragment Mono",
+      "weights": [
+        400
+      ]
+    }
+  ],
+  "tier": "free"
+}

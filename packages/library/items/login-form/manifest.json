@@ -1,0 +1,35 @@
+{
+  "id": "login-form",
+  "name": "Login form",
+  "description": "Email and password form with remember option and recovery link.",
+  "category": "app",
+  "tags": [
+    "auth",
+    "form"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    },
+    {
+      "family": "Fragment Mono",
+      "weights": [
+        400
+      ]
+    }
+  ],
+  "tier": "free"
+}
