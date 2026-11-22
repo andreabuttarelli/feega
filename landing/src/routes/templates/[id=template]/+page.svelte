@@ -108,7 +108,7 @@
     <h2>{lower('Insert with Feega')}</h2>
     <div class="body">
       <p>
-        Insert with Feega: open Add, then Library, and click Insert or drag it into your running app. Feega writes the component, tokens and fonts for your framework. One undo. <a href="https://docs.feega.app/getting-started/library/">how it works</a>
+        Open Add, then Library, and click Insert or drag it into your running app. Feega writes the component, tokens and fonts for your framework. One undo. <a href="https://docs.feega.app/getting-started/library/">how it works</a>
       </p>
     </div>
     <CtaBlock item={{ text: 'Free VS Code extension. No account, no AI.', label: 'get feega', href: DOWNLOAD_PATH }} />
