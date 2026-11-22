@@ -1,12 +1,14 @@
 import { offsetOf, type LiveAt } from './class-patch';
 import type { ReadFile } from './files';
 import type { TextWritten } from './literal-text';
-import { Delimiter, attributesOf, tagNameAt, type Attribute } from './open-tag';
+import { Delimiter, attributesOf, removeAttribute, tagNameAt, type Attribute } from './open-tag';
 import { setAttributes } from './set-attributes';
 
-const EDITABLE = /^(data-[\w-]+|src|alt|title|aria-label|placeholder|poster)$/;
+const EDITABLE = /^(data-[\w-]+|src|srcset|sizes|alt|title|aria-label|placeholder|poster)$/;
 const BOOKKEEPING = /^data-feega/;
 const BOUND_PREFIX = /^(?::|v-bind:)/;
+const IMAGE_SOURCE = 'src';
+const SHADOWING_SOURCE = ['srcset', 'sizes'];
 const PLAIN_LITERAL = /^\s*(?:(['"`])[^'"`$\\]*\1|-?\d+(?:\.\d+)?)\s*$/;
 
 export const isEditableAttribute = (name: string) => EDITABLE.test(name) && !BOOKKEEPING.test(name);
@@ -18,6 +20,10 @@ function isLiteral(attribute: Attribute): boolean {
     return false;
   }
   return attribute.delimiter !== Delimiter.Brace || PLAIN_LITERAL.test(attribute.value ?? '');
+}
+
+function withoutAttributes(text: string, start: number, names: string[]): string {
+  return names.reduce((current, name) => named(attributesOf(current, start), name).reduceRight(removeAttribute, current), text);
 }
 
 export async function attributeWrite(read: ReadFile, at: LiveAt, name: string, value: string): Promise<TextWritten> {
@@ -32,5 +38,13 @@ export async function attributeWrite(read: ReadFile, at: LiveAt, name: string, v
   if (!named(attributesOf(text, start), name).every(isLiteral)) {
     return { ok: false, reason: `${name} comes from an expression: edit it where it is declared`, at };
   }
-  return setAttributes(read, at, { [name]: value });
+  if (name !== IMAGE_SOURCE) {
+    return setAttributes(read, at, { [name]: value });
+  }
+  const shadowing = SHADOWING_SOURCE.find((other) => !named(attributesOf(text, start), other).every(isLiteral));
+  if (shadowing) {
+    return { ok: false, reason: `${shadowing} comes from an expression and would keep the old image: edit it where it is declared`, at };
+  }
+  const written = await setAttributes(read, at, { [name]: value });
+  return written.ok ? { ok: true, change: { ...written.change, after: withoutAttributes(written.change.after, start, SHADOWING_SOURCE) } } : written;
 }

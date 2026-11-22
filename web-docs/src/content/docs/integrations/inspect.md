@@ -35,9 +35,9 @@ Feega Inspect is a small editor extension, separate from the Feega canvas. No ac
    An element with no click handler can be given **Go to page**, **Open URL** or **Scroll to
    section**: Feega writes a small inline handler (Svelte `goto` with its import, `$router.push`
    in Vue, `window.location` otherwise; Next files become client components). One undo removes it.
-   An element with `data-*` attributes, `src`, `alt`, `title`, `aria-label`, `placeholder` or
+   An element with `data-*` attributes, `src`, `srcset`, `sizes`, `alt`, `title`, `aria-label`, `placeholder` or
    `poster` gets an **Attributes** section: edit a value and it is written to the source. Only
-   literal strings are written; a value built from props or expressions is refused.
+   literal strings are written; a value built from props or expressions is refused. Changing an image `src` also removes its literal `srcset` and `sizes`, so the new image shows.
 7. The **State** menu at the top of Properties shows the element as it looks on **Hover**,
    **Focus**, **Focus visible**, **Active** or, on form controls, **Disabled**, without the mouse.
    A dot marks a state that already has styles, and rows that differ from Default turn blue. While
