@@ -5,7 +5,7 @@ import { SettingKey, settingsWith } from '../settings';
 import { Column, openTarget, revealColumn } from './open-source';
 import type { Account, AccountStore } from './account';
 import { IMAGE_EXTENSIONS } from './image-copy';
-import { globalStateOnboardingStore } from './onboarding';
+import { deviceOnboardingStore, globalStateOnboardingStore } from './onboarding';
 import type { Platform } from './platform';
 import { Device, editorOf, globalStateInstallStore, installIdOf, type UsageHost } from './usage';
 
@@ -114,7 +114,7 @@ export function vsCodePlatform(host: VsCodeHost, panel: PanelLike, befores: Map<
     notify: (text) => vscode.window.showInformationMessage(`Feega: ${text}`),
     pickImage,
     account: secretAccountStore(context.secrets),
-    onboarding: globalStateOnboardingStore(context.globalState),
+    onboarding: deviceOnboardingStore(globalStateOnboardingStore(context.globalState)),
     usage: vsCodeUsage(context)
   };
 }
