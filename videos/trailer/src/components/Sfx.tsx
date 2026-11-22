@@ -12,6 +12,7 @@ export enum Sound {
   Tap = "tap",
   Power = "power",
   Mouse = "mouse",
+  Clatter = "clatter",
 }
 
 export type Cue = { at: number; sound: Sound; volume: number };

@@ -7,7 +7,7 @@ import { PixelgodTui, LineKind, type Rect, type TermLine } from "../components/T
 import { VSCODE, VSCodeWindow } from "../components/VSCode";
 import { lift, mix, tween } from "../ease";
 import { COLORS } from "../theme";
-import { applyKeys, BEATS, BROWSER_OPENS, BUILD, CAMERA_KEYS, Focus, Front, FRONT_KEYS, LIFT, LIMIT, NAV_CENTER, NAV_CHANGE, NAV_LEFT, Reply, Stroke, SWAPS, TITLE_FIX } from "./coldOpenTimeline";
+import { applyKeys, BEATS, BROWSER_OPENS, BUILD, CAMERA_KEYS, type Beat, Focus, Front, FRONT_KEYS, LIMIT, NAV_CENTER, NAV_LEFT, Reply, Stroke, SWAPS, TITLE_FIX, Typing, type Keystroke } from "./coldOpenTimeline";
 
 const BROWSER = { x: 470, y: 150, w: 940, h: 720 };
 
@@ -30,7 +30,7 @@ const BACK_DIM = 0.8;
 const SHADOW = { rest: 0.45, lifted: 0.7 };
 
 const buildSteps = (frame: number): TermLine[] =>
-  BUILD_STEPS.filter((_, i) => frame >= BUILD.submit + ((i + 1) * BUILD.work) / (BUILD_STEPS.length + 1)).map((text) => ({
+  BUILD_STEPS.filter((_, i) => frame >= BUILD.submit + ((i + 1) * BUILD.think) / (BUILD_STEPS.length + 1)).map((text) => ({
     kind: LineKind.Tool,
     text,
   }));
@@ -84,18 +84,24 @@ const cursorOn = (frame: number, typing: boolean) => {
   return Math.floor(frame / BLINK) % 2 === 0;
 };
 
-const navCenter = (frame: number) => {
-  const right = mix(NAV_START, NAV_RIGHT, tween(frame, NAV_LEFT.changeAt, NAV_CHANGE));
+const change = (frame: number, beat: Beat) => tween(frame, beat.changeAt, beat.change);
 
-  return mix(right, NAV_MIDDLE, tween(frame, NAV_CENTER.changeAt, NAV_CHANGE));
+const navCenter = (frame: number) => {
+  const right = mix(NAV_START, NAV_RIGHT, change(frame, NAV_LEFT));
+
+  return mix(right, NAV_MIDDLE, change(frame, NAV_CENTER));
 };
 
+const strokeCue = (s: Keystroke, i: number): Cue => (s.stroke === Stroke.Backspace ? { at: s.at, sound: Sound.Backspace, volume: 0.4 } : keyClick(s.at, i));
+
+const onePerFrame = (strokes: Keystroke[]) => strokes.filter((s, i) => i === 0 || s.at !== strokes[i - 1].at);
+
+const typingCues = (beat: Beat): Cue[] =>
+  beat.typing === Typing.Burst ? [{ at: beat.typeStart, sound: Sound.Clatter, volume: 0.5 }] : onePerFrame(beat.strokes).map(strokeCue);
+
 const CUES: Cue[] = [
-  ...BEATS.flatMap((beat) => [
-    ...beat.strokes.map((s, i) => (s.stroke === Stroke.Backspace ? { at: s.at, sound: Sound.Backspace, volume: 0.4 } : keyClick(s.at, i))),
-    { at: beat.submit, sound: Sound.Enter, volume: 0.5 },
-  ]),
-  ...CAMERA_KEYS.filter((key) => key.at > 0).map((key) => ({ at: key.at, sound: Sound.Whoosh, volume: 0.3 })),
+  ...BEATS.flatMap((beat) => [...typingCues(beat), { at: beat.submit, sound: Sound.Enter, volume: 0.5 }]),
+  ...CAMERA_KEYS.filter((key) => key.at > 0 && key.move > 0).map((key) => ({ at: key.at, sound: Sound.Whoosh, volume: 0.3 })),
   ...SWAPS.map((swap) => ({ at: swap.at, sound: Sound.Tap, volume: 0.3 })),
   { at: BROWSER_OPENS, sound: Sound.Pop, volume: 0.4 },
   { at: LIMIT.replyAt, sound: Sound.Chime, volume: 0.6 },
@@ -109,11 +115,12 @@ const SHAKE = [
   { x: 22, y: 3, hue: -35 },
   { x: -4, y: 2, hue: 0 },
 ];
+const SNAP_SHAKE = 2;
 const FREEZE_DELAY = 10;
 const FREEZE_LENGTH = 26;
 
 const pageShake = (frame: number) => {
-  const step = SHAKE[frame - TITLE_FIX.changeAt];
+  const step = SHAKE.slice(0, Math.max(SNAP_SHAKE, TITLE_FIX.change))[frame - TITLE_FIX.changeAt];
 
   if (!step) {
     return undefined;
@@ -129,9 +136,9 @@ const frozen = (frame: number) => {
 };
 
 const glitches = (frame: number) => ({
-  button: tween(frame, NAV_LEFT.changeAt, NAV_CHANGE),
-  image: tween(frame, NAV_CENTER.changeAt, NAV_CHANGE),
-  font: tween(frame, TITLE_FIX.changeAt, NAV_CHANGE),
+  button: change(frame, NAV_LEFT),
+  image: change(frame, NAV_CENTER),
+  font: change(frame, TITLE_FIX),
 });
 
 const frontKey = (frame: number) => FRONT_KEYS.filter((key) => key.at <= frame).pop() ?? FRONT_KEYS[0];
@@ -139,10 +146,10 @@ const frontKey = (frame: number) => FRONT_KEYS.filter((key) => key.at <= frame).
 const stacking = (frame: number, rect: Rect, window: Front) => {
   const key = frontKey(frame);
   const front = key.front === window;
-  const t = front ? lift(frame, key.at, LIFT) : 1;
+  const t = front ? lift(frame, key.at, key.lift) : 1;
   const scale = front ? mix(0.98, 1, t) : 1;
   const shadow = front ? mix(SHADOW.rest, SHADOW.lifted, t) : SHADOW.rest;
-  const dim = front ? 1 : mix(1, BACK_DIM, lift(frame, key.at, LIFT));
+  const dim = front ? 1 : mix(1, BACK_DIM, lift(frame, key.at, key.lift));
 
   return {
     zIndex: front ? 2 : 1,
@@ -161,7 +168,7 @@ export const ColdOpen = () => {
   const frame = useCurrentFrame();
   const { input, typing } = typedInput(frame);
   const open = tween(frame, BROWSER_OPENS, BROWSER_OPEN);
-  const recolor = tween(frame, TITLE_FIX.changeAt, NAV_CHANGE);
+  const recolor = change(frame, TITLE_FIX);
   const titleColor = interpolateColors(Math.min(recolor, 1), [0, 1], [COLORS.pageRed, COLORS.pageBlue]);
 
   const term = stacking(frame, VSCODE, Front.Terminal);

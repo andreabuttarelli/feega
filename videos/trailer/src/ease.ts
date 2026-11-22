@@ -16,7 +16,7 @@ const expoOut = Easing.out(Easing.exp);
 const glideInOut = Easing.bezier(0.7, 0, 0.3, 1);
 
 const progress = (frame: number, start: number, duration: number) =>
-  interpolate(frame, [start, start + duration], [0, 1], {
+  duration <= 0 ? Number(frame >= start) : interpolate(frame, [start, start + duration], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });

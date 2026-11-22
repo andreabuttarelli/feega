@@ -122,6 +122,14 @@ const mouse = () => {
   return render(0.12, (t) => press(t) + 0.6 * press(t - 0.07));
 };
 
+const CLATTER_TAPS = [0, 0.018, 0.031, 0.047, 0.06, 0.074, 0.083, 0.097];
+
+const clatter = () => {
+  const keys = CLATTER_TAPS.map((at, i) => ({ at, samples: click(141 + 17 * i, 2100 + 160 * (i % 4)) }));
+
+  return render(0.15, (t) => keys.reduce((sum, { at, samples }) => sum + (samples[Math.round((t - at) * RATE)] ?? 0) * 0.8, 0));
+};
+
 mkdirSync(OUT, { recursive: true });
 
 const SOUNDS = {
@@ -136,6 +144,7 @@ const SOUNDS = {
   tap: tap(),
   power: power(),
   mouse: mouse(),
+  clatter: clatter(),
 };
 
 for (const [name, samples] of Object.entries(SOUNDS)) {
