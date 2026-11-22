@@ -1,10 +1,11 @@
-import { basename } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import * as vscode from 'vscode';
 import type { HostMessage, Source } from '../messages';
 import { SettingKey, settingsWith } from '../settings';
 import { Column, openTarget, revealColumn } from './open-source';
 import type { Account, AccountStore } from './account';
 import { IMAGE_EXTENSIONS } from './image-copy';
+import { catalogFile } from './library';
 import { deviceOnboardingStore, globalStateOnboardingStore } from './onboarding';
 import type { Platform } from './platform';
 import { Device, editorOf, globalStateInstallStore, installIdOf, type UsageHost } from './usage';
@@ -113,6 +114,7 @@ export function vsCodePlatform(host: VsCodeHost, panel: PanelLike, befores: Map<
     sourceControl: () => vscode.commands.executeCommand('workbench.view.scm'),
     notify: (text) => vscode.window.showInformationMessage(`Feega: ${text}`),
     pickImage,
+    library: catalogFile(join(dirname(host.launcher), 'library.json')),
     account: secretAccountStore(context.secrets),
     onboarding: deviceOnboardingStore(globalStateOnboardingStore(context.globalState)),
     usage: vsCodeUsage(context)

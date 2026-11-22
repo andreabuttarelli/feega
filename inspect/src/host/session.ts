@@ -27,6 +27,7 @@ import { themesOf } from './themes';
 import { usageSession } from './usage';
 import { selectionSync } from './selection-sync';
 import { wiringOf } from './wiring';
+import { entriesOf, insertAskOf } from './library';
 
 const PICK_TIMEOUT_MS = 3000;
 const SYNC_SELECTION_DELAY_MS = 200;
@@ -122,6 +123,17 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
       return;
     }
     await edits.structure({ op: StructureOp.Add, at, add: { kind: AddKind.Image, src: copied.url, place } }).then((out) => edited(out, null));
+  }
+
+  async function libraryShown() {
+    const catalog = (await platform.library?.()) ?? null;
+    await post({ kind: ToView.Library, items: catalog ? entriesOf(catalog) : [] });
+  }
+
+  async function libraryInserted(m: Extract<HostMessage, { kind: ToHost.LibraryInsert }>) {
+    const ask = insertAskOf((await platform.library?.()) ?? null, m.id);
+    const out: Written = ask.ok ? await edits.library(m.at, m.place, ask.item, ask.tokens) : ask;
+    await edited(out, null);
   }
 
   const comments = commentsHost(platform.cloud, post);
@@ -426,7 +438,9 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.ShareStart]: (m) => sharing.start(m.name, m.canEdit),
     [ToHost.ShareStop]: sharing.stop,
     [ToHost.ShareKick]: (m) => sharing.kick(m.userId),
-    [ToHost.ShareRole]: (m) => sharing.setRole(m.userId, m.role)
+    [ToHost.ShareRole]: (m) => sharing.setRole(m.userId, m.role),
+    [ToHost.LibraryList]: libraryShown,
+    [ToHost.LibraryInsert]: libraryInserted
   };
 
   platform.receive((message) => (handlers[message.kind] as (m: HostMessage) => unknown)(message));

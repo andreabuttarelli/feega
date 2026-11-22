@@ -1,4 +1,4 @@
-import { cp, readFile, rm } from 'node:fs/promises';
+import { cp, readFile, rm, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { build as esbuild, context } from 'esbuild';
 import { build as vite } from 'vite';
@@ -29,6 +29,11 @@ if (WATCH) {
 } else {
   await esbuild(HOST);
 }
+
+const CATALOG_BUILDER = here('dist/catalog-builder.mjs');
+await esbuild({ entryPoints: [here('../packages/library/src/catalog.ts')], outfile: CATALOG_BUILDER, bundle: true, platform: 'node', format: 'esm', target: 'node20' });
+await writeFile(here('dist/library.json'), JSON.stringify((await import(CATALOG_BUILDER)).buildCatalog(here('../packages/library/items'), here('../packages/library/tokens.css'))));
+await rm(CATALOG_BUILDER);
 
 await esbuild({
   entryPoints: [`${SOURCE_MAP}vite.ts`],

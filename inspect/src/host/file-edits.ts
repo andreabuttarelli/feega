@@ -1,4 +1,5 @@
-import { readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
 import { stylePatch, type LiveAt } from '@feega/live-edit/class-patch';
 import { cssModuleRule } from '@feega/live-edit/css-module';
 import type { FileChange, ReadFile } from '@feega/live-edit/files';
@@ -11,6 +12,7 @@ import { globalSheetOf, googleFontImport, googleFontLink } from '@feega/live-edi
 import { VariableHome, saveVariable, variableName } from '@feega/live-edit/save-variable';
 import { addedCss, AddKind, AddPlace, AddStyle } from '@feega/live-edit/add-node';
 import { wrapperCss, type WrapTag } from '@feega/live-edit/wrap-node';
+import { libraryInsert, type InsertItem } from '@feega/live-edit/library-insert';
 import type { LoopMove } from '@feega/live-edit/move-loop-item';
 import type { Usage } from '@feega/live-edit/move-usage';
 import { StructureOp, structure } from '@feega/live-edit/structure';
@@ -122,7 +124,7 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
       }
       step.push({ full, before: change.before, after: change.after });
     }
-    await Promise.all(step.map((s) => writeFile(s.full, s.after)));
+    await Promise.all(step.map(async (s) => (await mkdir(dirname(s.full), { recursive: true }), writeFile(s.full, s.after))));
     steps.push(step);
     undone.length = 0;
     const change = { ...meta, id: ++nextId, files: moving.map((c) => c.path), time: Date.now() };
@@ -303,6 +305,20 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     return out.ok && written.ok ? { ...written, selected: out.selected } : written;
   }
 
+  async function libraryWritten(rawAt: string, place: AddPlace, item: InsertItem, tokens: string): Promise<Written> {
+    meta = { at: rawAt, prop: 'library', value: item.id, scope: '' };
+    const at = placed(rawAt);
+    if (!at) {
+      return { ok: false, reason: `${rawAt} is not a file:line:col inside the workspace` };
+    }
+    const out = await libraryInsert(reader(root), at, place, item, tokens);
+    if (!out.ok) {
+      return out;
+    }
+    const written = await writtenAll(out.changes, '', out.note);
+    return written.ok ? { ...written, selected: out.selected } : written;
+  }
+
   async function variableSaved(ask: EditAsk, name: string): Promise<Written> {
     const sheet = await globalSheetOf(reader(root));
     if (!sheet) {
@@ -320,6 +336,7 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
   return {
     saveVariable: (ask: EditAsk, name: string) => inTurn(() => variableSaved(ask, name)),
     structure: (ask: StructureAsk) => inTurn(() => restructured(ask)),
+    library: (at: string, place: AddPlace, item: InsertItem, tokens: string) => inTurn(() => libraryWritten(at, place, item, tokens)),
     move: (from: string, to: string, place: Place) => inTurn(() => moved(from, to, place)),
     edit: (ask: EditAsk) => inTurn(() => edited(ask)),
     icon: (at: string, name: string) => inTurn(() => iconSwapped(at, name)),

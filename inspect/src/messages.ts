@@ -101,6 +101,8 @@ export type FontChoice = { family: string; google: boolean };
 
 export type Palette = { document: string[]; tokens: { name: string; value: string }[]; fonts: string[] };
 
+export type LibraryEntry = { id: string; name: string; description: string; category: string; tags: string[]; tier: string; page: string };
+
 export enum Mode {
   Design = 'design',
   Navigate = 'navigate'
@@ -150,7 +152,9 @@ export enum ToHost {
   ShareStart = 'share-start',
   ShareStop = 'share-stop',
   ShareKick = 'share-kick',
-  ShareRole = 'share-role'
+  ShareRole = 'share-role',
+  LibraryList = 'library-list',
+  LibraryInsert = 'library-insert'
 }
 
 export type ChangeRow = { id: number; at: string; prop: string; value: string; scope: string; files: string[]; time: number };
@@ -173,7 +177,8 @@ export enum ToView {
   ImageSaved = 'image-saved',
   Wiring = 'wiring',
   Comments = 'comments',
-  Share = 'share'
+  Share = 'share',
+  Library = 'library'
 }
 
 export enum ShareState {
@@ -238,7 +243,9 @@ export type HostMessage =
   | { kind: ToHost.ShareStart; name: string; canEdit: boolean }
   | { kind: ToHost.ShareStop }
   | { kind: ToHost.ShareKick; userId: string }
-  | { kind: ToHost.ShareRole; userId: string; role: VisitorRole };
+  | { kind: ToHost.ShareRole; userId: string; role: VisitorRole }
+  | { kind: ToHost.LibraryList }
+  | { kind: ToHost.LibraryInsert; id: string; at: string; place: AddPlace };
 
 export type ViewMessage =
   | { kind: ToView.App; url: string; styling: Styling; prefs: Prefs | null; route?: string; breakpoints: Breakpoints; themes: Theme[] }
@@ -256,7 +263,8 @@ export type ViewMessage =
   | { kind: ToView.ImageSaved; url: string }
   | { kind: ToView.Wiring; at: string; instance?: number; wiring: Wiring }
   | { kind: ToView.Comments; enabled: boolean; comments: CloudComment[]; error?: string }
-  | { kind: ToView.Share; state: ShareState; available: boolean; name: string; canEdit: boolean; url?: string; expiresAt?: string; visitors: Present[]; notice: boolean; error?: string };
+  | { kind: ToView.Share; state: ShareState; available: boolean; name: string; canEdit: boolean; url?: string; expiresAt?: string; visitors: Present[]; notice: boolean; error?: string }
+  | { kind: ToView.Library; items: LibraryEntry[] };
 
 export const INSPECT = 'feega:inspect';
 export const INSPECT_RESULT = 'feega:inspect:result';

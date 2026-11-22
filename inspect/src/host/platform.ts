@@ -1,4 +1,5 @@
 import type { HostMessage, Source, ViewMessage } from '../messages';
+import type { Catalog } from '../../../packages/library/src/catalog';
 import type { AccountStore } from './account';
 import type { CommentsCloud } from './comments';
 import type { SharePort } from './share/share-port-factory';
@@ -41,6 +42,7 @@ export type Platform = Transport & {
   sourceControl: () => unknown;
   notify: (text: string) => unknown;
   pickImage?: () => Promise<ChosenImage | null>;
+  library?: () => Promise<Catalog | null>;
   usage?: UsageHost;
   account: AccountStore;
   cloud?: CommentsCloud;
