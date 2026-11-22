@@ -88,3 +88,39 @@ describe('replaceEverywhere', () => {
     expect(change).toEqual({ path: 'a.css', before: 'p { font-family: Brandon }', after: 'p { font-family: Inter }' });
   });
 });
+
+describe('replaceEverywhere removes the loading of the replaced family', () => {
+  const url = (family: string) => `https://fonts.googleapis.com/css2?family=${family}:wght@300..800&display=swap`;
+
+  it('drops the link of the family from a page head', () => {
+    const html = `<head>\n  <link rel="stylesheet" href="${url('Brandon')}" />\n  <title>x</title>\n</head>\n`;
+    const [change] = replaceEverywhere([{ path: 'index.html', text: html }], 'Brandon', 'Inter');
+
+    expect(change.after).toBe('<head>\n  <title>x</title>\n</head>\n');
+  });
+
+  it('drops the @import of the family and keeps the rules', () => {
+    const css = `@import url("${url('Brandon')}");\nh1 { font-family: Brandon; }\n`;
+    const [change] = replaceEverywhere([{ path: 'a.css', text: css }], 'Brandon', 'Inter');
+
+    expect(change.after).toBe('h1 { font-family: Inter; }\n');
+  });
+
+  it('matches a family with spaces written with a plus', () => {
+    const css = `@import url("${url('Space+Grotesk')}");\n`;
+
+    expect(replaceEverywhere([{ path: 'a.css', text: css }], 'Space Grotesk', 'Inter')[0].after).toBe('');
+  });
+
+  it('keeps the link of another family', () => {
+    const html = `<link rel="stylesheet" href="${url('Lato')}" />`;
+
+    expect(replaceEverywhere([{ path: 'index.html', text: html }], 'Brandon', 'Inter')).toEqual([]);
+  });
+
+  it('keeps a link that loads several families', () => {
+    const html = '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Brandon&family=Lato" />';
+
+    expect(replaceEverywhere([{ path: 'index.html', text: html }], 'Brandon', 'Inter')).toEqual([]);
+  });
+});

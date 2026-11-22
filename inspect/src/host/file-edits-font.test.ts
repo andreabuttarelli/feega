@@ -79,6 +79,28 @@ describe('replacing a font everywhere', () => {
     expect(read(root, 'src/app.css')).not.toContain('@import');
   });
 
+  it('removes the old Google import of the replaced family', async () => {
+    const old = '@import url("https://fonts.googleapis.com/css2?family=Brandon:wght@300..800&display=swap");\n';
+    const root = project({ 'src/app.css': old + FILES['src/app.css'] });
+    await fileEdits(root).replaceFont('Brandon', 'Inter', false);
+
+    expect(read(root, 'src/app.css')).toBe("h1 { font-family: 'Inter', sans-serif; }\n");
+  });
+
+  it('reaches a file past the two hundred the scan keeps for other features', async () => {
+    const many = Object.fromEntries(Array.from({ length: 250 }, (_, i) => [`src/gen/f${String(i).padStart(3, '0')}.css`, 'p { color: red }\n']));
+    const root = project({ ...many, 'src/gen/zz-last.css': "p { font-family: 'Brandon'; }\n" });
+    await fileEdits(root).replaceFont('Brandon', 'Inter', false);
+
+    expect(read(root, 'src/gen/zz-last.css')).toContain("'Inter'");
+  });
+
+  it('says how many files changed', async () => {
+    const out = await fileEdits(project()).replaceFont('Brandon', 'Inter', false);
+
+    expect(out.ok && out.note).toBe('Replaced Brandon with Inter in 3 files');
+  });
+
   it('refuses when the family appears nowhere', async () => {
     const out = await fileEdits(project()).replaceFont('Nonexistent', 'Inter', false);
 

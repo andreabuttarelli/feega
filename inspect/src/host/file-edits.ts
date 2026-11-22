@@ -202,7 +202,7 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
   }
 
   async function projectSources(): Promise<{ path: string; text: string }[]> {
-    const scan = await scanProject(root);
+    const scan = await scanProject(root, Infinity);
     const paths = [...new Set([...scan.sheets, ...scan.sources].map((full) => relative(root, full)).concat(FONT_CONFIGS))];
     const read = reader(root);
     const files = await Promise.all(paths.map(async (path) => ({ path, text: await read(path) })));
@@ -216,7 +216,8 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
       return { ok: false, reason: `${from} is not named in any source file` };
     }
     const wiring = await fontWiring(afterChanges(reader(root), replaced), to, google);
-    return writtenAll(mergedChanges(replaced, wiring.changes), to, wiring.unloaded ? FONT_NOT_LOADED : undefined);
+    const count = `Replaced ${from} with ${to} in ${replaced.length} ${replaced.length === 1 ? 'file' : 'files'}`;
+    return writtenAll(mergedChanges(replaced, wiring.changes), to, wiring.unloaded ? `${count}. ${FONT_NOT_LOADED}` : count);
   }
 
   async function fontLoaded(family: string): Promise<Written> {

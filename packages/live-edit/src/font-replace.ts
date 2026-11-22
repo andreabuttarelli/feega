@@ -45,8 +45,21 @@ export function replaceFamily(text: string, family: string, to: string): string 
   return rewritten.replace(new RegExp(`${MASK}(\\d+)${MASK}`, 'g'), (_, index: string) => faces[Number(index)]);
 }
 
+const LOADING_LINK = /^[ \t]*<link\b[^>]*href=["']([^"']*fonts\.googleapis\.com\/css[^"']*)["'][^>]*>[ \t]*\n?/gm;
+const LOADING_IMPORT = /^[ \t]*@import\s+url\(\s*["']?([^"')]*fonts\.googleapis\.com\/css[^"')]*)["']?\s*\)\s*;?[ \t]*\n?/gm;
+
+function loadsOnly(url: string, family: string): boolean {
+  const names = [...url.matchAll(/[?&]family=([^:&;@]+)/g)].map((m) => decodeURIComponent(m[1].replace(/\+/g, ' ')).toLowerCase());
+  return names.length === 1 && names[0] === family.trim().toLowerCase();
+}
+
+function withoutLoading(text: string, family: string): string {
+  const drop = (whole: string, url: string) => (loadsOnly(url, family) ? '' : whole);
+  return text.replace(LOADING_LINK, drop).replace(LOADING_IMPORT, drop);
+}
+
 export function replaceEverywhere(files: SourceFile[], family: string, to: string): FileChange[] {
   return files
-    .map(({ path, text }) => ({ path, before: text, after: replaceFamily(text, family, to) }))
+    .map(({ path, text }) => ({ path, before: text, after: withoutLoading(replaceFamily(text, family, to), family) }))
     .filter((change) => change.after !== change.before);
 }
