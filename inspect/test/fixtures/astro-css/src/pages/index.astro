@@ -1,5 +1,9 @@
 ---
 const title = 'Northwind';
+const beans = [
+  { name: 'Huila Washed', note: 'Red apple, panela · clean and round', price: '€14' },
+  { name: 'Nyeri AA', note: 'Blackcurrant, grapefruit, bright', price: '€18' }
+];
 ---
 
 <html lang="en">
@@ -12,6 +16,15 @@ const title = 'Northwind';
     <h1>Plan your launch in an afternoon</h1>
     <p>Briefs, timelines and assets in one place.</p>
     <p>Your whole team can edit.</p>
+    <section class="beans">
+      {beans.map((bean) => (
+        <article class="card">
+          <h3>{bean.name}</h3>
+          <p>{bean.note}</p>
+          <a href="#buy">Add to bag · {bean.price}</a>
+        </article>
+      ))}
+    </section>
     </main>
   </body>
 </html>

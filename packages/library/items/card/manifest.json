@@ -1,0 +1,35 @@
+{
+  "id": "card",
+  "name": "Card",
+  "description": "Image placeholder, title, text and a link.",
+  "category": "component",
+  "tags": [
+    "card",
+    "content"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    },
+    {
+      "family": "Fragment Mono",
+      "weights": [
+        400
+      ]
+    }
+  ],
+  "tier": "free"
+}

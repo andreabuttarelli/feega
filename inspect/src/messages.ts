@@ -101,7 +101,9 @@ export type ColourPick = { css: string; token?: string };
 
 export type FontChoice = { family: string; google: boolean };
 
-export type Palette = { document: string[]; tokens: { name: string; value: string }[]; fonts: string[] };
+export type MissingFont = { family: string; fallback: string; declared: boolean };
+
+export type Palette = { document: string[]; tokens: { name: string; value: string }[]; fonts: string[]; missing: MissingFont[] };
 
 export enum PluginCall {
   Project = 'project',
@@ -131,10 +133,13 @@ export enum ToHost {
   Setting = 'setting',
   Move = 'move',
   Structure = 'structure',
+  StructureMany = 'structure-many',
   AddImage = 'add-image',
   Server = 'server',
   Redo = 'redo',
   Font = 'font',
+  FontReplace = 'font-replace',
+  FontLoad = 'font-load',
   SaveVariable = 'save-variable',
   Revert = 'revert',
   Diff = 'diff',
@@ -222,10 +227,13 @@ export type HostMessage =
   | { kind: ToHost.Setting; key: SettingKey; value: SettingValue }
   | { kind: ToHost.Move; from: string; to: string; place: Place }
   | { kind: ToHost.Structure; op: StructureOp; at: string; to?: string; usage?: Usage; loop?: LoopMove; instance?: number; add?: { kind: AddKind; src?: string; place?: AddPlace }; wrap?: WrapTag }
+  | { kind: ToHost.StructureMany; op: StructureOp; targets: { at: string; instance?: number }[]; wrap?: WrapTag }
   | { kind: ToHost.AddImage; at: string; place?: AddPlace }
   | { kind: ToHost.Server; action: ServerAction }
   | { kind: ToHost.Redo }
   | { kind: ToHost.Font; ask: EditAsk; google: boolean }
+  | { kind: ToHost.FontReplace; from: string; to: string; google: boolean }
+  | { kind: ToHost.FontLoad; family: string }
   | { kind: ToHost.SaveVariable; ask: EditAsk; name: string }
   | { kind: ToHost.Revert; id: number | null }
   | { kind: ToHost.Diff; id: number }

@@ -1,0 +1,35 @@
+{
+  "id": "faq-two-column",
+  "name": "FAQ, two columns",
+  "description": "Questions and answers laid out open in two columns, no accordion.",
+  "category": "section",
+  "tags": [
+    "faq",
+    "support"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    },
+    {
+      "family": "Fragment Mono",
+      "weights": [
+        400
+      ]
+    }
+  ],
+  "tier": "free"
+}

@@ -1,0 +1,35 @@
+{
+  "id": "contact-form",
+  "name": "Contact form",
+  "description": "Contact details beside a form with name, email, topic and message.",
+  "category": "section",
+  "tags": [
+    "contact",
+    "form"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    },
+    {
+      "family": "Fragment Mono",
+      "weights": [
+        400
+      ]
+    }
+  ],
+  "tier": "free"
+}

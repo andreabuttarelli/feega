@@ -1,0 +1,35 @@
+{
+  "id": "features-grid",
+  "name": "Features grid",
+  "description": "Section title and six features in a responsive grid.",
+  "category": "section",
+  "tags": [
+    "features",
+    "grid"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    },
+    {
+      "family": "Fragment Mono",
+      "weights": [
+        400
+      ]
+    }
+  ],
+  "tier": "free"
+}

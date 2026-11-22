@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { AddKind, AddPlace } from '@feega/live-edit/add-node';
 import { StructureOp } from '@feega/live-edit/structure';
 import { WrapTag } from '@feega/live-edit/wrap-node';
-import { ADD_ITEMS, COPY_FOR_AGENT, Command, MENU_ITEMS, WRAP_ITEMS, fitMenu, pickedOf, submenuSpot, type MenuItem } from './structure-menu';
+import { ADD_ITEMS, COPY_FOR_AGENT, Command, MENU_ITEMS, WRAP_ITEMS, fitMenu, menuFor, pickedOf, submenuSpot, type MenuItem } from './structure-menu';
 
 const VIEW = { width: 1000, height: 900 };
 
@@ -67,5 +67,18 @@ describe('the one menu table', () => {
     expect(pickedOf(StructureOp.Delete)).toEqual({ command: Command.Structure, op: StructureOp.Delete });
     expect(pickedOf(COPY_FOR_AGENT)).toEqual({ command: Command.Copy });
     expect(pickedOf('wrap:section')).toEqual({ command: Command.Wrap, tag: WrapTag.Section });
+  });
+});
+
+describe('menuFor', () => {
+  it('keeps the whole menu for one element', () => {
+    expect(menuFor(1)).toEqual(MENU_ITEMS);
+  });
+
+  it('drops what only makes sense for one element when several are selected', () => {
+    const ids = menuFor(3).map((item) => item.id);
+
+    expect(ids).not.toContain('add-child');
+    expect(ids).toEqual(expect.arrayContaining([COPY_FOR_AGENT, StructureOp.Duplicate, 'wrap-with', StructureOp.Unwrap, StructureOp.Delete]));
   });
 });

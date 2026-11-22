@@ -1,0 +1,36 @@
+{
+  "id": "changelog",
+  "name": "Changelog timeline",
+  "description": "Dated entries on a vertical line with a tag and a short note each.",
+  "category": "section",
+  "tags": [
+    "changelog",
+    "timeline",
+    "updates"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    },
+    {
+      "family": "Fragment Mono",
+      "weights": [
+        400
+      ]
+    }
+  ],
+  "tier": "free"
+}

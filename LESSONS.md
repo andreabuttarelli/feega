@@ -4059,6 +4059,20 @@ property reads on ~2,000 items (`src/lib/canvas/counted-list.testkit.ts`), not w
 
 **Signal:** a test peer gets `event.data` as an object with no `byteLength` and every decoded frame is `null`. **Move:** set `socket.binaryType = 'arraybuffer'` before `accept()` in the test harness.
 
+## Feega Inspect
+
+### Every file read in `fileEdits` answers null though the file exists
+
+**Signal:** an edit or a project-wide rewrite says "not named in any source file" / "not a file inside the workspace" in the panel harness, while the same code passes in unit tests. **Move:** `inside(root, path)` compares against `normalize(root) + sep`, so a root with a trailing slash never matches. Pass the app root without the trailing slash (`fileURLToPath(new URL('../fixtures/vite-react', import.meta.url))`).
+
+## The preview opens a stranger's server: a planned port is not a served port
+
+**Signal:** the preview or the status-dot menu shows a port that is not the one the dev server prints. A free port is probed, released, then the framework starts (Astro and Nuxt step to the next port when it is taken); a readiness check that accepts "something listens on the planned port" accepts the stranger. **Move:** readiness takes the port from the server's own printed URL; the planned port counts only when the listener's cwd is the app. The menu derives from the one URL the preview loads, never from the plan.
+
 ## A fixture package.json changes by itself after the first run
 
 **Signal:** a framework e2e fails with `package.json` in the changed files. React Router adds `isbot` to the app when it is missing, and the test cleanup then reverts your uncommitted fixture edit. **Move:** declare the dependency the framework wants in the committed fixture, and commit fixture edits before running the e2e.
+
+## Astro compiler offsets are UTF-8 bytes
+
+**Signal:** raw `data-feega-src="..."` shows as visible text in the middle of words on an Astro page, only after the first non-ASCII character (`·`, `€`, accents) in the file. **Move:** convert `position.start.offset` from bytes to string indices before inserting, and keep a non-ASCII case in the Astro stamping test and fixture.

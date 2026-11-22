@@ -1,0 +1,36 @@
+{
+  "id": "badge-set",
+  "name": "Badge set",
+  "description": "Status, count, outline and removable tag badges in every tone.",
+  "category": "component",
+  "tags": [
+    "badge",
+    "status",
+    "tag"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    },
+    {
+      "family": "Fragment Mono",
+      "weights": [
+        400
+      ]
+    }
+  ],
+  "tier": "free"
+}

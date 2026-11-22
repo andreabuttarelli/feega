@@ -1,0 +1,36 @@
+{
+  "id": "team-grid",
+  "name": "Team grid",
+  "description": "Placeholder people with initials, role and a link; replace every name before publishing.",
+  "category": "section",
+  "tags": [
+    "team",
+    "about",
+    "people"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    },
+    {
+      "family": "Fragment Mono",
+      "weights": [
+        400
+      ]
+    }
+  ],
+  "tier": "free"
+}

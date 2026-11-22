@@ -89,6 +89,11 @@ async function main(): Promise<number> {
   say(`feega: editing ${root}`);
   say(args.url ? `feega: attaching to ${args.url}` : 'feega: starting its dev server…');
   const started = await (args.url ? session.attachUrl(args.url) : session.start());
+  if ('refused' in started && started.attachRefused) {
+    await session.stop();
+    await editor.close();
+    return 1;
+  }
   if ('refused' in started) {
     say(`feega: ${started.refused}`);
   } else {

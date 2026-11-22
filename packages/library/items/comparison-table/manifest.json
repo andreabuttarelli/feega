@@ -1,0 +1,36 @@
+{
+  "id": "comparison-table",
+  "name": "Comparison table",
+  "description": "You versus two alternatives across six rows; scrolls sideways inside its card on phones.",
+  "category": "section",
+  "tags": [
+    "comparison",
+    "table",
+    "pricing"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    },
+    {
+      "family": "Fragment Mono",
+      "weights": [
+        400
+      ]
+    }
+  ],
+  "tier": "free"
+}

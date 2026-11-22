@@ -1,0 +1,36 @@
+{
+  "id": "hero-product",
+  "name": "Hero, product screenshot",
+  "description": "Centered headline over a browser-framed product mockup; swap the mockup for a real screenshot.",
+  "category": "section",
+  "tags": [
+    "hero",
+    "landing",
+    "image"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    },
+    {
+      "family": "Fragment Mono",
+      "weights": [
+        400
+      ]
+    }
+  ],
+  "tier": "free"
+}

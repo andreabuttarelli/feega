@@ -1,5 +1,6 @@
 import { stampSources } from './framework-meta.js';
 import { SOURCE_ATTR, rectOf, deepestAt, clearPreview, hidePreview, paletteOf, relativeOf, treeOf, inspectElement, keepPreviews, previewEdit, settlePreview } from './runtime.js';
+import { missingFontsOf } from './missing-fonts.js';
 import { trackRects } from './track.js';
 import { keepScroll } from './reload-restore.js';
 import { applyTheme, keepTheme, themeNow, watchScheme } from './theme-switch.js';
@@ -104,7 +105,7 @@ export function installBridge(win) {
     [FORCE]: (request) => forceState(doc, request.source, request.state),
     [THEME]: (request) => applyTheme(doc, request),
     [MODE]: (request) => (mode = request.mode),
-    [PALETTE]: () => reply({ type: PALETTE_RESULT, ...paletteOf(doc) }),
+    [PALETTE]: () => reply({ type: PALETTE_RESULT, ...paletteOf(doc), missing: missingFontsOf(doc) }),
     [HIDE]: (request) => hidePreview(doc, request.source, request.hidden),
     [LEAVE]: () => scroll.leave(),
     [TRACK]: (request) => tracker.follow(request.slot, request.source, request.index),
