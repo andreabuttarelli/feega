@@ -16,7 +16,7 @@ const COLUMNS: Record<Column, vscode.ViewColumn> = { [Column.First]: vscode.View
 
 const SECRET_KEY = 'feegaInspect.account';
 
-export const DEV_PLUGINS_SETTING = 'feega.plugins.dev';
+export const DEV_PLUGINS_SETTING = 'feegaInspect.plugins.dev';
 
 export const approveInModal = async (question: string, yes: string) => (await vscode.window.showWarningMessage(question, { modal: true }, yes)) === yes;
 

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { SETTINGS, issueUrl } from './settings';
 
 const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
-const SETTINGS_JSON_ONLY = ['feega.plugins.dev'];
+const SETTINGS_JSON_ONLY = ['feegaInspect.plugins.dev'];
 const declared = manifest.contributes.configuration.properties as Record<string, { default: unknown; enum?: string[] }>;
 
 describe('settings', () => {

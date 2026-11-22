@@ -62,7 +62,34 @@ and undo in one step. A proposal with one operation the manifest does not allow 
 
 The worker has no network, storage or sub-workers of its own: `fetch`, `XMLHttpRequest`,
 `WebSocket`, `indexedDB`, `Worker` and similar globals are removed. Everything goes through
-messages. Write the script as a plain script (no `import`; bundle it first if you use modules).
+messages, and the SDK wraps them. Copy `feega-plugin-sdk.js` from
+[`packages/plugin-api/sdk`](https://github.com/andreabuttarelli/feega/tree/main/packages/plugin-api/sdk)
+into your project (one ES module, no dependencies) and bundle your script as a plain script, as
+the worker cannot `import`:
+
+```js
+import { runPlugin } from './feega-plugin-sdk.js';
+
+runPlugin((api) => {
+  api.command.on(async (command) => {
+    const selection = await api.selection.get();
+    await api.notify(selection ? `Hello from <${selection.tag}>` : 'Select an element first.');
+  });
+});
+```
+
+```bash
+esbuild src/plugin.js --bundle --format=iife --outfile=plugin.js
+```
+
+The example folder has this setup, with a `build.mjs` that does the bundling.
+
+The SDK offers `api.selection.get/on/watch`, `api.project.info`, `api.source.text`,
+`api.propose(label, ops)`, `api.preview`, `api.fetch`, `api.pickFile`, `api.notify`,
+`api.section(id).render/on`, `api.overlay(id).render/on`, and `api.menu`, `api.command` and
+`api.action` with `.on`. Each needs the permission listed below.
+
+Under the SDK is a small message protocol, if you prefer to talk to it directly.
 
 A call:
 
@@ -96,7 +123,7 @@ time one of its files changes.
 
 - Terminal: `npx feega plugin dev ./my-plugin` opens the editor on the current folder with the
   plugin loaded.
-- VS Code: add the folder to the `feega.plugins.dev` setting (an array of folders, absolute or
+- VS Code: add the folder to the `feegaInspect.plugins.dev` setting (an array of folders, absolute or
   relative to the workspace).
 
 ## Publish

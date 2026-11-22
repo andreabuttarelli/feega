@@ -13,6 +13,6 @@ describe('the example plugin', () => {
     const out = await catalogOf({ root: mkdtempSync(join(tmpdir(), 'feega-example-')), dev: [HELLO] });
     expect(out.problems).toEqual([]);
     expect(out.plugins).toMatchObject([{ id: 'example.hello', origin: Origin.Dev, enabled: true, words: ['See which element you select'] }]);
-    expect(out.plugins[0].code).toContain("'command'");
+    expect(out.plugins[0].code).toContain('feega-plugin-sdk');
   });
 });

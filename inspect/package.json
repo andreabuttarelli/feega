@@ -119,7 +119,7 @@
           "default": true,
           "description": "Reveal the source of the selected element in a text editor beside Feega, with its line selected, without taking focus. Coding agents that read the editor selection then see it."
         },
-        "feega.plugins.dev": {
+        "feegaInspect.plugins.dev": {
           "type": "array",
           "items": {
             "type": "string"
