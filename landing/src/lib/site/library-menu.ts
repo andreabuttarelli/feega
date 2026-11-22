@@ -15,7 +15,7 @@ export const LIBRARY_ITEMS: readonly LibraryItem[] = [
     href: '/templates',
     label: 'templates',
     icon: PixelIcon.Templates,
-    describe: (free) => `${free} free sections and components for Svelte, React, Vue and Astro`
+    describe: () => 'free sections and components for Svelte, React, Vue and Astro'
   },
   { href: '/plugins', label: 'plugins', icon: PixelIcon.Plugin, describe: () => 'extend the editor' }
 ];

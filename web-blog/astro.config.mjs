@@ -2,13 +2,14 @@ import { defineConfig } from 'astro/config';
 import mdx from '@astrojs/mdx';
 import sitemap from '@astrojs/sitemap';
 import { archivedPaths } from './archived-posts.mjs';
+import { withLastmod } from './lastmod.mjs';
 
 const ARCHIVED = archivedPaths();
 
 export default defineConfig({
   site: 'https://blog.feega.app',
   trailingSlash: 'always',
-  integrations: [mdx(), sitemap({ filter: (page) => !ARCHIVED.includes(new URL(page).pathname) })],
+  integrations: [mdx(), sitemap({ filter: (page) => !ARCHIVED.includes(new URL(page).pathname), serialize: withLastmod })],
   markdown: {
     shikiConfig: { theme: 'github-dark' }
   }

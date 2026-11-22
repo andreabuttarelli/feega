@@ -9,6 +9,7 @@
     "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
+    "@astrojs/sitemap": "^3.7.4",
     "@astrojs/starlight": "0.34.4",
     "astro": "5.9.3"
   }

@@ -20,14 +20,16 @@ describe('home templates teaser', () => {
     expect(shots.every((shot) => existsSync(`static${shot.src}`))).toBe(true);
   });
 
-  it('counts the free templates from the library, not from a literal', () => {
-    expect(teaserTitle(freeCount)).toBe(`${freeCount} free templates, ready to drop in`);
+  it('names no template count in the title', () => {
+    expect(teaserTitle()).toBe('free templates, ready to drop in');
+    expect(teaserTitle()).not.toMatch(/\d/);
   });
 
   it('renders the count, the thumbnails with size attributes and the link to /templates', () => {
     const { body } = render(TemplatesTeaser, { props: { count: freeCount } });
 
-    expect(body).toContain(`${freeCount} free templates, ready to drop in`);
+    expect(body).toContain('free templates, ready to drop in');
+    expect(body).not.toContain(`${freeCount} free templates`);
     expect(body).toContain(`href="${TEASER_CTA.href}"`);
     expect(body).toContain('width="640" height="400"');
     expect(body).toContain('loading="lazy"');
