@@ -12,6 +12,7 @@ import { currentIcon } from './icon-current';
 import { mcpIcon, searchIcons } from './icon-search';
 import { previewQueue } from './icon-previews';
 import { appOfSource, firstStampedFile, urlOf } from './attach-url';
+import { serverInfo } from './server-info';
 import { Attach, attachDev, factsOf, startDev, type Refused, type Running } from './dev-server';
 import { RestartWatch, Signal, Step } from './restart-watch';
 import { shownFor, watchServer } from './server-watch';
@@ -238,7 +239,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   const keptMinutes = () => Number(platform.settings()[SettingKey.KeepServerAlive]) || 0;
 
   function infoOf(now: Running) {
-    return { keptMinutes: kept ? keptMinutes() : 0, url: now.url, framework: now.plan.framework, command: now.command, pid: now.pid, port: Number(new URL(now.url).port), attached: now.attached, startedAt, lastError };
+    return serverInfo({ url: now.url, framework: now.plan.framework, command: now.command, pid: now.pid, attached: now.attached }, { keptMinutes: kept ? keptMinutes() : 0, startedAt, lastError });
   }
 
   function logLine(line: string) {
