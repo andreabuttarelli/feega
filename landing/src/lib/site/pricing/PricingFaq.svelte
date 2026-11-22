@@ -1,12 +1,14 @@
 <script lang="ts">
   import { lower } from '../lower';
   import { FAQ } from '../home';
+
+  let { items = FAQ, heading = 'questions' }: { items?: readonly { q: string; a: string }[]; heading?: string } = $props();
 </script>
 
 <div class="faq" id="faq">
-  <h3>questions</h3>
+  <h3>{lower(heading)}</h3>
   <div class="list">
-    {#each FAQ as item (item.q)}
+    {#each items as item (item.q)}
       <details>
         <summary><span>{lower(item.q)}</span><span aria-hidden="true">+</span></summary>
         <p>{@html lower(item.a)}</p>
