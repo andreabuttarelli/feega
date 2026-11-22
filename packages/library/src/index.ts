@@ -7,7 +7,10 @@ export const REQUIRED_FRAMEWORKS = ['svelte', 'react', 'vue', 'astro'] as const;
 export const CATEGORIES = ['section', 'component', 'app'] as const;
 
 export type Framework = (typeof FRAMEWORKS)[number];
+export const TIERS = ['free', 'pro'] as const;
+
 export type Category = (typeof CATEGORIES)[number];
+export type Tier = (typeof TIERS)[number];
 
 export interface LibraryItem {
 	id: string;
@@ -17,7 +20,8 @@ export interface LibraryItem {
 	tags: string[];
 	frameworks: Framework[];
 	dependencies: string[];
-	tier: 'free';
+	tier: Tier;
+	preview?: string;
 }
 
 const PACKAGE_DIR = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -40,7 +44,8 @@ export function parseManifest(raw: unknown): LibraryItem {
 		m.frameworks.every((f) => FRAMEWORKS.includes(f as Framework)) &&
 		REQUIRED_FRAMEWORKS.every((f) => (m.frameworks as string[]).includes(f)) &&
 		isStringList(m.dependencies) &&
-		m.tier === 'free';
+		TIERS.includes(m.tier as Tier) &&
+		(m.preview === undefined || typeof m.preview === 'string');
 	if (!valid) {
 		throw new Error(`Invalid library manifest: ${JSON.stringify(raw)}`);
 	}

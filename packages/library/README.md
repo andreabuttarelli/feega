@@ -7,7 +7,7 @@ these into a project; this package is the content and its format.
 
 ```
 tokens.css                 shared --feega-* tokens, light and dark
-items/<id>/manifest.json   id, name, description, category, tags, frameworks, dependencies, tier
+items/<id>/manifest.json   id, name, description, category, tags, frameworks, dependencies, tier, preview?
 items/<id>/svelte/<Name>.svelte      Svelte 5 runes
 items/<id>/react/<Name>.tsx + .css   React
 items/<id>/vue/<Name>.vue            Vue 3, <script setup lang="ts">
@@ -20,7 +20,8 @@ preview/                   static page with every item in light and dark
 `<Name>` is the id in PascalCase (`hero-split` is `HeroSplit`). Required frameworks: svelte, react,
 vue, astro. `html` is a fallback only. No Angular.
 
-Categories: `section`, `component`, `app`. Tier is always `free` here. Items have no dependencies.
+Categories: `section`, `component`, `app`. Tier is `free` or `pro`; every item here is `free`.
+Optional `preview` is a URL to a preview image. Items have no dependencies.
 
 ## Theming
 

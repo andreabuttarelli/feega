@@ -44,6 +44,9 @@ describe('library items', () => {
 		expect(() => parseManifest({})).toThrow();
 		expect(() => parseManifest({ ...VALID_MANIFEST, category: 'nope' })).toThrow();
 		expect(() => parseManifest({ ...VALID_MANIFEST, tier: 'paid' })).toThrow();
+		expect(parseManifest({ ...VALID_MANIFEST, tier: 'pro' }).tier).toBe('pro');
+		expect(parseManifest({ ...VALID_MANIFEST, preview: 'https://example.com/x.png' }).preview).toBe('https://example.com/x.png');
+		expect(() => parseManifest({ ...VALID_MANIFEST, preview: 3 })).toThrow();
 		expect(() => parseManifest({ ...VALID_MANIFEST, frameworks: ['html'] })).toThrow();
 	});
 
