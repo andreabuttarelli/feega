@@ -47,7 +47,7 @@ There is no bug bounty. We say thank you and we credit you.
 - Cross-tenant access of any kind — this is a multi-tenant product and every table is supposed to
   be scoped by brand through row-level security. A read or write across that line is the most
   serious class of bug here, always.
-- Authentication and session handling, one-tap approval links (`APP_SECRET`), the cron/worker
+- Authentication and session handling, the cron/worker
   endpoint secrets, and anything that lets an unauthenticated caller spend AI credits.
 - Secrets reachable from the browser: `SUPABASE_SERVICE_ROLE_KEY` or any private env value leaking
   into a client bundle.
