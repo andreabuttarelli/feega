@@ -2,7 +2,10 @@ export enum PixelIcon {
   Start = 'start',
   Editing = 'editing',
   Stack = 'stack',
-  Help = 'help'
+  Help = 'help',
+  Plugin = 'plugin',
+  MeshGradient = 'mesh-gradient',
+  Object3d = 'object-3d'
 }
 
 export const PIXEL_PALETTE: Readonly<Record<string, string>> = {
@@ -18,7 +21,10 @@ export const PIXEL_ROWS: Readonly<Record<PixelIcon, readonly string[]>> = {
   [PixelIcon.Start]: ['...#....', '..###...', '.#####..', '#######.', '..o.o...', '.o.o.o..', '........'],
   [PixelIcon.Editing]: ['......##', '.....###', '....###.', '...###..', '..###...', '.##o....', '##......'],
   [PixelIcon.Stack]: ['..bbbb..', '.b....b.', 'b..oo..b', 'b.oooo.b', 'b..oo..b', '.b....b.', '..bbbb..'],
-  [PixelIcon.Help]: ['..####..', '.##..##.', '.....##.', '....##..', '...##...', '........', '...##...']
+  [PixelIcon.Help]: ['..####..', '.##..##.', '.....##.', '....##..', '...##...', '........', '...##...'],
+  [PixelIcon.Plugin]: ['..b..b..', '..b..b..', '.######.', '.#oooo#.', '.#oooo#.', '..####..', '...##...'],
+  [PixelIcon.MeshGradient]: ['bbbooo##', 'bbboooo#', 'nbbbooo#', 'nnbbooo#', 'nnnbboo#', 'nnnnbboo', 'nnnnnbbo'],
+  [PixelIcon.Object3d]: ['...bb...', '..bbbb..', '.bbbnnb.', 'bbbnnnnb', 'bbnnnnn.', '.bnnnn..', '..nnn...']
 };
 
 export type PixelCell = { readonly x: number; readonly y: number; readonly fill: string };

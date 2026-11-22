@@ -52,6 +52,7 @@ export const HEADER_LINKS = [
   { href: DOWNLOAD_PATH, label: 'Download' },
   { href: DOCS_URL, label: 'Docs' },
   { href: STORY_URL, label: 'Blog' },
+  { href: '/plugins', label: 'Plugins' },
   { href: '/pricing', label: 'Pricing' },
   { href: DISCORD_URL, label: 'Community' }
 ] as const;
