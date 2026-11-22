@@ -29,6 +29,7 @@ import { themesOf } from './themes';
 import { usageSession } from './usage';
 import { selectionSync } from './selection-sync';
 import { wiringOf } from './wiring';
+import { entriesOf, insertAskOf } from './library';
 import { pluginCalls } from './plugin-calls';
 import { pluginsSession } from './plugins-session';
 import { dependenciesOf, offerInstall } from './install-offer';
@@ -129,6 +130,17 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
       return;
     }
     await edits.structure({ op: StructureOp.Add, at, add: { kind: AddKind.Image, src: copied.url, place } }).then((out) => edited(out, null));
+  }
+
+  async function libraryShown() {
+    const catalog = (await platform.library?.()) ?? null;
+    await post({ kind: ToView.Library, items: catalog ? entriesOf(catalog) : [] });
+  }
+
+  async function libraryInserted(m: Extract<HostMessage, { kind: ToHost.LibraryInsert }>) {
+    const ask = insertAskOf((await platform.library?.()) ?? null, m.id);
+    const out: Written = ask.ok ? await edits.library(m.at, m.place, ask.item, ask.tokens) : ask;
+    await edited(out, null);
   }
 
   function installOffered(now: Running, packages: string[]) {
@@ -486,6 +498,8 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.ShareStop]: sharing.stop,
     [ToHost.ShareKick]: (m) => sharing.kick(m.userId),
     [ToHost.ShareRole]: (m) => sharing.setRole(m.userId, m.role),
+    [ToHost.LibraryList]: libraryShown,
+    [ToHost.LibraryInsert]: libraryInserted,
     [ToHost.Plugin]: async (m) => post({ kind: ToView.Plugin, id: m.id, result: await pluginRun(m.ask) }),
     [ToHost.PluginEnable]: (m) => pluginList?.enable(m.id, m.enabled),
     [ToHost.PluginRemove]: (m) => pluginList?.remove(m.id),

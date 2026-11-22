@@ -53,11 +53,11 @@ export async function globalSheetOf(read: ReadFile, candidates = GLOBAL_SHEETS):
   return null;
 }
 
-export const googleFontUrl = (family: string) => `${GOOGLE_CSS}?family=${family.trim().replace(/\s+/g, '+')}:${WEIGHTS}&display=swap`;
+export const googleFontUrl = (family: string, axis = WEIGHTS) => `${GOOGLE_CSS}?family=${family.trim().replace(/\s+/g, '+')}:${axis}&display=swap`;
 
-export async function googleFontImport(read: ReadFile, sheet: string, family: string): Promise<FileChange | null> {
+export async function googleFontImport(read: ReadFile, sheet: string, family: string, axis = WEIGHTS): Promise<FileChange | null> {
   const before = (await read(sheet)) ?? '';
-  const url = googleFontUrl(family);
+  const url = googleFontUrl(family, axis);
   if (before.includes(`family=${family.trim().replace(/\s+/g, '+')}:`)) {
     return null;
   }
@@ -70,12 +70,12 @@ const HEAD_CLOSE = /^([ \t]*)<\/head>/m;
 const HTML_OPEN = /^([ \t]*)<html\b[^>]*>\n/m;
 const HEAD_INDENT = '  ';
 
-const fontLink = (family: string) => `<link rel="stylesheet" href="${googleFontUrl(family)}" />`;
+const fontLink = (family: string, axis: string) => `<link rel="stylesheet" href="${googleFontUrl(family, axis)}" />`;
 
 const familyKey = (family: string) => `family=${family.trim().replace(/\s+/g, '+')}:`;
 
-function linkedInHead(html: string, family: string): string {
-  const link = fontLink(family);
+function linkedInHead(html: string, family: string, axis: string): string {
+  const link = fontLink(family, axis);
   const close = html.match(HEAD_CLOSE);
   if (close) {
     return html.replace(HEAD_CLOSE, `${close[1]}${HEAD_INDENT}${link}\n${close[1]}</head>`);
@@ -83,16 +83,16 @@ function linkedInHead(html: string, family: string): string {
   return html.replace('</head>', `  ${link}\n</head>`);
 }
 
-function linkedInLayout(layout: string, family: string): string | null {
+function linkedInLayout(layout: string, family: string, axis: string): string | null {
   const html = layout.match(HTML_OPEN);
   if (!html) {
     return null;
   }
-  const head = `${html[1]}${HEAD_INDENT}<head>\n${html[1]}${HEAD_INDENT}${HEAD_INDENT}${fontLink(family)}\n${html[1]}${HEAD_INDENT}</head>\n`;
+  const head = `${html[1]}${HEAD_INDENT}<head>\n${html[1]}${HEAD_INDENT}${HEAD_INDENT}${fontLink(family, axis)}\n${html[1]}${HEAD_INDENT}</head>\n`;
   return layout.replace(HTML_OPEN, (whole) => whole + head);
 }
 
-export async function googleFontLink(read: ReadFile, family: string): Promise<FileChange | null> {
+export async function googleFontLink(read: ReadFile, family: string, axis = WEIGHTS): Promise<FileChange | null> {
   for (const path of [...HEAD_SHELLS, ...LAYOUTS]) {
     const before = await read(path);
     if (before === null) {
@@ -101,7 +101,7 @@ export async function googleFontLink(read: ReadFile, family: string): Promise<Fi
     if (before.includes(familyKey(family))) {
       return null;
     }
-    const after = path.endsWith('.html') ? (before.includes('</head>') ? linkedInHead(before, family) : null) : linkedInLayout(before, family);
+    const after = path.endsWith('.html') ? (before.includes('</head>') ? linkedInHead(before, family, axis) : null) : linkedInLayout(before, family, axis);
     if (after) {
       return { path, before, after };
     }

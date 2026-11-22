@@ -117,6 +117,8 @@ export type PluginAsk = { call: PluginCall.Project } | { call: PluginCall.Source
 
 export type PluginResult = { ok: true; value: unknown } | { ok: false; reason: string };
 
+export type LibraryEntry = { id: string; name: string; description: string; category: string; tags: string[]; tier: string; page: string };
+
 export enum Mode {
   Design = 'design',
   Navigate = 'navigate'
@@ -170,6 +172,8 @@ export enum ToHost {
   ShareStop = 'share-stop',
   ShareKick = 'share-kick',
   ShareRole = 'share-role',
+  LibraryList = 'library-list',
+  LibraryInsert = 'library-insert',
   Plugin = 'plugin',
   PluginEnable = 'plugin-enable',
   PluginRemove = 'plugin-remove',
@@ -197,6 +201,7 @@ export enum ToView {
   Wiring = 'wiring',
   Comments = 'comments',
   Share = 'share',
+  Library = 'library',
   Plugin = 'plugin',
   Plugins = 'plugins',
   Reload = 'reload'
@@ -268,6 +273,8 @@ export type HostMessage =
   | { kind: ToHost.ShareStop }
   | { kind: ToHost.ShareKick; userId: string }
   | { kind: ToHost.ShareRole; userId: string; role: VisitorRole }
+  | { kind: ToHost.LibraryList }
+  | { kind: ToHost.LibraryInsert; id: string; at: string; place: AddPlace }
   | { kind: ToHost.Plugin; id: number; ask: PluginAsk }
   | { kind: ToHost.PluginEnable; id: string; enabled: boolean }
   | { kind: ToHost.PluginRemove; id: string }
@@ -290,6 +297,7 @@ export type ViewMessage =
   | { kind: ToView.Wiring; at: string; instance?: number; wiring: Wiring }
   | { kind: ToView.Comments; enabled: boolean; comments: CloudComment[]; error?: string }
   | { kind: ToView.Share; state: ShareState; available: boolean; name: string; canEdit: boolean; url?: string; expiresAt?: string; visitors: Present[]; notice: boolean; error?: string }
+  | { kind: ToView.Library; items: LibraryEntry[] }
   | { kind: ToView.Plugin; id: number; result: PluginResult }
   | { kind: ToView.Plugins; catalog: Catalog; canInstall: boolean }
   | { kind: ToView.Reload };

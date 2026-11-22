@@ -54,7 +54,7 @@ function markupOf(req: AddRequest, file: string): string {
   return req.kind === AddKind.Image ? `${open} />` : `${open}>${recipe.text}</${recipe.tag}>`;
 }
 
-function lineCol(text: string, offset: number): { line: number; col: number } {
+export function lineCol(text: string, offset: number): { line: number; col: number } {
   const lines = text.slice(0, offset).split('\n');
   return { line: lines.length, col: lines[lines.length - 1].length + 1 };
 }

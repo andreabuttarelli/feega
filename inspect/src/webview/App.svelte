@@ -13,7 +13,7 @@
   import { untrack } from 'svelte';
   import { MOVES, Shortcut, isMac, needsBareFocus, shortcutOf, typingIn } from './selection-keys';
   import { Click, NONE, Surface, clickOf, contains, extend, keyOf, only, primary, refOf, siblingsOf, toggle, visibleRows, type Selection } from './selection';
-  import { AccountState, Mode, Onboarding, Move, ServerAction, Slot, type ChangeRow, type FontChoice, type LayerNode, type Palette, ServerState, type ServerInfo, Styling, ToHost, ToView, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
+  import { AccountState, Mode, Onboarding, Move, ServerAction, Slot, type ChangeRow, type FontChoice, type LayerNode, type LibraryEntry, type Palette, ServerState, type ServerInfo, Styling, ToHost, ToView, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
   import { fromHost, inVscode, toHost } from './host';
   import { imageSaved } from './image-file.svelte';
   import { iconDrawn, iconsFound } from './icon-search.svelte';
@@ -54,6 +54,8 @@
   import { Place } from '@feega/live-edit/move-node';
   import { StructureOp } from '@feega/live-edit/structure';
   import StructureMenu from './StructureMenu.svelte';
+  import LibraryPanel from './LibraryPanel.svelte';
+  import { LIBRARY_DRAG_TYPE } from './library';
   import { agentContexts, commentContext } from './agent-context';
   import CommentsList from './CommentsList.svelte';
   import type { CloudComment, CommentDraft } from '../host/cloud-api';
@@ -61,7 +63,7 @@
   import { AddKind, AddPlace } from '@feega/live-edit/add-node';
   import { WrapTag } from '@feega/live-edit/wrap-node';
   import { ADD_DRAG_TYPE, insertSpot, type InsertSpot } from './insert-drop';
-  import { ADD_ITEMS, ADD_LOOP_ITEM, Command, menuFor, pickedOf } from './structure-menu';
+  import { ADD_ITEMS, ADD_LOOP_ITEM, Command, LIBRARY_ID, LIBRARY_ITEM, menuFor, pickedOf } from './structure-menu';
   import { modeOfKey } from './modes';
   import { browseHistory } from './history';
   import { DEFAULT_ANCHOR, anchorBox, isAnchor, nearestAnchor, nextAnchor, type Anchor } from './anchors';
@@ -577,6 +579,7 @@
     [ToView.Plugins]: (m) => plugins.sync(m.catalog, m.canInstall),
     [ToView.Account]: (m) => (account = { state: m.state, email: m.email }),
     [ToView.Share]: (m) => (share = m),
+    [ToView.Library]: (m) => (libraryItems = m.items),
     [ToView.Comments]: (m) => (cloud = { enabled: m.enabled, comments: m.comments, error: m.error ?? '' }),
     [ToView.Onboarding]: (m) => (onboarding = m.state),
     [ToView.IconResults]: (m) => iconsFound({ id: m.id, library: m.library, hits: m.hits, error: m.error ?? '' }),
@@ -835,6 +838,33 @@
   }
 
   let addMenu = $state<{ x: number; y: number } | null>(null);
+  let libraryOpen = $state(false);
+  let libraryItems = $state<LibraryEntry[]>([]);
+
+  function openLibrary() {
+    libraryOpen = true;
+    leftClosed = false;
+    toHost({ kind: ToHost.LibraryList });
+  }
+
+  function insertLibrary(id: string, target: Source, place: AddPlace) {
+    toHost({ kind: ToHost.LibraryInsert, id, at: sourceText(target), place });
+  }
+
+  function pickAdd(id: string) {
+    if (runPluginItem(id, picked?.source ?? null)) {
+      return;
+    }
+    if (id === LIBRARY_ID) {
+      openLibrary();
+      return;
+    }
+    if (id === StructureOp.AddItem) {
+      restructure(StructureOp.AddItem);
+      return;
+    }
+    addElement(id as AddKind);
+  }
 
   function openAddMenu(x: number, y: number) {
     if (picked) {
@@ -856,7 +886,7 @@
   let addSpot = $state<InsertSpot | null>(null);
   let spotAsked = 0;
 
-  const addDrag = (e: DragEvent) => e.dataTransfer?.types.includes(ADD_DRAG_TYPE) ?? false;
+  const addDrag = (e: DragEvent) => (e.dataTransfer?.types.includes(ADD_DRAG_TYPE) || e.dataTransfer?.types.includes(LIBRARY_DRAG_TYPE)) ?? false;
 
   async function overAdd(e: DragEvent) {
     if (!addDrag(e)) {
@@ -880,9 +910,14 @@
     e.preventDefault();
     spotAsked++;
     const kind = e.dataTransfer?.getData(ADD_DRAG_TYPE) as AddKind;
+    const library = e.dataTransfer?.getData(LIBRARY_DRAG_TYPE);
     const spot = addSpot;
     addSpot = null;
     addMenu = null;
+    if (library && spot) {
+      insertLibrary(library, spot.target, spot.place);
+      return;
+    }
     const dropped = kind && spot ? pluginDrop(kind, spot) : null;
     if (dropped) {
       plugins.host.menu(dropped.plugin, dropped.item, dropped.target, dropped.place);
@@ -1077,10 +1112,14 @@
 
 <main bind:clientWidth={viewW} style={`grid-template-columns: ${leftPx}px minmax(0, 1fr) ${barPx}px; --bar: ${barPx}px; --left: ${leftPx}px`} class:sizing={sizing || leftSizing}>
   <aside class="left" class:closed={leftClosed}>
+    {#if libraryOpen}
+      <LibraryPanel items={libraryItems} canInsert={!!picked} oninsert={(id) => picked && insertLibrary(id, picked.source, AddPlace.After)} onclose={() => (libraryOpen = false)} />
+    {:else}
     <header class="left-head">Layers<button type="button" class="add" title="Add an element (/)" aria-label="Add" data-testid="add-button" disabled={!picked} onclick={(e) => openAddMenu(e.clientX, e.clientY)}>+ Add</button></header>
     <div class="layers" role="tree" aria-label="Layers" data-testid="layers">
       <LayersTree nodes={layers} {picked} selected={selectedKeys} badge={badgeOf(elementState)} open={layersOpen} onselect={selectRow} onhover={hoverLayer} onopen={(at) => toHost({ kind: ToHost.Open, at })} onmove={moveLayer} onusage={moveUsage} dragging={layerDrag} hidden={hiddenNow} locked={lockedNow} ontoggle={toggleFlag} oncontext={openLayerMenu} onadd={layerAdd} />
     </div>
+    {/if}
     {#if !leftClosed}<span class="edge-right" role="separator" aria-orientation="vertical" aria-label="Resize Layers" title="Drag to resize, double-click to reset" onpointerdown={(e) => ((e.currentTarget as HTMLElement).setPointerCapture(e.pointerId), (leftSizing = { x: e.clientX, width: leftPx }))} onpointermove={(e) => leftSizing && (leftWidth = leftSizing.width + (e.clientX - leftSizing.x))} onpointerup={() => leftSizing && ((leftSizing = null), (leftWidth = leftPx), savePrefs())} ondblclick={() => ((leftWidth = LEFT_DEFAULT_PX), savePrefs())}></span>{/if}
   </aside>
   <section class="view">
@@ -1157,7 +1196,7 @@
         </div>
       {/if}
       {#if menu}<StructureMenu x={menu.x} y={menu.y} items={contextMenuItems(menuFor(selection.refs.length), plugins.contextMenu, menu.where)} onpick={pickMenu} onclose={() => (menu = null)} />{/if}
-      {#if addMenu}<StructureMenu x={addMenu.x} y={addMenu.y} items={addMenuItems(picked && picked.instances > 1 ? [...ADD_ITEMS, ADD_LOOP_ITEM] : ADD_ITEMS, plugins.addMenu)} label="add" draggable={true} onpick={(id) => (runPluginItem(id, picked?.source ?? null) ? undefined : id === StructureOp.AddItem ? restructure(StructureOp.AddItem) : addElement(id as AddKind))} onclose={() => (addMenu = null)} />{/if}
+      {#if addMenu}<StructureMenu x={addMenu.x} y={addMenu.y} items={addMenuItems(picked && picked.instances > 1 ? [...ADD_ITEMS, ADD_LOOP_ITEM, LIBRARY_ITEM] : [...ADD_ITEMS, LIBRARY_ITEM], plugins.addMenu)} label="add" draggable={true} onpick={pickAdd} onclose={() => (addMenu = null)} />{/if}
       {#if fontNotice}
         <div class="notice missingfont" data-testid="font-notice">
           <MissingFont missing={fontNotice} project={palette.fonts.filter((name) => !palette.missing.some((m) => m.family === name))} onreplace={replaceFont} onload={loadFont} />
