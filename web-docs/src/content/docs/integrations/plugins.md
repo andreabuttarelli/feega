@@ -39,7 +39,7 @@ One undoable step:
   add it to) and `src/feega/mount-scene.ts`, the three.js code;
 - imports the component and places it in the selected element;
 - for a model, copies the file to `public/feega/models/` (`static/` in SvelteKit apps);
-- for 3D text, copies a bundled font to `public/feega/fonts/`. No network needed.
+- for 3D text, copies the bundled Inter Bold font and its OFL licence to `public/feega/fonts/`. No network needed.
 
 Select the scene to edit it in **Properties**: **Material** (glass, metal, matte), **Lights**
 (studio, soft, dramatic), **Auto-rotate**, **Mouse follow**, **Height** and **Colour**. These are written as
