@@ -12,8 +12,7 @@ vi.mock('$lib/server/onboarding/onboarding', async (orig) => ({
 vi.mock('$lib/server/repos/profiles', async (orig) => ({
 	...(await orig<object>()),
 	ensureProfile: vi.fn(async () => ({ id: 'u1', email: 'u1@esempio.it', name: null, avatarUrl: null, termsAcceptedAt: '2026-09-30T00:00:00.000Z', termsVersion: '2026-09-30' })),
-	recordTermsAcceptance: vi.fn(async () => {}),
-	claimCampaignTemplate: vi.fn(async () => false)
+	recordTermsAcceptance: vi.fn(async () => {})
 }));
 
 const { load } = await import('./+page.server');
