@@ -36,6 +36,8 @@ export interface LibraryItem {
 
 const PACKAGE_DIR = join(dirname(fileURLToPath(import.meta.url)), '..');
 export const ITEMS_DIR = join(PACKAGE_DIR, 'items');
+export const PRO_DIR = join(PACKAGE_DIR, 'pro');
+export const PREVIEW_FILE = 'preview.webp';
 export const TOKENS_FILE = join(PACKAGE_DIR, 'tokens.css');
 
 function isFontList(value: unknown): value is FontNeed[] {
@@ -91,7 +93,9 @@ export function componentName(id: string): string {
 		.join('');
 }
 
-export function itemFiles(item: LibraryItem, framework: Framework, itemsDir: string = ITEMS_DIR): string[] {
+const TIER_DIRS: Record<Tier, string> = { free: ITEMS_DIR, pro: PRO_DIR };
+
+export function itemFiles(item: LibraryItem, framework: Framework, itemsDir: string = TIER_DIRS[item.tier]): string[] {
 	const dir = join(itemsDir, item.id, framework);
 	const name = componentName(item.id);
 	const byFramework: Record<Framework, string[]> = {

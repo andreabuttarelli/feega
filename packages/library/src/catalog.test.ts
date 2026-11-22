@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { buildCatalog } from './catalog';
-import { loadItems } from './index';
+import { PRO_DIR, loadItems } from './index';
 
 const catalog = buildCatalog();
 
 describe('buildCatalog', () => {
 	it('holds every item with its files for the four frameworks', () => {
-		expect(catalog.items).toHaveLength(loadItems().length);
-		for (const item of catalog.items) {
+		expect(catalog.items).toHaveLength(loadItems().length + loadItems(PRO_DIR).length);
+		for (const item of catalog.items.filter((entry) => entry.tier === 'free')) {
 			for (const framework of ['svelte', 'react', 'vue', 'astro'] as const) {
 				expect(item.files[framework].length, `${item.id} ${framework}`).toBeGreaterThan(0);
 				expect(item.files[framework].every((file) => file.text.length > 0)).toBe(true);
@@ -31,5 +31,18 @@ describe('buildCatalog', () => {
 
 	it('loads no network resource in the thumbnail page', () => {
 		expect(catalog.items.every((item) => !/https?:\/\//.test(item.page.replace(/xmlns="[^"]*"/g, '')))).toBe(true);
+	});
+
+	it('lists pro items as metadata and a preview image, with none of their source', () => {
+		const pro = catalog.items.filter((item) => item.tier === 'pro');
+		expect(pro.length).toBeGreaterThan(0);
+		for (const item of pro) {
+			for (const framework of ['svelte', 'react', 'vue', 'astro'] as const) {
+				expect(item.files[framework], `${item.id} ${framework}`).toEqual([]);
+			}
+			expect(item.page).toContain('<img');
+			expect(item.page).not.toContain(`fl-${item.id}`);
+			expect(item.page).not.toContain('<script');
+		}
 	});
 });
