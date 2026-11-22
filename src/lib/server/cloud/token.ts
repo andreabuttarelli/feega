@@ -1,6 +1,6 @@
 export type TokenRole = 'host' | 'editor' | 'viewer';
 
-export type TokenClaims = { sid: string; role: TokenRole; sub: string; org: string; exp: number };
+export type TokenClaims = { sid: string; role: TokenRole; sub: string; org: string; exp: number; name?: string };
 
 export enum TokenCheck {
   Valid = 'valid',
