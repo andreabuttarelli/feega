@@ -221,6 +221,7 @@ const DEFINERS_A_SESSION_CALLS = {
   'commit_motion_revision(uuid,uuid,integer,jsonb,text,text,uuid,text,integer,uuid)': 'motion_revision_writer refuses a non-editor',
   'commit_motion_revision(uuid,uuid,integer,jsonb,text,text,uuid,text,integer,uuid,integer)': 'motion_revision_writer refuses a non-editor',
   'org_credit_balance(uuid)': 'sums only an org in auth_org_ids()',
+  'plugin_catalogue(text,timestamp with time zone)': 'public catalogue and aggregate counts, no per-user data',
   'project_has_shares(uuid)': 'a boolean for any project id: an oracle, no write',
   'project_has_uncensored_outputs(uuid)': 'a boolean for any project id: an oracle, no write',
   'project_is_uncensored(uuid)': 'a boolean for any project id: an oracle, no write',
