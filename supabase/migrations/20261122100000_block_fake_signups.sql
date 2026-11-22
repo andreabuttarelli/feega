@@ -98,6 +98,12 @@ end;
 $$;
 
 revoke execute on function public.hook_before_user_created(jsonb) from public, anon, authenticated;
-grant execute on function public.hook_before_user_created(jsonb) to supabase_auth_admin;
+do $grant$
+begin
+  if exists (select 1 from pg_roles where rolname = 'supabase_auth_admin') then
+    grant execute on function public.hook_before_user_created(jsonb) to supabase_auth_admin;
+  end if;
+end
+$grant$;
 
 commit;
