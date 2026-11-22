@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { PAGE_TITLES, llmsFullTxt, llmsTxt } from '../llms';
@@ -17,7 +17,7 @@ import { TOKENS_CSS, codeOf, previewParts } from './sources';
 import { Category, Framework, Theme, Tier } from './template';
 
 const STATIC = resolve(import.meta.dirname, '../../../../static');
-const LIBRARY_SIZE = 62;
+const LIBRARY_SIZE = readdirSync(resolve(import.meta.dirname, '../../../../../packages/library/items')).length;
 const CATEGORY_WORDS = { min: 150, max: 300 };
 const FRAMEWORK_WORDS = { min: 400, max: 700 };
 
