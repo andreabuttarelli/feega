@@ -4058,3 +4058,7 @@ property reads on ~2,000 items (`src/lib/canvas/counted-list.testkit.ts`), not w
 ## A Workers test WebSocket delivers binary frames as Blob
 
 **Signal:** a test peer gets `event.data` as an object with no `byteLength` and every decoded frame is `null`. **Move:** set `socket.binaryType = 'arraybuffer'` before `accept()` in the test harness.
+
+## The preview opens a stranger's server: a planned port is not a served port
+
+**Signal:** the preview or the status-dot menu shows a port that is not the one the dev server prints. A free port is probed, released, then the framework starts (Astro and Nuxt step to the next port when it is taken); a readiness check that accepts "something listens on the planned port" accepts the stranger. **Move:** readiness takes the port from the server's own printed URL; the planned port counts only when the listener's cwd is the app. The menu derives from the one URL the preview loads, never from the plan.
