@@ -7,7 +7,7 @@ export const entries: EntryGenerator = () => TEMPLATES.map((t) => ({ id: t.id })
 
 export const load: PageServerLoad = async ({ params }) => {
   const template = templateById(params.id)!;
-  const [code, parts] = await Promise.all([codeOf(template), previewParts(template.id)]);
+  const [code, parts] = await Promise.all([codeOf(template), previewParts(template)]);
 
   return { template, code, tokensCss: TOKENS_CSS, facts: factsOf(template, parts, code) };
 };

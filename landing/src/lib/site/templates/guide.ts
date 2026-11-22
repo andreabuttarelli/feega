@@ -1,7 +1,7 @@
 import { CATEGORY_COPY } from './copy';
 import { FRAMEWORK_LABEL } from './labels';
 import { TEMPLATES } from './library';
-import { Framework, type FrameworkCode, type Template } from './template';
+import { Framework, TIER_WORD, Tier, type FrameworkCode, type Template } from './template';
 
 const TOKEN_MEANING: Readonly<Record<string, string>> = {
   '--feega-bg': 'the page background',
@@ -121,14 +121,21 @@ const fontLine = (template: Template) =>
     ? 'It needs no web fonts.'
     : `It uses ${list(template.fonts.map((f) => `${f.family} (${f.weights.join(', ')})`))} from Google Fonts. Without them the font tokens fall back to a system stack.`;
 
+const SCRIPT_BEHAVIOUR = 'It has behaviour: a few lines of script in the plain HTML version, and framework state in the Svelte, React and Vue versions.';
+
+const INTRO: Readonly<Record<Tier, (noun: string) => string>> = {
+  [Tier.Free]: (noun) => `a free ${noun}`,
+  [Tier.Pro]: (noun) => `a ${noun} included in ${TIER_WORD[Tier.Pro]}`
+};
+
 export function factsOf(template: Template, parts: { markup: string; css: string }, code: FrameworkCode): ItemFacts {
   const noun = CATEGORY_COPY[template.category].noun;
-  const interactive = needsScript(parts.markup);
+  const interactive = template.tier === Tier.Pro || needsScript(parts.markup);
 
   return {
-    intro: `${template.name} is a free ${noun}. ${template.description} It is tagged ${list(template.tags)}.`,
+    intro: `${template.name} is ${INTRO[template.tier](noun)}. ${template.description} It is tagged ${list(template.tags)}.`,
     behaviour: interactive
-      ? 'It has behaviour: a few lines of script in the plain HTML version, and framework state in the Svelte, React and Vue versions.'
+      ? SCRIPT_BEHAVIOUR
       : 'It is markup and CSS only, with no script in any version.',
     fonts: fontLine(template),
     tokens: tokensUsed(parts.css),
