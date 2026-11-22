@@ -38,4 +38,23 @@ describe('attribute edit', () => {
 
     expect((await fileEdits(root).attribute('src/Tunnel.html:1:1', 'class', 'x')).ok).toBe(false);
   });
+
+  it('changing src removes srcset and sizes in one undo step', async () => {
+    const IMG = '<img src="/a.jpg" srcset="/a.jpg 1x, /a2.jpg 2x" sizes="100vw" alt="" />\n';
+    const root = app({ 'src/Pic.html': IMG });
+    const edits = fileEdits(root);
+
+    const out = await edits.attribute('src/Pic.html:1:1', 'src', '/b.jpg');
+
+    expect(out.ok).toBe(true);
+    expect(readFileSync(join(root, 'src/Pic.html'), 'utf8')).toBe('<img src="/b.jpg" alt="" />\n');
+    await edits.undo();
+    expect(readFileSync(join(root, 'src/Pic.html'), 'utf8')).toBe(IMG);
+  });
+
+  it('refuses a src change when srcset is an expression', async () => {
+    const root = app({ 'src/Pic.tsx': 'const a = <img src="/a.jpg" srcset={set} />;\n' });
+
+    expect((await fileEdits(root).attribute('src/Pic.tsx:1:11', 'src', '/b.jpg')).ok).toBe(false);
+  });
 });
