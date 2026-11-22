@@ -15,7 +15,7 @@ export type Selection = {
   attributes: { name: string; value: string }[];
 };
 
-export type ProjectInfo = { typescript: boolean };
+export type ProjectInfo = { typescript: boolean; publicDir: string };
 
 export enum OpKind {
   Style = 'style',
@@ -39,8 +39,8 @@ export type ComponentFile = { name: string; file: string; source: string; attrib
 export type Op =
   | { kind: OpKind.Style; at: string; css: Css }
   | { kind: OpKind.Insert; at: string; place: Place; component: ComponentFile; support?: SupportFile[] }
-  | { kind: OpKind.Attributes; at: string; set: Record<string, string> }
-  | { kind: OpKind.Dependency; name: string; version: string }
+  | { kind: OpKind.Attributes; at: string; tag?: string; set: Record<string, string> }
+  | { kind: OpKind.Dependency; name: string; version: string; dev?: boolean }
   | { kind: OpKind.Asset; file: string; base64: string };
 
 export type Proposal = { label: string; ops: Op[] };
@@ -127,7 +127,7 @@ export enum HandlePhase {
 
 export type Signals = {
   [Signal.Selection]: { selection: Selection | null };
-  [Signal.Control]: { contribution: string; id: string; value: string | number | boolean };
+  [Signal.Control]: { contribution: string; id: string; value: string | number | boolean; live: boolean };
   [Signal.Handle]: { contribution: string; id: string; phase: HandlePhase; x: number; y: number };
   [Signal.Menu]: { item: string; target: Source | null; place: Place | null };
   [Signal.Command]: { command: string };

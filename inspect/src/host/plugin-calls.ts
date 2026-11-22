@@ -6,6 +6,8 @@ import { PluginCall, type PluginAsk, type PluginResult } from '../messages';
 import type { Written } from './file-edits';
 
 const TSCONFIG = 'tsconfig.json';
+const PUBLIC_DIR = 'public';
+const STATIC_DIR = 'static';
 const FETCH_LIMIT_CHARS = 1_000_000;
 
 export type PluginCallDeps = {
@@ -21,7 +23,11 @@ const outcomeOf = (written: Written): Outcome => (written.ok ? { ok: true } : { 
 
 export function pluginCalls(deps: PluginCallDeps) {
   const handlers: { [K in PluginCall]: (ask: Extract<PluginAsk, { call: K }>) => Promise<unknown> } = {
-    [PluginCall.Project]: async () => ({ typescript: await exists(join(deps.root, deps.appDir(), TSCONFIG)) }),
+    [PluginCall.Project]: async () => {
+      const app = join(deps.root, deps.appDir());
+      const [typescript, hasPublic, hasStatic] = await Promise.all([exists(join(app, TSCONFIG)), exists(join(app, PUBLIC_DIR)), exists(join(app, STATIC_DIR))]);
+      return { typescript, publicDir: hasStatic && !hasPublic ? STATIC_DIR : PUBLIC_DIR };
+    },
     [PluginCall.Source]: async (ask) => {
       const at = liveAtOf(ask.at);
       return at ? reader(deps.root)(at.file) : null;

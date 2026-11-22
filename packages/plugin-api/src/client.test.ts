@@ -17,7 +17,7 @@ function wire(permissions: string[], contributions: Record<string, unknown>) {
   const proposals: Proposal[] = [];
   const editor: EditorPort = {
     selection: () => SELECTION,
-    project: async () => ({ typescript: false }),
+    project: async () => ({ typescript: false, publicDir: 'public' }),
     sourceText: async () => 'text',
     propose: async (p) => (proposals.push(p), { ok: true }),
     preview: () => undefined,
@@ -38,7 +38,7 @@ describe('plugin api against the host', () => {
   it('reads the selection and the project', async () => {
     const { api } = wire(['selection', 'project', 'source'], {});
     expect(await api.selection.get()).toEqual(SELECTION);
-    expect(await api.project.info()).toEqual({ typescript: false });
+    expect(await api.project.info()).toEqual({ typescript: false, publicDir: 'public' });
     expect(await api.source.text()).toBe('text');
   });
 

@@ -20,12 +20,17 @@ function setup(files: Record<string, string> = {}, appDir = '') {
 
 describe('pluginCalls', () => {
   it('says whether the app uses TypeScript', async () => {
-    expect(await setup({ 'tsconfig.json': '{}' }).run({ call: PluginCall.Project })).toEqual({ ok: true, value: { typescript: true } });
-    expect(await setup().run({ call: PluginCall.Project })).toEqual({ ok: true, value: { typescript: false } });
+    expect(await setup({ 'tsconfig.json': '{}' }).run({ call: PluginCall.Project })).toEqual({ ok: true, value: { typescript: true, publicDir: 'public' } });
+    expect(await setup().run({ call: PluginCall.Project })).toEqual({ ok: true, value: { typescript: false, publicDir: 'public' } });
   });
 
   it('looks for tsconfig inside the app directory', async () => {
-    expect(await setup({ 'apps/web/tsconfig.json': '{}' }, 'apps/web').run({ call: PluginCall.Project })).toEqual({ ok: true, value: { typescript: true } });
+    expect(await setup({ 'apps/web/tsconfig.json': '{}' }, 'apps/web').run({ call: PluginCall.Project })).toEqual({ ok: true, value: { typescript: true, publicDir: 'public' } });
+  });
+
+  it('serves static files from static in a SvelteKit app', async () => {
+    expect(await setup({ 'static/robots.txt': 'x' }).run({ call: PluginCall.Project })).toMatchObject({ value: { publicDir: 'static' } });
+    expect(await setup({ 'static/a.txt': 'x', 'public/b.txt': 'y' }).run({ call: PluginCall.Project })).toMatchObject({ value: { publicDir: 'public' } });
   });
 
   it('reads a source file inside the workspace', async () => {

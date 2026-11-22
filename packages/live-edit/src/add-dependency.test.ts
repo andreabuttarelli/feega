@@ -23,6 +23,11 @@ describe('addDependency', () => {
     expect(addDependency(before, 'three', '^0.180.0')).toEqual({ ok: true, after: before });
   });
 
+  it('adds to devDependencies when asked', () => {
+    const out = addDependency('{\n  "devDependencies": {\n    "vite": "^5.0.0"\n  }\n}\n', '@types/three', '^0.180.0', true);
+    expect(out).toEqual({ ok: true, after: '{\n  "devDependencies": {\n    "@types/three": "^0.180.0",\n    "vite": "^5.0.0"\n  }\n}\n' });
+  });
+
   it('refuses text that is not json', () => {
     expect(addDependency('{ nope', 'three', '^1.0.0').ok).toBe(false);
   });

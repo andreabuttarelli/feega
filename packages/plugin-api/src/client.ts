@@ -69,7 +69,7 @@ export function createApi(port: Port) {
     pickFile: (accept: string[]): Promise<Picked | null> => call(Call.PickFile, { accept }),
     section: (contribution: string) => ({
       render: (tree: UiNode[]) => call(Call.Render, { contribution, tree }),
-      on: (listener: (id: string, value: string | number | boolean) => void) => on(Signal.Control, (p) => p.contribution === contribution && listener(p.id, p.value))
+      on: (listener: (id: string, value: string | number | boolean, live: boolean) => void) => on(Signal.Control, (p) => p.contribution === contribution && listener(p.id, p.value, p.live))
     }),
     overlay: (contribution: string) => ({
       render: (handles: Handle[]) => call(Call.Overlay, { contribution, handles }),

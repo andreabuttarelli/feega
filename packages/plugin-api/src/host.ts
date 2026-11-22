@@ -148,7 +148,7 @@ export function createPluginHost(deps: { sandbox: Sandbox; editor: EditorPort })
     handles: (plugin: string, contribution: string): Handle[] => plugins.get(plugin)?.handles.get(contribution) ?? [],
     subscribe: (watch: () => void) => (watchers.add(watch), () => watchers.delete(watch)),
     selectionChanged: (selection: Selection | null) => plugins.forEach((p) => !missing(p.manifest, CALL_PERMISSION[Call.Selection]) && signal(p, Signal.Selection, { selection })),
-    control: (plugin: string, contribution: string, id: string, value: string | number | boolean) => signal(plugins.get(plugin), Signal.Control, { contribution, id, value }),
+    control: (plugin: string, contribution: string, id: string, value: string | number | boolean, live = false) => signal(plugins.get(plugin), Signal.Control, { contribution, id, value, live }),
     handle: (plugin: string, contribution: string, id: string, phase: HandlePhase, x: number, y: number) => signal(plugins.get(plugin), Signal.Handle, { contribution, id, phase, x, y }),
     menu: (plugin: string, item: string, target: Source | null, place: Place | null = null) => signal(plugins.get(plugin), Signal.Menu, { item, target, place }),
     command: (plugin: string, command: string) => signal(plugins.get(plugin), Signal.Command, { command }),

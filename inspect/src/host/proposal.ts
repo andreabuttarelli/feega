@@ -45,14 +45,14 @@ const attributes: Handler<OpKind.Attributes> = async (deps, op) => {
   if (typeof at === 'string') {
     return refused(at);
   }
-  const out = await setAttributes(deps.read, at, op.set);
+  const out = await setAttributes(deps.read, at, op.set, op.tag);
   return out.ok ? { ok: true, changes: [out.change] } : out;
 };
 
 const dependency: Handler<OpKind.Dependency> = async (deps, op) => {
   const path = appPath(deps, PACKAGE_FILE);
   const before = await deps.read(path);
-  const out = addDependency(before, op.name, op.version);
+  const out = addDependency(before, op.name, op.version, op.dev);
   return out.ok ? { ok: true, changes: [{ path, before: before ?? '', after: out.after }] } : out;
 };
 

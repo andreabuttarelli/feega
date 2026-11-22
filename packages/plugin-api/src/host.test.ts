@@ -35,7 +35,7 @@ function setup(permissions: string[], contributions: Record<string, unknown> = {
   const proposals: Proposal[] = [];
   const editor: EditorPort = {
     selection: () => selection,
-    project: async () => ({ typescript: true }),
+    project: async () => ({ typescript: true, publicDir: 'public' }),
     sourceText: async () => 'source',
     propose: async (p): Promise<Outcome> => (proposals.push(p), { ok: true }),
     preview: vi.fn(),

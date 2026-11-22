@@ -29,4 +29,22 @@ describe('setAttributes', () => {
     const out = await setAttributes(reading({ 'a.svelte': '<Scene />\n' }), { file: 'a.svelte', line: 1, col: 1 }, { a: 'x"y' });
     expect(out.ok).toBe(false);
   });
+
+  it('finds the named tag inside the element at the position', async () => {
+    const files = { 'a.svelte': '<main>\n  <h1>Hi</h1>\n  <Scene shape="cube" />\n  <Scene shape="torus" />\n</main>\n' };
+    const out = await setAttributes(reading(files), { file: 'a.svelte', line: 1, col: 1 }, { shape: 'sphere' }, 'Scene');
+    expect(out.ok && out.change.after).toBe('<main>\n  <h1>Hi</h1>\n  <Scene shape="sphere" />\n  <Scene shape="torus" />\n</main>\n');
+  });
+
+  it('does not take a longer tag that starts the same', async () => {
+    const files = { 'a.svelte': '<main>\n  <SceneBox a="1" />\n  <Scene a="2" />\n</main>\n' };
+    const out = await setAttributes(reading(files), { file: 'a.svelte', line: 1, col: 1 }, { a: '9' }, 'Scene');
+    expect(out.ok && out.change.after).toContain('<SceneBox a="1" />');
+    expect(out.ok && out.change.after).toContain('<Scene a="9" />');
+  });
+
+  it('refuses when the named tag is not inside the element', async () => {
+    const out = await setAttributes(reading({ 'a.svelte': '<main><p/></main>\n' }), { file: 'a.svelte', line: 1, col: 1 }, { a: '1' }, 'Scene');
+    expect(out.ok).toBe(false);
+  });
 });
