@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { ITEMS_DIR, TOKENS_FILE, componentName, itemFiles, loadItems, type Framework, type LibraryItem } from './index';
+import { ITEMS_DIR, PREVIEW_FILE, TOKENS_FILE, componentName, itemFiles, loadItems, type Framework, type LibraryItem } from './index';
 
 export const CATALOG_FRAMEWORKS = ['svelte', 'react', 'vue', 'astro'] as const;
 
@@ -29,13 +29,21 @@ const pageOf = (tokens: string, item: LibraryItem, itemsDir: string): string => 
 	return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>${tokens}\n${read(join(dir, 'style.css'))}\nbody{margin:0;background:var(--feega-bg)}</style></head><body>${read(join(dir, 'index.html'))}</body></html>`;
 };
 
-export function buildCatalog(itemsDir: string = ITEMS_DIR, tokensFile: string = TOKENS_FILE): Catalog {
+const noFiles = () => Object.fromEntries(CATALOG_FRAMEWORKS.map((framework) => [framework, []])) as unknown as CatalogItem['files'];
+
+const lockedPageOf = (item: LibraryItem, proDir: string): string => {
+	const image = readFileSync(join(proDir, item.id, PREVIEW_FILE)).toString('base64');
+	return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>html,body{margin:0;height:100%}img{display:block;width:100%;height:100%;object-fit:cover}</style></head><body><img alt="" src="data:image/webp;base64,${image}"></body></html>`;
+};
+
+export function buildCatalog(itemsDir: string = ITEMS_DIR, tokensFile: string = TOKENS_FILE, proDir: string = join(itemsDir, '..', 'pro')): Catalog {
 	const tokens = read(tokensFile);
-	const items = loadItems(itemsDir).map((item) => ({
+	const free = loadItems(itemsDir).map((item) => ({
 		...item,
 		component: componentName(item.id),
 		files: Object.fromEntries(CATALOG_FRAMEWORKS.map((framework) => [framework, filesOf(item, framework, itemsDir)])) as CatalogItem['files'],
 		page: pageOf(tokens, item, itemsDir)
 	}));
-	return { tokens, items };
+	const pro = loadItems(proDir).map((item) => ({ ...item, component: componentName(item.id), files: noFiles(), page: lockedPageOf(item, proDir) }));
+	return { tokens, items: [...free, ...pro] };
 }

@@ -6,6 +6,7 @@ import {
 	CATEGORIES,
 	GOOGLE_FONTS,
 	ITEMS_DIR,
+	PRO_DIR,
 	REQUIRED_FRAMEWORKS,
 	TOKENS_FILE,
 	itemFiles,
@@ -13,7 +14,9 @@ import {
 	parseManifest
 } from './index';
 
-const items = loadItems();
+const freeItems = loadItems();
+const proItems = loadItems(PRO_DIR);
+const items = [...freeItems, ...proItems];
 const tokens = readFileSync(TOKENS_FILE, 'utf8');
 const COLOR_LITERAL = /#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\(/;
 const NAMED_COLOR =
@@ -74,8 +77,14 @@ describe('library items', () => {
 	});
 
 	it('has one folder per manifest id', () => {
-		const folders = readdirSync(ITEMS_DIR).sort();
-		expect(items.map((item) => item.id).sort()).toEqual(folders);
+		expect(freeItems.map((item) => item.id).sort()).toEqual(readdirSync(ITEMS_DIR).sort());
+		expect(proItems.map((item) => item.id).sort()).toEqual(readdirSync(PRO_DIR).sort());
+	});
+
+	it('keeps free items in items/ and pro items apart in pro/', () => {
+		expect(freeItems.every((item) => item.tier === 'free')).toBe(true);
+		expect(proItems.length).toBeGreaterThan(0);
+		expect(proItems.every((item) => item.tier === 'pro')).toBe(true);
 	});
 
 	it('requires a valid manifest', () => {
@@ -100,8 +109,7 @@ describe('library items', () => {
 
 	for (const item of items) {
 		describe(item.id, () => {
-			it('is free, dependency free and in every required framework', () => {
-				expect(item.tier).toBe('free');
+			it('is dependency free and in every required framework', () => {
 				expect(item.dependencies).toEqual([]);
 				for (const framework of REQUIRED_FRAMEWORKS) {
 					expect(item.frameworks).toContain(framework);
