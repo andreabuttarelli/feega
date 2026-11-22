@@ -1,25 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { FALLBACK_PLUGINS } from './fallback';
-import { loadPlugins, pluginPath } from './catalogue';
+import { PLUGINS, pluginPath } from './plugins';
 import { permissionWords } from './permissions';
-
-const apiRow = {
-  id: 'mesh-gradient',
-  name: 'Mesh gradient',
-  summary: 'From the API',
-  author: 'Feega',
-  tier: 'free',
-  latestVersion: '1.0.0',
-  manifest: { permissions: ['selection'] },
-  installs: 12,
-  activeInstalls: 7,
-  upvotes: 3
-};
-
-const answering = (body: unknown, ok = true) => (async () => ({ ok, json: async () => body })) as unknown as typeof fetch;
-const failing = (async () => {
-  throw new Error('offline');
-}) as unknown as typeof fetch;
 
 describe('permission words', () => {
   it('explains each known permission in plain words', () => {
@@ -36,36 +17,21 @@ describe('permission words', () => {
   });
 });
 
-describe('loadPlugins', () => {
-  it('shows the live counts from the public api', async () => {
-    const plugins = await loadPlugins(answering({ plugins: [apiRow] }));
-
-    expect(plugins[0]).toMatchObject({ id: 'mesh-gradient', summary: 'From the API', stats: { installs: 12, activeInstalls: 7, upvotes: 3 } });
+describe('plugins', () => {
+  it('lists the two built-ins', () => {
+    expect(PLUGINS.map((p) => p.id)).toEqual(['mesh-gradient', '3d-object']);
   });
 
-  it('keeps the long description and permissions of the page', async () => {
-    const [plugin] = await loadPlugins(answering({ plugins: [apiRow] }));
+  it('writes each permission in plain words', () => {
+    const mesh = PLUGINS.find((p) => p.id === 'mesh-gradient');
 
-    expect(plugin.permissions).toEqual(['See which element you have selected']);
-    expect(plugin.description.length).toBeGreaterThan(plugin.summary.length);
+    expect(mesh?.permissions).toEqual(['See which element you have selected', 'Change the styles of the selected element']);
   });
 
-  it('falls back to the built-ins without counts when the api is down', async () => {
-    const plugins = await loadPlugins(failing);
+  it('asks the 3D plugin for no network access', () => {
+    const object = PLUGINS.find((p) => p.id === '3d-object');
 
-    expect(plugins.map((p) => p.id)).toEqual(FALLBACK_PLUGINS.map((p) => p.id));
-    expect(plugins.every((p) => p.stats === null)).toBe(true);
-  });
-
-  it('falls back when the api answers an error', async () => {
-    const plugins = await loadPlugins(answering({}, false));
-
-    expect(plugins.length).toBe(FALLBACK_PLUGINS.length);
-  });
-
-  it('falls back when the catalogue is empty or malformed', async () => {
-    expect((await loadPlugins(answering({ plugins: [] }))).length).toBe(FALLBACK_PLUGINS.length);
-    expect((await loadPlugins(answering({ nope: 1 }))).length).toBe(FALLBACK_PLUGINS.length);
+    expect(object?.permissions.some((line) => line.startsWith('Download files'))).toBe(false);
   });
 
   it('builds the detail path from the id', () => {

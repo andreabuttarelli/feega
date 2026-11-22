@@ -1,8 +1,7 @@
 import { FAQ } from './home';
 import { CODEBASE, CODEBASE_PATH } from './codebase';
 import { DOWNLOAD_META, HOME_META, PLUGINS_META, PRICING_META } from './seo';
-import { PLUGINS_PATH, pluginPath } from './plugins/catalogue';
-import { FALLBACK_PLUGINS } from './plugins/fallback';
+import { PLUGINS, PLUGINS_PATH, pluginPath } from './plugins/plugins';
 import { COFFEE_URL, DOWNLOAD_PATH, EDITORS, EXTENSION_PUBLISHED, GITHUB_URL, SITE_URL } from './links';
 import { PRICING_PATH, SITE_PATHS } from './paths';
 import { LEGAL_DOCS } from './legal';
@@ -39,7 +38,7 @@ export const PAGE_TITLES: Record<string, string> = {
   [PRICING_PATH]: PRICING_META.title,
   [DOWNLOAD_PATH]: DOWNLOAD_META.title,
   [PLUGINS_PATH]: PLUGINS_META.title,
-  ...Object.fromEntries(FALLBACK_PLUGINS.map((p) => [pluginPath(p.id), `${p.name} plugin`])),
+  ...Object.fromEntries(PLUGINS.map((p) => [pluginPath(p.id), `${p.name} plugin`])),
   '/changelog': 'Changelog',
   [CODEBASE_PATH]: CODEBASE.title,
   [ALTERNATIVES_PATH]: ALTERNATIVES_INDEX.title,

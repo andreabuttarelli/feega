@@ -1,7 +1,7 @@
 <script lang="ts">
   import Pixel from '$lib/site/alternatives/Pixel.svelte';
   import TierBadge from '$lib/site/plugins/TierBadge.svelte';
-  import { PLUGINS_PATH } from '$lib/site/plugins/catalogue';
+  import { PLUGINS_PATH } from '$lib/site/plugins/plugins';
   import { primaryCta } from '$lib/site/install';
   import { lower } from '$lib/site/lower';
 
@@ -30,14 +30,6 @@
       </div>
       <TierBadge tier={plugin.tier} />
     </header>
-
-    {#if plugin.stats}
-      <dl class="stats">
-        <div><dt>installs</dt><dd>{plugin.stats.installs}</dd></div>
-        <div><dt>active</dt><dd>{plugin.stats.activeInstalls}</dd></div>
-        <div><dt>upvotes</dt><dd>{plugin.stats.upvotes}</dd></div>
-      </dl>
-    {/if}
 
     <p class="lead">{plugin.description}</p>
 
@@ -108,27 +100,6 @@
     font-family: var(--sx-mono);
     font-size: 13px;
     opacity: 0.6;
-  }
-
-  .stats {
-    display: flex;
-    gap: 32px;
-    margin: 32px 0 0;
-    font-family: var(--sx-mono);
-    font-size: 14px;
-  }
-
-  .stats div {
-    display: flex;
-    gap: 8px;
-  }
-
-  dt {
-    opacity: 0.55;
-  }
-
-  dd {
-    margin: 0;
   }
 
   .lead {

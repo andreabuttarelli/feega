@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { PluginTier } from './fallback';
+  import type { PluginTier } from './plugins';
 
   let { tier }: { tier: PluginTier } = $props();
 

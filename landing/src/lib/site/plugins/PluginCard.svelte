@@ -1,7 +1,7 @@
 <script lang="ts">
   import Pixel from '../alternatives/Pixel.svelte';
   import { lower } from '../lower';
-  import { pluginPath, type PluginView } from './catalogue';
+  import { pluginPath, type PluginView } from './plugins';
   import TierBadge from './TierBadge.svelte';
 
   let { plugin }: { plugin: PluginView } = $props();
@@ -16,12 +16,6 @@
   <h2>{lower(plugin.name)}</h2>
   <p class="summary">{lower(plugin.summary)}</p>
 
-  {#if plugin.stats}
-    <dl class="stats">
-      <div><dt>installs</dt><dd>{plugin.stats.installs}</dd></div>
-      <div><dt>upvotes</dt><dd>{plugin.stats.upvotes}</dd></div>
-    </dl>
-  {/if}
 </a>
 
 <style>
@@ -70,27 +64,5 @@
     font-size: 16px;
     line-height: 1.4;
     opacity: 0.7;
-  }
-
-  .stats {
-    display: flex;
-    gap: 24px;
-    margin: auto 0 0;
-    padding-top: 12px;
-    font-family: var(--sx-mono);
-    font-size: 13px;
-  }
-
-  .stats div {
-    display: flex;
-    gap: 8px;
-  }
-
-  dt {
-    opacity: 0.55;
-  }
-
-  dd {
-    margin: 0;
   }
 </style>
