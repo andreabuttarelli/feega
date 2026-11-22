@@ -5,7 +5,7 @@
   import PageTitle from '$lib/components/PageTitle.svelte';
   import PageHead from '$lib/components/PageHead.svelte';
   import { Notice } from '$lib/components/ui/notice';
-  import { DASHBOARD_SETTINGS_GROUPS, dashboardSettingsHref, sectionEditable, SETTINGS_SECTIONS } from '$lib/components/settings/platforms';
+  import { sectionEditable, SETTINGS_NAV, SETTINGS_SECTIONS } from '$lib/components/settings/platforms';
   import '$lib/styles/settings-shell.css';
 
   let { data, children } = $props();
@@ -14,26 +14,20 @@
   const editable = $derived(sectionEditable(path, data.org.role as OrgRole));
   const activeSection = $derived(SETTINGS_SECTIONS.find((s) => path.endsWith(`/settings/${s.path}`))?.path ?? '');
   const titleKey = $derived(SETTINGS_SECTIONS.find((s) => s.path === activeSection)?.labelKey);
+  const subtitleKey = $derived(SETTINGS_SECTIONS.find((s) => s.path === activeSection)?.subtitleKey);
   const title = $derived($_(titleKey ?? 'app.nav.settings'));
 </script>
 
-<div class="settings-frame has-nav">
-  <nav class="settings-nav" aria-label={$_('app.nav.settings')}>
-    {#each DASHBOARD_SETTINGS_GROUPS as group (group.labelKey)}
-      <p class="nav-group">{$_(group.labelKey)}</p>
-      {#each group.items as item (item.section)}
-        <a
-          class="nav-item"
-          class:is-active={activeSection === item.section}
-          aria-current={activeSection === item.section ? 'page' : undefined}
-          href={dashboardSettingsHref(item.section)}>{$_(item.labelKey)}</a
-        >
-      {/each}
-    {/each}
-  </nav>
+<div class="settings-frame">
   <div class="content settings-shell">
     <PageHead {title} subtitle={null} />
     <PageTitle text={title} />
+    {#if subtitleKey}<p class="subtitle">{$_(subtitleKey)}</p>{/if}
+    <nav class="tabs" aria-label={$_('app.nav.settings')}>
+      {#each SETTINGS_NAV as entry (entry.section)}
+        <a href={entry.href} aria-current={entry.section === activeSection ? 'page' : undefined}>{$_(entry.labelKey)}</a>
+      {/each}
+    </nav>
     {#if !editable}<Notice>View only: ask an admin of this organisation for edit access.</Notice>{/if}
     <div class="settings" inert={!editable}>
       {@render children()}
@@ -49,82 +43,35 @@
     padding: var(--content-pad-top) var(--content-pad-x) var(--content-pad-bottom);
   }
 
-  .settings-frame.has-nav {
-    display: grid;
-    grid-template-columns: 200px minmax(0, 1fr);
-    gap: 32px;
-    align-items: start;
-    max-width: calc(var(--content-max) + 232px);
-    margin: 0 auto;
+  .subtitle {
+    margin: var(--ui-space-2) 0 0;
+    font-size: var(--ui-text-lg);
+    color: var(--ui-text-secondary);
   }
 
-  .settings-nav {
-    position: sticky;
-    top: 0;
+  .tabs {
     display: flex;
-    flex-direction: column;
+    gap: var(--ui-space-2);
+    margin: 20px 0 var(--ui-space-6) -16px;
+    overflow-x: auto;
   }
 
-  .nav-group {
-    margin: 16px 0 4px;
-    padding: 0 8px;
-    font-size: var(--ui-type-section);
-    font-weight: var(--ui-weight-semibold);
-    letter-spacing: var(--ui-tracking-caps);
-    text-transform: uppercase;
-    color: var(--ui-text-tertiary);
-  }
-
-  .nav-group:first-child {
-    margin-top: 0;
-  }
-
-  .nav-item {
-    display: flex;
-    align-items: center;
-    height: var(--ui-row-lg);
-    padding: 0 8px;
-    border-radius: var(--ui-radius-sm);
-    font-size: var(--ui-type-body);
+  .tabs a {
+    padding: 8px 16px;
+    border-radius: 999px;
+    font-size: var(--ui-text-lg);
+    color: var(--ui-text-secondary);
     text-decoration: none;
-    overflow: hidden;
-    text-overflow: ellipsis;
     white-space: nowrap;
-    transition: background var(--ui-dur-fast) var(--ui-ease);
-    color: var(--ui-text-secondary, #6e6e73);
   }
 
-  .nav-item:hover,
-  .nav-item.is-active {
+  .tabs a:hover {
+    background: color-mix(in srgb, var(--ui-text) 12%, transparent);
+  }
+
+  .tabs a[aria-current='page'] {
+    background: color-mix(in srgb, var(--ui-text) 12%, transparent);
     color: var(--ui-text);
-    background: var(--ui-wash);
   }
 
-  .nav-item.is-active {
-    font-weight: var(--ui-weight-medium);
-    border-radius: var(--ui-radius-md);
-  }
-
-  .nav-item:focus-visible {
-    outline: none;
-    box-shadow: var(--ui-ring);
-  }
-
-  @media (max-width: 720px) {
-    .settings-frame.has-nav {
-      display: block;
-    }
-
-    .settings-nav {
-      position: static;
-      flex-direction: row;
-      flex-wrap: wrap;
-      gap: 4px;
-      padding: 12px var(--content-pad-x) 0;
-    }
-
-    .nav-group {
-      display: none;
-    }
-  }
 </style>

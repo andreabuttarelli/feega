@@ -4,12 +4,6 @@ type Handler = (event: never) => unknown;
 export type SettingsPage = { load?: Handler; actions?: Record<string, Handler> };
 
 export const SETTINGS_PAGES: Record<SettingsSection, () => Promise<SettingsPage>> = {
-  [SettingsSection.Project]: () => import('./pages/project'),
   [SettingsSection.Profile]: () => import('./pages/profile'),
-  [SettingsSection.Content]: () => import('./pages/content'),
-  [SettingsSection.Team]: () => import('./pages/team'),
-  [SettingsSection.ApiKeys]: () => import('./pages/api-keys'),
-  [SettingsSection.Models]: () => import('./pages/models'),
-  [SettingsSection.Fonts]: () => import('./pages/fonts'),
-  [SettingsSection.Spend]: () => import('./pages/spend')
+  [SettingsSection.Billing]: () => import('./pages/billing')
 };

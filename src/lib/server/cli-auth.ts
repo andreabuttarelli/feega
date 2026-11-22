@@ -4,8 +4,6 @@ import { env } from '$env/dynamic/private';
 import { json } from '@sveltejs/kit';
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { markRlsScoped } from '$lib/server/rls-client';
-import { LOCAL_AI_MESSAGE, localStore } from '$lib/server/local/local-mode';
-import { hasAiKey } from '$lib/local-ai-keys';
 import { ProductEvent, track } from '$lib/server/product-events/track';
 import { scopesOfHolder } from '$lib/server/api-key-holder';
 
@@ -184,9 +182,6 @@ export type CreditGateDenial = { status: number; data: { error: string; message:
 const CREDITS_EXHAUSTED_MESSAGE = 'AI credits are exhausted for this billing period. Buy more to continue.';
 
 async function creditGateOutcome(spend: () => Promise<void>): Promise<CreditGateDenial | undefined> {
-  if (localStore()) {
-    return hasAiKey(process.env) ? undefined : { status: 403, data: { error: 'local_mode', message: LOCAL_AI_MESSAGE } };
-  }
   const { CreditsExhaustedError } = await import('./credits');
   try {
     await spend();

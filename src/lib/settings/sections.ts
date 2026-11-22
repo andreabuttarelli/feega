@@ -1,12 +1,6 @@
 export enum SettingsSection {
-  Project = 'project',
   Profile = 'profile',
-  Content = 'content',
-  Team = 'team',
-  ApiKeys = 'api-keys',
-  Models = 'models',
-  Fonts = 'fonts',
-  Spend = 'spend'
+  Billing = 'billing'
 }
 
 export const DASHBOARD_SETTINGS_API = '/api/v1/me/settings';

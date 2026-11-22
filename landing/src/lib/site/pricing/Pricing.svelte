@@ -8,7 +8,7 @@
 </script>
 
 <section class="pricing site-wide" id="pricing" aria-labelledby="pricing-title">
-  <h2 id="pricing-title" data-agent-id="pricing-title">start free on your computer. add Feega Cloud to work together in real time.</h2>
+  <h2 id="pricing-title" data-agent-id="pricing-title">the extension is free. Feega Cloud is coming soon.</h2>
 
   <PriceGrid {plan} />
 

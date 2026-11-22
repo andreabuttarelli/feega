@@ -3,15 +3,12 @@ import type { User } from '@supabase/supabase-js';
 import type { Db } from '$lib/server/db/client';
 import { ensureProfile, recordTermsAcceptance } from '$lib/server/repos/profiles';
 import { acceptInvite } from '$lib/server/tenancy/bootstrap';
-import { DASHBOARD_PATH, ENTRY_DEPS, EntryVia, homePathFor, startPathFor } from '$lib/server/tenancy/entry';
-import { HOME_DRAFT_COOKIE } from '$lib/home/home-draft';
-import { ORG_COOKIE, LAST_PROJECT_COOKIE } from '$lib/server/tenancy/context';
+import { ENTRY_DEPS, homePathFor } from '$lib/server/tenancy/entry';
+import { ORG_COOKIE } from '$lib/server/tenancy/context';
 import { CURRENT_TERMS_VERSION } from '$lib/legal-links';
-import { takeCampaign } from '$lib/server/onboarding/campaign-cookie';
-import { takeStartUrl } from '$lib/server/onboarding/start-url-cookie';
-import { resumedQuery } from '$lib/home/handoff';
 import { ProductEvent, track } from '$lib/server/product-events/track';
 import { markSignedUp } from '$lib/server/core-usage';
+import { onboardingPathFor } from '$lib/server/onboarding/onboarding';
 
 export const INVITE_PARAM = 'invite_token';
 export const INVITE_ERROR_PARAM = 'invite_error';
@@ -21,11 +18,11 @@ export type LandingDeps = {
   recordTermsAcceptance: typeof recordTermsAcceptance;
   acceptInvite: typeof acceptInvite;
   homePathFor: typeof homePathFor;
-  startPathFor: typeof startPathFor;
   track: typeof track;
+  onboardingPathFor: typeof onboardingPathFor;
 };
 
-const LANDING_DEPS: LandingDeps = { ensureProfile, recordTermsAcceptance, acceptInvite, homePathFor, startPathFor, track };
+const LANDING_DEPS: LandingDeps = { ensureProfile, recordTermsAcceptance, acceptInvite, homePathFor, track, onboardingPathFor };
 
 async function recordFirstAcceptance(db: Db, deps: LandingDeps, userId: string, termsAcceptedAt: string | null) {
   if (termsAcceptedAt) {
@@ -34,16 +31,6 @@ async function recordFirstAcceptance(db: Db, deps: LandingDeps, userId: string, 
   await deps.recordTermsAcceptance(db, userId, CURRENT_TERMS_VERSION);
   await deps.track(ProductEvent.SignupCompleted, { userId }, {});
   markSignedUp(userId, new Date().toISOString());
-}
-
-function takeHomeDraft(cookies: Cookies): string | null {
-  const pending = cookies.get(HOME_DRAFT_COOKIE);
-  if (!pending) {
-    return null;
-  }
-
-  cookies.delete(HOME_DRAFT_COOKIE, { path: '/' });
-  return pending.startsWith('?') ? `${DASHBOARD_PATH}${resumedQuery(pending, () => crypto.randomUUID())}` : DASHBOARD_PATH;
 }
 
 export function inviteTokenIn(params: URLSearchParams | FormData): string | null {
@@ -60,15 +47,11 @@ export async function landingPath(
 ): Promise<string> {
   const profile = await deps.ensureProfile(db, user);
   await recordFirstAcceptance(db, deps, user.id, profile.termsAcceptedAt);
-  const startUrl = takeStartUrl(cookies);
-
-  if (!inviteToken && startUrl) {
-    return deps.startPathFor(db, ENTRY_DEPS, user, cookies.get(ORG_COOKIE) ?? null, startUrl);
-  }
 
   if (!inviteToken) {
-    const path = await deps.homePathFor(db, ENTRY_DEPS, user, cookies.get(ORG_COOKIE) ?? null, cookies.get(LAST_PROJECT_COOKIE) ?? null, takeCampaign(cookies));
-    return takeHomeDraft(cookies) ?? path;
+    const chosenOrgId = cookies.get(ORG_COOKIE) ?? null;
+    const home = await deps.homePathFor(db, ENTRY_DEPS, user, chosenOrgId);
+    return (await deps.onboardingPathFor(db, user, chosenOrgId, home)) ?? home;
   }
 
   const result = await deps.acceptInvite({ token: inviteToken, userId: user.id, email: user.email ?? '' });
@@ -78,5 +61,6 @@ export async function landingPath(
 
   await deps.track(ProductEvent.TeamInviteAccepted, { userId: user.id, orgId: result.orgId }, { role: result.role });
 
-  return deps.homePathFor(db, ENTRY_DEPS, user, result.orgId, null, null, EntryVia.Invite);
+  const home = await deps.homePathFor(db, ENTRY_DEPS, user, result.orgId);
+  return (await deps.onboardingPathFor(db, user, result.orgId, home)) ?? home;
 }

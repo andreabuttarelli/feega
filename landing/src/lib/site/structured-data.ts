@@ -1,7 +1,8 @@
 import { PLAN } from './pricing/plan';
 import { FAQ } from './home';
 import { plainText } from './text';
-import { DISCORD_URL, GITHUB_URL, SITE_URL, SOCIAL_LINKS } from './links';
+import type { Topic } from './topics/topic';
+import { DISCORD_URL, DOWNLOAD_PATH, FEEGA_VERSION, GITHUB_URL, SITE_URL, SOCIAL_LINKS } from './links';
 
 const SITE = `${SITE_URL}/`;
 
@@ -22,18 +23,11 @@ const APPLICATION = {
   '@context': 'https://schema.org',
   '@type': 'SoftwareApplication',
   name: 'Feega',
-  url: 'https://oh.feega.app',
-  applicationCategory: 'MultimediaApplication',
-  operatingSystem: 'Web',
-  description: 'Design inside your code with your agents and team: an open-source canvas for website designs and motion videos, driven by prompts, Claude Code, Codex or Cursor.',
-  offers: {
-    '@type': 'Offer',
-    category: 'subscription',
-    price: PLAN.price,
-    priceCurrency: 'EUR',
-    description: `Per ${PLAN.per} per ${PLAN.period}. Viewers and AI agents are free.`,
-    priceSpecification: { '@type': 'UnitPriceSpecification', price: PLAN.price, priceCurrency: 'EUR', unitText: `${PLAN.per} / ${PLAN.period}` }
-  },
+  url: SITE,
+  applicationCategory: 'DeveloperApplication',
+  operatingSystem: 'Windows, macOS, Linux',
+  description: 'Feega Inspect is a free VS Code extension: click any element of your running app, edit it like in Figma, and the change is written to your code. No AI, no tokens, with diffs.',
+  offers: { '@type': 'Offer', price: 0, priceCurrency: 'EUR', description: 'Free VS Code extension.' },
   sameAs: SAME_AS,
   publisher: { '@type': 'Organization', name: 'Feega', sameAs: SAME_AS }
 };
@@ -47,7 +41,7 @@ const FOUNDER = {
   worksFor: { '@type': 'Organization', name: 'Feega', url: SITE }
 };
 
-const script = (data: object) => `<script type="application/ld+json">${JSON.stringify(data)}</` + 'script>';
+export const script = (data: object) => `<script type="application/ld+json">${JSON.stringify(data)}</` + 'script>';
 
 export const faqJsonLd = (items: readonly { q: string; a: string }[]) =>
   script({
@@ -56,14 +50,13 @@ export const faqJsonLd = (items: readonly { q: string; a: string }[]) =>
     mainEntity: items.map(({ q, a }) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: plainText(a) } }))
   });
 
-export const breadcrumbJsonLd = (name: string, path: string) =>
+export type Crumb = { name: string; path: string };
+
+export const breadcrumbJsonLd = (trail: readonly Crumb[]) =>
   script({
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
-    itemListElement: [
-      { '@type': 'ListItem', position: 1, name: 'Feega', item: SITE },
-      { '@type': 'ListItem', position: 2, name, item: `${SITE}${path.slice(1)}` }
-    ]
+    itemListElement: [{ name: 'Feega', path: '/' }, ...trail].map((c, i) => ({ '@type': 'ListItem', position: i + 1, name: c.name, item: `${SITE}${c.path.slice(1)}` }))
   });
 
 export const HOME_JSON_LD = [ORGANIZATION, APPLICATION, FOUNDER].map(script).join('') + faqJsonLd(FAQ);
@@ -80,10 +73,37 @@ export const articleJsonLd = (article: { title: string; description: string; pat
     publisher: { '@type': 'Organization', name: 'Feega', url: SITE }
   });
 
+export const topicJsonLd = (topic: Topic, path: string) =>
+  script({
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: topic.title,
+    description: topic.description,
+    url: `${SITE}${path.slice(1)}`,
+    mainEntityOfPage: `${SITE}${path.slice(1)}`,
+    image: `${SITE_URL}${topic.cover.src}`,
+    datePublished: topic.checked,
+    dateModified: topic.checked,
+    author: { '@type': 'Person', name: 'Andrea Buttarelli' },
+    publisher: { '@type': 'Organization', name: 'Feega', url: SITE }
+  }) +
+  script(ORGANIZATION) +
+  faqJsonLd(topic.questions);
+
 export const howToJsonLd = (name: string, steps: readonly { name: string; text: string }[]) =>
   script({
     '@context': 'https://schema.org',
     '@type': 'HowTo',
     name,
     step: steps.map((s, i) => ({ '@type': 'HowToStep', position: i + 1, name: s.name, text: s.text }))
+  });
+
+export const downloadJsonLd = () =>
+  script({
+    ...APPLICATION,
+    '@context': 'https://schema.org',
+    softwareVersion: FEEGA_VERSION,
+    downloadUrl: `${SITE_URL}${DOWNLOAD_PATH}`,
+    isAccessibleForFree: true,
+    offers: { '@type': 'Offer', price: 0, priceCurrency: 'EUR' }
   });

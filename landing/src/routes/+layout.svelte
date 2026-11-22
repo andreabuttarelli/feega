@@ -1,18 +1,27 @@
 <script lang="ts">
+  import '$lib/site/theme/tokens.css';
+  import '$lib/site/theme/chrome.css';
   import '$lib/site/site.css';
   import SiteHeader from '$lib/site/SiteHeader.svelte';
   import SiteFooter from '$lib/site/SiteFooter.svelte';
-  import CanvasEnding from '$lib/site/CanvasEnding.svelte';
   import { page } from '$app/state';
   import { SITE_URL } from '$lib/site/links';
-  import { pageTitle } from '$lib/site/llms';
+  import { trailOf } from '$lib/site/llms';
   import { breadcrumbJsonLd } from '$lib/site/structured-data';
   import { OG } from '$lib/site/seo';
 
+  import { onMount, type Component } from 'svelte';
+
   let { children } = $props();
 
+  let AskAi = $state<Component | null>(null);
+
+  onMount(async () => {
+    AskAi = (await import('$lib/site/ask-ai/AskAi.svelte')).default;
+  });
+
   const canonical = $derived(SITE_URL + page.url.pathname);
-  const crumb = $derived(page.url.pathname === '/' ? undefined : pageTitle(page.url.pathname));
+  const trail = $derived(page.url.pathname === '/' ? [] : trailOf(page.url.pathname));
 </script>
 
 <svelte:head>
@@ -26,7 +35,7 @@
   <link rel="apple-touch-icon" href="/site/apple-touch-icon.png" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Feega" />
-  {#if crumb}{@html breadcrumbJsonLd(crumb, page.url.pathname)}{/if}
+  {#if trail.length}{@html breadcrumbJsonLd(trail)}{/if}
   <meta property="og:url" content={canonical} />
   <meta property="og:image" content={OG.image.url} />
   <meta property="og:image:width" content={String(OG.image.width)} />
@@ -49,9 +58,9 @@
   <main>
     {@render children()}
   </main>
-  {#if page.url.pathname === '/'}
-    <CanvasEnding pick=".mark"><SiteFooter /></CanvasEnding>
-  {:else}
-    <SiteFooter />
-  {/if}
+  <SiteFooter />
 </div>
+
+{#if AskAi}
+  <AskAi />
+{/if}

@@ -1,5 +1,9 @@
 ---
+import '../styles/theme/tokens.css';
+import '../styles/theme/chrome.css';
 import '../styles/blog.css';
+import SiteNav from '../components/theme/SiteNav.astro';
+import SiteFooter from '../components/theme/SiteFooter.astro';
 import { SITE_TITLE, SITE_DESCRIPTION, SOCIAL_PREVIEW } from '../site';
 
 interface Props {
@@ -8,9 +12,10 @@ interface Props {
   cover?: { src: string; alt: string };
   type?: 'website' | 'article';
   jsonLd?: object;
+  noindex?: boolean;
 }
 
-const { title, description = SITE_DESCRIPTION, cover, type = 'website', jsonLd } = Astro.props;
+const { title, description = SITE_DESCRIPTION, cover, type = 'website', jsonLd, noindex = false } = Astro.props;
 const fullTitle = title ? `${title} · ${SITE_TITLE}` : SITE_TITLE;
 const canonical = new URL(Astro.url.pathname, Astro.site);
 const ogImage = cover ? new URL(cover.src, Astro.site).href : SOCIAL_PREVIEW.image;
@@ -25,6 +30,7 @@ const ogAlt = cover?.alt ?? SOCIAL_PREVIEW.alt;
     <title>{fullTitle}</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
+    {noindex && <meta name="robots" content="noindex, follow" />}
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
     <link rel="icon" href="/favicon.png" sizes="48x48" type="image/png" />
@@ -32,7 +38,7 @@ const ogAlt = cover?.alt ?? SOCIAL_PREVIEW.alt;
     <link rel="alternate" type="application/rss+xml" title={SITE_TITLE} href="/rss.xml" />
     <link rel="sitemap" href="/sitemap-index.xml" />
     <link rel="preload" href="/fonts/bdo-grotesk-Regular.woff2" as="font" type="font/woff2" crossorigin />
-    <meta name="color-scheme" content="light dark" />
+    <meta name="color-scheme" content="dark" />
     <meta property="og:site_name" content={SITE_TITLE} />
     <meta property="og:type" content={type} />
     <meta property="og:title" content={title ?? SITE_TITLE} />
@@ -56,21 +62,10 @@ const ogAlt = cover?.alt ?? SOCIAL_PREVIEW.alt;
     {jsonLd && <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />}
   </head>
   <body>
-    <header class="site-header">
-      <a class="wordmark" href="/"><img src="/favicon.svg" alt="" width="22" height="22" />Feega</a>
-      <nav>
-        <a href="https://feega.app">Product</a>
-        <a href="https://docs.feega.app">Docs</a>
-        <a href="https://github.com/andreabuttarelli/feega">GitHub</a>
-        <a href="https://discord.gg/PUp37DG6vr">Discord</a>
-      </nav>
-    </header>
-    <main>
+    <SiteNav current="blog" />
+    <main class="page">
       <slot />
     </main>
-    <footer class="site-footer">
-      <span>Try it: <code>npx feega</code></span>
-      <span><a href="/rss.xml">RSS</a> · <a href="/tags/">Tags</a> · <a href="https://feega.app">feega.app</a></span>
-    </footer>
+    <SiteFooter />
   </body>
 </html>

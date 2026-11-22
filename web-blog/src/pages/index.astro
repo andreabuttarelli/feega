@@ -7,7 +7,15 @@ const posts = await postsNewestFirst();
 ---
 
 <Base>
-  <h1 class="page-title">Building Feega in public</h1>
-  <p class="lede">Notes on the canvas, the motion engine and the decisions behind them.</p>
+  <header class="index-head">
+    <nav class="sx-crumbs" aria-label="Breadcrumb"><span>blog</span></nav>
+    <h1 class="page-title">Building Feega in public</h1>
+    <p class="lede">Notes on design in your codebase, and the decisions behind Feega.</p>
+    <div class="pills">
+      <a class="sx-pill is-outline" href="/rss.xml">rss</a>
+      <a class="sx-pill is-outline" href="/use-cases/">use cases</a>
+      <a class="sx-pill is-outline" href="/tags/">tags</a>
+    </div>
+  </header>
   <PostList posts={posts} />
 </Base>

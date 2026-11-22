@@ -1,0 +1,28 @@
+.topic .topic-figure {
+  margin: var(--sx-s7) 0 0;
+}
+
+.topic .topic-figure img,
+.topic .card img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--sx-radius-xl);
+  background: #0a0a0a;
+}
+
+.topic section > h3 + p {
+  margin-top: var(--sx-s3);
+}
+
+.topic .body ul {
+  margin-top: var(--sx-s5);
+}
+
+.catalog .compare.topic code {
+  padding: 0.12em 0.4em;
+  border-radius: var(--sx-radius-xs);
+  background: var(--sx-grey-1);
+  color: var(--sx-accent-soft);
+  font-size: 0.85em;
+}

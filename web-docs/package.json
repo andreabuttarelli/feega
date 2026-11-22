@@ -3,10 +3,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "gen": "node scripts/gen.mjs",
-    "dev": "npm run gen && astro dev",
-    "build": "npm run gen && astro build",
-    "preview": "astro preview"
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
     "@astrojs/starlight": "0.34.4",

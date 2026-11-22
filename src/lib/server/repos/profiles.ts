@@ -1,6 +1,7 @@
 import type { User } from '@supabase/supabase-js';
 import type { Db } from '$lib/server/db/client';
 import type { Database } from '$lib/database.types';
+import { isGithubProvider } from '$lib/onboarding/provider-name';
 
 /**
  * IL PROFILO È LA PERSONA, E IL SUO ID È QUELLO DI AUTH.
@@ -63,7 +64,7 @@ export function profileFromAuthUser(user: User): Profile {
   return {
     id: user.id,
     email: user.email,
-    name: firstString(metadata, NAME_KEYS),
+    name: isGithubProvider(user) ? null : firstString(metadata, NAME_KEYS),
     avatarUrl: firstString(metadata, AVATAR_KEYS),
     termsAcceptedAt: null,
     termsVersion: null

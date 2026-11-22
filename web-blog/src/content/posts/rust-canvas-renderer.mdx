@@ -1,6 +1,7 @@
 ---
 title: Why we wrote the canvas renderer in Rust
-description: WebGPU, WebAssembly and the same engine for the editor and the export.
+description: "Earlier version of Feega, discontinued. WebGPU, WebAssembly and the same engine for the editor and the export."
+archived: true
 date: 2026-10-28
 cover: /covers/rust-canvas-renderer.png
 coverAlt: "Cover: Rust, WebGPU, WASM. One engine."
@@ -32,9 +33,3 @@ cargo build --locked --lib --target wasm32-unknown-unknown
 ## One engine for the editor and the export
 
 That is the point of the whole exercise. The engine that draws the canvas while you work is the engine that renders the frames you export. One place to fix a bug, one place to make things faster, and no drift between what you edit and what you ship.
-
-The code is open source on [GitHub](https://github.com/andreabuttarelli/feega). To try the canvas yourself:
-
-```bash
-npx feega
-```

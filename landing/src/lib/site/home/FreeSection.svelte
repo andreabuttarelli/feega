@@ -1,19 +1,28 @@
 <script lang="ts">
-  const FACTS = ['€0, forever', 'the editor, no trial timer', 'runs on your own computer'] as const;
+  const FACTS = ['€0, forever', 'every edit a diff', 'no AI, no tokens'] as const;
 </script>
 
 <section class="free site-wide" aria-labelledby="free-title">
   <h2 id="free-title" data-agent-id="free-title">
-    <span class="lead">for local use, Feega is</span>
+    <span class="lead">the Feega extension is</span>
     <span class="word site-display">free</span>
   </h2>
 
   <ul class="facts">
     {#each FACTS as fact (fact)}<li>{fact}</li>{/each}
   </ul>
+
+  <a class="templates" href="/templates">free sections and UI templates for Svelte, React, Vue and Astro →</a>
 </section>
 
 <style>
+  .templates {
+    color: var(--site-ink);
+    font-size: 16px;
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+
   .free {
     display: grid;
     justify-items: center;

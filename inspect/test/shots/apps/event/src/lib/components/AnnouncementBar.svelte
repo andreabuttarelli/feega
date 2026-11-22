@@ -1,0 +1,19 @@
+<aside class="fl-announcement-bar" aria-label="Announcement">
+  <a href="#"><span class="tag">tickets</span><span class="text">Early bird tickets end Friday</span><span class="go">get tickets <svg class="fl-px" viewBox="0 0 7 5" aria-hidden="true"><path d="M4 0h1v1h-1zM5 1h1v1h-1zM0 2h1v1h-1zM1 2h1v1h-1zM2 2h1v1h-1zM3 2h1v1h-1zM4 2h1v1h-1zM5 2h1v1h-1zM6 2h1v1h-1zM5 3h1v1h-1zM4 4h1v1h-1z" /></svg></span></a>
+</aside>
+
+<style>
+.fl-announcement-bar{font-family:var(--feega-font);font-size:var(--feega-text-body);line-height:1.5;letter-spacing:var(--feega-tracking);color:var(--feega-fg);background:var(--feega-bg);-webkit-font-smoothing:antialiased}
+:where(.fl-announcement-bar) *,:where(.fl-announcement-bar) *::before,:where(.fl-announcement-bar) *::after{box-sizing:border-box}
+:where(.fl-announcement-bar) :is(h1,h2,h3,h4,p,ul,ol,figure,blockquote,dl,dd){margin:0}
+:where(.fl-announcement-bar) a{color:inherit;text-decoration:none}
+:where(.fl-announcement-bar) :focus-visible{outline:2px solid var(--feega-focus);outline-offset:3px}
+.fl-px{display:block;flex:none;width:1em;height:auto;fill:currentColor;shape-rendering:crispEdges}
+.fl-announcement-bar{background:var(--feega-fg);color:var(--feega-bg)}
+.fl-announcement-bar a{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px 12px;min-height:44px;padding:8px var(--feega-gutter);font-size:var(--feega-text-sm);font-weight:500;text-align:center}
+.fl-announcement-bar .tag{padding:1px 8px;border-radius:var(--feega-radius-full);background:var(--feega-accent);color:var(--feega-accent-fg);font-family:var(--feega-font-mono);font-size:11px;text-transform:uppercase}
+.fl-announcement-bar .go{display:inline-flex;align-items:center;gap:6px;color:var(--feega-accent)}
+.fl-announcement-bar .go .fl-px{width:9px;transition:transform var(--feega-dur) var(--feega-ease)}
+.fl-announcement-bar a:hover .go .fl-px{transform:translateX(4px)}
+@media (prefers-reduced-motion:reduce){:where([class^="fl-"]) *,:where([class^="fl-"]) *::before,:where([class^="fl-"]) *::after{animation:none!important;transition:none!important}}
+</style>

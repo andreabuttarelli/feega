@@ -1,18 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { CLIP, FREE_CREDITS, IMAGE, PLAN, bringYourAgent, outcomesIn, topUpPrices } from './plan';
+import { PLAN, annualLine, priceLabel } from './plan';
 
-describe('what credits get you', () => {
-  it('charges 120 credits per provider dollar, rounding down', () => {
-    expect(outcomesIn(PLAN.includedCredits, IMAGE)).toBe(55);
-    expect(outcomesIn(PLAN.includedCredits, CLIP)).toBe(10);
-    expect(outcomesIn(FREE_CREDITS, IMAGE)).toBe(11);
+describe('the Cloud price', () => {
+  it('is 15 euros per editor a month', () => {
+    expect(priceLabel(PLAN)).toBe('€15');
+    expect(PLAN.per).toBe('editor');
   });
 
-  it('lists every top-up price', () => {
-    expect(topUpPrices(PLAN)).toBe('€10, €20 or €50');
-  });
-
-  it('states the free agent cap from the plan', () => {
-    expect(bringYourAgent({ ...PLAN, freeAgentLayersPerWeek: 2500 })).toContain('2,500 agent-made layers in any 7 days');
+  it('bills 12 euros a month, 144 a year, on the annual plan', () => {
+    expect(annualLine(PLAN)).toBe('or €12 a month billed annually, €144 a year. Viewers are free.');
   });
 });

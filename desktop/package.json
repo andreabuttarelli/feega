@@ -1,0 +1,25 @@
+{
+  "name": "feega-desktop",
+  "productName": "Feega",
+  "description": "Design in your codebase",
+  "author": "Feega",
+  "homepage": "https://feega.app",
+  "private": true,
+  "version": "0.1.0",
+  "main": "dist/main.cjs",
+  "scripts": {
+    "build": "node build.mjs",
+    "icons": "electron scripts/make-icons.cjs",
+    "dev": "node scripts/dev-identity.mjs && node build.mjs && electron .",
+    "start": "node scripts/dev-identity.mjs && node build.mjs && electron .",
+    "dist": "node build.mjs && electron-builder --config electron-builder.config.cjs --publish never"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8",
+    "esbuild": "^0.25.0"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11"
+  }
+}

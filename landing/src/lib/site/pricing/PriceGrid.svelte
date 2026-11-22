@@ -1,58 +1,46 @@
 <script lang="ts">
   import { lower } from '../lower';
-  import { APP_URL, DOCS_URL } from '../links';
+  import { GITHUB_URL } from '../links';
+  import { primaryCta } from '../install';
   import PriceTag from './PriceTag.svelte';
-  import { CLOUD_FOR, CLOUD_LINES, LOCAL_FOR, LOCAL_LINES, LOCAL_NOTE, AGENT_DOCS_URL, SEAT_RULE, bringYourAgent, creditsLine, freeStart, freeTier, getsYou, money, moreSeats, priceUnit, type CloudPlan } from './plan';
-
-  const LOCAL_DOCS_URL = `${DOCS_URL}/getting-started/local-mode/`;
+  import { CLOUD_SOON_FOR, CLOUD_SOON_LINES, EXTENSION_FOR, EXTENSION_LINES, EXTENSION_NOTE, CLOUD_SOON_NOTE, annualLine, priceLabel, priceUnit, type CloudPlan } from './plan';
 
   let { plan, details = 'hide' }: { plan: CloudPlan; details?: 'show' | 'hide' } = $props();
+
+  const install = primaryCta();
 </script>
 
 <div class="plans">
   <article class="plan">
-    <div class="strip terminal" aria-hidden="true"><span>$</span>npx feega my-canvas.feega</div>
-    <h3>local</h3>
-    <p class="for">{lower(LOCAL_FOR)}</p>
-    <PriceTag amount="free" unit="forever" cta="run it locally" href={LOCAL_DOCS_URL} tone="outline" />
-    <p class="start">{lower(LOCAL_NOTE)}</p>
+    <div class="strip terminal" aria-hidden="true"><span>$</span>npx feega</div>
+    <h3>Feega extension</h3>
+    <p class="for">{lower(EXTENSION_FOR)}</p>
+    <PriceTag amount="free" unit="forever" cta={lower(install.label)} href={install.href} />
+    <p class="start">{lower(EXTENSION_NOTE)}</p>
     <ul>
-      {#each LOCAL_LINES as line (line)}<li>{lower(line)}</li>{/each}
+      {#each EXTENSION_LINES as line (line)}<li>{lower(line)}</li>{/each}
     </ul>
   </article>
 
   <article class="plan">
     <div class="strip canvas" aria-hidden="true"></div>
     <h3>Feega {plan.name}</h3>
-    <p class="for">{lower(CLOUD_FOR)}</p>
-    <PriceTag amount={money(plan, plan.price)} unit={priceUnit(plan)} cta="start free" href={APP_URL} />
-    <p class="start">{lower(freeStart(plan))}</p>
+    <p class="for">{lower(CLOUD_SOON_FOR)}</p>
+    <PriceTag amount={priceLabel(plan)} unit={lower(priceUnit(plan))} cta="follow on github" href={GITHUB_URL} tone="outline" />
+    <p class="start">{lower(annualLine(plan))} {lower('Coming soon.')} {lower(CLOUD_SOON_NOTE)}</p>
     <ul>
-      {#each CLOUD_LINES as line (line)}<li>{lower(line)}</li>{/each}
+      {#each CLOUD_SOON_LINES as line (line)}<li>{lower(line)}</li>{/each}
     </ul>
-    <p class="credits">{lower(creditsLine(plan))}</p>
+    <p class="start">{lower('The free library is already open:')} <a href="/templates">{lower('free templates')}</a></p>
   </article>
 </div>
 
-{#if details === 'show'}
-<details class="details">
-  <summary>plan details</summary>
-  <p class="trial">{lower(freeTier())}</p>
-  <p class="trial">{lower(SEAT_RULE)}</p>
-  <p class="trial">{lower(getsYou(plan))}</p>
-  <p class="trial">{lower(bringYourAgent(plan))} <a class="link" href={AGENT_DOCS_URL}>connect your agent →</a></p>
-  <p class="trial">{lower(moreSeats(plan))}</p>
-</details>
-{/if}
 
 <style>
   p {
     margin: 0;
   }
 
-  .details {
-    margin-top: 16px;
-  }
 
   .plans {
     display: grid;
@@ -85,13 +73,10 @@
     color: #fff;
   }
 
-  .trial {
-    margin-top: 12px;
-    opacity: 0.75;
-  }
 
   ul {
     display: grid;
+    align-content: start;
     gap: 12px;
     margin: 8px 0 0;
     padding: 16px 0 0;
@@ -116,21 +101,8 @@
     transform: rotate(-45deg);
   }
 
-  .credits {
-    opacity: 0.85;
-  }
 
-  .link {
-    display: inline-block;
-    padding: 4px 0;
-    border-bottom: 1px solid currentColor;
-    color: #fff;
-  }
 
-  .link:focus-visible {
-    outline: 2px solid #ff5100;
-    outline-offset: 3px;
-  }
 
   .strip {
     height: 140px;
@@ -164,7 +136,7 @@
 
     .plan {
       display: grid;
-      grid-row: span 8;
+      grid-row: span 7;
       grid-template-rows: subgrid;
       align-content: start;
     }

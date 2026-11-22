@@ -1,0 +1,381 @@
+---
+import { getCollection } from 'astro:content';
+import Pixel from './Pixel.astro';
+import { COVER_HEIGHT, COVER_WIDTH, coverUrl } from '../docs-pages.mjs';
+
+const START = [
+  { slug: 'getting-started/install', n: 1, tint: 'accent', blurb: 'Add the extension to VS Code, Cursor, Windsurf or VSCodium, or run it with npx.' },
+  { slug: 'getting-started/quick-start', n: 2, tint: 'blue', blurb: 'Open your running app and make your first edit in two minutes.' },
+  { slug: 'editing/selecting-and-navigating', n: 3, tint: 'grey', blurb: 'Pick any element, move around the page and know what you are editing.' }
+];
+
+const DIGITS: Record<number, string[]> = {
+  1: ['..#..', '.##..', '..#..', '..#..', '..#..', '..#..', '.###.'],
+  2: ['.###.', '#...#', '....#', '...#.', '..#..', '.#...', '#####'],
+  3: ['.###.', '#...#', '....#', '..##.', '....#', '#...#', '.###.']
+};
+
+const ICONS: Record<string, string[]> = {
+  start: ['...#....', '..###...', '.#####..', '#######.', '..o.o...', '.o.o.o..', '........'],
+  editing: ['......##', '.....###', '....###.', '...###..', '..###...', '.##o....', '##......'],
+  stack: ['..bbbb..', '.b....b.', 'b..oo..b', 'b.oooo.b', 'b..oo..b', '.b....b.', '..bbbb..'],
+  help: ['..####..', '.##..##.', '.....##.', '....##..', '...##...', '........', '...##...']
+};
+
+const GROUPS = [
+  { title: 'start here', icon: 'start', dirs: ['getting-started'] },
+  { title: 'editing', icon: 'editing', dirs: ['editing'] },
+  { title: 'frameworks and styling', icon: 'stack', dirs: ['frameworks', 'styling'] },
+  { title: 'account and help', icon: 'help', dirs: ['more'] }
+];
+
+
+const entries = await getCollection('docs');
+const pages = entries.filter((e) => e.id !== 'index' && e.id.includes('/') && !e.id.startsWith('integrations/'));
+const order = (e: (typeof pages)[number]) => e.data.sidebar?.order ?? 99;
+const byId = new Map(pages.map((p) => [p.id, p]));
+
+const start = START.map((s) => ({ ...s, page: byId.get(s.slug) })).filter((s) => s.page);
+const groups = GROUPS.map((g) => ({
+  ...g,
+  pages: pages.filter((p) => g.dirs.includes(p.id.split('/')[0])).sort((a, b) => g.dirs.indexOf(a.id.split('/')[0]) - g.dirs.indexOf(b.id.split('/')[0]) || order(a) - order(b))
+}));
+---
+
+<div class="home">
+  <header class="home-head">
+    <h1>docs</h1>
+    <p class="home-lead">how to install Feega and get the most out of it. short pages, plain words.</p>
+    <button type="button" class="home-search" data-open-search aria-label="Search the docs">
+      <svg viewBox="0 0 20 20" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="9" cy="9" r="6" /><path d="m14 14 4 4" /></svg>
+      <span>search the docs</span>
+      <kbd>/</kbd>
+    </button>
+  </header>
+
+  <div class="band" role="img" aria-label="Pixel landscape at dusk"></div>
+
+  <section class="new">
+    <p class="home-label">new here? read these three.</p>
+    <div class="new-grid">
+      {
+        start.map((s) => (
+          <a class={`new-card is-${s.tint}`} href={`/${s.slug}/`}>
+            <img class="thumb" src={coverUrl(s.slug, 'webp')} alt="" width={COVER_WIDTH} height={COVER_HEIGHT} loading="lazy" decoding="async" />
+            <Pixel rows={DIGITS[s.n]} size={8} />
+            <h2>{s.page!.data.title}</h2>
+            <p>{s.blurb}</p>
+          </a>
+        ))
+      }
+    </div>
+  </section>
+
+  <section class="dir">
+    <p class="home-label">every page</p>
+    {
+      groups.map((g) => (
+        <div class="group">
+          <h2 class="group-title"><Pixel rows={ICONS[g.icon]} size={4} />{g.title}</h2>
+          <ul class="group-grid">
+            {g.pages.map((p) => (
+              <li>
+                <a href={`/${p.id}/`}>
+                  <img class="thumb" src={coverUrl(p.id, 'webp')} alt="" width={COVER_WIDTH} height={COVER_HEIGHT} loading="lazy" decoding="async" />
+                  <strong>{p.data.title}</strong>
+                  <span>{p.data.description}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))
+    }
+  </section>
+</div>
+
+<script>
+  const open = () => document.querySelector<HTMLButtonElement>('site-search [data-open-modal]')?.click();
+  const isTyping = (el: Element | null) => !!el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName);
+
+  document.querySelectorAll('[data-open-search]').forEach((b) => b.addEventListener('click', open));
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== '/' || e.metaKey || e.ctrlKey || isTyping(document.activeElement)) {
+      return;
+    }
+    e.preventDefault();
+    open();
+  });
+</script>
+
+<style>
+  .home {
+    max-width: var(--site-max);
+    margin: 0 auto;
+    padding: calc(var(--sx-nav-h) + var(--sx-s8)) var(--sx-gutter) var(--sx-s9);
+  }
+
+  h1 {
+    margin: 0;
+    font-size: clamp(88px, 17vw, 168px);
+    font-weight: var(--sx-w-title);
+    line-height: 0.85;
+    letter-spacing: -0.06em;
+    color: #fff;
+  }
+
+  .home-lead {
+    max-width: 640px;
+    margin: var(--sx-s6) 0 var(--sx-s7);
+    color: var(--sx-ink-3);
+    font-size: var(--sx-fs-lead);
+    line-height: 1.45;
+  }
+
+  .home-search {
+    display: flex;
+    align-items: center;
+    gap: var(--sx-s4);
+    width: 100%;
+    max-width: 720px;
+    height: 68px;
+    padding: 0 var(--sx-s5);
+    border: 1px solid var(--sx-line-strong);
+    border-radius: 999px;
+    background: var(--sx-grey-1);
+    color: var(--sx-ink-2);
+    font: inherit;
+    font-size: 20px;
+    cursor: text;
+    transition: border-color 120ms;
+  }
+
+  .home-search:hover {
+    border-color: var(--sx-accent);
+  }
+
+  .home-search span {
+    flex: 1;
+    text-align: left;
+  }
+
+  kbd {
+    display: inline-grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--sx-line-strong);
+    border-radius: var(--sx-radius-sm);
+    font-family: var(--sx-mono);
+    font-size: 15px;
+    color: var(--sx-ink-3);
+  }
+
+  .band {
+    width: 100%;
+    height: clamp(160px, 22vw, 320px);
+    margin: var(--sx-s8) 0 0;
+    border-radius: var(--sx-radius-xl);
+    background: url('/pixel-band.png') center / cover no-repeat;
+    image-rendering: pixelated;
+  }
+
+  .home-label {
+    margin: 0 0 var(--sx-s8);
+    color: var(--sx-ink-3);
+    font-family: var(--sx-mono);
+    font-size: var(--sx-fs-mono);
+  }
+
+  .new,
+  .dir {
+    margin-top: var(--sx-section);
+  }
+
+  .new-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sx-s4);
+  }
+
+  .new-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sx-s4);
+    min-height: 280px;
+    padding: var(--sx-s6);
+    border-radius: var(--sx-radius-xl);
+    background: var(--sx-tint-grey);
+    color: var(--sx-ink);
+    text-decoration: none;
+    transition: transform 160ms;
+  }
+
+  .new-card:hover {
+    transform: translateY(-4px);
+  }
+
+  .new-card.is-accent {
+    background: var(--sx-tint-accent);
+  }
+
+  .new-card.is-blue {
+    background: var(--sx-tint-blue);
+  }
+
+  .home a {
+    text-decoration: none !important;
+    color: inherit !important;
+  }
+
+  .new-card :global(svg) {
+    margin-bottom: var(--sx-s7);
+  }
+
+  .new-card h2 {
+    margin: auto 0 0;
+    font-size: 32px;
+    font-weight: var(--sx-w-title);
+    letter-spacing: var(--sx-track-title);
+    line-height: 1.05;
+  }
+
+  .new-card p {
+    margin: 0;
+    color: var(--sx-ink-2);
+    font-size: 18px;
+    line-height: 1.5;
+  }
+
+  .new-grid > *,
+  .group > *,
+  .home li {
+    margin-top: 0 !important;
+  }
+
+  .home > * {
+    margin-top: 0;
+  }
+
+  .home .new,
+  .home .dir {
+    margin-top: calc(var(--sx-section) * 1.75);
+  }
+
+  .home .band {
+    margin-top: calc(var(--sx-section) * 1.25);
+  }
+
+  ul {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sx-s6);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  li a {
+    display: grid;
+    grid-template-columns: 112px minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    align-content: start;
+    column-gap: var(--sx-s4);
+    row-gap: var(--sx-s1);
+    height: 100%;
+    box-sizing: border-box;
+    margin: 0 calc(-1 * var(--sx-s3));
+    padding: var(--sx-s3);
+    border-radius: var(--sx-radius-lg);
+    color: var(--sx-ink);
+    text-decoration: none;
+    transition: background 120ms;
+  }
+
+  li a:hover {
+    background: var(--sx-hover);
+  }
+
+  li .thumb {
+    grid-row: 1 / 3;
+    align-self: start;
+    width: 112px;
+    height: auto;
+    aspect-ratio: 1200 / 630;
+    object-fit: cover;
+    border-radius: var(--sx-radius-sm);
+  }
+
+  .new-card .thumb {
+    width: 100%;
+    height: auto;
+    border-radius: var(--sx-radius-lg);
+  }
+
+  li strong {
+    overflow: hidden;
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1.3;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  li span {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    min-height: calc(2 * 1.45em);
+    color: var(--sx-ink-3);
+    font-size: var(--sx-fs-small);
+    line-height: 1.45;
+  }
+
+  .home ul.group-grid > li {
+    margin: 0 !important;
+  }
+
+  .home .group + .group {
+    margin-top: var(--sx-s10) !important;
+  }
+
+  .group-title {
+    display: flex;
+    align-items: center;
+    gap: var(--sx-s3);
+    margin: 0 0 var(--sx-s7);
+    padding-bottom: var(--sx-s5);
+    border-bottom: 1px solid var(--sx-line);
+    font-size: 24px;
+    font-weight: var(--sx-w-title);
+    letter-spacing: var(--sx-track-title);
+  }
+
+  .home ul.group-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sx-s6) var(--sx-s8);
+    align-items: stretch;
+  }
+
+  @media (min-width: 810px) {
+    .home ul.group-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (min-width: 1200px) {
+    .home ul.group-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  @media (min-width: 810px) {
+    .new-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: var(--sx-s5);
+    }
+  }
+</style>

@@ -1,0 +1,99 @@
+---
+import { render } from 'astro:content';
+import Base from './Base.astro';
+import { faqFromBody, faqSchema } from '../faq.mjs';
+import { formatDate, readingMinutes, tagSlug, ARCHIVED_BANNER, CURRENT_FEEGA_URL, SECTIONS, SITE_TITLE, type Entry, type Section } from '../site';
+
+interface Props {
+  post: Entry;
+  all: Entry[];
+  section?: Section;
+}
+
+const { post, all, section = 'posts' } = Astro.props;
+const { path, label, indexTitle } = SECTIONS[section];
+const { Content, headings } = await render(post);
+const toc = headings.filter((h) => h.depth === 2 || h.depth === 3);
+const url = new URL(`${path}${post.id}/`, Astro.site).href;
+const questions = faqFromBody(post.body);
+const article = {
+  '@type': 'BlogPosting',
+  headline: post.data.title,
+  description: post.data.description,
+  datePublished: post.data.date.toISOString(),
+  dateModified: (post.data.updated ?? post.data.date).toISOString(),
+  image: new URL(post.data.cover, Astro.site).href,
+  url,
+  mainEntityOfPage: url,
+  keywords: post.data.tags.join(', '),
+  author: { '@type': 'Person', name: post.data.author },
+  publisher: { '@type': 'Organization', name: SITE_TITLE, url: 'https://feega.app' }
+};
+const breadcrumbs = {
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'Blog', item: new URL('/', Astro.site).href },
+    ...(section === 'posts' ? [] : [{ '@type': 'ListItem', position: 2, name: 'Use cases', item: new URL(path, Astro.site).href }]),
+    { '@type': 'ListItem', position: section === 'posts' ? 2 : 3, name: post.data.title, item: url }
+  ]
+};
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@graph': [article, breadcrumbs, ...(questions.length > 0 ? [faqSchema(questions)] : [])]
+};
+---
+
+<Base title={post.data.title} description={post.data.description} cover={{ src: post.data.cover, alt: post.data.coverAlt }} type="article" jsonLd={jsonLd} noindex={post.data.archived}>
+  <div class="post-layout">
+    <aside class="post-side" aria-label={label}>
+      <p class="side-label">{label}</p>
+      <ul class="side-list">
+        {all.map((p) => <li><a href={`${path}${p.id}/`} aria-current={p.id === post.id ? 'page' : undefined}>{p.data.title}</a></li>)}
+      </ul>
+    </aside>
+
+    <article class="post-main">
+      <nav class="sx-crumbs" aria-label="Breadcrumb">
+        <a href="/">blog</a>
+        <span aria-hidden="true">/</span>
+        {
+          section === 'posts' ? (
+            <span>{post.data.tags[0] ?? 'post'}</span>
+          ) : (
+            <a href={path}>{indexTitle}</a>
+          )
+        }
+      </nav>
+      {
+        post.data.archived && (
+          <p class="archived-banner" role="note">
+            {ARCHIVED_BANNER} Feega is now a free, open-source VS Code extension to design in your codebase. <a href="/posts/introducing-feega/">Read the introduction</a> or visit <a href={CURRENT_FEEGA_URL}>feega.app</a>.
+          </p>
+        )
+      }
+      <h1 class="post-title">{post.data.title}</h1>
+      <p class="lede">{post.data.description}</p>
+      <p class="meta">
+        <time datetime={post.data.date.toISOString()}>{formatDate(post.data.date)}</time>{post.data.updated && <> · <time datetime={post.data.updated.toISOString()}>Updated {formatDate(post.data.updated)}</time></>} · {readingMinutes(post)} min read
+      </p>
+      <img class="cover" src={post.data.cover} alt={post.data.coverAlt} width="1200" height="630" />
+      <div class="prose">
+        <Content />
+      </div>
+      {
+        !post.data.archived && (
+          <p class="tags">
+            {post.data.tags.map((tag) => <a href={`/tags/${tagSlug(tag)}/`}>#{tag}</a>)}
+          </p>
+        )
+      }
+    </article>
+
+    <aside class="post-side" aria-label="On this page">
+      {toc.length > 0 && <p class="side-label">on this page</p>}
+      <ul class="side-list toc">
+        {toc.map((h) => <li><a class={`depth-${h.depth}`} href={`#${h.slug}`}>{h.text}</a></li>)}
+      </ul>
+    </aside>
+  </div>
+</Base>

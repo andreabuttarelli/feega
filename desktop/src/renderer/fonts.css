@@ -1,0 +1,20 @@
+@font-face {
+  font-family: 'BDO Grotesk';
+  src: url('fonts/bdo-grotesk-variable.woff2') format('woff2');
+  font-weight: 300 900;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Fragment Mono';
+  src: url('fonts/fragment-mono-latin.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Instrument Serif';
+  src: url('fonts/instrument-serif-latin.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+}

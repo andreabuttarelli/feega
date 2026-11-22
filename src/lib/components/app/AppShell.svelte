@@ -1,76 +1,45 @@
 <script lang="ts">
-  import { afterNavigate } from '$app/navigation';
-  import { navigating, page } from '$app/state';
-  import WorkbenchPageShimmer from '$lib/components/WorkbenchPageShimmer.svelte';
-  import Menu from '@lucide/svelte/icons/menu';
-  import * as Sheet from '$lib/components/ui/sheet/index.js';
+  import { _ } from 'svelte-i18n';
   import type { Snippet } from 'svelte';
+  import FeegaMark from '$lib/components/FeegaMark.svelte';
+  import Wordmark from './Wordmark.svelte';
+  import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+  import { signOutForm } from '$lib/auth/sign-out-form';
+  import { DASHBOARD_SETTINGS_HOME } from '$lib/settings/paths';
+  import { dashboardSettingsHref } from '$lib/components/settings/platforms';
+  import { SettingsSection } from '$lib/settings/sections';
   import type { AppShell as Shell } from '$lib/server/dashboard/app-shell';
-  import AppSidebar from './AppSidebar.svelte';
 
-  let { data, children }: { data: Shell; children: Snippet } = $props();
+  let { profile, children }: { profile: Shell['profile']; children: Snippet } = $props();
 
-  let drawerOpen = $state(false);
-
-  const projectId = $derived(data.projects[0]?.id ?? null);
-
-  const SKELETON_AFTER_MS = 150;
-  const DASHBOARD_ROUTE = '/app';
-
-  let slowNav = $state(false);
-
-  $effect(() => {
-    if (!navigating.to?.route.id?.startsWith(DASHBOARD_ROUTE)) {
-      slowNav = false;
-      return;
-    }
-    const timer = setTimeout(() => (slowNav = true), SKELETON_AFTER_MS);
-    return () => {
-      clearTimeout(timer);
-      slowNav = false;
-    };
-  });
-
-  afterNavigate(() => {
-    drawerOpen = false;
-  });
+  const label = $derived(profile.name?.trim() || profile.email);
 </script>
 
-{#snippet sidebar()}
-  <AppSidebar
-    pathname={page.url.pathname}
-    {projectId}
-    profile={data.profile}
-    org={data.org}
-    workspaces={data.workspaces}
-    creditBalance={data.creditBalance}
-  />
-{/snippet}
-
 <div class="app-shell safe-shell ui-app">
-  <aside class="app-side">
-    {@render sidebar()}
-  </aside>
-
   <header class="app-bar" data-testid="app-bar">
-    <Sheet.Root bind:open={drawerOpen}>
-      <Sheet.Trigger class="burger" aria-label="Menu">
-        <Menu size={18} strokeWidth={1.7} />
-      </Sheet.Trigger>
-      <Sheet.Content side="left" class="app-drawer" showCloseButton={false}>
-        <Sheet.Title class="sr-only">Menu</Sheet.Title>
-        {@render sidebar()}
-      </Sheet.Content>
-    </Sheet.Root>
-    <a class="wordmark" href="/app">feega</a>
+    <a class="home" href="/app" aria-label="feega"><FeegaMark size={20} /><Wordmark /></a>
+
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger class="account" data-testid="account-menu">{label}</DropdownMenu.Trigger>
+      <DropdownMenu.Content align="end">
+        <DropdownMenu.Label>
+          <span class="who">{profile.name?.trim() ?? ''}</span>
+          <span class="email">{profile.email}</span>
+        </DropdownMenu.Label>
+        <DropdownMenu.Separator />
+        <DropdownMenu.Item><a class="entry" href={DASHBOARD_SETTINGS_HOME}>{$_('app.account.settings')}</a></DropdownMenu.Item>
+        <DropdownMenu.Item><a class="entry" href={dashboardSettingsHref(SettingsSection.Billing)}>{$_('app.account.billing')}</a></DropdownMenu.Item>
+        <DropdownMenu.Item>
+          <form method="POST" action="/auth/signout" use:signOutForm>
+            <button type="submit" class="entry">{$_('app.account.signOut')}</button>
+          </form>
+        </DropdownMenu.Item>
+      </DropdownMenu.Content>
+    </DropdownMenu.Root>
   </header>
 
-  <main class="app-main" aria-busy={slowNav}>
-    {#if slowNav}
-      <div data-testid="app-content-skeleton"><WorkbenchPageShimmer variant="page" /></div>
-    {:else}
-      {@render children()}
-    {/if}
+  <main class="app-main">
+    {@render children()}
   </main>
 </div>
 
@@ -81,100 +50,66 @@
     color: var(--ui-text);
   }
 
-  .app-side {
-    display: none;
-  }
-
   .app-bar {
-    position: sticky;
-    top: 0;
-    z-index: 10;
     display: flex;
     align-items: center;
-    gap: var(--ui-space-2);
+    justify-content: space-between;
     height: var(--ui-bar-h);
-    padding: 0 var(--ui-space-2);
-    background: var(--paper);
+    padding: 0 var(--ui-space-4);
   }
 
-  .app-bar :global(.burger) {
+  .home {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    width: 44px;
-    height: 44px;
-    border: 0;
-    border-radius: var(--ui-radius-full);
-    background: transparent;
-    color: var(--ui-icon-ink);
-  }
-
-  .app-bar :global(.burger:hover) {
-    background: var(--ui-wash);
-    color: var(--ui-text);
-  }
-
-  .app-bar :global(.burger:focus-visible) {
-    outline: none;
-    box-shadow: var(--ui-ring);
-  }
-
-  .wordmark {
-    font-size: var(--ui-text-lg);
-    font-weight: 600;
-    letter-spacing: -0.02em;
+    gap: var(--ui-space-2);
     color: var(--ui-text);
     text-decoration: none;
   }
 
-  :global(.app-drawer[data-side='left']) {
-    border-right: 0 !important;
+  .app-bar :global(.account) {
+    max-width: 50vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: var(--ui-space-1) var(--ui-space-2);
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: transparent;
+    color: var(--ui-text);
+    font-size: var(--ui-type-body);
   }
 
-  :global(.app-drawer) {
-    width: 280px !important;
-    max-width: 85vw !important;
+  .app-bar :global(.account:hover) {
+    background: var(--ui-wash);
+  }
+
+  .app-bar :global(.account:focus-visible) {
+    outline: none;
+    box-shadow: var(--ui-ring);
+  }
+
+  .who,
+  .email {
+    display: block;
+  }
+
+  .email {
+    color: var(--ui-text-tertiary);
+  }
+
+  .entry {
+    display: block;
+    width: 100%;
     padding: 0;
-    gap: 0;
-    border: 0 !important;
-    background: var(--ui-panel-sunken) !important;
-    color: var(--ui-text);
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    text-decoration: none;
   }
 
   .app-main {
-    padding: var(--content-pad-top) var(--content-pad-x) var(--content-pad-bottom);
-  }
-
-  @media (min-width: 1024px) {
-    .app-shell {
-      display: grid;
-      grid-template-columns: var(--app-side-w) minmax(0, 1fr);
-      --app-side-w: 236px;
-    }
-
-    .app-side {
-      display: block;
-      position: sticky;
-      top: var(--ui-space-2);
-      height: calc(100dvh - 2 * var(--ui-space-2));
-      margin: var(--ui-space-2) 0 var(--ui-space-2) var(--ui-space-2);
-      border-radius: var(--ui-radius-lg);
-      background: var(--ui-panel-sunken);
-      box-shadow: var(--ui-shadow-float);
-    }
-
-    .app-bar {
-      display: none;
-    }
-
-    .app-main {
-      padding: var(--ui-space-8) var(--ui-space-8) var(--content-pad-bottom);
-    }
-  }
-
-  @media (max-width: 640px) {
-    .app-main {
-      padding: var(--ui-space-2) var(--ui-space-4) var(--content-pad-bottom);
-    }
+    padding: var(--ui-space-4);
   }
 </style>

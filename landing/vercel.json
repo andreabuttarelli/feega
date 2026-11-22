@@ -20,6 +20,19 @@
       ]
     },
     {
+      "source": "/install",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "text/x-shellscript; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=300"
+        }
+      ]
+    },
+    {
       "source": "/(llms.txt|llms-full.txt|sitemap.xml|robots.txt)",
       "headers": [
         {
@@ -37,14 +50,43 @@
   },
   "redirects": [
     {
-      "source": "/:path(.*)",
-      "has": [
-        {
-          "type": "host",
-          "value": "www.feega.app"
-        }
-      ],
-      "destination": "https://feega.app/:path",
+      "source": "/refunds",
+      "destination": "/terms#refunds",
+      "statusCode": 301
+    },
+    {
+      "source": "/:page(acceptable-use|ai-transparency|dpa|subprocessors|legal-notice)",
+      "destination": "/terms",
+      "statusCode": 301
+    },
+    {
+      "source": "/:page(ai-video-generator|ai-video-styles|claymation-ai|3d-animation-maker|ai-commercial-maker|paper-cutout-animation|80s-retro-video|anime-video-generator|spotify-canvas-maker|ai-video-upscaler)",
+      "destination": "/",
+      "statusCode": 301
+    },
+    {
+      "source": "/ai-node-editor",
+      "destination": "/design-in-your-codebase",
+      "statusCode": 301
+    },
+    {
+      "source": "/guides",
+      "destination": "/alternatives",
+      "statusCode": 301
+    },
+    {
+      "source": "/guides/:path*",
+      "destination": "/alternatives",
+      "statusCode": 301
+    },
+    {
+      "source": "/download/mac",
+      "destination": "/download",
+      "statusCode": 301
+    },
+    {
+      "source": "/guides/best-motion-design-tools-ai-agents",
+      "destination": "/alternatives",
       "statusCode": 301
     },
     {
@@ -53,18 +95,33 @@
       "statusCode": 301
     },
     {
-      "source": "/blog/feega-vs-:tool(figma|jitter|remotion|after-effects|pencil-dev|flora|rive|canva|gui)",
-      "destination": "/compare/:tool",
+      "source": "/compare",
+      "destination": "/alternatives",
+      "statusCode": 301
+    },
+    {
+      "source": "/compare/:tool(figma)",
+      "destination": "/alternatives/figma",
+      "statusCode": 301
+    },
+    {
+      "source": "/compare/:tool(pencil-dev|canva|flora|gui|jitter|remotion|after-effects|rive)",
+      "destination": "/alternatives",
+      "statusCode": 301
+    },
+    {
+      "source": "/blog/feega-vs-:tool(figma)",
+      "destination": "/alternatives/figma",
       "statusCode": 301
     },
     {
       "source": "/blog/feega-vs-:tool",
-      "destination": "/compare",
+      "destination": "/alternatives",
       "statusCode": 301
     },
     {
       "source": "/blog",
-      "destination": "/compare",
+      "destination": "/alternatives",
       "statusCode": 301
     },
     {
