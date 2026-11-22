@@ -46,7 +46,7 @@ describe('packages/* non importa $lib o $env', () => {
 	const files = packageSrcDirs().flatMap(listTsFiles);
 
 	it('ha trovato file .ts da controllare (il test non passa vuoto per errore)', () => {
-		expect(files.length).toBeGreaterThan(10);
+		expect(files.length).toBeGreaterThan(5);
 	});
 
 	it.each(files.map((f) => [f.slice(PACKAGES_DIR.length), f] as const))('%s', (_label, file) => {

@@ -4,7 +4,6 @@
 	import { Closes, openLayer } from "$lib/components/ui/shell/dismiss";
 	import { lastInput } from "$lib/components/ui/shell/last-input";
 	import { openTrigger } from "$lib/components/ui/shell/open-trigger";
-	import { leaveMenu } from "$lib/canvas/key-region.svelte";
 	import DropdownMenuPortal from "./dropdown-menu-portal.svelte";
 	import { DropdownMenu as DropdownMenuPrimitive } from "bits-ui";
 	import type { ComponentProps } from "svelte";
@@ -42,7 +41,6 @@
 	<DropdownMenuPrimitive.Content
 		bind:ref
 		data-slot="dropdown-menu-content"
-		onCloseAutoFocus={(e) => leaveMenu(trigger, lastInput(), e)}
 		{sideOffset}
 		{align}
 		class={cn(

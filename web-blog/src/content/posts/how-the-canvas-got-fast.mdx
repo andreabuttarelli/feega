@@ -1,6 +1,7 @@
 ---
 title: How the Feega canvas got fast
-description: "Tiles, offscreen frames, cheaper blur, analytic shadows and a wasm half the size: what made the Feega canvas fast, with the numbers from each change."
+description: "Earlier version of Feega, discontinued. Tiles, offscreen frames, cheaper blur, analytic shadows and a wasm half the size: what made the Feega canvas fast, with the numbers from each change."
+archived: true
 date: 2026-11-12
 cover: /covers/how-the-canvas-got-fast.png
 coverAlt: "Cover: Tiles, cheaper blur, half the wasm."
@@ -77,5 +78,3 @@ The noisy bench had been pointing at a real problem: trackpads deliver several w
 ## What is left
 
 Drag on the heavy canvas still puts about 2.5% of frames over 11.1 ms, and fit on the landings board varies between runs. Phones get smaller tile budgets and have not had the same attention. The benches and fixtures are in the repository, so the next change gets measured the same way.
-
-[Try Feega →](https://oh.feega.app)

@@ -1,0 +1,78 @@
+:root {
+  --sx-bg: #000;
+  --sx-ink: #f0eee9;
+  --sx-ink-2: #b4b1ab;
+  --sx-ink-3: #8a8780;
+  --sx-accent: #ff5100;
+  --sx-accent-soft: #ff8a3d;
+  --sx-blue: #004dff;
+  --sx-grey-1: #1f1f1f;
+  --sx-grey-2: #3d3d3d;
+  --sx-grey-3: #4f4f4f;
+  --sx-line: #2a2a2a;
+  --sx-line-strong: #4f4f4f;
+  --sx-tint-accent: rgb(255 81 0 / 0.08);
+  --sx-tint-blue: rgb(0 77 255 / 0.1);
+  --sx-tint-grey: #1f1f1f;
+  --sx-hover: rgb(255 255 255 / 0.07);
+  --sx-pill: rgb(255 255 255 / 0.1);
+
+  --sx-font: 'BDO Grotesk', system-ui, sans-serif;
+  --sx-mono: 'Fragment Mono', ui-monospace, Menlo, monospace;
+  --sx-w-body: 500;
+  --sx-w-title: 400;
+
+  --sx-fs-mono: 13px;
+  --sx-fs-small: 15px;
+  --sx-fs-body: 18px;
+  --sx-fs-lead: 20px;
+  --sx-fs-h3: 24px;
+  --sx-fs-h2: 32px;
+  --sx-fs-h1: clamp(46px, 11vw, 56px);
+  --sx-lh-body: 1.65;
+  --sx-lh-title: 0.98;
+  --sx-track-title: -0.04em;
+
+  --sx-s1: 4px;
+  --sx-s2: 8px;
+  --sx-s3: 12px;
+  --sx-s4: 16px;
+  --sx-s5: 24px;
+  --sx-s6: 32px;
+  --sx-s7: 48px;
+  --sx-s8: 64px;
+  --sx-s9: 96px;
+  --sx-s10: 120px;
+
+  --sx-radius-xs: 2px;
+  --sx-radius-sm: 4px;
+  --sx-radius-md: 6px;
+  --sx-radius-lg: 10px;
+  --sx-radius-xl: 16px;
+
+  --site-max: 1320px;
+  --sx-content: 800px;
+  --sx-side: 248px;
+  --sx-toc: 248px;
+  --sx-gutter: 16px;
+  --sx-nav-h: 80px;
+  --sx-section: 64px;
+}
+
+@media (min-width: 810px) {
+  :root {
+    --sx-gutter: 40px;
+    --sx-fs-body: 19px;
+    --sx-fs-lead: 22px;
+    --sx-fs-h2: 36px;
+    --sx-fs-h1: clamp(56px, 6.2vw, 84px);
+    --sx-section: 96px;
+  }
+}
+
+@media (min-width: 1200px) {
+  :root {
+    --sx-fs-h2: 40px;
+    --sx-section: 112px;
+  }
+}

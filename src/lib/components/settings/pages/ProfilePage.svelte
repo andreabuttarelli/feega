@@ -1,6 +1,5 @@
 <script lang="ts">
   import { signOutForm } from '$lib/auth/sign-out-form';
-  import { grantedPath } from '$lib/canvas/asset-url';
   import { enhance } from '$lib/settings/enhance';
   import { _ } from 'svelte-i18n';
   import { SvelteSet } from 'svelte/reactivity';
@@ -13,17 +12,6 @@
   import { Notice } from '$lib/components/ui/notice';
   import { openCookieSettings } from '$lib/consent';
   import LegalFooter from '$lib/components/LegalFooter.svelte';
-  import { MEMORY_MAX_CHARS } from '$lib/onboarding/limits';
-  import { MEMORY_PROMPT } from '$lib/onboarding/memory-prompt';
-
-  const COPIED_MS = 1800;
-  let promptCopied = $state(false);
-
-  async function copyPrompt() {
-    await navigator.clipboard.writeText(MEMORY_PROMPT).catch((e) => console.warn('[settings] prompt not copied', e));
-    promptCopied = true;
-    setTimeout(() => (promptCopied = false), COPIED_MS);
-  }
 
   import type { load as sectionLoad } from '$lib/server/settings/pages/profile';
   import type { SectionForm } from './section-form';
@@ -36,27 +24,12 @@
     transfer: 'app.settings.profile.deleteTransfer'
   } as const;
 
-  const FIGMA_ERROR_KEY: Record<string, string> = {
-    invalid: 'app.settings.profile.figmaInvalid',
-    rejected: 'app.settings.profile.figmaRejected',
-    none: 'app.settings.profile.figmaNone',
-    unavailable: 'app.settings.profile.figmaUnavailable'
-  };
-
   const busy = new SvelteSet<string>();
   const isBusy = (key: string) => busy.has(key);
   const withBusy = (key: string) => () => {
     busy.add(key);
     return async ({ update }: { update: () => Promise<void> }) => {
       await update();
-      busy.delete(key);
-    };
-  };
-
-  const keepText = (key: string) => () => {
-    busy.add(key);
-    return async ({ update }: { update: (options?: { reset?: boolean }) => Promise<void> }) => {
-      await update({ reset: false });
       busy.delete(key);
     };
   };
@@ -77,22 +50,6 @@
   <Notice tone="success">{$_('app.settings.profile.avatarSaved')}</Notice>
 {:else if form?.avatarRemoved}
   <Notice tone="success">{$_('app.settings.profile.avatarRemoved')}</Notice>
-{:else if form?.memorySaved}
-  <Notice tone="success">{$_('app.settings.profile.memorySaved')}</Notice>
-{:else if form?.memoryError}
-  <Notice tone="error">{$_('app.settings.profile.memoryTooLong')}</Notice>
-{:else if form?.figmaSaved}
-  <Notice tone="success">{$_('app.settings.profile.figmaSaved')}</Notice>
-{:else if form?.figmaTested !== undefined}
-  <Notice tone="success">{$_(form.figmaNote === 'scope' ? 'app.settings.profile.figmaTestedScope' : 'app.settings.profile.figmaTested')}</Notice>
-{:else if form?.cloudDisconnected}
-  <Notice tone="success">{$_('app.settings.profile.cloudDisconnected')}</Notice>
-{:else if form?.cloudError}
-  <Notice tone="error">{$_('app.settings.profile.cloudInvalid')}</Notice>
-{:else if form?.figmaRemoved}
-  <Notice tone="success">{$_('app.settings.profile.figmaRemoved')}</Notice>
-{:else if form?.figmaError}
-  <Notice tone="error">{$_(FIGMA_ERROR_KEY[form.figmaError as string] ?? 'app.settings.profile.figmaInvalid')}</Notice>
 {:else if form?.error === 'too_large'}
   <Notice tone="error">{$_('app.settings.profile.tooLarge')}</Notice>
 {:else if form?.error === 'not_image'}
@@ -175,44 +132,6 @@
   </form>
 </Panel>
 
-<Panel title={$_('app.settings.profile.memoryTitle')} description={$_('app.settings.profile.memoryDesc')}>
-  <form method="POST" action="?/saveMemory" use:enhance={keepText('memory')} class="m-0 flex flex-col gap-3" data-testid="memory-form">
-    <textarea name="content" rows="8" maxlength={MEMORY_MAX_CHARS} value={data.memory} disabled={isBusy('memory')} placeholder={$_('app.settings.profile.memoryPlaceholder')} class="memory-field" data-testid="memory-field"></textarea>
-    <div class="flex flex-wrap items-center gap-2">
-      <Button type="submit" disabled={isBusy('memory')}>{$_('app.settings.save')}</Button>
-      <Button variant="secondary" type="button" onclick={copyPrompt}>{promptCopied ? $_('app.settings.profile.memoryCopied') : $_('app.settings.profile.memoryCopy')}</Button>
-    </div>
-  </form>
-</Panel>
-
-<Panel title={$_('app.settings.profile.figmaTitle')} description={$_('app.settings.profile.figmaDesc')}>
-  <form method="POST" action="?/saveFigmaToken" use:enhance={withBusy('figma')} class="m-0 flex flex-col gap-3" data-testid="figma-token-form">
-    <Field label={$_('app.settings.profile.figmaToken')} hint={data.hasFigmaToken ? $_('app.settings.profile.figmaTokenSet') : $_('app.settings.profile.figmaTokenHint')}>
-      <Input name="token" type="password" autocomplete="off" maxlength={500} disabled={isBusy('figma')} class="h-9" />
-    </Field>
-    <div class="flex flex-wrap items-center gap-2">
-      <Button type="submit" disabled={isBusy('figma')}>{$_('app.settings.profile.figmaSave')}</Button>
-      {#if data.hasFigmaToken}
-        <Button variant="secondary" type="submit" formaction="?/testFigmaToken" disabled={isBusy('figma')}>{$_('app.settings.profile.figmaTest')}</Button>
-        <Button variant="ghost" type="submit" formaction="?/removeFigmaToken" disabled={isBusy('figma')}>{$_('app.settings.profile.figmaRemove')}</Button>
-      {/if}
-    </div>
-  </form>
-</Panel>
-
-<Panel title={$_('app.settings.profile.cloudTitle')} description={$_('app.settings.profile.cloudDesc')}>
-  {#each data.cloud as option (option.provider)}
-    <form method="POST" action="?/disconnectCloud" use:enhance={withBusy(option.provider)} class="m-0" data-testid={`cloud-${option.provider}`}>
-      <input type="hidden" name="provider" value={option.provider} />
-      <Field label={option.label} hint={option.connected ? $_('app.settings.profile.cloudConnected') : option.configured ? $_('app.settings.profile.cloudNotConnected') : $_('app.settings.profile.cloudNotConfigured')} layout={FieldLayout.Row}>
-        {#if option.connected}
-          <Button variant="secondary" type="submit" disabled={isBusy(option.provider)}>{$_('app.settings.profile.cloudDisconnect')}</Button>
-        {/if}
-      </Field>
-    </form>
-  {/each}
-</Panel>
-
 <Panel title={$_('app.settings.profile.session')}>
   <Field label={$_('app.account.signOut')} hint={$_('app.settings.profile.signOutDesc')} layout={FieldLayout.Row}>
     <form method="POST" action="/auth/signout" use:signOutForm>
@@ -226,7 +145,7 @@
     <Button variant="secondary" type="button" onclick={openCookieSettings} data-testid="open-cookie-settings">{$_('cookie.settings')}</Button>
   </Field>
   <Field label={$_('app.settings.profile.exportData')} hint={$_('app.settings.profile.exportHint')} layout={FieldLayout.Row}>
-    <a class={buttonVariants({ variant: 'secondary' })} href={grantedPath('/account/export')} download data-testid="export-data">{$_('app.settings.profile.exportData')}</a>
+    <a class={buttonVariants({ variant: 'secondary' })} href="/account/export" download data-testid="export-data">{$_('app.settings.profile.exportData')}</a>
   </Field>
 </Panel>
 
@@ -251,20 +170,6 @@
 </div>
 
 <style>
-  .memory-field {
-    width: 100%;
-    min-height: 160px;
-    padding: 10px 12px;
-    border: 0;
-    border-radius: var(--ui-radius-sm);
-    background: var(--ui-input);
-    color: var(--ui-text);
-    font-family: var(--ui-mono);
-    font-size: 12px;
-    line-height: 1.5;
-    resize: vertical;
-  }
-
   .legal-wrap {
     margin-top: 1.5rem;
   }

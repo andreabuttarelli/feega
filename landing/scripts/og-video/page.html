@@ -1,0 +1,132 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+@font-face { font-family: 'BDO Grotesk'; src: url(data:font/woff2;base64,{{SANS}}) format('woff2'); font-weight: 100 900; }
+@font-face { font-family: 'Fragment Mono'; src: url(data:font/woff2;base64,{{MONO}}) format('woff2'); }
+
+:root {
+  --paper: #f7f6f2;
+  --ink: #121110;
+  --ink-soft: #6b6862;
+  --orange: #ff5100;
+  --select: #1a6dff;
+  --chrome: #1b1b1b;
+  --chrome-line: #2b2b2b;
+  --chrome-text: #e8e6e1;
+  --chrome-dim: #8d8a84;
+  --app: #efeee8;
+}
+
+* { margin: 0; box-sizing: border-box; }
+html, body { width: 1200px; height: 630px; overflow: hidden; background: var(--paper); }
+body { font-family: 'BDO Grotesk', sans-serif; color: var(--ink); -webkit-font-smoothing: antialiased; }
+.mode { display: none; position: absolute; inset: 0; }
+body[data-mode="still"] #still, body[data-mode="video"] #video { display: block; }
+
+.lockup svg { display: block; height: 100%; width: auto; }
+.eyebrow { font-family: 'Fragment Mono', monospace; font-size: 15px; letter-spacing: .01em; color: var(--ink-soft); display: flex; align-items: center; gap: 10px; }
+.eyebrow::before { content: ''; width: 9px; height: 9px; background: var(--orange); }
+.title { font-weight: 600; letter-spacing: -.055em; line-height: .9; color: var(--ink); }
+
+#still .lockup { position: absolute; left: 72px; top: 64px; height: 38px; display: flex; align-items: center; gap: 10px; }
+#still .lockup .mark { height: 100%; }
+#still .lockup .mark svg { height: 100%; width: auto; }
+#still .lockup .name { font-weight: 600; font-size: 34px; letter-spacing: -.04em; line-height: 1; color: var(--ink); }
+#still .chip { position: absolute; right: 72px; top: 64px; height: 38px; padding: 0 16px; border: 1px solid rgb(18 17 16 / .16); border-radius: 999px; color: var(--ink); }
+#still .title { position: absolute; left: 0; right: 0; top: 150px; text-align: center; font-size: 62px; letter-spacing: -.05em; line-height: 1; }
+#still .shot { position: absolute; left: 100px; top: 265px; width: 1000px; border-radius: 12px 12px 0 0; overflow: hidden; box-shadow: 0 0 0 1px rgb(0 0 0 / .08), 0 30px 70px -20px rgb(30 20 10 / .4); background: var(--chrome); }
+#still .shot img { display: block; width: 100%; }
+
+#video .titlecard { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 34px; }
+#video .titlecard .lockup { height: 40px; }
+#video .titlecard .title { font-size: 120px; text-align: center; }
+#video .window { position: absolute; left: 40px; top: 36px; width: 1120px; height: 558px; border-radius: 10px; overflow: hidden; background: var(--chrome); box-shadow: 0 1px 0 rgb(0 0 0 / .06), 0 30px 70px -24px rgb(30 20 10 / .4); }
+.bar { height: 38px; display: flex; align-items: center; gap: 8px; padding: 0 14px; border-bottom: 1px solid var(--chrome-line); }
+.dot { width: 11px; height: 11px; border-radius: 50%; background: #3a3a3a; }
+.url { margin-left: 18px; height: 22px; width: 360px; border-radius: 4px; background: #262626; color: var(--chrome-dim); font-size: 12px; display: flex; align-items: center; padding: 0 10px; gap: 8px; }
+.url::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: #35c26b; }
+.canvas { position: absolute; left: 0; top: 38px; width: 800px; bottom: 0; background: var(--app); overflow: hidden; }
+.nav { position: absolute; left: 44px; right: 44px; top: 26px; display: flex; justify-content: space-between; align-items: center; font-weight: 600; font-size: 17px; letter-spacing: -.03em; }
+.nav .pill { background: #d7f23c; border-radius: 999px; padding: 8px 16px; font-size: 14px; font-weight: 500; }
+.hero { position: absolute; left: 44px; top: 112px; font-weight: 500; letter-spacing: -.06em; line-height: .92; white-space: nowrap; }
+.hero .soft { color: #5d5e4f; }
+.lede { position: absolute; left: 44px; right: 44px; font-size: 15px; color: #4a4943; border-top: 1px solid #d8d6cf; padding-top: 18px; }
+.sel { position: absolute; border: 2px solid var(--select); border-radius: 2px; }
+.sel .crumb { position: absolute; left: -2px; top: -22px; height: 20px; padding: 0 7px; background: var(--select); color: #fff; font-size: 11.5px; display: flex; align-items: center; white-space: nowrap; border-radius: 2px 2px 0 0; }
+.panel { position: absolute; left: 800px; top: 38px; right: 0; bottom: 0; border-left: 1px solid var(--chrome-line); color: var(--chrome-text); font-size: 13px; }
+.tabs { display: flex; gap: 4px; padding: 10px 12px; border-bottom: 1px solid var(--chrome-line); color: var(--chrome-dim); }
+.tabs span { padding: 5px 10px; border-radius: 4px; }
+.tabs span:first-child { background: #2c2c2c; color: var(--chrome-text); }
+.path { padding: 14px 16px 10px; color: var(--chrome-dim); font-size: 12px; }
+.path b { color: var(--chrome-text); font-weight: 500; }
+.group { padding: 10px 16px 4px; font-weight: 600; font-size: 13px; }
+.row { display: flex; align-items: center; padding: 6px 16px; gap: 10px; }
+.row label { width: 64px; color: var(--chrome-dim); }
+.field { flex: 1; height: 30px; border-radius: 4px; background: #262626; display: flex; align-items: center; padding: 0 10px; justify-content: space-between; color: var(--chrome-text); position: relative; overflow: hidden; }
+.field small { color: var(--chrome-dim); font-size: 11px; }
+.field.focus { box-shadow: inset 0 0 0 1.5px var(--select); }
+.color { display: flex; align-items: center; }
+.swatch { width: 14px; height: 14px; border-radius: 2px; background: #10110c; border: 1px solid #444; margin-right: 8px; }
+.num { position: relative; height: 30px; width: 40px; }
+.num span { position: absolute; left: 0; top: 0; line-height: 30px; }
+.code { position: absolute; left: 0; width: 800px; height: 214px; background: #141414; border-top: 1px solid var(--chrome-line); color: var(--chrome-text); font-family: 'Fragment Mono', monospace; font-size: 15px; }
+.code .file { padding: 11px 18px; color: var(--chrome-dim); font-size: 12.5px; border-bottom: 1px solid var(--chrome-line); display: flex; gap: 12px; }
+.code .file b { color: var(--chrome-text); font-weight: 400; }
+.code .line { padding: 6px 18px; white-space: pre; display: flex; gap: 18px; position: relative; }
+.code .line i { font-style: normal; color: #5a5853; width: 20px; text-align: right; }
+.code .line.del { background: rgb(255 90 90 / .13); color: #ffb3ab; }
+.code .line.add { background: rgb(60 210 130 / .13); color: #9ff0c2; }
+.cursor { position: absolute; left: 0; top: 0; width: 26px; height: 26px; }
+.ripple { position: absolute; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%; border: 2px solid var(--select); }
+</style>
+</head>
+<body data-mode="still">
+<section id="still" class="mode">
+  <div class="lockup"><span class="mark">{{MARK}}</span><span class="name">Feega</span></div>
+  <span class="eyebrow chip">free · open source</span>
+  <h1 class="title">design in your codebase</h1>
+  <div class="shot"><img src="data:image/webp;base64,{{SHOT}}" alt=""></div>
+</section>
+
+<section id="video" class="mode">
+  <div class="titlecard">
+    <div class="lockup">{{LOCKUP}}</div>
+    <h1 class="title">design in<br>your codebase</h1>
+  </div>
+  <div class="window">
+    <div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">localhost:5173</span></div>
+    <div class="canvas">
+      <div class="nav"><span>mara quill</span><span class="pill">get in touch →</span></div>
+      <h2 class="hero">photographs<br><span class="soft">of quiet places</span></h2>
+      <p class="lede">Documentary and travel work, shot on film across twelve countries.</p>
+      <div class="sel"><span class="crumb">section.hero › h1</span></div>
+      <div class="code">
+        <div class="file"><b>src/routes/+page.svelte</b><span>1 change</span></div>
+        <div class="line"><i>14</i>&lt;section class="hero"&gt;</div>
+        <div class="line del"><i>15</i>- &lt;h1 class="text-[64px] font-medium"&gt;</div>
+        <div class="line add"><i>15</i>+ &lt;h1 class="text-[88px] font-medium"&gt;</div>
+        <div class="line"><i>16</i>  photographs of quiet places</div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="tabs"><span>Properties</span><span>Changes</span><span>Comments</span></div>
+      <p class="path">… › section.hero › <b>h1</b><br>+page.svelte:15</p>
+      <p class="group">Typography</p>
+      <div class="row"><label>Font</label><div class="field">BDO Grotesk<small>500</small></div></div>
+      <div class="row"><label>Size</label><div class="field" id="size"><span class="num"><span id="from">64</span><span id="to">88</span></span><small>px</small></div></div>
+      <div class="row"><label>Line</label><div class="field">0.92<small>em</small></div></div>
+      <div class="row"><label>Tracking</label><div class="field">-6<small>%</small></div></div>
+      <p class="group">Fill</p>
+      <div class="row"><label>Solid</label><div class="field"><span class="color"><span class="swatch"></span>#10110c</span><small>100%</small></div></div>
+      <p class="group">Spacing</p>
+      <div class="row"><label>Margin</label><div class="field">0<small>px</small></div></div>
+    </div>
+  </div>
+  <div class="ripple"></div>
+  <svg class="cursor" viewBox="0 0 26 26"><path d="M4 2 L4 21 L9 16.5 L12.5 24 L15.8 22.6 L12.4 15.2 L19 15.2 Z" fill="#111" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg>
+</section>
+<script>{{SCRIPT}}</script>
+</body>
+</html>

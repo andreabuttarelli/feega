@@ -1,0 +1,13 @@
+---
+import Article from '../../layouts/Article.astro';
+import { useCasesNewestFirst, type UseCase } from '../../site';
+
+export async function getStaticPaths() {
+  const entries = await useCasesNewestFirst();
+  return entries.map((post) => ({ params: { id: post.id }, props: { post, all: entries } }));
+}
+
+const { post, all } = Astro.props as { post: UseCase; all: UseCase[] };
+---
+
+<Article post={post} all={all} section="use-cases" />

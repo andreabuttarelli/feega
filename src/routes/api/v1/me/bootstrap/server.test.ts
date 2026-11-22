@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ProjectMode } from '$lib/project-mode';
-import { TourState } from '$lib/onboarding/tour';
 
 const USER = { id: 'u1', email: 'ada@x.it', created_at: '2020-01-01T00:00:00Z' };
 
@@ -12,8 +11,7 @@ const getUser = vi.fn(async () => ({ data: { user: USER }, error: null }));
 
 vi.mock('$lib/server/repos/orgs', () => ({ listMemberships }));
 vi.mock('$lib/server/repos/profiles', () => ({
-  ensureProfile: vi.fn(async () => ({ name: 'Ada', email: 'ada@x.it', avatarUrl: null })),
-  readTourSeen: vi.fn(async () => ({ seenAt: '2020-02-01T00:00:00Z' }))
+  ensureProfile: vi.fn(async () => ({ name: 'Ada', email: 'ada@x.it', avatarUrl: null }))
 }));
 vi.mock('$lib/server/credits', () => ({ orgCreditBalance: vi.fn(async () => 42) }));
 vi.mock('$lib/server/repos/projects', () => ({
@@ -27,16 +25,11 @@ const db = {
   auth: { getUser },
   from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { terms_version: '2020-01-01' } }) }) }) })
 };
-const DASHBOARD = { canvases: [], projects: [], batches: [], motions: [], moreVideos: null };
-const dashboardFor = vi.fn(async (_db: unknown, _deps: unknown, _org: string) => DASHBOARD);
-vi.mock('$lib/server/dashboard/dashboard', () => ({ DASHBOARD_DEPS: {}, dashboardFor }));
 vi.mock('$lib/server/db/client', () => ({ createUserDb: () => db }));
-vi.mock('$lib/server/feature-flags', () => ({ isPlanGoEnabled: () => false }));
 vi.mock('$lib/server/seline', () => ({ selineSetUser: vi.fn() }));
 
 const { GET } = await import('./+server');
 const { appShell } = await import('$lib/server/dashboard/app-shell');
-const { load: rootLoad } = await import('$lib/server/root-shell');
 
 async function call(headers: Record<string, string>, org?: string) {
   const url = new URL(`https://feega.test/api/v1/me/bootstrap${org ? `?org=${org}` : ''}`);
@@ -57,40 +50,6 @@ describe('GET /api/v1/me/bootstrap: the dashboard layouts in one call', () => {
     expect(res.status).toBe(200);
     expect(body.shell).toEqual(page);
     expect(body.user).toEqual({ id: 'u1', email: 'ada@x.it' });
-  });
-
-  it('returns the same terms and tour flags the root layout loads', async () => {
-    const url = new URL('https://feega.test/app');
-    const root = (await (rootLoad as (e: unknown) => Promise<{ termsNoticeVersion: string | null; tour: TourState; viewerName: string | null }>)({
-      url,
-      untrack: <T>(fn: () => T): T => fn(),
-      locals
-    })) as { termsNoticeVersion: string | null; tour: TourState; viewerName: string | null };
-
-    const { body } = await call({ authorization: 'Bearer jwt' });
-
-    expect(body.flags).toEqual({ termsNoticeVersion: root.termsNoticeVersion, tour: root.tour, name: root.viewerName });
-    expect(body.flags.termsNoticeVersion).not.toBeNull();
-  });
-
-  it('carries the recents of the chosen workspace, read in parallel with the shell', async () => {
-    let release: (m: unknown) => void = () => {};
-    listMemberships.mockReturnValueOnce(new Promise((r) => (release = r)) as never);
-    dashboardFor.mockClear();
-
-    const pending = call({ authorization: 'Bearer jwt' }, 'org-b');
-    await new Promise((r) => setTimeout(r, 0));
-    expect(dashboardFor).toHaveBeenCalledWith(expect.anything(), expect.anything(), 'org-b');
-    release([{ org: { id: 'org-b', name: 'B', slug: 'b' }, role: 'member' }]);
-
-    expect((await pending).body.dashboard).toEqual(DASHBOARD);
-  });
-
-  it('reads the recents of the workspace actually chosen when the hint was wrong', async () => {
-    dashboardFor.mockClear();
-    const { body } = await call({ authorization: 'Bearer jwt' }, 'org-gone');
-    expect(body.shell.org.id).toBe('org-a');
-    expect(dashboardFor).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), 'org-a');
   });
 
   it('verifies a token with Auth once, not on every navigation', async () => {

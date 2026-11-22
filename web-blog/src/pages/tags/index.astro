@@ -1,12 +1,13 @@
 ---
 import Base from '../../layouts/Base.astro';
-import { postsNewestFirst, tagSlug } from '../../site';
+import { allNewestFirst, tagSlug } from '../../site';
 
-const posts = await postsNewestFirst();
+const posts = await allNewestFirst();
 const tags = [...new Set(posts.flatMap((post) => post.data.tags))].sort();
 ---
 
 <Base title="Tags">
+  <nav class="sx-crumbs" aria-label="Breadcrumb"><a href="/">blog</a><span aria-hidden="true">/</span><span>tags</span></nav>
   <h1 class="page-title">Tags</h1>
   <ul class="tag-index">
     {tags.map((tag) => <li><a href={`/tags/${tagSlug(tag)}/`}>#{tag}</a></li>)}

@@ -5,6 +5,6 @@
   let { data, children } = $props();
 </script>
 
-<AppShell {data}>
+<AppShell profile={data.profile}>
   {@render children()}
 </AppShell>
