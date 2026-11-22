@@ -10,14 +10,11 @@ const ensureOrgCustomer = vi.fn();
 const createSubscriptionCheckout = vi.fn();
 const subscriptionPriceId = vi.fn();
 const cloudPriceId = vi.fn();
-const gateCredits = vi.fn();
-const structured = vi.fn();
 const billingGrantsReady = vi.fn();
 
 vi.mock('$lib/server/cli-auth', () => ({
 	openOrg: vi.fn(),
-	checkApiKeyWriteAccess: vi.fn(() => undefined),
-	gateOrgAiAction: vi.fn()
+	checkApiKeyWriteAccess: vi.fn(() => undefined)
 }));
 vi.mock('$lib/server/org-billing', () => ({
 	orgBillingById: (...args: unknown[]) => orgBillingById(...args),
@@ -33,20 +30,14 @@ vi.mock('$lib/server/stripe', () => ({
 	subscriptionPriceId: (...args: unknown[]) => subscriptionPriceId(...args),
 	cloudPriceId: (...args: unknown[]) => cloudPriceId(...args)
 }));
-vi.mock('$lib/server/credits', () => ({
-	gateCredits: (...args: unknown[]) => gateCredits(...args),
-	CreditsExhaustedError: class extends Error {}
-}));
 vi.mock('$lib/server/billing-readiness', () => ({
 	billingGrantsReady: (...args: unknown[]) => billingGrantsReady(...args)
 }));
 vi.mock('$lib/server/team/seat-billing', () => ({ editorCount: async () => 2 }));
-vi.mock('$lib/server/research', () => ({ structured: (...args: unknown[]) => structured(...args) }));
 vi.mock('$lib/server/app-url', () => ({ appOrigin: () => 'https://feega.test' }));
-vi.mock('$lib/server/feature-flags', () => ({ isPlanGoEnabled: () => false }));
 
 import { POST } from './+server';
-import { openOrg, checkApiKeyWriteAccess, gateOrgAiAction } from '$lib/server/cli-auth';
+import { openOrg, checkApiKeyWriteAccess } from '$lib/server/cli-auth';
 
 const CHECKOUT_URL = 'https://checkout.stripe.com/c/pay/cs_live_plan';
 const PLANS = [{ credits: 500, label: '€9 / editor / month' }];
@@ -183,14 +174,6 @@ describe('POST /api/v1/org/billing/checkout', () => {
 		expect(cancelSubscriptionAtPeriodEnd).not.toHaveBeenCalled();
 		expect(applyRetentionCoupon).not.toHaveBeenCalled();
 		expect(ensureSubscriptionCanceled).not.toHaveBeenCalled();
-	});
-
-	it('never gates on credits: whoever ran out is exactly who needs this link', async () => {
-		await call();
-
-		expect(gateOrgAiAction).not.toHaveBeenCalled();
-		expect(gateCredits).not.toHaveBeenCalled();
-		expect(structured).not.toHaveBeenCalled();
 	});
 
 	it('refuses a caller who does not own the org billing', async () => {

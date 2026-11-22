@@ -15,7 +15,7 @@ the change lands in the source. Sign-in and the account live in this web app (`o
 | `web-blog/` | the blog |
 | `supabase/` | all migrations (immutable) |
 | `cli/lib/init.ts` | project setup plan shared with the extension |
-| `docs/` | README media, runbooks, SEO notes |
+| `docs/` | README media, runbooks |
 
 The web app's routes: `/login`, `/auth/*`, `/cli/callback`, `/app` (dashboard),
 `/app/settings/profile`, `/account/export`, `/robots.txt`, and `/api` for the dashboard shell,

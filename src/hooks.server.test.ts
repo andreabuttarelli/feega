@@ -80,7 +80,6 @@ vi.mock('$lib/server/supabase-admin', () => ({
 }));
 
 const { handle } = await import('./hooks.server');
-const { logAiCall } = await import('$lib/server/ai-log');
 
 const nowS = () => Math.floor(Date.now() / 1000);
 const statusEvent = () => ({

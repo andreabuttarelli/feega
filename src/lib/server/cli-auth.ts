@@ -170,108 +170,15 @@ export function checkApiKeyWriteAccess(
   return json({ error: 'API key is read-only' }, { status: 403 });
 }
 
-/**
- * L'esito di un cancello crediti, indipendente da come chi ha chiamato deve restituirlo: una
- * rotta API vuole una `Response`, una form action di SvelteKit vuole un oggetto che `fail()`
- * costruisce — restituire una `Response` da un'azione fallisce a runtime con "Data returned from
- * action … is not serializable", e chi guarda vede un errore generico al posto di "crediti
- * finiti". Un solo controllo del saldo (qui sotto), due modi di raccontarne il rifiuto.
- */
-export type CreditGateDenial = { status: number; data: { error: string; message: string } };
-
-const CREDITS_EXHAUSTED_MESSAGE = 'AI credits are exhausted for this billing period. Buy more to continue.';
-
-async function creditGateOutcome(spend: () => Promise<void>): Promise<CreditGateDenial | undefined> {
-  const { CreditsExhaustedError } = await import('./credits');
-  try {
-    await spend();
-  } catch (e) {
-    if (e instanceof CreditsExhaustedError) {
-      return { status: 402, data: { error: 'credits_exhausted', message: CREDITS_EXHAUSTED_MESSAGE } };
-    }
-    throw e;
-  }
-  return undefined;
-}
-
-export async function gateOrgAiAction(
-  orgId: string,
-  apiKey: ApiKeyInfo | undefined
-): Promise<Response | undefined> {
-  const write = checkApiKeyWriteAccess(apiKey);
-  if (write) return write;
-
-  const { gateOrgCredits } = await import('./credits');
-  const denial = await creditGateOutcome(() => gateOrgCredits(orgId));
-  return denial ? json(denial.data, { status: denial.status }) : undefined;
-}
-
-/** Lo stesso cancello di gateOrgAiAction, per una form action: nessuna Response, un esito per fail(). */
-export async function gateOrgAiActionForForm(orgId: string): Promise<CreditGateDenial | undefined> {
-  const { gateOrgCredits } = await import('./credits');
-  return creditGateOutcome(() => gateOrgCredits(orgId));
-}
-
-export type OrgScope = {
-  supabase: SupabaseClient;
-  user: { id: string; email?: string };
-  orgId: string;
-  /** Chi ha pagato, per nome: il chiamante non l'ha scelto, quindi la risposta glielo dice. */
-  organization: { id: string; name: string | null };
-  apiKey?: ApiKeyInfo;
-};
-
-export async function openOrgScope(
-  request: Request
-): Promise<{ scope: OrgScope; error?: undefined } | { scope?: undefined; error: Response }> {
-  return orgScopeFor(await authenticate(request));
-}
-
-/**
- * La parte che DECIDE, separata da quella che autentica. Sono due mestieri, e tenerli insieme
- * rendeva i rifiuti raggiungibili solo passando da una chiave API vera: qui si provano per quello
- * che sono, uno per uno.
- */
-const HTTP_FORBIDDEN = 403;
-
-type ActiveOrg = { orgId: string | null; mayEdit: boolean };
-
-async function activeOrgOf(supabase: SupabaseClient, user: User): Promise<ActiveOrg> {
+async function activeOrgIdOf(supabase: SupabaseClient, user: User): Promise<string | null> {
   const { listMemberships } = await import('$lib/server/repos/orgs');
   const [active] = await listMemberships(supabase as never, user.id);
   if (active) {
-    const { can, OrgAction } = await import('$lib/org-roles');
-    return { orgId: active.org.id, mayEdit: can(active.role, OrgAction.Edit) };
+    return active.org.id;
   }
 
   const { ensureOrgForUser } = await import('./org');
-  return { orgId: await ensureOrgForUser(supabase, user), mayEdit: true };
-}
-
-export async function orgScopeFor(
-  caller: Caller
-): Promise<{ scope: OrgScope; error?: undefined } | { scope?: undefined; error: Response }> {
-  const { supabase, user, error, apiKey } = caller;
-  if (error) return { error };
-
-  const { orgId, mayEdit } = apiKey ? { orgId: apiKey.org_id, mayEdit: true } : await activeOrgOf(supabase, user as never);
-  if (!mayEdit) return { error: json({ error: 'view_only', message: 'Viewers cannot generate or edit. Ask an admin for edit access.' }, { status: HTTP_FORBIDDEN }) };
-  if (!orgId) return { error: json({ error: 'no_organization' }, { status: 500 }) };
-
-  const gate = await gateOrgAiAction(orgId, apiKey);
-  if (gate) return { error: gate };
-
-  const { data } = await supabase.from('orgs').select('id, name').eq('id', orgId).maybeSingle();
-
-  return {
-    scope: {
-      supabase,
-      user,
-      orgId,
-      organization: { id: orgId, name: (data?.name as string | null | undefined) ?? null },
-      apiKey
-    }
-  };
+  return ensureOrgForUser(supabase, user);
 }
 
 export type OrgCall = {
@@ -289,7 +196,7 @@ export async function openOrg(
     return { error };
   }
 
-  const orgId = apiKey ? apiKey.org_id : (await activeOrgOf(supabase, user as User)).orgId;
+  const orgId = apiKey ? apiKey.org_id : await activeOrgIdOf(supabase, user as User);
   if (!orgId) {
     return { error: json({ error: 'no_organization' }, { status: 500 }) };
   }

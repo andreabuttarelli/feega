@@ -6,13 +6,10 @@ const createBillingPortalSession = vi.fn();
 const applyRetentionCoupon = vi.fn();
 const cancelSubscriptionAtPeriodEnd = vi.fn();
 const ensureSubscriptionCanceled = vi.fn();
-const gateCredits = vi.fn();
-const structured = vi.fn();
 
 vi.mock('$lib/server/cli-auth', () => ({
 	openOrg: vi.fn(),
-	checkApiKeyWriteAccess: vi.fn(() => undefined),
-	gateOrgAiAction: vi.fn()
+	checkApiKeyWriteAccess: vi.fn(() => undefined)
 }));
 vi.mock('$lib/server/org-billing', () => ({
 	orgBillingById: (...args: unknown[]) => orgBillingById(...args),
@@ -24,15 +21,10 @@ vi.mock('$lib/server/stripe', () => ({
 	cancelSubscriptionAtPeriodEnd: (...args: unknown[]) => cancelSubscriptionAtPeriodEnd(...args),
 	ensureSubscriptionCanceled: (...args: unknown[]) => ensureSubscriptionCanceled(...args)
 }));
-vi.mock('$lib/server/credits', () => ({
-	gateCredits: (...args: unknown[]) => gateCredits(...args),
-	CreditsExhaustedError: class extends Error {}
-}));
-vi.mock('$lib/server/research', () => ({ structured: (...args: unknown[]) => structured(...args) }));
 vi.mock('$lib/server/app-url', () => ({ appOrigin: () => 'https://feega.test' }));
 
 import { POST } from './+server';
-import { openOrg, checkApiKeyWriteAccess, gateOrgAiAction } from '$lib/server/cli-auth';
+import { openOrg, checkApiKeyWriteAccess } from '$lib/server/cli-auth';
 
 const PORTAL_URL = 'https://billing.stripe.com/p/session/live_xyz';
 
@@ -96,13 +88,6 @@ describe('POST /api/v1/org/billing/portal', () => {
 		expect(ensureSubscriptionCanceled).not.toHaveBeenCalled();
 	});
 
-	it('never gates on credits: whoever ran out is exactly who needs this link', async () => {
-		await call();
-
-		expect(gateOrgAiAction).not.toHaveBeenCalled();
-		expect(gateCredits).not.toHaveBeenCalled();
-		expect(structured).not.toHaveBeenCalled();
-	});
 
 	it('refuses a caller who does not own the org billing', async () => {
 		isOrgOwner.mockResolvedValue(false);
