@@ -1,7 +1,8 @@
 export enum ArticleKind {
   Roundup = 'roundup',
   UseCase = 'use-case',
-  Single = 'single'
+  Single = 'single',
+  Agent = 'agent'
 }
 
 export type Question = { readonly q: string; readonly a: string };
@@ -36,6 +37,25 @@ export type Highlight = {
   readonly caption: string;
 };
 
+export enum CalloutTone {
+  Tip = 'tip',
+  Warning = 'warning',
+  Note = 'note'
+}
+
+export type Callout = { readonly tone: CalloutTone; readonly title: string; readonly text: string };
+
+export type Cta = { readonly text: string; readonly label: string; readonly href: string };
+
+export type Shot = { readonly src: string; readonly alt: string; readonly width: number; readonly height: number; readonly caption: string };
+
+export type TableBlock = {
+  readonly heading: string;
+  readonly head: readonly string[];
+  readonly rows: readonly (readonly string[])[];
+  readonly callout?: Callout;
+};
+
 export type Step = { readonly title: string; readonly text: string };
 
 export type Rich = {
@@ -48,9 +68,26 @@ export type Rich = {
   readonly steps: readonly Step[];
   readonly closing: string;
   readonly moreQuestions: readonly Question[];
+  readonly takeaways?: readonly string[];
+  readonly tables?: readonly TableBlock[];
+  readonly hero?: Shot;
 };
 
-export type Section = { readonly heading: string; readonly html: string };
+export type Section = {
+  readonly heading: string;
+  readonly html: string;
+  readonly callout?: Callout;
+  readonly cta?: Cta;
+  readonly image?: Shot;
+};
+
+export type Extras = {
+  readonly takeaways: readonly string[];
+  readonly tables: readonly TableBlock[];
+  readonly hero: Shot;
+  readonly sections: readonly Section[];
+  readonly sources: readonly Source[];
+};
 
 export type Article = {
   readonly kind: ArticleKind;
