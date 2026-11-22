@@ -1,11 +1,14 @@
 import { useCurrentFrame } from "remotion";
 import { lift, tween } from "../../ease";
 import { FeegaMark } from "../../components/brandIcons";
-import { Pixel, hop, type Sprite } from "../pixel";
-import { Place, Section } from "../Section";
+import { Heading, Pixel, Runner, hop, type Sprite } from "../pixel";
+import { Ending, Place, Section } from "../Section";
 import { DISPLAY, MONO, ORANGE, PAPER, Tone } from "../style";
 
-export const END_FRAMES = 180;
+export const END_FRAMES = 135;
+export const END_TONE = Tone.Ink;
+
+const RUN_IN = 18;
 export const LOGO_AT = 4;
 
 const AROUND: { x: number; y: number; s: Sprite }[] = [
@@ -27,12 +30,13 @@ export const EndCard = () => {
   const chip = tween(frame, 28, 12);
 
   return (
-    <Section tone={Tone.Ink}>
+    <Section tone={END_TONE} ending={Ending.Hold}>
       {AROUND.map((a, i) => {
-        const p = lift(frame, 10 + i * 3, 10);
+        const p = tween(frame, 6 + i * 3, RUN_IN);
+        const offstage = a.x < 960 ? -a.x - 200 : 2120 - a.x;
 
         return (
-          <Place key={i} x={a.x} y={a.y} style={{ transform: `translateY(${hop(frame, i * 3) * p}px) scale(${p})` }}>
+          <Place key={i} x={a.x} y={a.y} style={{ transform: `translate(${(1 - p) * offstage}px, ${hop(frame, i * 3)}px) rotate(${(1 - p) * (a.x < 960 ? 14 : -14)}deg)` }}>
             <Pixel sprite={a.s} size={11} />
           </Place>
         );
@@ -48,6 +52,8 @@ export const EndCard = () => {
           feega.app
         </div>
       </Place>
+      <Runner sprite="ghost" size={9} y={980} from={70} frames={60} heading={Heading.Right} />
+      <Runner sprite="blob" size={9} y={980} from={78} frames={60} heading={Heading.Right} />
     </Section>
   );
 };

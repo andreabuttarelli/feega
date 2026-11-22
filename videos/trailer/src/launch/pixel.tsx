@@ -1,5 +1,8 @@
 import { useCurrentFrame } from "remotion";
 import { lift } from "../ease";
+import { float } from "./motion";
+
+const SPECK_DEPTH = 10;
 
 const PALETTE: Record<string, string> = {
   "#": "#ff5100",
@@ -69,7 +72,36 @@ export const Parade = ({ sprites, size, start, gap, stagger }: { sprites: Sprite
   );
 };
 
-export type Speck = { x: number; y: number; s: number; c: string; at: number };
+export enum Heading {
+  Right = 1,
+  Left = -1,
+}
+
+const RUN_HOP = 7;
+const RUN_HEIGHT = 22;
+const RUN_LEAN = 8;
+const OFFSTAGE = 200;
+
+export const Runner = ({ sprite, size, y, from, frames, heading }: { sprite: Sprite; size: number; y: number; from: number; frames: number; heading: Heading }) => {
+  const frame = useCurrentFrame();
+  const t = (frame - from) / frames;
+
+  if (t < 0 || t > 1) {
+    return null;
+  }
+
+  const travel = (1920 + 2 * OFFSTAGE) * t;
+  const x = heading === Heading.Right ? -OFFSTAGE + travel : 1920 + OFFSTAGE - travel;
+  const bounce = -Math.abs(Math.sin(((frame - from) / RUN_HOP) * Math.PI)) * RUN_HEIGHT;
+
+  return (
+    <div style={{ position: "absolute", left: x, top: y, transform: `translateY(${bounce}px) rotate(${heading * RUN_LEAN}deg) scaleX(${heading})` }}>
+      <Pixel sprite={sprite} size={size} />
+    </div>
+  );
+};
+
+export type Speck ={ x: number; y: number; s: number; c: string; at: number };
 
 export const Scatter = ({ specks }: { specks: Speck[] }) => {
   const frame = useCurrentFrame();
@@ -78,8 +110,9 @@ export const Scatter = ({ specks }: { specks: Speck[] }) => {
     <>
       {specks.map((d, i) => {
         const visible = frame >= d.at && Math.floor((frame - d.at) / 9 + i) % 6 !== 0;
+        const depth = d.s / SPECK_DEPTH;
 
-        return visible ? <div key={i} style={{ position: "absolute", left: d.x, top: d.y, width: d.s, height: d.s, background: d.c }} /> : null;
+        return visible ? <div key={i} style={{ position: "absolute", left: d.x, top: d.y, width: d.s, height: d.s, background: d.c, transform: `translate(${-frame * depth}px, ${float(frame, i * 11, 10 * depth)}px)` }} /> : null;
       })}
     </>
   );

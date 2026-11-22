@@ -1,12 +1,16 @@
 import { useCurrentFrame } from "remotion";
 import { mix, tween } from "../../ease";
 import { Align, Headline } from "../Headline";
-import { Scatter, specks } from "../pixel";
+import { float } from "../motion";
+import { Scatter, hop, specks } from "../pixel";
 import { Pointer, pointerAt } from "../Pointer";
 import { Place, Section } from "../Section";
 import { BLUE, ORANGE, PAPER, Tone } from "../style";
 
-export const PLUGINS_FRAMES = 120;
+export const PLUGINS_FRAMES = 105;
+export const PLUGINS_TONE = Tone.Paper;
+
+const ORBIT = 26;
 export const DRAG_FROM = 24;
 
 const MESH_W = 620;
@@ -46,7 +50,7 @@ export const Plugins = () => {
   const frame = useCurrentFrame();
   const enter = tween(frame, 4, 20);
   const drag = tween(frame, DRAG_FROM, 34);
-  const points = POINTS.map((p, i) => (i === 0 ? { ...p, x: mix(p.x, DRAG_TO.x, drag), y: mix(p.y, DRAG_TO.y, drag) } : p));
+  const points = POINTS.map((p, i) => (i === 0 ? { ...p, x: mix(p.x, DRAG_TO.x, drag), y: mix(p.y, DRAG_TO.y, drag) } : { ...p, x: p.x + float(frame, i * 15, ORBIT), y: p.y + float(frame, i * 15 + 11, ORBIT) }));
   const pointer = pointerAt(frame, [
     { at: 6, x: 560, y: 500 },
     { at: DRAG_FROM, x: POINTS[0].x, y: POINTS[0].y },
@@ -55,12 +59,12 @@ export const Plugins = () => {
   const background = points.map((p) => `radial-gradient(circle at ${p.x}px ${p.y}px, ${p.c} 0, transparent 62%)`).join(", ");
 
   return (
-    <Section tone={Tone.Paper} eyebrow="05 · plugins">
+    <Section tone={PLUGINS_TONE} eyebrow="05 · plugins">
       <Scatter specks={SPECKS} />
       <Place x={100} y={380}>
         <Headline lines={["plugins, if you", "want more."]} boxed="more" tone={Tone.Paper} size={116} align={Align.Left} />
       </Place>
-      <Place x={1060} y={250} style={{ transform: `translateX(${(1 - enter) * 1000}px)` }}>
+      <Place x={1060} y={250} style={{ transform: `translateX(${(1 - enter) * 1000}px) rotate(${(1 - enter) * 8}deg) translateY(${float(frame, 0, 8)}px)` }}>
         <div style={{ width: MESH_W, height: MESH_H, borderRadius: 18, background: `${background}, ${PAPER}`, position: "relative", boxShadow: "0 30px 80px rgba(0,0,0,.18)" }}>
           {points.map((p, i) => (
             <div key={i} style={{ position: "absolute", left: p.x - 11, top: p.y - 11, width: 22, height: 22, borderRadius: 11, background: "#fff", border: `4px solid ${i === 0 && frame >= DRAG_FROM ? ORANGE : "#0b0b0a"}` }} />
@@ -69,7 +73,9 @@ export const Plugins = () => {
         </div>
       </Place>
       <Place x={1520} y={720} style={{ transform: `translateY(${(1 - tween(frame, 16, 18)) * 600}px)` }}>
-        <Cube angle={frame * 4} />
+        <div style={{ transform: `translateY(${hop(frame, 0) * 1.5}px)` }}>
+          <Cube angle={frame * 4} />
+        </div>
       </Place>
     </Section>
   );

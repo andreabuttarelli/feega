@@ -8,6 +8,7 @@ import { INK, Tone } from "../style";
 import { BASE_FONT, CardFrame } from "./Select";
 
 export const EDIT_FRAMES = 120;
+export const EDIT_TONE = Tone.Paper;
 export const SCRUB_FROM = 26;
 export const SWATCH_CLICK = 70;
 export const COLOR_CLICK = 92;
@@ -34,14 +35,16 @@ export const Edit = () => {
   const fontSize = Math.round(mix(BASE_FONT, TARGET_FONT, tween(frame, SCRUB_FROM, 32)));
   const scrubbing = frame >= SCRUB_FROM - 4 && frame < 64;
   const pressed = scrubbing || isPressed(frame, SWATCH_CLICK) || isPressed(frame, COLOR_CLICK);
+  const zoom = 1 + 0.12 * tween(frame, 14, 18) - 0.12 * tween(frame, 62, 16) + 0.1 * tween(frame, 80, 14);
+  const focus = frame < 79 ? `${sizeField.x}px ${sizeField.y}px` : `${swatch.x}px ${swatch.y}px`;
   const headColor = frame >= COLOR_CLICK ? SWATCHES[1] : INK;
 
   return (
-    <Section tone={Tone.Paper} eyebrow="02 · edit">
+    <Section tone={EDIT_TONE} eyebrow="02 · edit">
       <Place x={100} y={380}>
-        <Headline lines={["edit it", "like in figma."]} boxed="figma" tone={Tone.Paper} size={120} align={Align.Left} />
+        <Headline lines={["edit it", "like in Figma."]} boxed="Figma" tone={Tone.Paper} size={120} align={Align.Left} />
       </Place>
-      <CardFrame enter={1}>
+      <CardFrame enter={tween(frame, 0, 16)} zoom={zoom} origin={focus}>
         <EditorCard state={{ hover: 1, selected: 1, fontSize, headColor, scrubbing, swatchOpen: tween(frame, SWATCH_CLICK, 8) }} />
         <Pointer x={pointer.x} y={pointer.y} pressed={pressed} />
       </CardFrame>
