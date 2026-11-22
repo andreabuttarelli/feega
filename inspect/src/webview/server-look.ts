@@ -31,7 +31,7 @@ const ACTIONS: Record<ServerState, { own: ServerAction[]; attached: ServerAction
 export const actionsOf = (state: ServerState, attached: boolean): ServerAction[] => ACTIONS[state][attached ? 'attached' : 'own'];
 
 export const ACTION_LABEL: Record<ServerAction, string> = {
-  [ServerAction.Start]: 'Start',
+  [ServerAction.Start]: 'Start with Feega',
   [ServerAction.Restart]: 'Restart',
   [ServerAction.Stop]: 'Stop now',
   [ServerAction.ReloadPage]: 'Reload page',

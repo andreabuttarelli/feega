@@ -30,6 +30,7 @@ function setup() {
     log: () => undefined,
     openExternal: (url: string) => opened.push(url),
     notify: (text: string) => toasts.push(text),
+    warn: async () => false,
     account,
     onboarding: memoryOnboardingStore()
   } as unknown as Platform;
