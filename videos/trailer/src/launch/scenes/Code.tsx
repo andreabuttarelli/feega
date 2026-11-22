@@ -1,18 +1,23 @@
 import { useCurrentFrame } from "remotion";
 import { lift, tween } from "../../ease";
+import { APP_REST, AppShot, SWATCHES } from "../app/AppShot";
+import { APP } from "../app/appLayout";
 import { Align, Headline } from "../Headline";
-import { IconRow } from "../pixel";
 import { Place, Section } from "../Section";
-import { MONO, Tone } from "../style";
+import { MONO, ORANGE, PAPER, Tone } from "../style";
 
-export const CODE_FRAMES = 105;
+export const CODE_FRAMES = 96;
+export const CODE_TONE = Tone.Paper;
+export const DIFF_IN = 16;
 export const DIFF_LINES_AT = 30;
-export const CODE_TONE = Tone.Orange;
-export const PUSH_AT = 66;
 
-const ADDED_ROW = 2;
-const ROW_H = 43;
-const PUSH = 0.14;
+const APP_SCALE = 1.5;
+const CORNER = { x: 1420, y: 660 };
+const APP_SLIDE = 260;
+const DIFF_AT = { x: 840, y: 250 };
+const DIFF_SLIDE = 900;
+const LINE_STAGGER = 4;
+const MUTED = "#8a8780";
 
 enum Kind {
   Same = "same",
@@ -26,53 +31,58 @@ const KIND_STYLE: Record<Kind, { sign: string; bg: string; fg: string }> = {
   [Kind.Added]: { sign: "+", bg: "rgba(80,220,140,.14)", fg: "#8fe8b4" },
 };
 
-const LINES: { kind: Kind; text: string }[] = [
-  { kind: Kind.Same, text: '<section class="hero">' },
-  { kind: Kind.Removed, text: '  <h1 class="text-[64px] text-[#2a1c12]">' },
-  { kind: Kind.Added, text: '  <h1 class="text-[76px] text-[#ff5100]">' },
-  { kind: Kind.Same, text: "    Scent, slowly made." },
-  { kind: Kind.Same, text: "  </h1>" },
-  { kind: Kind.Same, text: '  <p class="lead">…</p>' },
-  { kind: Kind.Same, text: "</section>" },
+const LINES: { kind: Kind; n: number; text: string }[] = [
+  { kind: Kind.Same, n: 12, text: '<section class="hero">' },
+  { kind: Kind.Removed, n: 13, text: '  <h1 class="text-[#2a1c12]">' },
+  { kind: Kind.Added, n: 13, text: '  <h1 class="text-[#ff5100]">' },
+  { kind: Kind.Same, n: 14, text: "    Scent, slowly made." },
+  { kind: Kind.Same, n: 15, text: "  </h1>" },
 ];
 
-const LINE_STAGGER = 5;
+export const DIFF_TICKS = LINES.map((_, i) => DIFF_LINES_AT + i * LINE_STAGGER);
+
+const Diff = ({ frame }: { frame: number }) => (
+  <div style={{ width: 980, borderRadius: 28, background: "#141413", fontFamily: MONO, fontSize: 27, overflow: "hidden", boxShadow: "0 0 0 1px rgba(247,246,242,.08), 0 60px 140px rgba(0,0,0,.4)" }}>
+    <div style={{ padding: "26px 34px", display: "flex", alignItems: "center", gap: 16, borderBottom: "1px solid rgba(247,246,242,.08)", color: PAPER }}>
+      <span style={{ padding: "4px 12px", borderRadius: 10, background: ORANGE, fontSize: 19 }}>Changes</span>
+      <span style={{ color: MUTED }}>src/lib/Hero.svelte</span>
+      <span style={{ marginLeft: "auto" }}>
+        <span style={{ color: "#8fe8b4" }}>+1</span> <span style={{ color: "#ff9a9a" }}>−1</span>
+      </span>
+    </div>
+    <div style={{ padding: "18px 0" }}>
+      {LINES.map((line, i) => {
+        const p = lift(frame, DIFF_TICKS[i], 10);
+        const style = KIND_STYLE[line.kind];
+
+        return (
+          <div key={i} style={{ display: "flex", gap: 22, padding: "9px 34px", background: style.bg, color: style.fg, whiteSpace: "pre", opacity: p, transform: `translateX(${(1 - p) * 30}px)` }}>
+            <span style={{ width: 34, color: "#5c5a55", textAlign: "right" }}>{line.n}</span>
+            <span style={{ width: 14 }}>{style.sign}</span>
+            {line.text}
+          </div>
+        );
+      })}
+    </div>
+  </div>
+);
 
 export const Code = () => {
   const frame = useCurrentFrame();
-  const enter = tween(frame, 6, 20);
-  const zoom = 1 + PUSH * tween(frame, PUSH_AT, 18);
-  const sweep = tween(frame, PUSH_AT + 8, 16);
+  const app = tween(frame, 0, 18);
+  const diff = tween(frame, DIFF_IN, 18);
+  const state = { ...APP_REST, selected: 1, headColor: SWATCHES[1] };
 
   return (
-    <Section tone={CODE_TONE} eyebrow="03 · ship">
-      <Place x={100} y={330}>
-        <Headline lines={["every edit", "lands in", "your code."]} boxed="code" tone={Tone.Orange} size={116} align={Align.Left} />
+    <Section tone={CODE_TONE}>
+      <Place x={CORNER.x - APP.w * APP_SCALE} y={CORNER.y - APP.h * APP_SCALE} style={{ transform: `translate(${(app - 1) * APP_SLIDE}px, ${(app - 1) * APP_SLIDE}px) scale(${APP_SCALE})`, transformOrigin: "0 0" }}>
+        <AppShot state={state} />
       </Place>
-      <Place x={880} y={290} style={{ transform: `translateX(${(1 - enter) * 1100}px) rotate(${(1 - enter) * -6}deg) scale(${zoom})`, transformOrigin: `0px ${80 + ROW_H * ADDED_ROW}px` }}>
-        <div style={{ position: "absolute", left: 40, top: -56 }}>
-          <IconRow sprites={["cursor", "code", "palette"]} size={7} start={DIFF_LINES_AT + 20} gap={24} stagger={4} />
-        </div>
-        <div style={{ width: 920, borderRadius: 16, background: "#141413", fontFamily: MONO, fontSize: 25, overflow: "hidden", boxShadow: "0 40px 90px rgba(0,0,0,.25)" }}>
-          <div style={{ padding: "18px 26px", color: "#8a8780", borderBottom: "1px solid #2a2a28", display: "flex", justifyContent: "space-between" }}>
-            <span>src/lib/Hero.svelte</span>
-            <span><span style={{ color: "#8fe8b4" }}>+1</span> <span style={{ color: "#ff9a9a" }}>−1</span></span>
-          </div>
-          <div style={{ padding: "14px 0" }}>
-            {LINES.map((line, i) => {
-              const p = lift(frame, DIFF_LINES_AT + i * LINE_STAGGER, 10);
-              const style = KIND_STYLE[line.kind];
-
-              return (
-                <div key={i} style={{ position: "relative", display: "flex", gap: 22, padding: "6px 26px", background: style.bg, color: style.fg, whiteSpace: "pre", opacity: p, transform: `translateX(${(1 - p) * 30}px)` }}>
-                  <span style={{ width: 14 }}>{style.sign}</span>
-                  {line.text}
-                  {i === ADDED_ROW ? <span style={{ position: "absolute", top: 0, bottom: 0, left: 0, width: 160, background: "rgba(143,232,180,.4)", opacity: Math.sin(Math.PI * sweep), transform: `translateX(${sweep * 760}px)` }} /> : null}
-                </div>
-              );
-            })}
-          </div>
-        </div>
+      <Place x={DIFF_AT.x} y={DIFF_AT.y} style={{ transform: `translateX(${(1 - diff) * DIFF_SLIDE}px) rotate(${(1 - diff) * 5}deg)` }}>
+        <Diff frame={frame} />
+      </Place>
+      <Place x={100} y={790}>
+        <Headline lines={["every edit lands in your code."]} boxed="code" tone={CODE_TONE} size={108} align={Align.Left} />
       </Place>
     </Section>
   );

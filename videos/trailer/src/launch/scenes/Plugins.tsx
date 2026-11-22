@@ -7,9 +7,10 @@ import { Pointer, pointerAt, type Click } from "../Pointer";
 import { EditorFrame } from "../editor/EditorFrame";
 import { EDITOR_REST, FeegaEditor, pressAmount } from "../editor/FeegaEditor";
 import { MESH_BOX } from "../editor/layout";
-import { EDITOR_AT } from "./Select";
 import { Place, Section } from "../Section";
 import { BLUE, ORANGE, Tone } from "../style";
+
+const EDITOR_AT = { x: 970, y: 300, scale: 0.72 };
 
 export const PLUGINS_FRAMES = 95;
 export const PLUGINS_TONE = Tone.White;
@@ -65,7 +66,7 @@ export const Plugins = () => {
   const zoom = 1 + 0.2 * tween(frame, 12, 18) - 0.2 * tween(frame, 70, 16);
 
   return (
-    <Section tone={PLUGINS_TONE} eyebrow="05 · plugins">
+    <Section tone={PLUGINS_TONE} eyebrow="04 · plugins">
       <Scatter specks={SPECKS} />
       <Place x={100} y={380}>
         <Headline lines={["plugins, if you", "want more."]} boxed="more" tone={PLUGINS_TONE} size={116} align={Align.Left} />

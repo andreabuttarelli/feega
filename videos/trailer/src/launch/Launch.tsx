@@ -3,15 +3,14 @@ import { AbsoluteFill, Series } from "remotion";
 import { Sfx, Sound, type Cue } from "../components/Sfx";
 import { assembleTicks, boxPopAt } from "./Headline";
 import { AGENTS_CUES, AGENTS_FRAMES, AGENTS_TONE, Agents } from "./scenes/Agents";
-import { CODE_FRAMES, CODE_TONE, Code, DIFF_LINES_AT, PUSH_AT } from "./scenes/Code";
-import { EDIT_FRAMES, EDIT_TONE, COLOR_CLICK, Edit, SCRUB_FROM, SWATCH_CLICK } from "./scenes/Edit";
+import { CODE_FRAMES, CODE_TONE, Code, DIFF_IN, DIFF_TICKS } from "./scenes/Code";
 import { EDITORS_CUES, EDITORS_FRAMES, EDITORS_TONE, Editors } from "./scenes/Editors";
 import { END_FRAMES, END_TONE, EndCard, LOGO_AT } from "./scenes/EndCard";
 import { FRAMEWORKS_CUES, FRAMEWORKS_FRAMES, FRAMEWORKS_TONE, Frameworks } from "./scenes/Frameworks";
 import { HERO_FRAMES, HERO_TONE, Hero } from "./scenes/Hero";
 import { OPEN_SOURCE_FRAMES, OPEN_SOURCE_TONE, OpenSource, STAR_CLICK } from "./scenes/OpenSource";
 import { DRAG_FROM, PLUGINS_FRAMES, PLUGINS_TONE, Plugins } from "./scenes/Plugins";
-import { SELECT_CLICK, SELECT_FRAMES, SELECT_TONE, Select } from "./scenes/Select";
+import { SELECT_CLICK, SELECT_FRAMES, SELECT_TONE, SWATCH_CLICK, Select } from "./scenes/Select";
 import { LIBRARY_CLICK, LIBRARY_IN, TEMPLATES_FRAMES, TEMPLATES_TONE, Templates } from "./scenes/Templates";
 import { TONES, Tone, loadFonts } from "./style";
 import { Exit, ExitWipe, LANDSCAPE_FRAMES, WIPE_FRAMES } from "./Transition";
@@ -27,10 +26,9 @@ const title = (): Cue[] => [...assembleTicks().map(tick), pop(boxPopAt())];
 
 const SHOTS: Shot[] = [
   { scene: Hero, frames: HERO_FRAMES, tone: HERO_TONE, exit: Exit.Pixels, cues: [...title(), tap(16), tap(24)] },
-  { scene: Select, frames: SELECT_FRAMES, tone: SELECT_TONE, exit: Exit.Panel, cues: [whoosh(4), ...title(), click(SELECT_CLICK)] },
-  { scene: Edit, frames: EDIT_FRAMES, tone: EDIT_TONE, exit: Exit.Pixels, cues: [whoosh(0), ...title(), click(SCRUB_FROM), click(SWATCH_CLICK), click(COLOR_CLICK)] },
-  { scene: Code, frames: CODE_FRAMES, tone: CODE_TONE, exit: Exit.Cut, cues: [whoosh(4), ...title(), tap(DIFF_LINES_AT + 5), tap(DIFF_LINES_AT + 10), tap(PUSH_AT + 8)] },
-  { scene: Templates, frames: TEMPLATES_FRAMES, tone: TEMPLATES_TONE, exit: Exit.Landscape, cues: [whoosh(0), ...title(), whoosh(LIBRARY_IN), click(LIBRARY_CLICK)] },
+  { scene: Select, frames: SELECT_FRAMES, tone: SELECT_TONE, exit: Exit.Panel, cues: [whoosh(4), ...title(), click(SELECT_CLICK), click(SWATCH_CLICK)] },
+  { scene: Code, frames: CODE_FRAMES, tone: CODE_TONE, exit: Exit.Cut, cues: [whoosh(0), whoosh(DIFF_IN), ...title(), ...DIFF_TICKS.map((at) => tap(at + 2))] },
+  { scene: Templates, frames: TEMPLATES_FRAMES, tone: TEMPLATES_TONE, exit: Exit.Landscape, cues: [whoosh(0), ...title(), { at: LIBRARY_IN, sound: Sound.ClickC, volume: 0.5 }, click(LIBRARY_CLICK), whoosh(LIBRARY_CLICK + 2), pop(LIBRARY_CLICK + 14)] },
   { scene: Plugins, frames: PLUGINS_FRAMES, tone: PLUGINS_TONE, exit: Exit.Pixels, cues: [whoosh(4), ...title(), click(DRAG_FROM)] },
   { scene: Editors, frames: EDITORS_FRAMES, tone: EDITORS_TONE, exit: Exit.Cut, cues: [whoosh(6), ...EDITORS_CUES] },
   { scene: Frameworks, frames: FRAMEWORKS_FRAMES, tone: FRAMEWORKS_TONE, exit: Exit.Panel, cues: [...FRAMEWORKS_CUES, whoosh(FRAMEWORKS_FRAMES - 22)] },

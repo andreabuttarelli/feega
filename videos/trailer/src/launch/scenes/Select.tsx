@@ -1,45 +1,65 @@
 import { useCurrentFrame } from "remotion";
 import { tween } from "../../ease";
-import { EditorFrame } from "../editor/EditorFrame";
-import { EDITOR_REST, FeegaEditor, pressAmount } from "../editor/FeegaEditor";
-import { BASE_FONT, center, h1Rect } from "../editor/layout";
+import { APP_REST, AppShot, SWATCHES, pressAmount } from "../app/AppShot";
+import { HEAD, swatchRect } from "../app/appLayout";
+import { center } from "../editor/layout";
 import { Align, Headline } from "../Headline";
 import { Pointer, pointerAt, type Click } from "../Pointer";
-import { Scatter, specks } from "../pixel";
 import { Place, Section } from "../Section";
-import { BLUE, ORANGE, Tone } from "../style";
+import { Tone } from "../style";
 
-export const SELECT_FRAMES = 110;
-export const SELECT_TONE = Tone.Raised;
-export const SELECT_CLICK = 66;
+export const SELECT_FRAMES = 78;
+export const SELECT_TONE = Tone.Orange;
+export const SELECT_CLICK = 32;
+export const SWATCH_CLICK = 50;
 
-export const EDITOR_AT = { x: 970, y: 300, scale: 0.72 };
+const APP_AT = { x: 140, y: 230 };
+const ORANGE_SWATCH = swatchRect(1);
+const RISE = 520;
+const PUSH = 0.06;
+const FOCUS = { x: 1100, y: 420 };
+const POINTER_SIZE = 0.62;
 
-const H1 = h1Rect(BASE_FONT);
-const TARGET = { x: H1.x + 130, y: H1.y + 34 };
-const SPECKS = specks(2, 14, [ORANGE, BLUE]);
 const PATH = [
-  { at: 24, x: 1000, y: 680 },
-  { at: SELECT_CLICK - 8, x: TARGET.x, y: TARGET.y },
+  { at: 14, x: 980, y: 860 },
+  { at: SELECT_CLICK - 4, x: HEAD.x + 220, y: HEAD.y + 60 },
+  { at: SWATCH_CLICK - 4, ...center(ORANGE_SWATCH) },
 ];
 
-export const SELECT_CLICKS: Click[] = [{ label: "select h1", at: SELECT_CLICK, path: PATH, rect: H1 }];
+export const SELECT_CLICKS: Click[] = [
+  { label: "select h1", at: SELECT_CLICK, path: PATH, rect: HEAD },
+  { label: "pick orange", at: SWATCH_CLICK, path: PATH, rect: ORANGE_SWATCH },
+];
+
+const isPressed = (frame: number, at: number) => Math.abs(frame - at) < 3;
 
 export const Select = () => {
   const frame = useCurrentFrame();
-  const zoom = 1 + 0.22 * tween(frame, 46, 22) - 0.22 * tween(frame, 92, 16);
+  const enter = tween(frame, 0, 16);
+  const zoom = 1 + PUSH * tween(frame, 16, 40);
   const pointer = pointerAt(frame, PATH);
+  const state = {
+    ...APP_REST,
+    hover: tween(frame, SELECT_CLICK - 8, 5),
+    selected: tween(frame, SELECT_CLICK, 4),
+    headColor: frame >= SWATCH_CLICK ? SWATCHES[1] : SWATCHES[0],
+    presses: [
+      { rect: HEAD, amount: pressAmount(frame, SELECT_CLICK) },
+      { rect: ORANGE_SWATCH, amount: pressAmount(frame, SWATCH_CLICK) },
+    ],
+  };
 
   return (
-    <Section tone={SELECT_TONE} eyebrow="01 · select">
-      <Scatter specks={SPECKS} />
-      <Place x={100} y={340}>
-        <Headline lines={["click any", "element of your", "running app."]} boxed="app" tone={SELECT_TONE} size={100} align={Align.Left} />
+    <Section tone={SELECT_TONE}>
+      <Place x={0} y={62} style={{ width: 1920 }}>
+        <Headline lines={["edit your running app visually."]} boxed="visually" tone={SELECT_TONE} size={96} align={Align.Center} />
       </Place>
-      <EditorFrame x={EDITOR_AT.x} y={EDITOR_AT.y} scale={EDITOR_AT.scale} enter={tween(frame, 4, 20)} zoom={zoom} focus={center(H1)}>
-        <FeegaEditor state={{ ...EDITOR_REST, hover: tween(frame, 50, 6), selected: tween(frame, SELECT_CLICK, 6), presses: [{ rect: H1, amount: pressAmount(frame, SELECT_CLICK) }] }} />
-        {frame >= PATH[0].at ? <Pointer x={pointer.x} y={pointer.y} pressed={Math.abs(frame - SELECT_CLICK) < 3} scale={EDITOR_AT.scale * zoom} /> : null}
-      </EditorFrame>
+      <Place x={APP_AT.x} y={APP_AT.y} style={{ transform: `translateY(${(1 - enter) * RISE}px)` }}>
+        <div style={{ position: "relative", transform: `scale(${zoom})`, transformOrigin: `${FOCUS.x}px ${FOCUS.y}px` }}>
+          <AppShot state={state} />
+          {frame >= PATH[0].at ? <Pointer x={pointer.x} y={pointer.y} pressed={isPressed(frame, SELECT_CLICK) || isPressed(frame, SWATCH_CLICK)} scale={zoom * POINTER_SIZE} /> : null}
+        </div>
+      </Place>
     </Section>
   );
 };

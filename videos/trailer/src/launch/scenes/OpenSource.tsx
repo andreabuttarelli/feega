@@ -39,7 +39,7 @@ export const OpenSource = () => {
   const pointer = pointerAt(frame, PATH);
 
   return (
-    <Section tone={OPEN_SOURCE_TONE} eyebrow="09 · open source">
+    <Section tone={OPEN_SOURCE_TONE} eyebrow="08 · open source">
       <Place x={0} y={250} style={{ width: 1920 }}>
         <Headline lines={OPEN_LINES} boxed={OPEN_BOXED} tone={Tone.Orange} size={150} align={Align.Center} />
       </Place>

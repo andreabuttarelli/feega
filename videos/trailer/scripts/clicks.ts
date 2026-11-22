@@ -1,7 +1,6 @@
 import { inside } from "../src/launch/editor/layout";
 import { pointerAt, type Click } from "../src/launch/Pointer";
 import { AGENTS_CLICKS } from "../src/launch/scenes/Agents";
-import { EDIT_CLICKS } from "../src/launch/scenes/Edit";
 import { OPEN_CLICKS } from "../src/launch/scenes/OpenSource";
 import { PLUGINS_CLICKS } from "../src/launch/scenes/Plugins";
 import { SELECT_CLICKS } from "../src/launch/scenes/Select";
@@ -9,7 +8,6 @@ import { TEMPLATES_CLICKS } from "../src/launch/scenes/Templates";
 
 const SCENES: Record<string, Click[]> = {
   select: SELECT_CLICKS,
-  edit: EDIT_CLICKS,
   templates: TEMPLATES_CLICKS,
   plugins: PLUGINS_CLICKS,
   agents: AGENTS_CLICKS,

@@ -275,7 +275,7 @@ export const Agents = () => {
   };
 
   return (
-    <Section tone={AGENTS_TONE} eyebrow="08 · agents">
+    <Section tone={AGENTS_TONE} eyebrow="07 · agents">
       <div style={{ position: "absolute", inset: 0, transform: `scale(${cam.zoom})`, transformOrigin: `${cam.focus.x}px ${cam.focus.y}px` }}>
         <Place x={0} y={80} style={{ width: 1920, opacity: 1 - 0.85 * tween(frame, SWAP_AT, 10) + 0.85 * tween(frame, BACK_AT, 10) }}>
           <Headline lines={AGENTS_LINES} boxed="build" tone={AGENTS_TONE} size={104} align={Align.Center} />
