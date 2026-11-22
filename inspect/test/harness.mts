@@ -15,7 +15,11 @@ import { breakpointsOf } from '../src/host/breakpoints.ts';
 import { themesOf } from '../src/host/themes.ts';
 import { commentsHost, type CommentsCloud } from '../src/host/comments.ts';
 import type { CommentDraft } from '../src/host/cloud-api.ts';
+import { entriesOf, insertAskOf } from '../src/host/library.ts';
+import { buildCatalog } from '../../packages/library/src/catalog.ts';
+import type { AddPlace } from '@feega/live-edit/add-node';
 
+const catalog = buildCatalog();
 const PANEL_PORT = Number(process.env.PANEL_PORT ?? 5999);
 const dist = fileURLToPath(new URL('../dist/webview/', import.meta.url));
 const launcher = fileURLToPath(new URL('../dist/launcher/', import.meta.url));
@@ -57,7 +61,7 @@ export async function openPanel(appRoot: string, theme = DARK, cloud?: CommentsC
   const comments = commentsHost(cloud, reply);
   const previewIcons = previewQueue(fetch, (name, svg) => reply({ kind: ToView.IconPreview, name, svg }));
 
-  await page.exposeFunction('toHost', async (m: { kind: ToHost; ask?: EditAsk; id?: number | string; pick?: Pick | null; query?: string; names?: string[]; draft?: CommentDraft }) => {
+  await page.exposeFunction('toHost', async (m: { kind: ToHost; ask?: EditAsk; id?: number | string; pick?: Pick | null; query?: string; names?: string[]; draft?: CommentDraft; at?: string; place?: string }) => {
     if (m.kind === ToHost.Ready) {
       await reply({ kind: ToView.App, url: running.url, styling, prefs: null, breakpoints: await breakpointsOf(appRoot), themes: await themesOf(appRoot) });
       await reply({ kind: ToView.Server, state: ServerState.Running });
@@ -75,6 +79,14 @@ export async function openPanel(appRoot: string, theme = DARK, cloud?: CommentsC
     if (m.kind === ToHost.Structure) {
       const out = await edits.structure(m);
       await reply(out.ok ? { kind: ToView.Edited, ok: true, written: out.written, select: out.selected } : { kind: ToView.Edited, ok: false, reason: out.reason, at: out.at });
+    }
+    if (m.kind === ToHost.LibraryList) {
+      await reply({ kind: ToView.Library, items: entriesOf(catalog) });
+    }
+    if (m.kind === ToHost.LibraryInsert) {
+      const ask = insertAskOf(catalog, m.id as string);
+      const out = ask.ok ? await edits.library(m.at as string, m.place as AddPlace, ask.item, ask.tokens) : ask;
+      await reply(out.ok ? { kind: ToView.Edited, ok: true, written: '', select: 'selected' in out ? out.selected : undefined } : { kind: ToView.Edited, ok: false, reason: out.reason });
     }
     if (m.kind === ToHost.IconSearch) {
       const found = await searchIcons(appRoot, fetch, m.query!, null);
