@@ -2,7 +2,7 @@ import { AddKind, AddPlace } from '@feega/live-edit/add-node';
 import { StructureOp } from '@feega/live-edit/structure';
 import { WrapTag } from '@feega/live-edit/wrap-node';
 
-export type MenuItem = { id: string; label: string; shortcut?: string; items?: MenuItem[] };
+export type MenuItem = { id: string; label: string; shortcut?: string; items?: MenuItem[]; still?: boolean };
 
 export const COPY_FOR_AGENT = 'copy-for-agent';
 export const ADD_CHILD_PREFIX = 'add-child:';
@@ -47,6 +47,9 @@ export const MENU_ITEMS: MenuItem[] = [
   { id: StructureOp.Unwrap, label: 'Unwrap', shortcut: '⇧⌘G' },
   { id: StructureOp.Delete, label: 'Delete', shortcut: '⌫' }
 ];
+
+export const LIBRARY_ID = 'library';
+export const LIBRARY_ITEM: MenuItem = { id: LIBRARY_ID, label: 'Library', still: true };
 
 export const ADD_LOOP_ITEM: MenuItem = { id: StructureOp.AddItem, label: 'Add item' };
 

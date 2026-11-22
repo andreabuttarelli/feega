@@ -26,7 +26,7 @@ const filesOf = (item: LibraryItem, framework: Framework, itemsDir: string): Cat
 
 const pageOf = (tokens: string, item: LibraryItem, itemsDir: string): string => {
 	const dir = join(itemsDir, item.id, 'html');
-	return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>${tokens}\n${read(join(dir, 'style.css'))}\nbody{margin:0}</style></head><body>${read(join(dir, 'index.html'))}</body></html>`;
+	return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>${tokens}\n${read(join(dir, 'style.css'))}\nbody{margin:0;background:var(--feega-bg)}</style></head><body>${read(join(dir, 'index.html'))}</body></html>`;
 };
 
 export function buildCatalog(itemsDir: string = ITEMS_DIR, tokensFile: string = TOKENS_FILE): Catalog {

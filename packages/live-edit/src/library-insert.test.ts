@@ -146,11 +146,11 @@ describe('libraryInsert on SvelteKit', () => {
     expect(c['src/lib/components/feega/Pricing3.svelte']).toBeDefined();
   });
 
-  it('writes tokens but no sheet change when the project has no global stylesheet, and says so', async () => {
+  it('has the component import the tokens itself when the project has no global stylesheet', async () => {
     const read = files({ 'package.json': pkg(['@sveltejs/kit']), 'src/routes/+page.svelte': SVELTE_PAGE });
-    const out = await libraryInsert(read, H1_SVELTE, AddPlace.After, ITEM, TOKENS);
-    expect(out.ok && out.note).toMatch(/no global stylesheet/);
-    expect(changes(out)['src/lib/components/feega/tokens.css']).toBeDefined();
+    const c = changes(await libraryInsert(read, H1_SVELTE, AddPlace.After, ITEM, TOKENS));
+    expect(c['src/lib/components/feega/tokens.css'].after).toBe(TOKENS);
+    expect(c['src/lib/components/feega/Pricing.svelte'].after).toBe(`<script lang="ts">\n  import './tokens.css';\n</script>\n\n${ITEM.files.svelte[0].text}`);
   });
 });
 
@@ -175,6 +175,12 @@ describe('libraryInsert on React', () => {
     expect(c['src/components/feega/Pricing2.tsx'].after).toContain('export function Pricing2()');
     expect(c['src/components/feega/Pricing2.css']).toBeDefined();
     expect(c['src/App.tsx'].after).toContain("import { Pricing2 } from './components/feega/Pricing2';");
+  });
+
+  it('imports the tokens in the component without a global stylesheet', async () => {
+    const read = files({ 'package.json': pkg(['react', 'vite']), 'src/App.tsx': TSX_PAGE });
+    const c = changes(await libraryInsert(read, H1, AddPlace.After, ITEM, TOKENS));
+    expect(c['src/components/feega/Pricing.tsx'].after.startsWith("import './Pricing.css';\nimport './tokens.css';\n")).toBe(true);
   });
 
   it('adds the import after the existing ones', async () => {
