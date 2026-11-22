@@ -24,7 +24,7 @@ export type Args =
   | { run: Run.Plugin; action: Exclude<PluginAction, PluginAction.Dev>; value: string }
   | { run: Run.Error; reason: string };
 
-export const USAGE = `Usage: npx feega [dir] [--url <address>] [--port N] [--no-open]
+const EDITOR_USAGE = `Usage: npx feega [dir] [--url <address>] [--port N] [--no-open]
 
 Opens the Feega editor on the web app in [dir] (default: this folder):
 starts its dev server, then a design panel in your browser. Edits are
@@ -35,7 +35,9 @@ written to your source files.
   --port N     port of the editor (default: a free one)
   --no-open    do not open the browser
   --help       this text
-  --version    the version
+  --version    the version`;
+
+const PLUGIN_USAGE = `
 
 Usage: npx feega plugin add <github:owner/repo[@tag] | npm-name[@version]>
        npx feega plugin remove <id>
@@ -44,18 +46,22 @@ Usage: npx feega plugin add <github:owner/repo[@tag] | npm-name[@version]>
 
 Installs, removes and lists third-party plugins (kept in ~/.feega/plugins),
 or opens the editor with a plugin folder you are developing, reloaded on change.
-Plugins are not reviewed by Feega: add shows what one may do and asks first.
+Plugins are not reviewed by Feega: add shows what one may do and asks first.`;
+
+const MCP_USAGE = `
 
 Usage: npx feega mcp
 
 Serves the Feega Cloud tools (share, comments) to a coding agent over
 MCP on stdio. Sign in once with npx feega, or set FEEGA_API_KEY.`;
 
+export const usageOf = (cloud: boolean): string => (cloud ? EDITOR_USAGE + PLUGIN_USAGE + MCP_USAGE : EDITOR_USAGE + PLUGIN_USAGE);
+
 const MCP_COMMAND = 'mcp';
 
 const FLAGS: Record<string, Run.Help | Run.Version> = { '--help': Run.Help, '-h': Run.Help, '--version': Run.Version, '-v': Run.Version };
 
-function pluginRun(argv: string[], cwd: string): Args {
+function pluginRun(argv: string[], cwd: string, cloud: boolean): Args {
   const parsed = pluginArgsOf(argv);
   if ('error' in parsed) {
     return { run: Run.Error, reason: parsed.error };
@@ -63,23 +69,23 @@ function pluginRun(argv: string[], cwd: string): Args {
   if (parsed.action !== PluginAction.Dev) {
     return { run: Run.Plugin, action: parsed.action, value: parsed.value };
   }
-  const editor = argsOf(parsed.rest, cwd);
+  const editor = argsOf(parsed.rest, cwd, cloud);
   return editor.run === Run.Editor ? { ...editor, devPlugins: [resolve(cwd, parsed.value)] } : editor;
 }
 
-export function argsOf(argv: string[], cwd: string): Args {
+export function argsOf(argv: string[], cwd: string, cloud = false): Args {
   let dir = cwd;
   let port = 0;
   let browser = Browser.Open;
   let url: string | undefined;
   const rest = [...argv];
 
-  if (rest[0] === MCP_COMMAND) {
+  if (cloud && rest[0] === MCP_COMMAND) {
     return { run: Run.Mcp };
   }
 
   if (rest[0] === PLUGIN_COMMAND) {
-    return pluginRun(rest.slice(1), cwd);
+    return pluginRun(rest.slice(1), cwd, cloud);
   }
 
   while (rest.length) {

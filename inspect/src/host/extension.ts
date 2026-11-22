@@ -15,6 +15,7 @@ import type { Running } from './dev-server';
 import { appOf, inspectSession, type Session } from './session';
 import { signInFromUri } from './sign-in';
 import { DEV_PLUGINS_SETTING, approveInModal, beforeProvider, vsCodePlatform, type VsCodeHost } from './vscode-platform';
+import { CLOUD_SETTING, cloudEnabled } from '../cloud-flag';
 import { cloudApi } from './cloud-api';
 import { editorServer } from './editor-server';
 import type { Platform } from './platform';
@@ -58,6 +59,10 @@ const RELAY_URL_VAR = 'FEEGA_RELAY_URL';
 const ANY_PORT = 0;
 
 function cloudPlatform(context: vscode.ExtensionContext, base: Platform): { platform: Platform; stopRemote: () => Promise<void> } {
+  if (!cloudEnabled({ setting: vscode.workspace.getConfiguration().get<boolean>(CLOUD_SETTING), env: process.env })) {
+    return { platform: base, stopRemote: async () => {} };
+  }
+
   const remote = withRemoteEditor(base, () => editorServer(vscode.Uri.joinPath(mediaOf(context)).fsPath, ANY_PORT));
   const token = async () => {
     const account = await base.account.read();

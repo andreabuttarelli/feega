@@ -186,6 +186,7 @@
   const PIN_STACK_PX = 22;
   const pins = $derived(pinsOf(threadsOf(cloud.comments, false)));
   const openComments = $derived(pins.length);
+  const cloudOn = $derived(Boolean(share?.available));
   let layers = $state<LayerNode[]>([]);
   let palette = $state<Palette>({ document: [], tokens: [], fonts: [], missing: [] });
   const dismissedFonts = new SvelteSet<string>();
@@ -1086,7 +1087,7 @@
     if (cmd || typing(e)) {
       return;
     }
-    if (e.key.toLowerCase() === COMMENT_KEY && picked && mode === Mode.Design && !editing) {
+    if (cloudOn && e.key.toLowerCase() === COMMENT_KEY && picked && mode === Mode.Design && !editing) {
       e.preventDefault();
       startComment();
       return;
@@ -1138,7 +1139,7 @@
       {#if themes.length > 1}<ThemeBar {themes} choice={themeName} onchoose={chooseTheme} />{/if}
       {#if fit.scale < 1}<span class="zoom" data-testid="zoom">{Math.round(fit.scale * 100)}%</span>{/if}
       <button type="button" class="icon" title="Open in browser" onclick={() => toHost({ kind: ToHost.External, url: new URL(route, url).toString() })}><ExternalLink size={14} /></button>
-      <SharePanel view={share} onstart={(name, canEdit) => toHost({ kind: ToHost.ShareStart, name, canEdit })} onstop={() => toHost({ kind: ToHost.ShareStop })} onkick={(userId) => toHost({ kind: ToHost.ShareKick, userId })} onrole={(userId, role) => toHost({ kind: ToHost.ShareRole, userId, role })} />
+      {#if share?.available}<SharePanel view={share} onstart={(name, canEdit) => toHost({ kind: ToHost.ShareStart, name, canEdit })} onstop={() => toHost({ kind: ToHost.ShareStop })} onkick={(userId) => toHost({ kind: ToHost.ShareKick, userId })} onrole={(userId, role) => toHost({ kind: ToHost.ShareRole, userId, role })} />{/if}
       <button type="button" class="icon" class:on={!barClosed} title="Properties (⌘\)" onclick={toggleBar} data-testid="bar-toggle"><PanelRight size={15} /></button>
     </header>
 
@@ -1237,7 +1238,7 @@
       <Tabs.List class="tab-list">
         <Tabs.Trigger value={Tab.Properties} class="tab">Properties</Tabs.Trigger>
         <Tabs.Trigger value={Tab.Changes} class="tab" data-testid="changes-tab">Changes{changes.length ? ` ${changes.length}` : ''}</Tabs.Trigger>
-        <Tabs.Trigger value={Tab.Comments} class="tab" data-testid="comments-tab">Comments{openComments ? ` ${openComments}` : ''}</Tabs.Trigger>
+        {#if cloudOn}<Tabs.Trigger value={Tab.Comments} class="tab" data-testid="comments-tab">Comments{openComments ? ` ${openComments}` : ''}</Tabs.Trigger>{/if}
         {#each plugins.sidePanel as panel (panel.plugin + panel.entry.id)}<Tabs.Trigger value={`plugin:${panel.plugin}/${panel.entry.id}`} class="tab" data-testid="plugin-tab">{panel.entry.title}</Tabs.Trigger>{/each}
       </Tabs.List>
       <Tabs.Content value={Tab.Properties}>
@@ -1256,7 +1257,7 @@
         {:else if picked}
           <div class="what" data-testid="selection">
             <Breadcrumb pick={picked} onselect={select} state={elementState} />
-            <span class="where">{#if picked.component}in {picked.component.file.split('/').pop()} · {/if}<button type="button" class="link" onclick={() => toHost({ kind: ToHost.Open, at: picked!.source })}>{picked.source.file.split('/').pop()}:{picked.source.line}</button> · <button type="button" class="link" data-testid="copy-for-agent" title="Copy file, selector and view for your coding agent" onclick={copyForAgent}>Copy for agent</button> · <button type="button" class="link" data-testid="comment-start" title="Comment on this element (C)" onclick={startComment}>Comment</button></span>
+            <span class="where">{#if picked.component}in {picked.component.file.split('/').pop()} · {/if}<button type="button" class="link" onclick={() => toHost({ kind: ToHost.Open, at: picked!.source })}>{picked.source.file.split('/').pop()}:{picked.source.line}</button> · <button type="button" class="link" data-testid="copy-for-agent" title="Copy file, selector and view for your coding agent" onclick={copyForAgent}>Copy for agent</button>{#if cloudOn} · <button type="button" class="link" data-testid="comment-start" title="Comment on this element (C)" onclick={startComment}>Comment</button>{/if}</span>
             {#if authored(picked.classes)}<code class="classes">{authored(picked.classes)}</code>{/if}
           </div>
           <BreakpointBar badge={reachBadge} theme={themeBadge(themeName)} items={reachItems(breakpoints)} choice={reach} onchoose={(id) => (reach = id)} />

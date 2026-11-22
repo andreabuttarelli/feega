@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { CLOUD_SETTING } from './cloud-flag';
 import { SETTINGS, issueUrl } from './settings';
 
 const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
@@ -20,7 +21,7 @@ describe('settings', () => {
   });
 
   it('every declared setting has a menu row', () => {
-    expect(Object.keys(declared).filter((key) => !SETTINGS_JSON_ONLY.includes(key)).sort()).toEqual(SETTINGS.map((r) => r.key).sort());
+    expect(Object.keys(declared).filter((key) => key !== CLOUD_SETTING && !SETTINGS_JSON_ONLY.includes(key)).sort()).toEqual(SETTINGS.map((r) => r.key).sort());
   });
 
   it('the problem report carries version and framework, no code', () => {
