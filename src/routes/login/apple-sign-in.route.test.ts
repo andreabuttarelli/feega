@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { isRedirect } from '@sveltejs/kit';
 
-vi.mock('$lib/server/oauth', () => ({ takeOAuthReturn: () => null }));
 vi.mock('$env/dynamic/private', () => ({ env: {} }));
 vi.mock('$lib/server/tenancy/landing', async (orig) => ({
   ...(await orig<object>()),

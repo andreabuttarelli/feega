@@ -1,0 +1,29 @@
+{
+  "id": "avatar-group",
+  "name": "Avatar group",
+  "description": "Overlapping avatars with a remaining count, in three sizes; placeholder initials.",
+  "category": "component",
+  "tags": [
+    "avatar",
+    "people"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    }
+  ],
+  "tier": "free"
+}

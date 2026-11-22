@@ -1,5 +1,5 @@
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { dirname, relative } from 'node:path';
 import { stylePatch, type LiveAt } from '@feega/live-edit/class-patch';
 import { cssModuleRule } from '@feega/live-edit/css-module';
 import type { FileChange, ReadFile } from '@feega/live-edit/files';
@@ -9,12 +9,14 @@ import { LiveProp } from '@feega/live-edit/live-fields';
 import { literalText } from '@feega/live-edit/literal-text';
 import { moveNode, type Place } from '@feega/live-edit/move-node';
 import { globalSheetOf, googleFontImport, googleFontLink } from '@feega/live-edit/font-wiring';
+import { replaceEverywhere } from '@feega/live-edit/font-replace';
 import { VariableHome, saveVariable, variableName } from '@feega/live-edit/save-variable';
 import { addedCss, AddKind, AddPlace, AddStyle } from '@feega/live-edit/add-node';
 import { wrapperCss, type WrapTag } from '@feega/live-edit/wrap-node';
 import type { LoopMove } from '@feega/live-edit/move-loop-item';
 import type { Usage } from '@feega/live-edit/move-usage';
 import { StructureOp, structure } from '@feega/live-edit/structure';
+import { structureMany, type Skipped, type Target } from '@feega/live-edit/structure-many';
 import { pageRule } from '@feega/live-edit/page-rule';
 import { ElementState } from '@feega/live-edit/element-state';
 import { scopedRule, type Scope } from '@feega/live-edit/scoped-rule';
@@ -34,8 +36,11 @@ import { breakpointsOf } from './breakpoints';
 import { themesOf } from './themes';
 import { proposalChanges } from './proposal';
 import { filesIn } from './wiring';
+import { scanProject } from './project-scan';
 
 export type StructureAsk = { op: StructureOp; at: string; to?: string; usage?: Usage; loop?: LoopMove; instance?: number; add?: { kind: AddKind; src?: string; place?: AddPlace }; wrap?: WrapTag };
+
+export type ManyAsk = { op: StructureOp; targets: { at: string; instance?: number }[]; wrap?: WrapTag };
 
 export type Written = { ok: true; path: string; written: string; note?: string; selected?: LiveAt } | { ok: false; reason: string; at?: LiveAt };
 
@@ -94,6 +99,8 @@ export type Change = { id: number; at: string; prop: string; value: string; scop
 const NOTHING_TO_UNDO = 'nothing to undo';
 const NOTHING_TO_REDO = 'nothing to redo';
 const CHANGED_SINCE = 'a file changed after the edit: not restored';
+const FONT_NOT_LOADED = 'no global stylesheet or page head found: the font is named but not loaded';
+const FONT_CONFIGS = ['tailwind.config.mjs', 'tailwind.config.cjs'];
 
 export type Snapshot = { steps: { step: Step; change: Change }[]; undone: { step: Step; change: Change }[] };
 
@@ -187,12 +194,44 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     return out.files.length || extra.length ? written(out.files, token ?? '') : { ok: true, path: at.file, written: token ?? '' };
   }
 
+  async function fontWiring(read: ReadFile, family: string, google: boolean): Promise<{ changes: FileChange[]; unloaded: boolean }> {
+    if (!google) {
+      return { changes: [], unloaded: false };
+    }
+    const sheet = await globalSheetOf(read);
+    const wiring = sheet ? await googleFontImport(read, sheet, family) : await googleFontLink(read, family);
+    return { changes: wiring ? [wiring] : [], unloaded: !sheet && !wiring };
+  }
+
   async function fontEdited(ask: EditAsk, google: boolean): Promise<Written> {
-    const sheet = google ? await globalSheetOf(reader(root)) : null;
-    const linked = google && !sheet ? await googleFontLink(reader(root), ask.value ?? '') : null;
-    const wiring = sheet ? await googleFontImport(reader(root), sheet, ask.value ?? '') : linked;
-    const out = await edited(ask, wiring ? [wiring] : []);
-    return out.ok && google && !sheet && !linked ? { ...out, note: 'no global stylesheet or page head found: the font is named but not loaded' } : out;
+    const wiring = await fontWiring(reader(root), ask.value ?? '', google);
+    const out = await edited(ask, wiring.changes);
+    return out.ok && wiring.unloaded ? { ...out, note: FONT_NOT_LOADED } : out;
+  }
+
+  async function projectSources(): Promise<{ path: string; text: string }[]> {
+    const scan = await scanProject(root, Infinity);
+    const paths = [...new Set([...scan.sheets, ...scan.sources].map((full) => relative(root, full)).concat(FONT_CONFIGS))];
+    const read = reader(root);
+    const files = await Promise.all(paths.map(async (path) => ({ path, text: await read(path) })));
+    return files.filter((f): f is { path: string; text: string } => f.text !== null);
+  }
+
+  async function fontReplaced(from: string, to: string, google: boolean): Promise<Written> {
+    meta = { at: '', prop: 'font-family', value: to, scope: 'project' };
+    const replaced = replaceEverywhere(await projectSources(), from, to);
+    if (!replaced.length) {
+      return { ok: false, reason: `${from} is not named in any source file` };
+    }
+    const wiring = await fontWiring(afterChanges(reader(root), replaced), to, google);
+    const count = `Replaced ${from} with ${to} in ${replaced.length} ${replaced.length === 1 ? 'file' : 'files'}`;
+    return writtenAll(mergedChanges(replaced, wiring.changes), to, wiring.unloaded ? `${count}. ${FONT_NOT_LOADED}` : count);
+  }
+
+  async function fontLoaded(family: string): Promise<Written> {
+    meta = { at: '', prop: 'font-load', value: family, scope: 'project' };
+    const wiring = await fontWiring(reader(root), family, true);
+    return writtenAll(wiring.changes, family, wiring.unloaded ? FONT_NOT_LOADED : undefined);
   }
 
   async function iconSwapped(rawAt: string, name: string): Promise<Written> {
@@ -315,6 +354,37 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     return out.ok ? writtenAll(out.changes, '') : out;
   }
 
+  const skippedNote = (total: number, skipped: Skipped[]): string | undefined => {
+    const reasons = [...new Set(skipped.map((s) => s.reason))].join('; ');
+    return skipped.length ? `${total - skipped.length} of ${total} changed · skipped: ${reasons}` : undefined;
+  };
+
+  async function restructuredMany(ask: ManyAsk): Promise<Written> {
+    const { op, wrap } = ask;
+    const tailwind = (await stylingOf(root, choice())) === Styling.Tailwind;
+    const style = tailwind ? AddStyle.Tailwind : AddStyle.Plain;
+    meta = { at: ask.targets[0]?.at ?? '', prop: op, value: `${ask.targets.length} elements`, scope: '' };
+    const outside: Skipped[] = [];
+    const targets: Target[] = [];
+    for (const target of ask.targets) {
+      const at = placed(target.at);
+      if (at) {
+        targets.push({ at, instance: target.instance });
+        continue;
+      }
+      outside.push({ at: { file: target.at, line: 0, col: 0 }, reason: `${target.at} is not a file:line:col inside the workspace` });
+    }
+    const made = await structureMany(reader(root), { op, targets, style, wrap });
+    if (!made.ok) {
+      return made;
+    }
+    const css = tailwind ? {} : op === StructureOp.Wrap ? wrapperCss(wrap) : {};
+    const out = await ruled(reader(root), { ok: true, changes: made.changes, selected: made.selected }, css);
+    const note = skippedNote(ask.targets.length, [...outside, ...made.skipped]);
+    const written = out.ok ? await writtenAll(out.changes, '', note ?? out.note) : out;
+    return out.ok && written.ok ? { ...written, selected: out.selected } : written;
+  }
+
   async function variableSaved(ask: EditAsk, name: string): Promise<Written> {
     const sheet = await globalSheetOf(reader(root));
     if (!sheet) {
@@ -333,11 +403,14 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     proposal: (proposal: Proposal, appDir: string) => inTurn(() => proposed(proposal, appDir)),
     saveVariable: (ask: EditAsk, name: string) => inTurn(() => variableSaved(ask, name)),
     structure: (ask: StructureAsk) => inTurn(() => restructured(ask)),
+    structureMany: (ask: ManyAsk) => inTurn(() => restructuredMany(ask)),
     move: (from: string, to: string, place: Place) => inTurn(() => moved(from, to, place)),
     edit: (ask: EditAsk) => inTurn(() => edited(ask)),
     icon: (at: string, name: string) => inTurn(() => iconSwapped(at, name)),
     svg: (at: string, markup: string, inner?: string) => inTurn(() => svgWritten(at, markup, inner)),
     font: (ask: EditAsk, google: boolean) => inTurn(() => fontEdited(ask, google)),
+    replaceFont: (from: string, to: string, google: boolean) => inTurn(() => fontReplaced(from, to, google)),
+    loadFont: (family: string) => inTurn(() => fontLoaded(family)),
     link: (at: string, edit: LinkEdit, instance?: number) => inTurn(() => linkWritten(at, edit, instance)),
     go: (at: string, ask: GoAsk) => inTurn(() => goWritten(at, ask)),
     undo: () => inTurn(undoStep),

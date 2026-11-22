@@ -66,6 +66,8 @@ describe('rowOverrides', () => {
 
   it('finds an overridden class family', () => {
     expect(rowOverrides(row('width'), 'w-full md:w-1/2', DEFAULT_BREAKPOINTS)).toEqual(['md']);
+    expect(rowOverrides(row('max-width'), 'max-w-prose md:max-w-[720px]', DEFAULT_BREAKPOINTS)).toEqual(['md']);
+    expect(rowOverrides(row('max-width'), 'w-full md:w-1/2', DEFAULT_BREAKPOINTS)).toEqual([]);
   });
 
   it('is empty without overrides', () => {

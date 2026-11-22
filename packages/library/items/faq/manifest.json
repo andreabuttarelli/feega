@@ -1,0 +1,35 @@
+{
+  "id": "faq",
+  "name": "FAQ",
+  "description": "Accordion built on native details and summary; no JavaScript.",
+  "category": "section",
+  "tags": [
+    "faq",
+    "accordion"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    },
+    {
+      "family": "Fragment Mono",
+      "weights": [
+        400
+      ]
+    }
+  ],
+  "tier": "free"
+}

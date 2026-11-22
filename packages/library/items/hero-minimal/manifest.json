@@ -1,0 +1,30 @@
+{
+  "id": "hero-minimal",
+  "name": "Hero, text only",
+  "description": "One huge lowercase line and a single link; nothing else on the page competes.",
+  "category": "section",
+  "tags": [
+    "hero",
+    "landing",
+    "minimal"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    }
+  ],
+  "tier": "free"
+}

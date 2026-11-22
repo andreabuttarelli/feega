@@ -5,14 +5,14 @@ import { useCoreSink } from '$lib/server/core-usage';
 describe('track', () => {
   it('writes one row with the ids and the props, never more', async () => {
     const rows: EventRow[] = [];
-    await track(ProductEvent.AgentFailed, { userId: 'u1', orgId: 'o1' }, { code: 'project_not_found' }, async (row) => void rows.push(row));
+    await track(ProductEvent.AgentConnected, { userId: 'u1', orgId: 'o1' }, { key_id: 'k1' }, async (row) => void rows.push(row));
 
-    expect(rows).toEqual([{ event: 'agent_failed', user_id: 'u1', org_id: 'o1', anonymous_id: null, props: { code: 'project_not_found' } }]);
+    expect(rows).toEqual([{ event: 'agent_connected', user_id: 'u1', org_id: 'o1', anonymous_id: null, props: { key_id: 'k1' } }]);
   });
 
   it('a signed-out visitor is recorded by the anonymous id alone', async () => {
     const rows: EventRow[] = [];
-    await track(ProductEvent.LandingPromptSent, { anonymousId: 'n1' }, { kind: 'motion', source: null }, async (row) => void rows.push(row));
+    await track(ProductEvent.TeamInviteAccepted, { anonymousId: 'n1' }, { role: 'editor' }, async (row) => void rows.push(row));
 
     expect(rows[0]).toMatchObject({ user_id: null, org_id: null, anonymous_id: 'n1' });
   });
@@ -43,7 +43,7 @@ describe('track verso PostHog', () => {
     const sent: unknown[] = [];
     useCoreSink((body) => void sent.push(body));
 
-    await track(ProductEvent.LoginStarted, { anonymousId: 'n1' }, {}, async () => {});
+    await track(ProductEvent.SignupCompleted, { anonymousId: 'n1' }, {}, async () => {});
     useCoreSink(null);
 
     expect(sent).toEqual([]);

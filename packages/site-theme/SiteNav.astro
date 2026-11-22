@@ -1,0 +1,57 @@
+---
+import { GITHUB_URL, SOCIAL_LINKS } from './social.mjs';
+
+interface Props {
+  current?: 'docs' | 'blog' | 'none';
+}
+
+const { current = 'none' } = Astro.props;
+
+const links = [
+  { id: 'download', href: 'https://www.feega.app/download', label: 'download' },
+  { id: 'docs', href: 'https://docs.feega.app/', label: 'docs' },
+  { id: 'blog', href: 'https://blog.feega.app/', label: 'blog' },
+  { id: 'pricing', href: 'https://www.feega.app/pricing', label: 'pricing' },
+  { id: 'community', href: 'https://discord.gg/PUp37DG6vr', label: 'community' }
+];
+---
+
+<header class="sx-nav">
+  <a class="sx-brand" href="https://www.feega.app/" aria-label="Feega home">
+    <img src="/favicon.svg" alt="" width="22" height="22" />feega
+  </a>
+
+  <nav class="sx-links" aria-label="Main">
+    {links.map((l) => <a class="sx-pill" href={l.href} aria-current={l.id === current ? 'page' : undefined}>{l.label}</a>)}
+  </nav>
+
+  <div class="sx-actions">
+    <slot name="search" />
+    <a class="sx-pill" href="https://github.com/andreabuttarelli/feega">star on github</a>
+    <a class="sx-pill sx-cta" href="https://www.feega.app/download">download</a>
+  </div>
+
+  <div class="sx-mobile">
+    <a class="sx-round" href={GITHUB_URL} aria-label="Feega on GitHub" set:html={SOCIAL_LINKS[1].icon} />
+
+    <details class="sx-menu">
+      <summary class="sx-round" aria-label="Menu">
+        <svg class="sx-open" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h16M4 16h16" /></svg>
+        <svg class="sx-close" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+      </summary>
+
+      <nav class="sx-menu-panel" aria-label="Menu">
+        <div class="sx-menu-links">
+          {links.map((l) => <a href={l.href}>{l.label}</a>)}
+          <a href={GITHUB_URL}>star on github</a>
+        </div>
+
+        <div class="sx-menu-icons">
+          {SOCIAL_LINKS.map((s) => <a href={s.href} aria-label={s.label} set:html={s.icon} />)}
+        </div>
+
+        <a class="sx-menu-cta" href="https://www.feega.app/download">download</a>
+      </nav>
+    </details>
+  </div>
+</header>

@@ -1,4 +1,4 @@
-export const BILLING_PATH = '/app/credits';
+export const BILLING_PATH = '/app/settings/billing';
 
 export enum CheckoutOutcome {
   None = 'none',

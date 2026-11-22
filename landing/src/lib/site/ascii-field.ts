@@ -111,3 +111,5 @@ export function envelope(nx: number, ny: number): number {
   const r = Math.min(1, Math.hypot(dx, dy) / Math.SQRT2);
   return 1 - r * r * (3 - 2 * r);
 }
+
+export const flagColour = (flag: number, t: number): Rgb => lifted(gradient(FLAG_STOPS[flag % FLAG_COUNT], t));

@@ -1,0 +1,15 @@
+<form class="fl-form-inputs" action="#">
+  <label class="fl-field" for="fl-inputs-name">Project name<input class="fl-input" id="fl-inputs-name" type="text" placeholder="My website" /><small>Shown in the sidebar.</small></label>
+  <label class="fl-field bad" for="fl-inputs-url">Domain<input class="fl-input" id="fl-inputs-url" type="text" value="example" aria-invalid="true" aria-describedby="fl-inputs-url-error" /><small id="fl-inputs-url-error">Enter a full domain, like example.com.</small></label>
+  <label class="fl-field" for="fl-inputs-plan">Plan<select class="fl-input" id="fl-inputs-plan"><option>Starter</option><option>Pro</option><option>Business</option></select></label>
+  <label class="fl-field" for="fl-inputs-notes">Notes<textarea class="fl-input" id="fl-inputs-notes" rows="3" placeholder="Anything we should know"></textarea></label>
+  <fieldset><legend>Visibility</legend>
+    <label class="radio"><input type="radio" name="fl-inputs-visibility" checked />Private</label>
+    <label class="radio"><input type="radio" name="fl-inputs-visibility" />Team</label>
+    <label class="radio"><input type="radio" name="fl-inputs-visibility" />Public</label>
+  </fieldset>
+  <fieldset><legend>Options</legend>
+    <label class="fl-check"><input type="checkbox" checked />Send me updates</label>
+    <label class="toggle"><input class="fl-switch" type="checkbox" checked />Auto publish</label>
+  </fieldset>
+</form>

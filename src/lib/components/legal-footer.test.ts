@@ -15,9 +15,9 @@ describe('il footer legale condiviso', () => {
     expect(component).toMatch(/target="_blank" rel="noopener"/);
   });
 
-  it('la tabella copre tutte le nove pagine richieste', () => {
-    expect(FOOTER_LEGAL_LINKS).toHaveLength(9);
-    expect(new Set(FOOTER_LEGAL_LINKS).size).toBe(9);
+  it('la tabella copre tutte le tre pagine richieste', () => {
+    expect(FOOTER_LEGAL_LINKS).toHaveLength(3);
+    expect(new Set(FOOTER_LEGAL_LINKS).size).toBe(3);
   });
 
   it('porta anche le impostazioni cookie, dalla stessa funzione della pagina profilo', () => {

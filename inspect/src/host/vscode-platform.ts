@@ -117,6 +117,7 @@ export function vsCodePlatform(host: VsCodeHost, panel: PanelLike, befores: Map<
     openSettings: (key) => vscode.commands.executeCommand('workbench.action.openSettings', key),
     sourceControl: () => vscode.commands.executeCommand('workbench.view.scm'),
     notify: (text) => vscode.window.showInformationMessage(`Feega: ${text}`),
+    warn: async (text, action) => (await vscode.window.showWarningMessage(`Feega: ${text}`, ...(action ? [action] : []))) === action,
     pickImage,
     account: secretAccountStore(context.secrets),
     onboarding: deviceOnboardingStore(globalStateOnboardingStore(context.globalState)),

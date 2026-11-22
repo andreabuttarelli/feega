@@ -1,0 +1,192 @@
+---
+title: SvelteKit form actions explained, with a working example
+description: "How SvelteKit form actions work in version 3: default and named actions, validation with fail, redirects, use:enhance, and what happens without JavaScript. Tested in a scratch project."
+date: 2026-11-22
+cover: /covers/sveltekit-form-actions-explained.png
+coverAlt: "Cover: Form actions, without the magic. SvelteKit explained"
+tags: [sveltekit, svelte, forms, tutorial]
+---
+
+import Callout from '../../components/Callout.astro';
+import Cta from '../../components/Cta.astro';
+
+A SvelteKit form action is a function on the server that a normal HTML form posts to. That is the whole idea. The rest is a few conventions for naming actions, returning errors and making the form feel fast when JavaScript is available.
+
+This post builds one small notes page with an add form, a remove button and a redirect, and explains each piece as it appears. I ran every example in a fresh project on SvelteKit 3.4.0 and Svelte 5.59.1, and I note where I only read the docs.
+
+<Callout icon="check" title="The short version">
+Export `actions` from `+page.server.ts`. Point a `<form method="POST">` at one with `action="?/name"`. Return data to show it in the page as `form`, use `fail()` to return an error status, and add `use:enhance` so the page updates without a reload. Without JavaScript the same form still works.
+</Callout>
+
+## How we checked
+
+On 22 November 2026 I opened the SvelteKit [form actions](https://svelte.dev/docs/kit/form-actions) and [routing](https://svelte.dev/docs/kit/routing) docs, and the SvelteKit changelog on GitHub for version 3.0.0. Then I created a project with `npx sv create` (minimal template, TypeScript), added the code below and ran it.
+
+I checked it three ways. `svelte-check` for types. `curl` against the dev server for the status codes and the no-JavaScript path. A real Chromium driven by Playwright for the `use:enhance` behaviour, where I set a marker on `window` and confirmed it survived the submit, which proves the page did not reload.
+
+Limits: one small app, dev server only, no database. I did not test file uploads, multiple forms with the same action name, or a deployed build. I did not run the custom `use:enhance` callback, so that part comes from the docs and is labelled.
+
+## The smallest action
+
+An action lives in `+page.server.ts` next to the page. It receives the request, reads the form data and returns something.
+
+```ts
+import { fail } from '@sveltejs/kit';
+import { addNote } from '#lib/server/notes.ts';
+import type { Actions } from './$types';
+
+export const actions: Actions = {
+  add: async ({ request }) => {
+    const data = await request.formData();
+    const text = String(data.get('text') ?? '').trim();
+
+    if (!text) {
+      return fail(400, { text, missing: true });
+    }
+
+    addNote(text);
+    return { added: text };
+  }
+};
+```
+
+The page posts to it by name:
+
+```svelte
+<script lang="ts">
+  import { enhance } from '$app/forms';
+  import type { PageProps } from './$types';
+
+  let { data, form }: PageProps = $props();
+</script>
+
+<form method="POST" action="?/add" use:enhance>
+  <input name="text" value={form?.text ?? ''} />
+  <button>Add</button>
+  {#if form?.missing}<p>Write something first.</p>{/if}
+  {#if form?.added}<p>Saved "{form.added}".</p>{/if}
+</form>
+```
+
+Three things to notice. The action is just an object key. The `?/add` in the form says which key. And whatever the action returns shows up on the page as the `form` prop.
+
+## Default and named actions
+
+If a page has one action, you can call it `default` and write `<form method="POST">` with no name. If it has several, you name them and choose in the form with `action="?/name"`, or per button with `formaction="?/name"`.
+
+The docs advise against mixing a `default` action with named ones on the same page. I found out why by accident. My page had only named actions, and I posted to `/notes` without a name. The response was a 404, because there is no `default` to run. When you see a 404 from a form that clearly exists, check the action name first.
+
+## Returning data to the page
+
+Whatever an action returns has to be serialisable, and it appears as `form` on the page until the next update. In my test, a successful add returned `{ added: 'Call Ana' }`, and the rendered page contained `Saved "Call Ana".` and the new note in the list.
+
+The list refreshes because after an action runs, SvelteKit reruns the page's `load` function. You do not write the refresh. In my app the add action did not touch the list at all, and the new note still showed up.
+
+<Callout icon="tip" title="Keep secrets out of what you return">
+Whatever you return goes to the browser. The docs give the example of returning the email a user typed so the field can be refilled, but not the password. Return the minimum the form needs to redraw itself.
+</Callout>
+
+## Validation with fail
+
+`fail(status, data)` returns an error status together with data, so the form can show a message and keep what the user typed.
+
+```ts
+return fail(400, { text, missing: true });
+```
+
+I posted an empty note with `curl` and got `HTTP/1.1 400 Bad Request`, with the page rendered and `Write something first.` in the markup. This matters for SvelteKit 3: its changelog lists a breaking change that form action responses now use the HTTP status code you return from `fail`. If you upgrade from 2.x and a test about a failed form starts to disagree on the status, this is the place to look.
+
+The `text` you return comes back as `form.text`, and the input uses `value={form?.text ?? ''}`. That is how the field keeps its value after a failed submit when JavaScript is off.
+
+## Redirects
+
+An action can redirect, as a `load` function can. I added a `go` action:
+
+```ts
+import { redirect } from '@sveltejs/kit';
+
+export const actions: Actions = {
+  go: async () => {
+    redirect(303, '/clock');
+  }
+};
+```
+
+A `POST` to `/notes?/go` came back as `303 See Other` with `location: /clock`. Use 303 after a successful `POST`, so the browser follows with a `GET` and a refresh does not resubmit the form. The docs show the common case, where a login action redirects to a page stored in a query parameter.
+
+## No JavaScript, and use:enhance
+
+A plain `<form method="POST">` works without any JavaScript. The browser posts, the server runs the action, and the page is rendered again with `form` filled in. I tested it with `curl` and the header `accept: text/html`. The failed add returned the full page with the error, and the successful add returned the full page with the new note.
+
+`use:enhance` is the upgrade. It submits with `fetch` instead of a full page navigation, updates `form`, resets the form on success, refreshes the data and handles redirects and errors. It only works with `POST` forms that target actions in `+page.server` files.
+
+I checked that it does what it says. In Chromium I loaded `/notes`, set `window.__marker = 1`, then submitted an empty form. The error appeared, `window.__marker` was still `1`, and the page had fired zero load events. Then I typed a note, submitted, and the list had both notes with no reload.
+
+You can pass a function to `use:enhance` to run code before the submit and to handle the result. The docs describe it like this: your function runs before submission and can return a callback; inside that callback, calling `update()` restores the default behaviour, and takes options such as `reset` and `navigate`. I did not run this, so test it in your own app before relying on it.
+
+## When not to use an action
+
+Actions are for forms. The docs say that for a button that calls an API and is not part of a form, a `+server.ts` endpoint with `fetch` is the alternative. They also prefer actions whenever there is a form, because actions can be progressively enhanced.
+
+## Mistakes I made
+
+**Testing with a bare `curl`.** My first request got JSON back, not a page. SvelteKit returns JSON when the `accept` header does not prefer HTML. Pass `-H 'accept: text/html'` to see what a browser without JavaScript sees. Pass `-H 'x-sveltekit-action: true'` and you get the JSON that `use:enhance` receives, for example `{"type":"failure","status":400,...}`.
+
+**A `curl` with no body.** My first call to the redirect action returned 415 Unsupported Media Type. The action expects form data. Adding `-d 'a=1'` gave the 303.
+
+**Calling it by the wrong name.** The 404 described earlier. I now write the action name in the form first and the function second.
+
+**The import path.** In this release `sv create` sets up `#lib` through `package.json` instead of `$lib`, and the import needs the file extension, `#lib/server/notes.ts`. I lost a few minutes to a type error before I read the template.
+
+## Where Feega fits
+
+Feega is a free, open-source VS Code extension that edits your running app and writes the change into your source. A form page like this one is a good fit, because the markup is literal: the input, the button and the error message are plain elements with plain text.
+
+The Feega docs for SvelteKit list the limits. Text that comes from a prop or a constant is refused with a message, so a button label you pass in as a prop cannot be edited from the page. Class names built by an expression are not written. So write `Add` and `Write something first.` straight into the markup, and Feega can change them.
+
+<Cta title="Style your form in the running app">
+Open the page, click the input or the button, change the spacing or the colour, and see the edit as a diff in your `.svelte` file.
+</Cta>
+
+## Questions
+
+### What is a SvelteKit form action?
+
+A function exported from a `+page.server.ts` file that handles a `POST` from a form. It reads the form data on the server and returns data or an error to the page.
+
+### How do I call a named action?
+
+Put the name after `?/` in the form's `action` attribute, as in `<form method="POST" action="?/add">`. For a single button you can use `formaction="?/add"`.
+
+### Do form actions work without JavaScript?
+
+Yes. The form posts as a normal request, the server runs the action, and the page is rendered again. `use:enhance` only makes it faster in the browser.
+
+### How do I show a validation error?
+
+Return `fail(400, { ... })` from the action and read the data from the `form` prop on the page. In SvelteKit 3 the response uses the status you pass to `fail`.
+
+### Can an action redirect?
+
+Yes. Call `redirect(303, '/path')`. In my test the response was a 303 with the new location.
+
+### Why do I get a 404 when I post to a page with actions?
+
+Most likely the form does not name an action and the page has only named actions. Add `action="?/name"`.
+
+## Sources
+
+Opened on 22 November 2026.
+
+- [SvelteKit docs: Form actions](https://svelte.dev/docs/kit/form-actions)
+- [SvelteKit docs: Routing](https://svelte.dev/docs/kit/routing)
+- [SvelteKit changelog](https://github.com/sveltejs/kit/blob/main/packages/kit/CHANGELOG.md), version 3.0.0.
+- npm registry: `@sveltejs/kit` 3.4.0 published 18 November 2026, `svelte` 5.59.1.
+- [Feega docs: SvelteKit](https://docs.feega.app/frameworks/sveltekit/)
+
+## Read next
+
+- [SvelteKit vs Next.js, with the same app built twice](/posts/sveltekit-vs-nextjs/)
+- [Server load or universal load?](/posts/sveltekit-load-functions-server-vs-universal/)
+- [Svelte 5 runes, in the order you need them](/posts/svelte-5-runes-in-practice/)
+- [Feega for freelancers and agencies](/use-cases/freelancers-and-agencies-design-reviews/)

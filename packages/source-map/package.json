@@ -54,5 +54,8 @@
     "vite": {
       "optional": true
     }
+  },
+  "devDependencies": {
+    "@astrojs/compiler": "^2.13.1"
   }
 }

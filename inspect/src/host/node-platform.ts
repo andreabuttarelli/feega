@@ -107,6 +107,7 @@ export function nodePlatform({ root, launcher, version, transport, print, launch
     },
     sourceControl: () => print(`feega: review the changes with \`git -C ${root} diff\``),
     notify: (text) => print(`feega: ${text}`),
+    warn: async (text) => (print(`feega: ${text}`), false),
     account,
     cloud,
     share,

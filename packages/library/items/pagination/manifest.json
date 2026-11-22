@@ -1,0 +1,29 @@
+{
+  "id": "pagination",
+  "name": "Pagination",
+  "description": "Previous, numbered pages with ellipsis, next; collapses to a page count on phones.",
+  "category": "component",
+  "tags": [
+    "pagination",
+    "navigation"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    }
+  ],
+  "tier": "free"
+}

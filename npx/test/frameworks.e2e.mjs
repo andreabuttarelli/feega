@@ -77,6 +77,11 @@ try {
   };
   const paragraphs = () => frame.locator('main p').count();
 
+  await check('stamping leaves no attribute text on the page', async () => {
+    const text = await frame.locator('body').innerText();
+    assert.ok(!text.includes('data-feega'), 'the page shows stamped attributes as text');
+  });
+
   await check('select to source: the picked element has a layer', async () => {
     await frame.locator('h1').first().click();
     await page.waitForTimeout(800);

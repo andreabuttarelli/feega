@@ -177,8 +177,8 @@ const DESIGN_ROWS: Row[] = [
   { section: Section.Layout, name: 'align', label: 'Align', control: Control.Choice, choices: Object.keys(ITEMS), read: (s) => keyOf(ITEMS, s['align-items']), preview: (v) => ({ alignItems: ITEMS[v] }), change: family(ClassFamily.Items) },
   { section: Section.Layout, name: 'justify', label: 'Justify', control: Control.Choice, choices: Object.keys(JUSTIFY), read: (s) => keyOf(JUSTIFY, s['justify-content']), preview: (v) => ({ justifyContent: JUSTIFY[v] }), change: family(ClassFamily.Justify) },
   { section: Section.Layout, units: UNITS_OF['gap'], name: 'gap', label: 'G', control: Control.Number, range: PX, unit: 'px', read: (s) => px(s, 'gap'), preview: pxStyle('gap'), change: prop(LiveProp.Gap) },
-  { section: Section.Size, units: UNITS_OF['width'], name: 'width', label: 'W', control: Control.Number, range: SIZE, unit: 'px', read: (s) => px(s, 'width'), preview: pxStyle('width'), change: family(ClassFamily.Width, (v) => `w-[${v}]`) },
-  { section: Section.Size, units: UNITS_OF['height'], name: 'height', label: 'H', control: Control.Number, range: SIZE, unit: 'px', read: (s) => px(s, 'height'), preview: pxStyle('height'), change: family(ClassFamily.Height, (v) => `h-[${v}]`) },
+  { section: Section.Size, units: UNITS_OF['width'], name: 'width', label: 'W', control: Control.Number, range: SIZE, unit: 'px', read: (s) => px(s, 'width'), preview: pxStyle('width'), change: family(ClassFamily.Width, (v) => tailwindToken('width', v)) },
+  { section: Section.Size, units: UNITS_OF['height'], name: 'height', label: 'H', control: Control.Number, range: SIZE, unit: 'px', read: (s) => px(s, 'height'), preview: pxStyle('height'), change: family(ClassFamily.Height, (v) => tailwindToken('height', v)) },
   ...boxRows(Group.Padding, LiveProp.Padding, PX),
   ...boxRows(Group.Margin, LiveProp.Margin, SIGNED),
   { section: Section.Typography, name: 'font-family', label: 'Font', control: Control.Text, read: (s) => (s['font-family'] ?? '').split(',')[0].replace(/["']/g, '').trim(), preview: style('fontFamily'), change: family(ClassFamily.FontFamily, (v) => `font-['${v.trim().replace(/\s+/g, '_')}']`) },
@@ -231,10 +231,10 @@ export const CSS_ROWS: CssSpec[] = [
   { ...choice(Section.Display, 'display', 'Display', ['block', 'inline-block', 'inline', 'flex', 'inline-flex', 'grid', 'inline-grid', 'contents', 'none']), utility: { family: ClassFamily.Display, make: (v) => (v === 'none' ? 'hidden' : v) } },
   choice(Section.Display, 'overflow-x', 'Overflow X', OVERFLOW),
   choice(Section.Display, 'overflow-y', 'Overflow Y', OVERFLOW),
-  length(Section.Constraints, 'min-width', 'Min W', SIZE),
-  length(Section.Constraints, 'max-width', 'Max W', SIZE),
-  length(Section.Constraints, 'min-height', 'Min H', SIZE),
-  length(Section.Constraints, 'max-height', 'Max H', SIZE),
+  length(Section.Size, 'min-width', 'Min W', SIZE, UNITS_OF['min-width']),
+  length(Section.Size, 'max-width', 'Max W', SIZE, UNITS_OF['max-width']),
+  length(Section.Size, 'min-height', 'Min H', SIZE, UNITS_OF['min-height']),
+  length(Section.Size, 'max-height', 'Max H', SIZE, UNITS_OF['max-height']),
   text(Section.Constraints, 'aspect-ratio', 'Ratio'),
   choice(Section.Object, 'object-fit', 'Fit', ['fill', 'contain', 'cover', 'none', 'scale-down']),
   text(Section.Object, 'object-position', 'Position'),
@@ -278,6 +278,12 @@ export const CSS_ROWS: CssSpec[] = [
 
 const STATIC_POSITION = 'static';
 const POSITIONED_ONLY = new Set(['top', 'right', 'bottom', 'left', 'z-index']);
+
+export const SIZE_LIMITS = ['min-width', 'max-width', 'min-height', 'max-height'];
+
+const UNSET_LIMIT = ['', 'auto', 'none'];
+
+export const limitsSet = (styles: Styles): boolean => SIZE_LIMITS.some((name) => !UNSET_LIMIT.includes((styles[name] ?? '').trim()));
 
 export const shownRows = <T extends { name: string }>(rows: T[], styles: Styles): T[] => rows.filter((r) => !POSITIONED_ONLY.has(r.name) || (styles.position ?? STATIC_POSITION) !== STATIC_POSITION);
 

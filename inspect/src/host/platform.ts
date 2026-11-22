@@ -41,6 +41,7 @@ export type Platform = Transport & {
   openSettings: (key: SettingKey) => unknown;
   sourceControl: () => unknown;
   notify: (text: string) => unknown;
+  warn: (text: string, action?: string) => Promise<boolean>;
   pickImage?: () => Promise<ChosenImage | null>;
   usage?: UsageHost;
   account: AccountStore;

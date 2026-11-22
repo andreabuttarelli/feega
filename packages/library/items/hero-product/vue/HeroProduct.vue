@@ -1,0 +1,92 @@
+<template>
+  <section class="fl-hero-product">
+    <div class="fl-container head">
+      <p class="fl-eyebrow">for product teams</p>
+      <h1 class="title">show the product, not a promise</h1>
+      <p class="fl-lead">One sentence on what the screenshot below lets people do. Replace the mockup with a real capture.</p>
+      <div class="cta">
+        <a class="fl-btn fl-btn--primary" href="#">start free</a>
+        <a class="fl-btn" href="#">take the tour <svg class="fl-px" viewBox="0 0 7 5" aria-hidden="true"><path d="M4 0h1v1h-1zM5 1h1v1h-1zM0 2h1v1h-1zM1 2h1v1h-1zM2 2h1v1h-1zM3 2h1v1h-1zM4 2h1v1h-1zM5 2h1v1h-1zM6 2h1v1h-1zM5 3h1v1h-1zM4 4h1v1h-1z" /></svg></a>
+      </div>
+    </div>
+    <div class="fl-container">
+      <figure class="shot fl-dots" aria-label="Product screenshot placeholder">
+        <div class="window">
+          <div class="chrome"><i></i><i></i><i></i><span>app.example.com</span></div>
+          <div class="app">
+            <div class="side"><b></b><b></b><b></b><b></b><b></b></div>
+            <div class="body">
+              <div class="row"><span class="h"></span><span class="pill"></span></div>
+              <div class="cards"><span></span><span></span><span></span></div>
+              <div class="chart"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            </div>
+          </div>
+        </div>
+        <figcaption>screenshot placeholder</figcaption>
+      </figure>
+    </div>
+  </section>
+</template>
+
+<style scoped>
+.fl-hero-product{font-family:var(--feega-font);font-size:var(--feega-text-body);line-height:1.5;letter-spacing:var(--feega-tracking);color:var(--feega-fg);background:var(--feega-bg);-webkit-font-smoothing:antialiased}
+:where(.fl-hero-product) *,:where(.fl-hero-product) *::before,:where(.fl-hero-product) *::after{box-sizing:border-box}
+:where(.fl-hero-product) :is(h1,h2,h3,h4,p,ul,ol,figure,blockquote,dl,dd){margin:0}
+:where(.fl-hero-product) a{color:inherit;text-decoration:none}
+:where(.fl-hero-product) :focus-visible{outline:2px solid var(--feega-focus);outline-offset:3px}
+.fl-container{width:min(var(--feega-max-width),100% - 2 * var(--feega-gutter));margin-inline:auto}
+.fl-px{display:block;flex:none;width:1em;height:auto;fill:currentColor;shape-rendering:crispEdges}
+.fl-btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--feega-space-2);min-height:44px;padding:0 var(--feega-space-6);border:1px solid var(--feega-line-strong);border-radius:var(--feega-radius-full);background:transparent;color:var(--feega-fg);font:inherit;font-size:0.9375rem;font-weight:500;letter-spacing:var(--feega-tracking);white-space:nowrap;text-decoration:none;cursor:pointer;transition:background-color var(--feega-dur-fast) var(--feega-ease),border-color var(--feega-dur-fast) var(--feega-ease),color var(--feega-dur-fast) var(--feega-ease),transform var(--feega-dur-fast) var(--feega-ease)}
+.fl-btn:hover{border-color:var(--feega-fg-subtle);background:var(--feega-surface)}
+.fl-btn:active{transform:scale(0.97)}
+.fl-btn--primary{border-color:var(--feega-accent);background:var(--feega-accent);color:var(--feega-accent-fg)}
+.fl-btn--primary:hover{border-color:var(--feega-accent-hover);background:var(--feega-accent-hover)}
+.fl-btn--ink{border-color:var(--feega-fg);background:var(--feega-fg);color:var(--feega-bg)}
+.fl-btn--ink:hover{border-color:var(--feega-fg-muted);background:var(--feega-fg-muted)}
+.fl-btn--ghost{border-color:transparent}
+.fl-btn--sm{min-height:36px;padding:0 var(--feega-space-4);font-size:var(--feega-text-sm)}
+.fl-btn .fl-px{width:10px;transition:transform var(--feega-dur) var(--feega-ease)}
+.fl-btn:hover .fl-px{transform:translateX(3px)}
+.fl-btn[disabled]{opacity:0.45;cursor:not-allowed}
+.fl-title{font-family:var(--feega-font-display);font-size:var(--feega-text-title);font-weight:500;line-height:0.95;letter-spacing:var(--feega-tracking-tight);text-wrap:balance}
+.fl-lead{max-width:34rem;font-size:var(--feega-text-lg);line-height:1.4;color:var(--feega-fg-muted);text-wrap:pretty}
+.fl-eyebrow{display:inline-flex;align-items:center;gap:var(--feega-space-2);font-family:var(--feega-font-mono);font-size:var(--feega-text-xs);letter-spacing:0.02em;color:var(--feega-fg-muted);text-transform:uppercase}
+.fl-eyebrow::before{content:"";width:6px;height:6px;background:var(--feega-accent)}
+.fl-dots{background-image:radial-gradient(var(--feega-dot) 1px,transparent 1.5px);background-size:14px 14px}
+.fl-hero-product{overflow:hidden;padding-top:var(--feega-space-section)}
+.fl-hero-product .head{display:flex;flex-direction:column;align-items:center;gap:var(--feega-space-6);text-align:center}
+.fl-hero-product .title{max-width:15ch;font-family:var(--feega-font-display);font-size:var(--feega-text-display);font-weight:500;line-height:0.92;letter-spacing:var(--feega-tracking-tight);text-wrap:balance}
+.fl-hero-product .cta{display:flex;flex-wrap:wrap;justify-content:center;gap:var(--feega-space-3)}
+.fl-hero-product .shot{position:relative;margin-top:var(--feega-space-16);padding:clamp(1rem,4vw,3rem) clamp(1rem,4vw,3rem) 0;border-radius:var(--feega-radius-lg) var(--feega-radius-lg) 0 0;background-color:var(--feega-surface)}
+.fl-hero-product .window{overflow:hidden;border-radius:var(--feega-radius-md) var(--feega-radius-md) 0 0;background:var(--feega-raised);box-shadow:var(--feega-shadow-float);animation:fl-hero-product-up 900ms var(--feega-ease) backwards}
+@keyframes fl-hero-product-up{from{opacity:0;transform:translateY(40px)}}
+.fl-hero-product .chrome{display:flex;align-items:center;gap:6px;height:36px;padding:0 14px;border-bottom:1px solid var(--feega-line)}
+.fl-hero-product .chrome i{width:9px;height:9px;border-radius:var(--feega-radius-full);background:var(--feega-line-strong)}
+.fl-hero-product .chrome span{margin-inline:auto;padding-right:40px;font-family:var(--feega-font-mono);font-size:11px;color:var(--feega-fg-subtle)}
+.fl-hero-product .app{display:grid;grid-template-columns:minmax(0,180px) minmax(0,1fr);min-height:clamp(220px,34vw,420px)}
+.fl-hero-product .side{display:grid;align-content:start;gap:10px;padding:18px;border-right:1px solid var(--feega-line)}
+.fl-hero-product .side b{height:10px;border-radius:var(--feega-radius-xs);background:var(--feega-surface)}
+.fl-hero-product .side b:first-child{width:60%;background:var(--feega-accent)}
+.fl-hero-product .body{display:grid;align-content:start;gap:18px;padding:clamp(14px,3vw,28px)}
+.fl-hero-product .row{display:flex;justify-content:space-between;align-items:center}
+.fl-hero-product .h{width:40%;height:18px;border-radius:var(--feega-radius-xs);background:var(--feega-fg)}
+.fl-hero-product .pill{width:72px;height:22px;border-radius:var(--feega-radius-full);background:var(--feega-accent)}
+.fl-hero-product .cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.fl-hero-product .cards span{height:clamp(40px,7vw,72px);border-radius:var(--feega-radius-sm);background:var(--feega-surface)}
+.fl-hero-product .chart{display:flex;align-items:flex-end;gap:6px;height:clamp(60px,10vw,140px)}
+.fl-hero-product .chart i{flex:1;height:var(--h,50%);border-radius:var(--feega-radius-xs) var(--feega-radius-xs) 0 0;background:var(--feega-line-strong)}
+.fl-hero-product .chart i:nth-child(1){--h:34%}
+.fl-hero-product .chart i:nth-child(2){--h:48%}
+.fl-hero-product .chart i:nth-child(3){--h:40%}
+.fl-hero-product .chart i:nth-child(4){--h:56%}
+.fl-hero-product .chart i:nth-child(5){--h:52%}
+.fl-hero-product .chart i:nth-child(6){--h:64%}
+.fl-hero-product .chart i:nth-child(7){--h:60%}
+.fl-hero-product .chart i:nth-child(8){--h:74%}
+.fl-hero-product .chart i:nth-child(9){--h:82%}
+.fl-hero-product .chart i:nth-child(10){--h:100%}
+.fl-hero-product .chart i:last-child{background:var(--feega-accent)}
+.fl-hero-product figcaption{position:absolute;top:12px;right:14px;font-family:var(--feega-font-mono);font-size:10px;color:var(--feega-fg-subtle);text-transform:uppercase}
+@media (max-width:640px){.fl-hero-product .app{grid-template-columns:minmax(0,1fr)}.fl-hero-product .side,.fl-hero-product figcaption{display:none}}
+@media (prefers-reduced-motion:reduce){:where([class^="fl-"]) *,:where([class^="fl-"]) *::before,:where([class^="fl-"]) *::after{animation:none!important;transition:none!important}}
+</style>

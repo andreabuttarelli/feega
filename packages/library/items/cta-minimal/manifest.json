@@ -1,0 +1,29 @@
+{
+  "id": "cta-minimal",
+  "name": "CTA, minimal",
+  "description": "One line and a text link with an arrow, separated by hairlines.",
+  "category": "section",
+  "tags": [
+    "cta",
+    "minimal"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    }
+  ],
+  "tier": "free"
+}

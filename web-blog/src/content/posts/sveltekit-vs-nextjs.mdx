@@ -1,0 +1,341 @@
+---
+title: SvelteKit vs Next.js in 2026, with the same app built twice
+description: I built the same small notes app in SvelteKit 3 and Next.js 16.4 and compared routing, data loading, forms, endpoints and deployment. Real code, a table, and the mistakes I made.
+date: 2026-11-22
+cover: /covers/sveltekit-vs-nextjs.png
+coverAlt: "Cover: SvelteKit or Next.js? The same app, side by side"
+tags: [sveltekit, nextjs, comparison, frameworks]
+---
+
+import Callout from '../../components/Callout.astro';
+import Cta from '../../components/Cta.astro';
+
+I built one small app twice: a notes page with a list, an add form, a detail route and a JSON endpoint. Once in SvelteKit, once in Next.js. This post puts the two side by side. It covers what is current today, how each framework handles routing, data, forms, endpoints and deployment, and where each one surprised me.
+
+The short version: SvelteKit asks you to learn less and gives you plain HTTP and plain forms. Next.js gives you more, and in the current release asks you to think about caching from the first line. Neither is wrong. If you already know React, Next.js is probably your answer. If you are starting fresh and want the smaller surface, look at SvelteKit.
+
+<Callout icon="check" title="Versions this post uses">
+SvelteKit 3.4.0 (18 November 2026) with Svelte 5.59.1 and Vite 8. Next.js 16.4.6 with React 19. Both were the latest stable releases on 22 November 2026, per npm.
+</Callout>
+
+## How we checked
+
+I ran both apps instead of describing them from memory. This is what I opened and ran on 22 November 2026.
+
+- npm registry for `@sveltejs/kit`, `svelte`, `next` and `react`: latest tags and publish dates.
+- The SvelteKit changelog on GitHub, for the 3.0.0 release notes and the 3.4.0 entry.
+- The SvelteKit docs on [routing](https://svelte.dev/docs/kit/routing), [form actions](https://svelte.dev/docs/kit/form-actions), [load](https://svelte.dev/docs/kit/load) and [adapters](https://svelte.dev/docs/kit/adapters).
+- The Next.js [blog index](https://nextjs.org/blog), the App Router overview, [Mutating Data](https://nextjs.org/docs/app/getting-started/mutating-data) (last updated 15 October 2026) and [Deploying](https://nextjs.org/docs/app/getting-started/deploying) (last updated 6 August 2026).
+- A scratch SvelteKit project from `npx sv create`, and a scratch Next.js project from `create-next-app@16.4.6`. Both ran, type-checked and built. I drove the forms in a real browser and with `curl`.
+- The Feega docs for [SvelteKit](https://docs.feega.app/frameworks/sveltekit/) and [Next.js](https://docs.feega.app/frameworks/nextjs/), for the last section.
+
+Limits: I did not benchmark anything. I tested one small app, not a large one. I did not deploy either app to a host. I could not check how either behaves under heavy traffic. The scratch projects are deleted, and the code below is what I ran, trimmed.
+
+## What is current
+
+Version numbers matter here, because both frameworks changed a lot in the last year.
+
+SvelteKit 3.0.0 shipped on 1 October 2026. According to its changelog, it requires Node 22 or newer, TypeScript 6, Vite's plugin for Svelte v7, and it changed the form action behaviour so that the HTTP status you return from `fail` is the status the response uses. It also removed `base`, `assets` and `resolveRoute` from `$app/paths`. The 2.x line still got a patch, 2.70.4, on 5 November. Today's release is 3.4.0.
+
+Svelte 5 is the component layer. It uses runes: `$state`, `$derived`, `$effect` and `$props`. If you learned Svelte 3 or 4, the `let count = 0` magic is gone and you write `let count = $state(0)`. I cover that in [Svelte 5 runes in practice](/posts/svelte-5-runes-in-practice/).
+
+Next.js 16.4 came out on 6 October 2026. The version 16 line began with Next.js 16 on 21 October 2025, and the blog shows 16.1 in December, 16.2 in March, 16.3 in August and 16.4 in October. Turbopack is the default bundler. In 16.4, `create-next-app` writes `cacheComponents: true` and `partialPrefetching: true` into `next.config.ts`, so a fresh project opts into Cache Components from the start. That one detail changes how you write pages, and it caused two of my mistakes below.
+
+## The app
+
+Same app in both: `/notes` lists notes and has an add form, `/notes/[id]` shows one note, and `GET /api/notes` returns JSON. The data lives in a module-level array, so there is no database to set up. Everything below is the code I ran.
+
+## Routing
+
+Both use the file system. The folder is the URL.
+
+SvelteKit puts files with a `+` prefix in `src/routes`:
+
+```txt
+src/routes/
+  notes/
+    +page.svelte
+    +page.server.ts
+    [id]/+page.svelte
+  api/notes/+server.ts
+```
+
+Next.js puts files with fixed names in `src/app`:
+
+```txt
+src/app/
+  notes/
+    page.tsx
+    actions.ts
+    [id]/page.tsx
+  api/notes/route.ts
+```
+
+The difference is small but real. In SvelteKit the file name says what the file is for: `+page` renders, `+server` answers HTTP, `+layout` wraps. In Next.js each folder has one `page` and the data code sits inside it, because components can be async. SvelteKit separates the code that loads data from the code that draws it. Next.js lets them live together.
+
+Both support dynamic segments with `[id]`. In Next.js 16, `params` is a promise. You write `const { id } = await params`. In SvelteKit it is a plain object in `load` and a prop on the page.
+
+## Data loading
+
+SvelteKit has a `load` function in `+page.server.ts`. It runs only on the server and hands its result to the page as `data`:
+
+```ts
+import { listNotes } from '#lib/server/notes.ts';
+import type { PageServerLoad } from './$types';
+
+export const load: PageServerLoad = () => {
+  return { notes: listNotes() };
+};
+```
+
+```svelte
+<script lang="ts">
+  import type { PageProps } from './$types';
+
+  let { data }: PageProps = $props();
+</script>
+
+<ul>
+  {#each data.notes as note (note.id)}
+    <li>{note.text}</li>
+  {/each}
+</ul>
+```
+
+Next.js has no `load`. The page is a Server Component, so it is an async function that reads data directly:
+
+```tsx
+import { Suspense } from 'react';
+import { connection } from 'next/server';
+import { listNotes } from '@/lib/notes';
+
+async function NoteList() {
+  await connection();
+  const notes = listNotes();
+
+  return (
+    <ul>
+      {notes.map((note) => (
+        <li key={note.id}>{note.text}</li>
+      ))}
+    </ul>
+  );
+}
+
+export default function NotesPage() {
+  return (
+    <Suspense fallback={<p>Loading…</p>}>
+      <NoteList />
+    </Suspense>
+  );
+}
+```
+
+That `connection()` call and the `Suspense` boundary are not decoration. With Cache Components on, Next.js tries to prerender everything it can. Data that changes per request has to be marked as dynamic and wrapped, or the build fails. I explain the details in the mistakes section.
+
+If you want the longer story on SvelteKit's two kinds of `load`, read [server load or universal load](/posts/sveltekit-load-functions-server-vs-universal/).
+
+## Forms and mutations
+
+This is where the two frameworks feel most different.
+
+SvelteKit uses form actions. You export `actions` from `+page.server.ts`. The form posts to it, with or without JavaScript:
+
+```ts
+import { fail } from '@sveltejs/kit';
+import { addNote } from '#lib/server/notes.ts';
+import type { Actions } from './$types';
+
+export const actions: Actions = {
+  add: async ({ request }) => {
+    const data = await request.formData();
+    const text = String(data.get('text') ?? '').trim();
+
+    if (!text) {
+      return fail(400, { text, missing: true });
+    }
+
+    addNote(text);
+    return { added: text };
+  }
+};
+```
+
+```svelte
+<form method="POST" action="?/add" use:enhance>
+  <input name="text" value={form?.text ?? ''} />
+  <button>Add</button>
+  {#if form?.missing}<p>Write something first.</p>{/if}
+</form>
+```
+
+Next.js uses Server Actions. You write an async function marked `'use server'`, and pass it to a form through `useActionState`:
+
+```ts
+'use server';
+
+import { revalidatePath } from 'next/cache';
+import { addNote } from '@/lib/notes';
+
+export async function add(_previous: AddState, formData: FormData) {
+  const text = String(formData.get('text') ?? '').trim();
+
+  if (!text) {
+    return { text, missing: true };
+  }
+
+  addNote(text);
+  revalidatePath('/notes');
+  return { text: '', added: text };
+}
+```
+
+```tsx
+'use client';
+
+export function AddForm() {
+  const [state, action, pending] = useActionState(add, initial);
+
+  return (
+    <form action={action}>
+      <input name="text" defaultValue={state.text} />
+      <button disabled={pending}>Add</button>
+      {state.missing && <p>Write something first.</p>}
+    </form>
+  );
+}
+```
+
+Both worked in my tests. I submitted an empty note and got the error, then a real note and got the saved message. In SvelteKit the form kept working with JavaScript switched off, because it is a real `POST` to a real URL. I confirmed it with `curl` and an `accept: text/html` header, and got the 400 page back with the error rendered. In the browser with `use:enhance`, the page did not reload: I set a marker on `window` before submitting and it was still there afterwards.
+
+Next.js documents progressive enhancement for forms that call Server Actions from Server Components. My form is a Client Component because of `useActionState`, and the docs say submissions queue until JavaScript loads. I did not test the no-JavaScript case there.
+
+The practical gap: SvelteKit's action is an HTTP endpoint with a name, and you can see it. A Next.js Server Action is an ID the framework generates. Next.js reminds you in its own docs that Server Functions can be reached by direct `POST`, so every one needs its own authentication and authorization check. That is true of SvelteKit actions too, but a named URL makes it easier to remember.
+
+There is a full walkthrough in [form actions, without the magic](/posts/sveltekit-form-actions-explained/).
+
+## Endpoints
+
+Both give you a file that answers HTTP.
+
+```ts
+import { json } from '@sveltejs/kit';
+import { listNotes } from '#lib/server/notes.ts';
+import type { RequestHandler } from './$types';
+
+export const GET: RequestHandler = () => {
+  return json(listNotes());
+};
+```
+
+```ts
+import { listNotes } from '@/lib/notes';
+
+export function GET() {
+  return Response.json(listNotes());
+}
+```
+
+Almost the same. The catch is in Next.js. With Cache Components on, `next build` listed `/api/notes` as static (marked with a circle). I added a note after the build, and the endpoint still returned the one note from build time. In SvelteKit the same endpoint ran on every request, because SvelteKit only prerenders when you ask it to.
+
+## Deployment
+
+SvelteKit builds with an adapter. The official ones cover Node servers, static sites, Vercel, Netlify and Cloudflare, plus Bun. `adapter-auto` picks one from the environment. When I ran `vite build` on my laptop it printed that it could not detect a production environment, which is the expected answer when there is none.
+
+Next.js runs as a Node.js server, a Docker container, a static export, or through an adapter. Its docs list Vercel and Bun as verified adapters. Cloudflare and Netlify have their own integrations, and the docs say those are not built on the public Adapter API and are not verified by the Next.js team.
+
+If you are deploying to something other than Vercel, read that section of the Next.js docs before you pick. If you want a Node server, either framework is fine.
+
+## The comparison
+
+| | SvelteKit 3.4 | Next.js 16.4 |
+|---|---|---|
+| UI layer | Svelte 5 (runes) | React 19 |
+| Routing | `+page`, `+layout`, `+server` files | `page`, `layout`, `route` files |
+| Load data | `load` in `+page.server.ts` | async Server Components |
+| Mutations | Form actions, plain `POST` | Server Actions, `'use server'` |
+| Works without JS | Yes, forms are real forms | Yes for Server Component forms, queued in Client Components |
+| JSON endpoint | `+server.ts`, runs per request | `route.ts`, static unless it reads request data |
+| Caching | You add it | Cache Components on by default in new projects |
+| Output | Adapters | Node, Docker, static export, adapters |
+| Ecosystem | Smaller | Large |
+
+<Callout icon="tip" title="How to choose">
+Pick Next.js when your team already writes React, or you depend on React libraries. Pick SvelteKit when you want less framework to learn, plain forms and URLs, and a small bundle. Pick neither because of a benchmark you read once.
+</Callout>
+
+## Mistakes I made
+
+These cost me time. Each one is real, from the scratch projects.
+
+**SvelteKit: the import alias.** A new `sv create` project in this release does not use `$lib`. The template maps `#lib` through `package.json` `imports`. I wrote `#lib/server/notes`, and `svelte-check` reported "Cannot find module". The fix is to include the extension: `#lib/server/notes.ts`. Switching to `$lib` did not work either in that project.
+
+**SvelteKit: a page with only named actions.** I posted to `/notes` without `?/add` and got a 404. When a page has named actions, there is no default one to fall back to.
+
+**SvelteKit: `curl` returned JSON.** My first `curl` against a form action got a JSON body, not a page. SvelteKit answers with JSON when the `accept` header does not prefer HTML. Send `accept: text/html` to test the no-JavaScript path.
+
+**Next.js: `dynamic = 'force-dynamic'`.** The build refused it: "Route segment config 'dynamic' is not compatible with `nextConfig.cacheComponents`". Older tutorials use it everywhere. Use `connection()` inside a `Suspense` boundary.
+
+**Next.js: awaiting `params` outside `Suspense`.** My detail page was an async page that awaited `params`. The build failed with "encountered uncached or runtime data during prerendering". I moved the data read into a child component and wrapped it in `Suspense`.
+
+**Next.js: a missing note returned 200.** After that fix, `/notes/99` called `notFound()` but the response status was 200. The page had already started streaming. If you need a real 404 status, check the data before the response starts streaming.
+
+## Where Feega fits
+
+Feega is a free, open-source VS Code extension for visual editing. It runs your app, lets you click an element, and writes the edit to your source as a diff. It has no AI in the loop.
+
+Both frameworks are supported, with limits that come from how each one writes markup. The docs list for SvelteKit: selection, text and all property sections, Svelte scoped `<style>` blocks or Tailwind, and source mapping through components. The limits: text from a prop or a constant is refused with a message, class names built by an expression are not written, and `{#each}` items cannot be reordered one by one.
+
+For Next.js: selection and all property sections with Turbopack, CSS modules or Tailwind. The same limits on text from props and built class names apply, and layers may list framework wrapper nodes next to your own elements. Next.js projects need the `feega-source-map` plugin in the config. SvelteKit projects get it automatically.
+
+What does that mean for this comparison? Not much. Feega does not push you either way. It does mean that in either framework, writing the text and classes literally in the markup makes the page editable.
+
+<Cta title="Try it on your own app">
+Open your SvelteKit or Next.js project, run Feega, click an element and change it. The change lands in your file as a diff you can read and undo.
+</Cta>
+
+## Questions
+
+### Is SvelteKit faster than Next.js?
+
+I did not measure it, so I cannot say. Both build and run a small app without trouble. Pick on how you want to write the app, then measure your own app.
+
+### Which SvelteKit version is current?
+
+SvelteKit 3.4.0, released on 18 November 2026, with Svelte 5.59.1. Version 3.0.0 came out on 1 October 2026 and requires Node 22 or newer.
+
+### Which Next.js version is current?
+
+Next.js 16.4, released on 6 October 2026. The latest patch on npm on 22 November 2026 was 16.4.6.
+
+### Do SvelteKit forms work without JavaScript?
+
+Yes. A form action is a normal `POST` to a URL. `use:enhance` makes it faster in the browser, but the form works without it.
+
+### Can I deploy Next.js outside Vercel?
+
+Yes. It runs as a Node.js server, in Docker, as a static export, or through an adapter. The Next.js docs list Vercel and Bun as verified adapters and say Cloudflare and Netlify are working on theirs.
+
+### Does Feega work with both?
+
+Yes. The Feega docs list SvelteKit and Next.js as supported, with the limits described above.
+
+## Sources
+
+Opened on 22 November 2026.
+
+- npm registry: `@sveltejs/kit` 3.4.0 (18 November 2026), `svelte` 5.59.1, `next` 16.4.6, `react` 19.3.
+- [SvelteKit changelog](https://github.com/sveltejs/kit/blob/main/packages/kit/CHANGELOG.md), entries 3.0.0 and 3.4.0.
+- [SvelteKit routing](https://svelte.dev/docs/kit/routing), [form actions](https://svelte.dev/docs/kit/form-actions), [load](https://svelte.dev/docs/kit/load), [adapters](https://svelte.dev/docs/kit/adapters).
+- [Next.js blog](https://nextjs.org/blog): Next.js 16.4, 6 October 2026.
+- [Next.js Mutating Data](https://nextjs.org/docs/app/getting-started/mutating-data), last updated 15 October 2026.
+- [Next.js Deploying](https://nextjs.org/docs/app/getting-started/deploying), last updated 6 August 2026.
+- [Feega on SvelteKit](https://docs.feega.app/frameworks/sveltekit/) and [on Next.js](https://docs.feega.app/frameworks/nextjs/).
+
+## Read next
+
+- [Form actions, without the magic](/posts/sveltekit-form-actions-explained/)
+- [Server load or universal load?](/posts/sveltekit-load-functions-server-vs-universal/)
+- [Svelte 5 runes, in the order you need them](/posts/svelte-5-runes-in-practice/)
+- [Using Feega with Claude Code](/use-cases/feega-with-claude-code/)
+- [Why Feega is now one thing](/posts/design-in-your-codebase/)

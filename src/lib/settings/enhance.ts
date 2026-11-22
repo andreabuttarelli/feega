@@ -1,7 +1,6 @@
 import { applyAction, enhance as kitEnhance } from '$app/forms';
 import { goto, invalidateAll } from '$app/navigation';
 import { page } from '$app/state';
-import { refreshSheet } from '$lib/canvas/sheet-nav';
 import type { ActionResult, SubmitFunction } from '@sveltejs/kit';
 import { postSettingsAction } from './api';
 import { resetForm } from './reset-form';
@@ -25,7 +24,6 @@ async function follow(result: ActionResult): Promise<void> {
 
 function updater(form: HTMLFormElement, result: ActionResult) {
   return async ({ reset = true, invalidateAll: refresh = true }: UpdateOptions = {}) => {
-    const sheet = page.state.sheet;
     const succeeded = result.type === 'success';
     if (succeeded && reset) {
       resetForm(form);
@@ -34,9 +32,6 @@ function updater(form: HTMLFormElement, result: ActionResult) {
       await invalidateAll();
     }
     await follow(result);
-    if (succeeded && sheet) {
-      await refreshSheet(sheet.path);
-    }
   };
 }
 

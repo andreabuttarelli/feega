@@ -18,11 +18,6 @@ import { editorCount } from '$lib/server/team/seat-billing';
 
 const stripeApi = () => import('$lib/server/stripe');
 
-async function projectOrgId(supabase: SupabaseClient, projectId: string): Promise<string | null> {
-  const { data } = await supabase.from('projects').select('org_id').eq('id', projectId).is('archived_at', null).maybeSingle();
-  return data?.org_id ?? null;
-}
-
 const OWNER_ROLE = 'owner';
 
 type OwnerScope = { orgId: string; email: string | undefined };
@@ -38,8 +33,6 @@ async function chosenMembership({ cookies, locals: { supabase } }: RequestEvent)
 }
 
 async function orgIdOf(event: RequestEvent): Promise<string | null> {
-  const { projectId } = event.params;
-  if (projectId) return projectOrgId(event.locals.supabase, projectId);
   return (await chosenMembership(event))?.membership.org.id ?? null;
 }
 

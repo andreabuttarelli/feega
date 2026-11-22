@@ -1,0 +1,40 @@
+---
+---
+
+<article class="fl-card">
+  <a class="link" href="#">
+    <div class="media fl-dots" role="img" aria-label="Placeholder cover"><svg class="fl-px" viewBox="0 0 12 7" aria-hidden="true"><path d="M3 0h1v1h-1zM8 0h1v1h-1zM2 1h1v1h-1zM3 1h1v1h-1zM7 1h1v1h-1zM8 1h1v1h-1zM1 2h1v1h-1zM2 2h1v1h-1zM6 2h1v1h-1zM7 2h1v1h-1zM10 2h1v1h-1zM11 2h1v1h-1zM0 3h1v1h-1zM1 3h1v1h-1zM5 3h1v1h-1zM6 3h1v1h-1zM11 3h1v1h-1zM1 4h1v1h-1zM2 4h1v1h-1zM4 4h1v1h-1zM5 4h1v1h-1zM9 4h1v1h-1zM10 4h1v1h-1zM2 5h1v1h-1zM3 5h1v1h-1zM4 5h1v1h-1zM8 5h1v1h-1zM9 5h1v1h-1zM3 6h1v1h-1zM8 6h1v1h-1z" /></svg></div>
+    <div class="body">
+      <p class="meta"><span>guide</span><span>6 min read</span></p>
+      <h3>A clear title that says what the reader gets</h3>
+      <p class="excerpt">Two lines of summary. Enough to decide whether to open it, short enough to scan.</p>
+      <footer><span class="fl-avatar" aria-hidden="true">NS</span><span>Name Surname</span><svg class="fl-px" viewBox="0 0 7 5" aria-hidden="true"><path d="M4 0h1v1h-1zM5 1h1v1h-1zM0 2h1v1h-1zM1 2h1v1h-1zM2 2h1v1h-1zM3 2h1v1h-1zM4 2h1v1h-1zM5 2h1v1h-1zM6 2h1v1h-1zM5 3h1v1h-1zM4 4h1v1h-1z" /></svg></footer>
+    </div>
+  </a>
+</article>
+
+<style>
+.fl-card{font-family:var(--feega-font);font-size:var(--feega-text-body);line-height:1.5;letter-spacing:var(--feega-tracking);color:var(--feega-fg);background:var(--feega-bg);-webkit-font-smoothing:antialiased}
+:where(.fl-card) *,:where(.fl-card) *::before,:where(.fl-card) *::after{box-sizing:border-box}
+:where(.fl-card) :is(h1,h2,h3,h4,p,ul,ol,figure,blockquote,dl,dd){margin:0}
+:where(.fl-card) a{color:inherit;text-decoration:none}
+:where(.fl-card) :focus-visible{outline:2px solid var(--feega-focus);outline-offset:3px}
+.fl-px{display:block;flex:none;width:1em;height:auto;fill:currentColor;shape-rendering:crispEdges}
+.fl-avatar{display:inline-grid;flex:none;place-items:center;width:32px;height:32px;border-radius:var(--feega-radius-full);background:var(--feega-surface);color:var(--feega-fg-muted);font-size:var(--feega-text-xs);font-weight:600;letter-spacing:0}
+.fl-dots{background-image:radial-gradient(var(--feega-dot) 1px,transparent 1.5px);background-size:14px 14px}
+.fl-card{padding:var(--feega-space-6) var(--feega-gutter)}
+.fl-card .link{display:block;max-width:24rem;overflow:hidden;border-radius:var(--feega-radius-lg);background:var(--feega-raised);box-shadow:var(--feega-shadow),inset 0 0 0 1px var(--feega-line);transition:transform var(--feega-dur) var(--feega-ease),box-shadow var(--feega-dur) var(--feega-ease)}
+.fl-card .link:hover{transform:translateY(-4px);box-shadow:var(--feega-shadow-float),inset 0 0 0 1px var(--feega-line)}
+.fl-card .media{display:grid;place-items:center;aspect-ratio:16/10;background-color:var(--feega-surface);color:var(--feega-accent)}
+.fl-card .media .fl-px{width:72px;transition:transform var(--feega-dur) var(--feega-ease)}
+.fl-card .link:hover .media .fl-px{transform:scale(1.12)}
+.fl-card .body{display:grid;gap:var(--feega-space-3);padding:var(--feega-space-6)}
+.fl-card .meta{display:flex;gap:var(--feega-space-3);color:var(--feega-fg-subtle);font-family:var(--feega-font-mono);font-size:var(--feega-text-xs);letter-spacing:0;text-transform:uppercase}
+.fl-card .meta span:first-child{color:var(--feega-accent-text)}
+.fl-card h3{font-size:1.375rem;font-weight:500;line-height:1.15;letter-spacing:-0.04em;text-wrap:balance}
+.fl-card .excerpt{color:var(--feega-fg-muted);font-size:var(--feega-text-sm)}
+.fl-card footer{display:flex;align-items:center;gap:10px;margin-top:var(--feega-space-2);font-size:var(--feega-text-sm);font-weight:500}
+.fl-card footer .fl-px{width:10px;margin-left:auto;color:var(--feega-fg-subtle);transition:transform var(--feega-dur) var(--feega-ease),color var(--feega-dur) var(--feega-ease)}
+.fl-card .link:hover footer .fl-px{color:var(--feega-accent);transform:translateX(4px)}
+@media (prefers-reduced-motion:reduce){:where([class^="fl-"]) *,:where([class^="fl-"]) *::before,:where([class^="fl-"]) *::after{animation:none!important;transition:none!important}}
+</style>

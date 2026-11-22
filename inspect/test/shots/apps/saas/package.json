@@ -1,0 +1,12 @@
+{
+  "name": "shots-saas",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "vite": "^6.3.0"
+  }
+}

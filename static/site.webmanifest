@@ -2,7 +2,7 @@
   "id": "/",
   "name": "feega",
   "short_name": "feega",
-  "description": "An AI canvas for motion, images and video.",
+  "description": "Your Feega account.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

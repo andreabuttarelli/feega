@@ -1,0 +1,40 @@
+<template>
+  <section class="fl-not-found fl-dots">
+    <div class="inner">
+      <p class="code" aria-hidden="true">404</p>
+      <h1>this page wandered off</h1>
+      <p class="lead">The link may be old or mistyped. Try the home page or search.</p>
+      <div class="cta"><a class="fl-btn fl-btn--primary" href="#">back home</a><a class="fl-btn" href="#"><svg class="fl-px" viewBox="0 0 7 7" aria-hidden="true"><path d="M1 0h1v1h-1zM2 0h1v1h-1zM3 0h1v1h-1zM4 0h1v1h-1zM0 1h1v1h-1zM5 1h1v1h-1zM0 2h1v1h-1zM5 2h1v1h-1zM0 3h1v1h-1zM5 3h1v1h-1zM1 4h1v1h-1zM2 4h1v1h-1zM3 4h1v1h-1zM4 4h1v1h-1zM5 5h1v1h-1zM6 6h1v1h-1z" /></svg> search</a></div>
+    </div>
+  </section>
+</template>
+
+<style scoped>
+.fl-not-found{font-family:var(--feega-font);font-size:var(--feega-text-body);line-height:1.5;letter-spacing:var(--feega-tracking);color:var(--feega-fg);background:var(--feega-bg);-webkit-font-smoothing:antialiased}
+:where(.fl-not-found) *,:where(.fl-not-found) *::before,:where(.fl-not-found) *::after{box-sizing:border-box}
+:where(.fl-not-found) :is(h1,h2,h3,h4,p,ul,ol,figure,blockquote,dl,dd){margin:0}
+:where(.fl-not-found) a{color:inherit;text-decoration:none}
+:where(.fl-not-found) :focus-visible{outline:2px solid var(--feega-focus);outline-offset:3px}
+.fl-px{display:block;flex:none;width:1em;height:auto;fill:currentColor;shape-rendering:crispEdges}
+.fl-btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--feega-space-2);min-height:44px;padding:0 var(--feega-space-6);border:1px solid var(--feega-line-strong);border-radius:var(--feega-radius-full);background:transparent;color:var(--feega-fg);font:inherit;font-size:0.9375rem;font-weight:500;letter-spacing:var(--feega-tracking);white-space:nowrap;text-decoration:none;cursor:pointer;transition:background-color var(--feega-dur-fast) var(--feega-ease),border-color var(--feega-dur-fast) var(--feega-ease),color var(--feega-dur-fast) var(--feega-ease),transform var(--feega-dur-fast) var(--feega-ease)}
+.fl-btn:hover{border-color:var(--feega-fg-subtle);background:var(--feega-surface)}
+.fl-btn:active{transform:scale(0.97)}
+.fl-btn--primary{border-color:var(--feega-accent);background:var(--feega-accent);color:var(--feega-accent-fg)}
+.fl-btn--primary:hover{border-color:var(--feega-accent-hover);background:var(--feega-accent-hover)}
+.fl-btn--ink{border-color:var(--feega-fg);background:var(--feega-fg);color:var(--feega-bg)}
+.fl-btn--ink:hover{border-color:var(--feega-fg-muted);background:var(--feega-fg-muted)}
+.fl-btn--ghost{border-color:transparent}
+.fl-btn--sm{min-height:36px;padding:0 var(--feega-space-4);font-size:var(--feega-text-sm)}
+.fl-btn .fl-px{width:10px;transition:transform var(--feega-dur) var(--feega-ease)}
+.fl-btn:hover .fl-px{transform:translateX(3px)}
+.fl-btn[disabled]{opacity:0.45;cursor:not-allowed}
+.fl-dots{background-image:radial-gradient(var(--feega-dot) 1px,transparent 1.5px);background-size:14px 14px}
+.fl-not-found{display:grid;place-items:center;min-height:36rem;padding:var(--feega-space-16) var(--feega-gutter);background-color:var(--feega-bg);text-align:center}
+.fl-not-found .inner{display:grid;justify-items:center;gap:var(--feega-space-6)}
+.fl-not-found .code{font-family:var(--feega-font-mono);font-size:clamp(6rem,24vw,14rem);line-height:0.85;letter-spacing:-0.06em;color:var(--feega-accent)}
+.fl-not-found h1{font-size:clamp(2rem,5vw,3.5rem);font-weight:500;line-height:0.95;letter-spacing:var(--feega-tracking-tight)}
+.fl-not-found .lead{max-width:26rem;color:var(--feega-fg-muted)}
+.fl-not-found .cta{display:flex;flex-wrap:wrap;justify-content:center;gap:var(--feega-space-3)}
+.fl-not-found .cta .fl-px{width:12px}
+@media (prefers-reduced-motion:reduce){:where([class^="fl-"]) *,:where([class^="fl-"]) *::before,:where([class^="fl-"]) *::after{animation:none!important;transition:none!important}}
+</style>

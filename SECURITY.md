@@ -42,21 +42,19 @@ There is no bug bounty. We say thank you and we credit you.
 
 **In scope**
 
-- Anything in this repository: the SvelteKit app, `src/routes/api/v1/**`, the agent packages in
-  `packages/**`, the SQL in `supabase/migrations/**`, the compose stack in `infra/compose/**`.
+- Anything in this repository: the SvelteKit app, `src/routes/api/v1/**`, the VS Code extension
+  in `inspect/`, `npx/`, `packages/**`, the SQL in `supabase/migrations/**`.
 - Cross-tenant access of any kind — this is a multi-tenant product and every table is supposed to
   be scoped by brand through row-level security. A read or write across that line is the most
   serious class of bug here, always.
-- Authentication and session handling, one-tap approval links (`APP_SECRET`), the cron/worker
+- Authentication and session handling, the cron/worker
   endpoint secrets, and anything that lets an unauthenticated caller spend AI credits.
 - Secrets reachable from the browser: `SUPABASE_SERVICE_ROLE_KEY` or any private env value leaking
   into a client bundle.
 
 **Out of scope**
 
-- Findings that require a self-hosted operator to have misconfigured their own instance — but read
-  [`docs/SELF_HOSTING.md`](./docs/SELF_HOSTING.md) first, because the security posture and its
-  known gaps are documented there, and a gap we documented badly *is* in scope.
+- Findings that require an operator to have misconfigured their own Supabase project.
 - The publishable/anon Supabase key appearing in the client bundle. It is public by design; RLS is
   what protects the data. A way *around* RLS is very much in scope.
 - Third-party services we broker but don't run (Supabase, Vercel, Stripe, Composio, the model

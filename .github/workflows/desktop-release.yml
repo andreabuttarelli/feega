@@ -1,0 +1,113 @@
+name: Feega desktop release
+
+on:
+  push:
+    tags: ['desktop-v*']
+  pull_request:
+    paths: ['desktop/**', '.github/workflows/desktop-release.yml']
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Upload the builds to the desktop-latest release
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+env:
+  LATEST_TAG: desktop-latest
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            name: mac-arm64
+            targets: --mac zip dmg --arm64
+          - os: macos-latest
+            name: mac-x64
+            targets: --mac zip dmg --x64
+          - os: windows-latest
+            name: win-x64
+            targets: --win nsis --x64
+          - os: ubuntu-24.04
+            name: linux-x64
+            targets: --linux AppImage --x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npx svelte-kit sync
+      - run: npm run build
+        working-directory: npx
+      - run: npm ci --no-audit --no-fund
+        working-directory: desktop
+      - name: Version from the tag
+        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        working-directory: desktop
+        shell: bash
+        run: npm version --no-git-tag-version --allow-same-version "${GITHUB_REF_NAME#desktop-v}"
+      - run: npx vitest run --root . --dir desktop desktop/src
+      - run: npm run build
+        working-directory: desktop
+      - run: npx electron-builder --config electron-builder.config.cjs ${{ matrix.targets }} --publish never
+        working-directory: desktop
+        env:
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      - name: Update manifests for the macOS self-updater
+        if: startsWith(matrix.name, 'mac-')
+        run: node scripts/mac-manifest.cjs fragments release
+        working-directory: desktop
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.name }}
+          path: |
+            desktop/release/Feega-*.zip
+            desktop/release/Feega-*.dmg
+            desktop/release/Feega-*.exe
+            desktop/release/Feega-*.AppImage
+            desktop/release/latest.yml
+            desktop/release/latest-linux.yml
+            desktop/release/latest-mac-*.json
+          if-no-files-found: error
+
+  release:
+    needs: build
+    if: github.event_name == 'push' || inputs.publish
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: desktop/scripts
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          pattern: desktop-*
+          merge-multiple: true
+      - name: Merge the macOS manifest
+        run: node desktop/scripts/mac-manifest.cjs merge assets
+      - run: ls -la assets
+      - name: Release named by the tag
+        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        run: |
+          gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
+            || gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --prerelease --title "Feega desktop ${GITHUB_REF_NAME#desktop-v}" --notes "Unsigned beta of the Feega desktop app."
+          gh release upload "$GITHUB_REF_NAME" assets/* --repo "$GITHUB_REPOSITORY" --clobber
+      - name: Fixed release with stable asset URLs
+        run: |
+          gh release view "$LATEST_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
+            || gh release create "$LATEST_TAG" --repo "$GITHUB_REPOSITORY" --prerelease --target "$GITHUB_SHA" --title "Feega desktop (latest)" --notes "Always the newest desktop build. Download URLs under this release never change."
+          gh release upload "$LATEST_TAG" assets/* --repo "$GITHUB_REPOSITORY" --clobber

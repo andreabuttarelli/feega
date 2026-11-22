@@ -1,0 +1,36 @@
+{
+  "id": "hero-media",
+  "name": "Hero, video frame",
+  "description": "Headline over a wide media frame with a play button; drop a video or poster image in.",
+  "category": "section",
+  "tags": [
+    "hero",
+    "landing",
+    "video"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    },
+    {
+      "family": "Fragment Mono",
+      "weights": [
+        400
+      ]
+    }
+  ],
+  "tier": "free"
+}

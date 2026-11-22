@@ -1,0 +1,36 @@
+{
+  "id": "dropdown-menu",
+  "name": "Dropdown menu",
+  "description": "Button that opens a menu with icons, shortcuts, a divider and a danger item; native details, no script.",
+  "category": "component",
+  "tags": [
+    "menu",
+    "dropdown",
+    "overlay"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    },
+    {
+      "family": "Fragment Mono",
+      "weights": [
+        400
+      ]
+    }
+  ],
+  "tier": "free"
+}

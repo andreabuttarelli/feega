@@ -1,108 +1,41 @@
-# feega — infinite canvas of typed nodes
+# feega — design in your codebase
 
-## CLI
+Feega is a VS Code extension and `npx feega`: select an element in the running app, edit it, and
+the change lands in the source. Sign-in and the account live in this web app (`oh.feega.app`).
 
-The `feega` CLI lives in this repo at **`cli/`** (Apache-2.0, source of CLI + MCP server +
-agent skills + Claude/Codex plugins). It is a thin HTTP client — it never touches the database,
-it only calls the API in `src/routes/api/v1/`. CLI, endpoints and MCP tools change in the same
-PRs here; releases are `cli-v*` tags (workflow `cli-release.yml`).
+## Layout
 
-```bash
-# Install (standalone binary, no runtime needed)
-curl -sSL https://raw.githubusercontent.com/andreabuttarelli/feega/main/cli/scripts/install.sh | bash
-feega login
-
-# Quick commands
-feega projects                                  # List projects
-feega canvases <projectId>                      # List a project's canvases
-feega motion list                               # List motion frames
-feega motion ask <nodeId> "<prompt>"            # Ask the motion agent to change a frame
-feega upgrade                                   # Open billing checkout
-```
-
-## Lo schema del database (progetto `klnswzhhgrqvbfjzioul`)
-
-Il prodotto è una **tela infinita**: nodi tipizzati che una persona, la chat in sidebar o un agente
-esterno via MCP lavorano insieme. Il disegno completo, con le ragioni di ogni scelta, sta in
-[`NEW_DATABASE_STRUCTURE.md`](NEW_DATABASE_STRUCTURE.md); qui stanno i nomi e i vincoli che
-servono per non sbagliare una query.
-
-**La gerarchia:**
-
-```
-org ── projects ──┬── canvases ── nodes ── nodes_connections
-                  │                 └── node_runs (una generazione)
-                  └── assets       testo/immagini/video/documenti
-```
-
-**I brand e i prodotti non esistono più (18/11/2026).** Il codice non legge né scrive `brands`,
-`brand_fonts`, `brand_pins`, `products`, `brand_memory` né nessuna colonna `brand_id`: un progetto
-non ha brand, i video e la chat girano senza contesto di brand. Le tabelle e le colonne restano nel
-database finché una migration separata, dopo il deploy, non le elimina; non vanno riusate. Dettaglio
-in `docs/adr/0040-remove-brands.md`.
-
-**Il post non appartiene al progetto.** `posts` non ha `project_id`: un post assembla materiale da
-tele diverse. Il legame con l'origine è `post_sources` (molti-a-molti verso `nodes`), l'unica
-tabella senza `org_id` — il tenant lo porta il padre.
-
-| Gruppo | Tabelle |
+| Path | What |
 |---|---|
-| Tenant | `orgs` `orgs_members` `orgs_invites` `profiles` `api_keys` |
-| Tela | `projects` `canvases` `nodes` `nodes_connections` `node_runs` `assets` `canvas_events` |
-| Account | `social_accounts` |
-| Contenuto | `posts` `post_sources` `scheduled_posts` |
-| Ads (solo Meta) | `ad_accounts` `ad_campaigns` `ad_creatives` `competitor_ads` |
-| Sorgenti | `social_posts` (feed scaricati) |
-| Agenti | `chat_threads` `chat_messages` `ai_calls` |
-| Influencer | `influencers` `influencer_views` |
+| `inspect/`, `npx/` | The VS Code extension and the `npx feega` launcher |
+| `packages/source-map` | `feega-source-map`, the dev plugin that maps DOM to source |
+| `src/` | The web app: login, auth, `/cli/callback` (editor sign-in), account settings, the dashboard (Feega Cloud preview), billing and the Stripe webhook |
+| `landing/` | www.feega.app |
+| `web-docs/` | docs.feega.app |
+| `web-blog/` | the blog |
+| `supabase/` | all migrations (immutable) |
+| `cli/lib/init.ts` | project setup plan shared with the extension |
+| `docs/` | README media, runbooks |
 
-**I vincoli che non si scoprono leggendo i nomi:**
+The web app's routes: `/login`, `/auth/*`, `/cli/callback`, `/app` (dashboard),
+`/app/settings/profile`, `/account/export`, `/robots.txt`, and `/api` for the dashboard shell,
+billing and the Stripe webhook. The old canvas, motion, GPU, nodes, chat, MCP and CLI product was
+removed on 20/11/2026; a full `git bundle` archive exists (`feega-20261120.bundle`).
 
-- **`org_id` su ogni tabella** (tranne `post_sources`), e la RLS è attiva su tutte con
-  `auth_org_ids()`. **La service-role key la scavalca**: ogni uso va dichiarato in
-  `src/lib/server/db/service-role-uses.ts`, che è un argomento obbligatorio di
-  `createServiceRoleDb`. **`influencers`/`influencer_views` sono la deviazione dichiarata**:
-  `org_id` è **nullable**, e `null` è il catalogo globale (seminato da
-  `scripts/import-anomalia-talents.ts` con la service-role key) — ogni org lo legge, nessuna lo
-  scrive; un'org che crea un proprio influencer ottiene `org_id` valorizzato, visibile solo a lei.
-- **`nodes.data jsonb`** porta il payload per tipo (`text` `image` `video` `doc` `iframe`
-  `social_account_feed` `social_post_mockup` `ads` `influencer`). Una tabella sola: i
-  campi per tipo sarebbero ~40, quasi tutti NULL, e il mockup è un albero.
-- **`nodes.version`**: la posizione è last-write-wins, `data` va in concorrenza ottimistica
-  (`where version = $atteso`; zero righe = conflitto, mai un successo silenzioso).
-- **`nodes.deleted_at`**: cancellazione morbida, e ogni lettura filtra `deleted_at is null`.
-- **`actor_kind` / `actor_id` / `agent_key`** ovunque si registri un'azione. Per un agente
-  `actor_id` è **l'utente per conto del quale agisce** — `api_keys.user_id` è NOT NULL proprio
-  perché dietro un agente c'è sempre chi paga.
-- **`nodes_connections.target_handle`**: un video con frame iniziale e finale ha due ingressi.
-  Senza saperlo l'arco non si può eseguire.
-- **Realtime** pubblica `nodes`, `nodes_connections`, `canvases`, `node_runs` con
-  `replica identity full` — senza, un DELETE arriva con la sola chiave primaria.
-- **Storage**: bucket `brand-knowledge` (`${userId}/media/...`) e `canvas-assets`
-  (`${orgId}/${projectId}/...`), entrambi privati. Nascono da una migration: erano mancanti sul
-  progetto nuovo e ogni generazione immagine falliva con `store_failed`. Bucket `influencers`
-  (privato anche lui): `catalogue/<influencerId>/...` (letto da chiunque abbia una sessione) e
-  `<orgId>/<influencerId>/...` (letto solo dalla propria org) — la sola policy di lettura del
-  primo confronta il segmento con la STRINGA `'catalogue'`, non con un `org_id` in `auth_org_ids()`
-  come ogni altra policy di questo bucket e di `canvas-assets`. Bucket `media`, PUBBLICO
-  (`20260923_media_bucket.sql`, non ancora applicata) — non per la produzione AI riusabile, che va
-  in `brand-knowledge`/`signKnowledgePaths` come ogni altro asset `generated`, ma per ciò che deve
-  restare un URL nudo, durevole oltre la sessione: avatar (`${userId}/profile/...`) e swatch di un colore trascinato sulla tela
-  (`colours/${orgId}/${hex}.png`).
+## Database
 
-I tipi vengono **generati** (`npm run db:types` → `src/lib/database.types.ts`), mai scritti a
-mano: sono ciò che trasforma una colonna sbagliata in un errore di compilazione invece che in un
-`console.warn` che nessuno legge.
+The Supabase project `klnswzhhgrqvbfjzioul` keeps the full schema: migrations in `supabase/` are
+immutable, and tables of the old product stay there untouched. The code reads and writes only
+what the account app needs (`profiles`, `orgs`, `orgs_members`, billing and credits).
+`org_id` is on every table (except `post_sources`) and RLS uses `auth_org_ids()`. The service-role
+key bypasses RLS: every use is declared in `src/lib/server/db/service-role-uses.ts`. Types are
+generated (`npm run db:types`), never written by hand.
 
-## Architecture (this repo — the server side of the CLI)
+## Architecture
 
-- **API** (`src/routes/api/v1/`) — REST endpoints the CLI calls. Adding a CLI command usually
-  starts with an endpoint here.
-- **Shared queries** (`src/lib/server/cli-queries.ts`) — reusable read functions
-- **Auth** (`src/lib/server/cli-auth.ts`) — Bearer auth (Supabase JWT or `feega_` API key),
-  `openOrg` (the caller's org), and `gateOrgAiAction` (paid plan + credits) for endpoints that spend AI
-- **Login callback** (`src/routes/cli/callback/`) — the page the browser login flow posts back to
-
+- **Auth** (`src/lib/server/cli-auth.ts`): Bearer auth (Supabase JWT or `feega_` API key).
+- **Pages API** (`src/routes/api/v1/me/*`): the dashboard shell, bootstrap, profile and settings.
+- **Billing** (`src/routes/api/v1/billing`, `src/routes/api/webhooks/stripe`): kept for existing subscribers.
 
 ## How code is written here: clean architecture and Kent Beck's method (a rule, not a habit)
 
@@ -169,25 +102,6 @@ code:
   next case is added with a row and all of them are visible together. A rule written in five
   places diverges at the first change — and diverges silently.
 
-## I raggi seguono una scala, non il gusto del momento (una regola, non un'abitudine)
-
-Il 14/10/2026 la regola "cerchi o rettangoli" è stata tolta: il guscio ora usa **una scala di
-raggi con un ruolo per gradino** (`--ui-radius-*` in `src/app.css`, esposta da Tailwind come
-`rounded-xs/sm/md/lg`; `--radius` in `src/lib/styles/tailwind.css` vale `md`): `none` 0 per
-tele, contenuto dei nodi, pannelli e barre a tutta altezza; `xs` 2px per kbd, checkbox, swatch;
-`sm` 4px per bottoni, input, righe, segmenti; `md` 6px per menu, popover, card; `lg` 10px per
-dialog, sheet, barre e pannelli flottanti della tela; `full` per avatar, pallini, pill. Si sceglie il gradino per
-ruolo, mai un valore libero (`border-radius: 7px` no). Il dettaglio sta in `DESIGN.md`. Il
-contenuto dei video e dei template segue le sue regole, non questa.
-
-## L'app comanda, CLI e MCP si adattano (una regola, non un'abitudine)
-
-La direzione è una sola: **app → CLI → MCP.** Se una funzionalità esce dal prodotto, escono con
-lei gli endpoint che la servivano, i comandi CLI che li chiamavano e i tool MCP che li
-esponevano — nello stesso cambiamento.
-
-Che la CLI usi una cosa **non è un argomento per tenerla**: è l'argomento per aggiornare la CLI.
-
 ## Una funzione non esiste finché non è collegata (una regola, non un'abitudine)
 
 Costruire il pezzo non basta. Una funzione è finita solo quando è **collegata da capo a capo**
@@ -198,51 +112,10 @@ tabella D*.
 
 Il test giusto è quello che esercita il collegamento vero: un test della route/action che chiama
 la funzione server reale, non un mock della cosa che si sta collegando. **Playwright non serve
-per ogni funzione**: costa tempo e budget. Si tiene per pochi percorsi critici (il canvas si apre,
-genera, crea un post, il calendario), sull'harness condiviso in `tests/e2e/fixtures/`.
+per ogni funzione**: costa tempo e budget. Si tiene per pochi percorsi critici (il login, la callback dell'editor, la dashboard).
 
 Il 22/09/2026 i connettori tipizzati esistevano nella logica e nessun componente li disegnava, e
 il calendario puntava a colonne mai esistite: la suite era verde in entrambi i casi.
-
-## Ottimista per default (una regola, non un'abitudine)
-
-**Nessuna azione aspetta l'OK del server prima che l'utente veda il risultato.** Ogni azione di
-tela o editor si applica in locale nello stesso frame, si salva in background, riconcilia id e
-`version` quando il server risponde, e torna indietro con un avviso chiaro solo se fallisce.
-
-Il meccanismo è uno: `createOptimistic` (`src/lib/canvas/optimistic-ops.ts`) — applica, riserva
-lo slot di undo, mette in coda la scrittura, a esito atterra l'undo o ripristina le sole righe
-toccate. Ogni azione è **una riga** in `REGISTRY` (`src/lib/canvas/optimistic-registry.ts`):
-applicazione locale, campi del server, cosa tocca, quando conta come atterrata, undo. Un'azione
-nuova si aggiunge con una riga, mai con un `await post(...)` prima di aggiornare lo stato.
-`tests/e2e/canvas-optimistic.spec.ts` rallenta il server di 2 s e pretende il cambiamento entro
-due frame. Il perché sta in `docs/adr/0029-optimistic-op-runner.md`.
-
-## Two changelogs, always both (a rule, not a habit)
-
-Every change a user can notice updates **two**, in the same commit. Both are **one file per
-entry** — two PRs in parallel touch different files and the changelogs never conflict:
-
-1. **`changelog/YYYY-MM-DD-<slug>.md`** — for whoever works on the code. Why the thing exists,
-   what was there before, which decisions were made and what was discarded. Convention in
-   `changelog/README.md`. **`CHANGELOG.md` is frozen** (historical archive): nothing is added
-   there anymore.
-2. **`src/lib/content/changelog/YYYY-MM-DD-<slug>.ts`** — the **public** changelog, the one the
-   customer reads. It is **English only**, one `ChangelogEntry` as export default; the loader
-   (`src/lib/content/changelog/index.ts`) sorts them newest first. One line per feature, few
-   words, release-note style ("Motion videos now have voice-over and music by default"), not a
-   paragraph. The page `landing/src/routes/changelog/+page.svelte` (the
-   standalone marketing site, `landing/`) reads this folder at build: it is not touched, it
-   already shows everything.
-
-They are two different texts, not the same text translated. The public one doesn't name files,
-functions, tables or internal tool names: it says **what changes for whoever uses the product**,
-in the present tense, in sentences that make sense without knowing how it is built inside. A
-name the user actually types (`/goal`) belongs there; `decideGoalContinuation` doesn't.
-
-Skip the public changelog only when the change is genuinely invisible from outside: a refactor,
-an index, a test, a log. When in doubt, write it — one more line in the public changelog costs
-far less than a shipped feature nobody discovers.
 
 ## `git stash` non si usa, mai (una regola, non un'abitudine)
 
@@ -277,130 +150,27 @@ no stories.
 - **When a new lesson is paid for**, it goes into LESSONS.md in the same commit that paid for it.
   Updating LESSONS.md is as non-optional as writing the test.
 
-## Agent evaluation, before anything that matters (a rule, not a habit)
+## Changelog
 
-Unit tests (~7.000, green in CI — check the CI log before believing a local red: see
-LESSONS.md) verify that the **code is well built**. They have never prevented a
-single quality defect, because they run on a fake model and a fake database: brand context
-arrived empty, attachments were rejected by a constraint, the model resolved to the wrong one,
-and a read crossed every brand of the user — **green suite for everyone**.
+A user-visible change adds one English entry in `src/lib/content/changelog/YYYY-MM-DD-<slug>.ts`
+(`ChangelogEntry` as default export), read by the landing at build. Release-note style, one line,
+no file or function names. Skip it for refactors, tests and indexes.
 
-The evaluation (`scripts/eval/`) is the only thing that verifies **the product works**: it puts
-the real agents to work on a disposable trial brand, with real requests, and judges FACTS before
-tastes — does the artifact exist? is the number right? how many text blocks? what did it cost?
+## Docs
 
-**What exists today — four commands against the real canvas, and they measure different things:**
+A change to the extension or `npx feega` updates `web-docs/` in the same PR. Every command,
+setting and feature a page names must exist in `inspect/` or `npx/`.
+
+## Running
 
 ```bash
-npm run eval:bootstrap    # a real signup lands in a working org/project — the entry path itself
-npm run eval:canvas       # realtime on nodes/canvases/presence: does a peer see what another peer wrote?
-npm run eval:gen-node     # the three paths run_node_generation can take, against the real engine
-npm run eval:image-node   # an image node lands a real file in storage, not just a row that claims one
-npm run eval:provider-smoke -- --spend   # one cheapest render per media provider, $1 hard cap; dry run without --spend
+npm run dev      # the web app on :5173
+npm run check    # svelte-check
+npm run test:unit
 ```
 
-`eval:bootstrap` proves the entry path a real signup takes — a fresh user through `enterApp` —
-lands in a usable org and project, not a row that exists but nothing can open.
-
-`eval:canvas` proves realtime works on what the canvas is built from: it connects two clients to
-the same canvas and checks that a write from one arrives at the other — presence, node changes,
-connections. A UI that reads from a channel nobody proved delivers is a UI that looks done and
-silently isn't.
-
-`eval:gen-node` walks `run_node_generation`'s three real outcomes — success, a stale `version`
-refused as `conflict`, a medium that doesn't match the node's `type` refused before anything is
-spent — against the actual engine, not a mock of it.
-
-`eval:image-node` is the narrower, cheaper proof that an image node lands a real file: one render
-on the cheapest model in the catalog, then the object is actually downloaded and its bytes
-counted. A bucket that exists and a policy that compiles are not the same claim as a file landing
-in it — `store_failed` can still come back for reasons neither of those catches.
-
-`npm run eval:motion -- --port=5199 [--only=<case>] [--compare=<run dir>] [--cap=20]` is the
-motion agent's quality eval: five fixed briefs (feega, linear, stripe, a Shopify demo store, a
-mobile app), each on a throwaway account, driven through the editor chat by Playwright, exported
-in the browser. Facts first (duration, holds, empty frames, text size, recreated vs kit UI, beat
-alignment, gate left, errors, cost from `ai_calls`), then a vision judge calibrated on anchor
-stills in `scripts/eval/motion-quality/anchors/`. Output in `~/Documents/feega-videos/evals/<ts>/`.
-Never on port 5173; ~$2.5 per case.
-
-**What does NOT exist, so nobody writes it in a report as if it had run:** `npm run eval`,
-`npm run eval:ux`, `npm run eval:durability`, `npm run eval:creative`, `npm run eval:clip` — the
-rubric/plan/post pipeline and the UGC clip renderer they walked are gone with the rest of the old
-product, and their scripts were deleted alongside them, not left broken in `scripts/eval/`. Also
-absent: the `--all` / `--budget` / `--jobs` / `--compare` flags, cost read from `ai_calls`,
-`docs/EVAL_PLAN.md`, and a browser engine with a throttled network. Reading about a command here
-is not evidence that it runs — check `package.json`.
-
-**And being in `package.json` is not evidence that it WORKS.** A script with a dead import — a
-function whose signature moved, a module that no longer exists — fails on its first line and
-nobody notices, because no unit test covers a script and nobody runs it between deploys; it costs
-money. A probe nobody runs rots exactly like the product it was meant to watch: run it before you
-trust its last report, and delete it outright the day its imports stop resolving rather than
-leaving it to lie in a report later.
-
-**When to run it** — not on every commit (it costs real money), but always:
-
-1. **Before a merge that touches the chat path, prompts, tools or the model.** The comparison
-   with the last run is the real question: *did it get worse?*
-2. **Before turning something big on**: a new model, a new engine (harness), a bridge refactor.
-   The verdict comes from the eval, not an opinion.
-3. **When a quality defect is reported**: first write the scenario that reproduces it, then fix
-   it. A scenario that cannot fail is dead weight; one that fails is a real defect.
-4. **After fixing it**: the scenario becomes the guardian that keeps it from coming back.
-
-**The rules that make the verdict reliable:**
-
-- A report must NEVER confuse "green" with "never tried": unexecuted scenarios carry an `unrun`
-  field with the reason, printed before the round. An eval that lies is worse than an agent that
-  promises and doesn't deliver.
-- **The trial brand is always destroyed**, even on errors (`finally`). And Storage is cleaned
-  separately: AI images live under `media/<userId>/`, indexed on the user, so the cascade on
-  brands doesn't take them away.
-- Cost is read from `ai_calls` **while the brand exists**: after teardown the cascade takes it.
-- An eval run from a worktree measures a **hybrid**: `$lib` points at your copy, but
-  `@feega/*` resolves from the main checkout's `node_modules`. If you touched `packages/`,
-  your eval doesn't see it.
-
-The criterion of a good scenario is one only: **if you re-ran the real failures already seen,
-would this one catch them?** If a real defect would not have been caught by any scenario, the
-scenario is missing.
-
-**Two families, not one — only one built today.** *Quality* scenarios (does the write land? does
-realtime deliver it? does the file actually exist?) run server-side and are what `scripts/eval/`
-holds now. A second family — bad network, tab closed and reopened mid-work, a turn that outlasts
-30 minutes — would need a real browser with a throttled network and does not exist yet: nothing
-in this repo measures it. A product that answers well and loses work when the line drops is not
-ready, so that gap is real, not a nitpick — it just isn't closed by a command you can run today.
-
-## Docs and a feature video ship with the change (a rule, not a habit)
-
-Every PR that changes a feature, an API under `/api/v1`, a CLI command, an MCP tool or
-self-hosting does two more things in the **same PR**:
-
-1. **Updates `web-docs/`** (published on https://docs.feega.app). Pages under
-   `reference/generated/`, `self-hosting/` and `architecture/adr/` are generated at build from the
-   code and `docs/`: fix the source, not the page. Every command, endpoint and tool a page names
-   must exist in the code; what leaves the product leaves the docs.
-2. **Records a feature video**, attached to the PR under *Evidence* and ready to post on X and
-   Threads: 16:9, about 10 s, two parts joined —
-   - an **intro/title made in feega's motion editor**, exported as MP4;
-   - a **real screen recording of the app** made with the demo recorder (`scripts/demo-record/`,
-     one `demos/<slug>.demo.ts` per feature, run with
-     `npx playwright test -c scripts/demo-record/playwright.config.ts <slug>`), whose camera zooms
-     on **every click and every typing moment**.
-
-   The video is always **complete** (the whole flow, start to finish, never a fragment) and uses
-   **real, realistic, well-made example content** (a landing page UI, an app UI, a graphic design
-   piece), never placeholder shapes or lorem ipsum.
-
-   Files land in `~/Documents/feega-videos/demos/`: the recorder writes
-   `<YYYY-MM-DD>-<slug>-16x9.mp4` (raw takes in `demos/raw/<slug>-<ts>/`); the intro is saved
-   next to it as `<YYYY-MM-DD>-<slug>-intro.mp4` and the joined cut as
-   `<YYYY-MM-DD>-<slug>-final.mp4`. `<slug>` is the PR branch slug. The final cut is the one
-   attached to the PR.
-
-A change that is invisible from outside (refactor, test, index) needs neither.
+Deploys do not run migrations: `node scripts/schema-drift-check.mjs` compares the schema and the
+code (read-only). Run it after every migration and before changes that touch the database.
 
 ## Agent PRs go to `dev`, never to `main` (a rule, not a habit)
 
@@ -426,22 +196,6 @@ Andrea Buttarelli <49411143+andreabuttarelli@users.noreply.github.com>
 ```
 
 The Claude account's email is **not** that identity: it has already blocked two deploys.
-
-## Running
-
-The SvelteKit dev server must be running for the CLI to work against a local instance:
-```bash
-npm run dev  # Starts on port 5173
-```
-
-The CLI auto-detects a dev server on `localhost:5173` and falls back to production otherwise;
-override with `PUBLIC_APP_URL`.
-
-This repo's deploys **do not** run migrations, so the schema and what the code expects drift in
-silence: `node scripts/schema-drift-check.mjs` redoes the comparison (read-only, anon key, zero
-rows: pointing at production without fear) and says which migrations are not applied and which
-names are wrong in the code. Run it after every migration written and before any change that
-touches the database; it exits 1 if it finds something.
 
 ## AGENT.MD
 

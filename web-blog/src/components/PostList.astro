@@ -1,8 +1,8 @@
 ---
-import { formatDate, readingMinutes, type Post } from '../site';
+import { formatDate, readingMinutes, sectionOf, SECTIONS, type Entry } from '../site';
 
 interface Props {
-  posts: Post[];
+  posts: Entry[];
 }
 
 const { posts } = Astro.props;
@@ -11,9 +11,9 @@ const { posts } = Astro.props;
 <ol class="post-list">
   {
     posts.map((post) => (
-      <li>
-        <a href={`/posts/${post.id}/`}>
-          <img src={post.data.cover} alt="" width="160" height="84" loading="lazy" />
+      <li class="post-item">
+        <a href={`${SECTIONS[sectionOf(post)].path}${post.id}/`}>
+          <img src={post.data.cover} alt="" width="1200" height="630" loading="lazy" />
           <div>
             <h2>{post.data.title}</h2>
             <p>{post.data.description}</p>

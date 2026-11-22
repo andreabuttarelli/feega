@@ -1,6 +1,7 @@
 import type { User } from '@supabase/supabase-js';
 import type { Db } from '$lib/server/db/client';
 import type { Database } from '$lib/database.types';
+import { isGithubProvider } from '$lib/onboarding/provider-name';
 
 /**
  * IL PROFILO È LA PERSONA, E IL SUO ID È QUELLO DI AUTH.
@@ -63,7 +64,7 @@ export function profileFromAuthUser(user: User): Profile {
   return {
     id: user.id,
     email: user.email,
-    name: firstString(metadata, NAME_KEYS),
+    name: isGithubProvider(user) ? null : firstString(metadata, NAME_KEYS),
     avatarUrl: firstString(metadata, AVATAR_KEYS),
     termsAcceptedAt: null,
     termsVersion: null
@@ -103,21 +104,6 @@ function emptyFilled(row: ProfileColumns, fromAuth: Profile): Partial<Pick<Profi
   return patch;
 }
 
-export async function listProfileNames(db: Db, userIds: string[]): Promise<Record<string, string>> {
-  if (!userIds.length) {
-    return {};
-  }
-
-  const { data, error } = await db.from('profiles').select('id, name, email').in('id', userIds);
-  if (error) {
-    throw error;
-  }
-  return Object.fromEntries((data ?? []).flatMap((row) => {
-    const name = row.name || row.email;
-    return name ? [[row.id, name]] : [];
-  }));
-}
-
 export async function ensureProfile(db: Db, user: User): Promise<Profile> {
   const fromAuth = profileFromAuthUser(user);
   const row = (await readProfile(db, user.id)) ?? (await createProfile(db, fromAuth));
@@ -148,111 +134,8 @@ export async function recordTermsAcceptance(db: Db, userId: string, version: str
   }
 }
 
-export async function claimCampaignTemplate(db: Db, userId: string, campaign: string): Promise<boolean> {
-  const { data, error } = await db
-    .from('profiles')
-    .update({ signup_campaign: campaign, campaign_template_at: new Date().toISOString() })
-    .eq('id', userId)
-    .is('campaign_template_at', null)
-    .select('id');
-
-  if (error) {
-    throw error;
-  }
-  return (data ?? []).length > 0;
-}
-
-export type FirstRun = { signupCampaign: string | null; onboardingStatus: string | null };
-
-export async function readFirstRun(db: Db, userId: string): Promise<FirstRun> {
-  const { data, error } = await db
-    .from('profiles')
-    .select('signup_campaign, onboarding_status')
-    .eq('id', userId)
-    .maybeSingle();
-
-  if (error) {
-    throw error;
-  }
-  return { signupCampaign: data?.signup_campaign ?? null, onboardingStatus: data?.onboarding_status ?? null };
-}
-
-export enum TourWrite {
-  Saved = 'saved',
-  NoColumn = 'no_column'
-}
-
-const MISSING_COLUMN_CODES = new Set(['42703', 'PGRST204']);
-
-const isMissingColumn = (error: { code?: string } | null) => MISSING_COLUMN_CODES.has(error?.code ?? '');
-
-export async function readTourSeen(db: Db, userId: string): Promise<{ seenAt: string | null } | null> {
-  const { data, error } = await db.from('profiles').select('onboarding_seen_at').eq('id', userId).maybeSingle();
-
-  if (isMissingColumn(error)) {
-    console.warn('[tour] profiles.onboarding_seen_at missing: apply 20261010180000_onboarding_seen.sql');
-    return null;
-  }
-  if (error) {
-    throw error;
-  }
-  return { seenAt: data?.onboarding_seen_at ?? null };
-}
-
-export async function markTourSeen(db: Db, userId: string): Promise<TourWrite> {
-  const { error } = await db.from('profiles').update({ onboarding_seen_at: new Date().toISOString() }).eq('id', userId);
-
-  if (isMissingColumn(error)) {
-    console.warn('[tour] profiles.onboarding_seen_at missing: seen kept in the browser only');
-    return TourWrite.NoColumn;
-  }
-  if (error) {
-    throw error;
-  }
-  return TourWrite.Saved;
-}
-
-export async function moveOnboarding(db: Db, userId: string, input: { from: string | null; to: string }): Promise<boolean> {
-  const update = db.from('profiles').update({ onboarding_status: input.to }).eq('id', userId);
-  const guarded = input.from === null ? update.is('onboarding_status', null) : update.eq('onboarding_status', input.from);
-  const { data, error } = await guarded.select('id');
-
-  if (error) {
-    throw error;
-  }
-  return (data ?? []).length > 0;
-}
-
-type MemoryColumns = { agent_memory: string | null; agent_memory_updated_at: string | null };
-
-type MemoryTable = {
-  select(columns: string): { eq(column: string, value: string): { maybeSingle(): Promise<{ data: MemoryColumns | null; error: Error | null }> } };
-  update(values: Partial<MemoryColumns>): { eq(column: string, value: string): PromiseLike<{ error: Error | null }> };
-};
-
-const memoryTable = (db: Db): MemoryTable => db.from('profiles') as unknown as MemoryTable;
-
 export async function saveName(db: Db, userId: string, name: string): Promise<void> {
   const { error } = await db.from('profiles').update({ name, updated_at: new Date().toISOString() }).eq('id', userId);
-
-  if (error) {
-    throw error;
-  }
-}
-
-export async function readAgentMemory(db: Db, userId: string): Promise<string | null> {
-  const { data, error } = await memoryTable(db).select('agent_memory').eq('id', userId).maybeSingle();
-
-  if (error) {
-    throw error;
-  }
-  return data?.agent_memory || null;
-}
-
-export async function saveAgentMemory(db: Db, userId: string, content: string): Promise<void> {
-  const { error } = await memoryTable(db)
-    .update({ agent_memory: content || null, agent_memory_updated_at: new Date().toISOString() })
-    .eq('id', userId);
 
   if (error) {
     throw error;
