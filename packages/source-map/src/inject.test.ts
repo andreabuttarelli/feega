@@ -11,6 +11,15 @@ const hasVueCompiler = (() => {
   }
 })();
 
+const hasAstroCompiler = (() => {
+  try {
+    createRequire(import.meta.url).resolve('@astrojs/compiler/sync');
+    return true;
+  } catch {
+    return false;
+  }
+})();
+
 const tagsOf = (code: string) => [...code.matchAll(/<(\w+)[^>]*data-feega-src="([^"]+)"/g)].map((m) => `${m[1]} ${m[2]}`);
 
 describe('injectSource', () => {
@@ -101,5 +110,23 @@ describe('injectSource', () => {
 
       expect(out, pkg).toContain('<Star data-feega-src="A.jsx:2:24" data-feega-icon="Star" />');
     }
+  });
+
+  it('tags HTML elements with file:line:col, leaving the head and script bodies alone', () => {
+    const code = `<!doctype html>\n<html>\n  <head><title>t</title></head>\n  <body>\n    <main class="a">\n      <h1>Hi</h1>\n      <img src="x.png">\n    </main>\n    <script>const a = '<p>';</script>\n  </body>\n</html>\n`;
+
+    const out = injectSource(code, 'index.html')!;
+
+    expect(tagsOf(out)).toEqual(['body index.html:4:3', 'main index.html:5:5', 'h1 index.html:6:7', 'img index.html:7:7']);
+    expect(out).toContain('<img data-feega-src="index.html:7:7" src="x.png">');
+  });
+
+  it.skipIf(!hasAstroCompiler)('tags Astro elements and skips components and the front matter', () => {
+    const code = `---\nimport Card from './Card.astro';\nconst html = '<p>';\n---\n\n<main>\n  <Card><li>one</li></Card>\n  <h1 class="t">Hi</h1>\n</main>\n<style>\n  h1 { color: red }\n</style>\n`;
+
+    const out = injectSource(code, 'src/pages/index.astro')!;
+
+    expect(tagsOf(out)).toEqual(['main src/pages/index.astro:6:1', 'li src/pages/index.astro:7:9', 'h1 src/pages/index.astro:8:3']);
+    expect(out).toContain('<Card>');
   });
 });
