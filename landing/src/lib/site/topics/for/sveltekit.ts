@@ -72,5 +72,5 @@ export const SVELTEKIT: Topic = {
     { label: 'Svelte: class attribute and directives', href: 'https://svelte.dev/docs/svelte/class' },
     { label: 'SvelteKit: loading data', href: 'https://svelte.dev/docs/kit/load' }
   ],
-  readNext: ['/for/vue', '/for/tailwind', '/integrations/vscode', '/integrations/vscodium', '/alternatives/visual-editor-for-your-codebase', '/download']
+  readNext: ['/for/vue', '/for/tailwind', '/integrations/vscode', '/templates/svelte', '/alternatives/visual-editor-for-your-codebase', '/download']
 };

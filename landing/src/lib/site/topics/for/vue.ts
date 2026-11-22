@@ -72,5 +72,5 @@ export const VUE: Topic = {
     { label: 'Vue: class and style bindings', href: 'https://vuejs.org/guide/essentials/class-and-style.html' },
     { label: 'create-vue on GitHub', href: 'https://github.com/vuejs/create-vue' }
   ],
-  readNext: ['/for/sveltekit', '/for/tailwind', '/integrations/vscode', '/integrations/windsurf', '/alternatives/visual-editor-for-your-codebase', '/download']
+  readNext: ['/for/sveltekit', '/for/tailwind', '/integrations/vscode', '/templates/vue', '/alternatives/visual-editor-for-your-codebase', '/download']
 };

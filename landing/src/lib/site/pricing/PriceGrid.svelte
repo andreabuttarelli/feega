@@ -31,6 +31,7 @@
     <ul>
       {#each CLOUD_SOON_LINES as line (line)}<li>{lower(line)}</li>{/each}
     </ul>
+    <p class="start">{lower('The free library is already open:')} <a href="/templates">{lower('free templates')}</a></p>
   </article>
 </div>
 

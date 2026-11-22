@@ -8,6 +8,7 @@
   import { ALTERNATIVES_PATH } from './alternatives';
   import { CODEBASE_PATH } from './codebase';
   import { HUBS } from './topics';
+  import { TEMPLATES_PATH } from './templates/paths';
 
   const legal = Object.entries(LEGAL_DOCS).map(([slug, doc]) => ({ href: `/${slug}`, label: doc.label }));
   const year = new Date().getFullYear();
@@ -32,6 +33,7 @@
       <a href="/">home</a>
       <a href={DOWNLOAD_PATH}>download</a>
       <a href={PRICING_PATH}>pricing</a>
+      <a href={TEMPLATES_PATH}>templates</a>
       <a href={CODEBASE_PATH}>codebase</a>
       <a href="/changelog">changelog</a>
       <a href={GITHUB_URL}>star on github</a>

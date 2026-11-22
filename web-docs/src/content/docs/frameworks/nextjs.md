@@ -15,3 +15,7 @@ sidebar:
 - Text from props or constants is refused with a message.
 - Class names built by an expression (`cn()`, `clsx()`, template strings) are not written.
 - Layers may list framework wrapper nodes besides your own elements.
+
+## Free templates
+
+Free sections and UI components to start from, in React: [Feega templates](https://www.feega.app/templates/react).

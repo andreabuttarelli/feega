@@ -41,7 +41,7 @@ const FOUNDER = {
   worksFor: { '@type': 'Organization', name: 'Feega', url: SITE }
 };
 
-const script = (data: object) => `<script type="application/ld+json">${JSON.stringify(data)}</` + 'script>';
+export const script = (data: object) => `<script type="application/ld+json">${JSON.stringify(data)}</` + 'script>';
 
 export const faqJsonLd = (items: readonly { q: string; a: string }[]) =>
   script({
