@@ -1,0 +1,31 @@
+{
+  "id": "glass-button",
+  "name": "Glass button",
+  "description": "A liquid glass pill button over a slowly rotating rainbow glow that the glass bends like a lens.",
+  "category": "component",
+  "tags": [
+    "button",
+    "glass",
+    "glow",
+    "animation"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    }
+  ],
+  "tier": "free"
+}
