@@ -21,8 +21,10 @@ preview/                   static page with every item in light and dark
 vue, astro. `html` is a fallback only. No Angular.
 
 Categories: `section`, `component`, `app`. Tier is `free` or `pro`. Free items live in `items/`,
-pro items in `pro/<id>/` (same format plus `preview.webp`). The landing reads only pro manifests
-and the extension catalog carries pro items as metadata and the preview image, never their files.
+pro items keep only `pro/<id>/manifest.json` and `preview.webp` here; their source lives in the
+private repo feega-library-pro and is served to Feega Cloud through `/api/v1/library/pro/:id`. The
+landing reads only pro manifests and the extension catalog carries pro items as metadata and the
+preview image, never their files.
 Optional `preview` is a URL to a preview image. Items have no dependencies.
 
 `fonts` lists the Google Fonts families an item needs, with weights, so the editor can add the

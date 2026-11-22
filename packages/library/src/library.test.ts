@@ -115,7 +115,7 @@ describe('library items', () => {
 		}
 	});
 
-	for (const item of items) {
+	for (const item of freeItems) {
 		describe(item.id, () => {
 			it('is dependency free and in every required framework', () => {
 				expect(item.dependencies).toEqual([]);
