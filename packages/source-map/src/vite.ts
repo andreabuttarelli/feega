@@ -37,6 +37,13 @@ export function feegaSource(): Plugin {
       return out === null ? null : { code: out, map: null };
     },
 
+    transformIndexHtml: {
+      order: 'pre',
+      handler(html, ctx) {
+        return injectSource(html, sourceId(root, ctx.filename)) ?? html;
+      }
+    },
+
     transform(code, id, options) {
       if (!VITE_CLIENT.test(id)) {
         return null;

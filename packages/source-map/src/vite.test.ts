@@ -43,4 +43,18 @@ describe('feegaSource', () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  it('tags the elements of index.html before Vite serves it', async () => {
+    const root = mkdtempSync(join(FIXTURES_DIR, '.html-'));
+    writeFileSync(join(root, 'index.html'), '<!doctype html>\n<html><body>\n<h1>Hi</h1>\n</body></html>\n');
+    const server = await createServer({ root, configFile: false, logLevel: 'silent', server: { middlewareMode: true, hmr: false }, optimizeDeps: { noDiscovery: true }, plugins: [feegaSource()] });
+
+    try {
+      const out = await server.transformIndexHtml('/index.html', '<!doctype html>\n<html><body>\n<h1>Hi</h1>\n</body></html>\n', '/index.html');
+      expect(out).toContain('<h1 data-feega-src="index.html:3:1">Hi</h1>');
+    } finally {
+      await server.close();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
