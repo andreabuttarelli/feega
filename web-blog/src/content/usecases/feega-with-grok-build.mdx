@@ -45,11 +45,11 @@ A skill is a folder with a `SKILL.md` file. Grok Build's docs say it loads skill
 
 The same page says Grok reads Claude Code skills, plugins, marketplaces and instruction files with no configuration. It does not name the exact Claude Code path, so I would not rely on that for a first setup.
 
-The plain approach is to copy the Feega skill into one of those folders. The skill lives in the Feega repository at `skills/feega`.
+The plain approach is to copy the Feega skill into one of those folders. The skill lives in the Feega repository at `plugins/feega/skills/feega`.
 
 ```bash
 mkdir -p .grok/skills
-cp -r path/to/feega/skills/feega .grok/skills/feega
+cp -r path/to/feega/plugins/feega/skills/feega .grok/skills/feega
 ```
 
 Commit `.grok/skills/feega` if you want the team to get it. Grok Build's `/skills` command opens a panel for skills, and the page lists `/plugins`, `/hooks` and `/mcps` the same way, so you can check the skill shows up.
@@ -157,7 +157,7 @@ Read on 22 November 2026.
 - [Grok Build: modes and commands](https://docs.x.ai/build/modes-and-commands)
 - [xAI: Grok Build launch](https://x.ai/news/grok-build-cli), 25 May 2026.
 - [Feega docs: Use Feega with AI agents](https://docs.feega.app/more/ai-agents/)
-- The Feega skill, `skills/feega/SKILL.md`, in the [Feega repository](https://github.com/andreabuttarelli/feega).
+- The Feega skill, `plugins/feega/skills/feega/SKILL.md`, in the [Feega repository](https://github.com/andreabuttarelli/feega).
 
 ## Read next
 

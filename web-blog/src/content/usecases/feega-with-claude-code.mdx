@@ -29,7 +29,7 @@ Feega supports SvelteKit, Vite (React, Vue, Svelte), React Router, Next.js, Nuxt
 
 ## How we checked
 
-On 22 November 2026 I read the Feega docs page on AI agents, the Feega skill file at `skills/feega/SKILL.md` in the repository, the plugin manifest at `.claude-plugin/marketplace.json`, and the Claude Code docs on [skills](https://code.claude.com/docs/en/skills) and [plugins](https://code.claude.com/docs/en/plugins).
+On 22 November 2026 I read the Feega docs page on AI agents, the Feega skill file at `plugins/feega/skills/feega/SKILL.md` in the repository, the plugin manifest at `.claude-plugin/marketplace.json`, and the Claude Code docs on [skills](https://code.claude.com/docs/en/skills) and [plugins](https://code.claude.com/docs/en/plugins).
 
 What I did not do: I did not run Claude Code in this session. The install commands below come from those pages, and I could not confirm them against a live Claude Code. The screenshot above is a product screenshot of Feega beside a Claude Code panel. There are no stories here about how someone used it on a client.
 
@@ -56,9 +56,9 @@ The Claude Code plugin docs describe the longer form, which is the one to use if
 /plugin install feega@feega
 ```
 
-The repository's marketplace file names the marketplace and the plugin `feega`, and points the plugin at the skill folder `skills/feega`.
+The repository's marketplace file names the marketplace and the plugin `feega`, and points the plugin at the skill folder `plugins/feega/skills/feega`.
 
-You can also install it by hand. The Claude Code docs say a personal skill lives at `~/.claude/skills/<skill-name>/SKILL.md`, and a project skill at `.claude/skills/<skill-name>/SKILL.md`. Copy `skills/feega` there. Commit the project one to share it with your team.
+You can also install it by hand. The Claude Code docs say a personal skill lives at `~/.claude/skills/<skill-name>/SKILL.md`, and a project skill at `.claude/skills/<skill-name>/SKILL.md`. Copy `plugins/feega/skills/feega` there. Commit the project one to share it with your team.
 
 <Callout icon="tip" title="Check it loaded">
 Claude Code watches skill folders, so a new skill should appear in the current session. The docs say to run `/reload-skills` if it does not. Then ask for something that matches the skill, such as "set this project up for Feega".
@@ -150,7 +150,7 @@ No. Feega has no AI. It edits your source the way you would. The agent is your o
 
 ### How do I install the Feega skill for Claude Code?
 
-Run `npx skills add andreabuttarelli/feega`, or install the plugin from the `andreabuttarelli/feega` marketplace. You can also copy `skills/feega` into `.claude/skills/`.
+Run `npx skills add andreabuttarelli/feega`, or install the plugin from the `andreabuttarelli/feega` marketplace. You can also copy `plugins/feega/skills/feega` into `.claude/skills/`.
 
 ### Does it work in Cursor or Codex?
 
@@ -173,7 +173,7 @@ Grok Build reads skills too. See [Using Feega with Grok Build](/use-cases/feega-
 Read on 22 November 2026.
 
 - [Feega docs: Use Feega with AI agents](https://docs.feega.app/more/ai-agents/)
-- The Feega skill, `skills/feega/SKILL.md`, and the plugin manifest `.claude-plugin/marketplace.json` in the [Feega repository](https://github.com/andreabuttarelli/feega).
+- The Feega skill, `plugins/feega/skills/feega/SKILL.md`, and the plugin manifest `.claude-plugin/marketplace.json` in the [Feega repository](https://github.com/andreabuttarelli/feega).
 - [Claude Code docs: Skills](https://code.claude.com/docs/en/skills)
 - [Claude Code docs: Plugins](https://code.claude.com/docs/en/plugins)
 - [Feega docs: Undo and changes](https://docs.feega.app/editing/undo-and-changes/)
