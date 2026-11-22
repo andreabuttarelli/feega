@@ -1,0 +1,35 @@
+{
+  "id": "data-table",
+  "name": "Data table",
+  "description": "Captioned table with a status column; scrolls horizontally on narrow screens.",
+  "category": "app",
+  "tags": [
+    "table",
+    "data"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    },
+    {
+      "family": "Fragment Mono",
+      "weights": [
+        400
+      ]
+    }
+  ],
+  "tier": "free"
+}

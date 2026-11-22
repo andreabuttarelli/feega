@@ -1,0 +1,30 @@
+{
+  "id": "form-inputs",
+  "name": "Form inputs",
+  "description": "Text input, select, checkbox, radio, switch and textarea with labels, hints and an error state.",
+  "category": "component",
+  "tags": [
+    "form",
+    "input",
+    "controls"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    }
+  ],
+  "tier": "free"
+}

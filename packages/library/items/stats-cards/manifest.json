@@ -1,0 +1,30 @@
+{
+  "id": "stats-cards",
+  "name": "Dashboard stats cards",
+  "description": "Four metric cards with change badge and a tiny bar sparkline.",
+  "category": "app",
+  "tags": [
+    "dashboard",
+    "stats",
+    "cards"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    }
+  ],
+  "tier": "free"
+}

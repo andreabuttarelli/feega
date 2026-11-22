@@ -1,0 +1,15 @@
+import './Breadcrumbs.css';
+
+export function Breadcrumbs() {
+  return (
+    <nav className="fl-breadcrumbs" aria-label="Breadcrumb">
+      <ol>
+        <li><a href="#"><svg className="fl-px" viewBox="0 0 8 7" aria-hidden="true"><path d="M3 0h1v1h-1zM4 0h1v1h-1zM2 1h1v1h-1zM3 1h1v1h-1zM4 1h1v1h-1zM5 1h1v1h-1zM1 2h1v1h-1zM2 2h1v1h-1zM3 2h1v1h-1zM4 2h1v1h-1zM5 2h1v1h-1zM6 2h1v1h-1zM0 3h1v1h-1zM1 3h1v1h-1zM2 3h1v1h-1zM3 3h1v1h-1zM4 3h1v1h-1zM5 3h1v1h-1zM6 3h1v1h-1zM7 3h1v1h-1zM1 4h1v1h-1zM2 4h1v1h-1zM5 4h1v1h-1zM6 4h1v1h-1zM1 5h1v1h-1zM2 5h1v1h-1zM5 5h1v1h-1zM6 5h1v1h-1zM1 6h1v1h-1zM2 6h1v1h-1zM5 6h1v1h-1zM6 6h1v1h-1z" /></svg><span className="sr">Home</span></a></li>
+        <li className="mid"><a href="#">Workspace</a></li>
+        <li className="mid"><a href="#">Projects</a></li>
+        <li><a href="#">Website</a></li>
+        <li><span aria-current="page">Pricing page</span></li>
+      </ol>
+    </nav>
+  );
+}

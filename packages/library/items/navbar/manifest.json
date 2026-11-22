@@ -1,0 +1,29 @@
+{
+  "id": "navbar",
+  "name": "Navbar",
+  "description": "Brand, primary links and two actions; wraps cleanly at 360px.",
+  "category": "section",
+  "tags": [
+    "navigation",
+    "header"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    }
+  ],
+  "tier": "free"
+}

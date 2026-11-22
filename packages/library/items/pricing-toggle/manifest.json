@@ -1,0 +1,36 @@
+{
+  "id": "pricing-toggle",
+  "name": "Pricing, monthly and annual",
+  "description": "Three plans with a monthly or annual switch; pure CSS, no script needed.",
+  "category": "section",
+  "tags": [
+    "pricing",
+    "plans",
+    "toggle"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    },
+    {
+      "family": "Fragment Mono",
+      "weights": [
+        400
+      ]
+    }
+  ],
+  "tier": "free"
+}
