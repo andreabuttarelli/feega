@@ -1,9 +1,10 @@
+import { AsciiField } from "../AsciiField";
 import { useCurrentFrame } from "remotion";
 import { lift, tween } from "../../ease";
 import { FeegaMark } from "../../components/brandIcons";
 import { Heading, Pixel, Runner, hop, type Sprite } from "../pixel";
 import { Ending, Place, Section } from "../Section";
-import { DISPLAY, MONO, ORANGE, PAPER, Tone } from "../style";
+import { DISPLAY, INK, MONO, ORANGE, PAPER, Tone } from "../style";
 
 export const END_FRAMES = 135;
 export const END_TONE = Tone.Ink;
@@ -31,6 +32,7 @@ export const EndCard = () => {
 
   return (
     <Section tone={END_TONE} ending={Ending.Hold}>
+      <AsciiField fade={INK} />
       {AROUND.map((a, i) => {
         const p = tween(frame, 6 + i * 3, RUN_IN);
         const offstage = a.x < 960 ? -a.x - 200 : 2120 - a.x;

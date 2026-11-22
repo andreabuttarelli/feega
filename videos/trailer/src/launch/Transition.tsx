@@ -1,14 +1,20 @@
+import type { ReactNode } from "react";
 import { AbsoluteFill, useCurrentFrame, useVideoConfig } from "remotion";
 import { glide } from "../ease";
+import { Landscape } from "./Landscape";
 import { noise } from "./motion";
 
 export enum Exit {
   Pixels = "pixels",
   Panel = "panel",
   Cut = "cut",
+  Landscape = "landscape",
 }
 
 export const WIPE_FRAMES = 12;
+export const LANDSCAPE_FRAMES = 20;
+
+const LANDSCAPE_RISE = 0.7;
 
 const CELL = 80;
 const COLS = 24;
@@ -42,10 +48,31 @@ const PanelSlide = ({ progress, color }: { progress: number; color: string }) =>
   );
 };
 
+const LandscapeWipe = ({ progress, color }: { progress: number; color: string }) => {
+  const rise = Math.min(progress / LANDSCAPE_RISE, 1);
+  const flood = Math.max((progress - LANDSCAPE_RISE) / (1 - LANDSCAPE_RISE), 0);
+
+  return (
+    <>
+      <div style={{ position: "absolute", left: 0, top: 0, transform: `translateY(${(1 - rise) * 1080}px)` }}>
+        <Landscape cols={192} rows={108} seed={4} width={1920} height={1080} />
+      </div>
+      <PixelWipe progress={flood * 1.02} color={color} />
+    </>
+  );
+};
+
+const WIPES: Record<Exclude<Exit, Exit.Cut>, (props: { progress: number; color: string }) => ReactNode> = {
+  [Exit.Pixels]: ({ progress, color }) => <PixelWipe progress={progress * 1.02} color={color} />,
+  [Exit.Panel]: PanelSlide,
+  [Exit.Landscape]: LandscapeWipe,
+};
+
 export const ExitWipe = ({ exit, color }: { exit: Exit; color: string }) => {
   const frame = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();
-  const progress = glide(frame, durationInFrames - WIPE_FRAMES, WIPE_FRAMES);
+  const span = exit === Exit.Landscape ? LANDSCAPE_FRAMES : WIPE_FRAMES;
+  const progress = glide(frame, durationInFrames - span, span);
 
   if (exit === Exit.Cut || progress <= 0) {
     return null;
@@ -53,7 +80,7 @@ export const ExitWipe = ({ exit, color }: { exit: Exit; color: string }) => {
 
   return (
     <AbsoluteFill style={{ overflow: "hidden" }}>
-      {exit === Exit.Pixels ? <PixelWipe progress={progress * 1.02} color={color} /> : <PanelSlide progress={progress} color={color} />}
+      {WIPES[exit]({ progress, color })}
     </AbsoluteFill>
   );
 };

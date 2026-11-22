@@ -1,7 +1,8 @@
+import { AsciiField } from "../AsciiField";
 import { Align, Headline } from "../Headline";
 import { CREW, Parade, Scatter, specks } from "../pixel";
 import { Place, Section } from "../Section";
-import { BLUE, ORANGE, Tone } from "../style";
+import { BLUE, ORANGE, PAPER, Tone } from "../style";
 
 export const HERO_LINES = ["the best free", "Lovable alternative."];
 export const HERO_FRAMES = 90;
@@ -11,6 +12,7 @@ const SPECKS = specks(1, 22, [ORANGE, BLUE, "#ff8a3d"]);
 
 export const Hero = () => (
   <Section tone={HERO_TONE}>
+    <AsciiField fade={PAPER} strength={0.8} />
     <Scatter specks={SPECKS} />
     <Place x={0} y={250} style={{ width: 1920 }}>
       <Headline lines={HERO_LINES} boxed="free" tone={Tone.Paper} size={150} align={Align.Center} />
