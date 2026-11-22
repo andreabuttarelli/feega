@@ -9,6 +9,7 @@ import { variants } from './variants.mjs';
 import { blocks } from './blocks.mjs';
 import { pieces } from './pieces.mjs';
 import { palette } from './palette.mjs';
+import { scrollReveal } from './scroll-reveal.mjs';
 
 const ITEMS = join(dirname(fileURLToPath(import.meta.url)), '..', 'items');
 const FRAMEWORKS = ['html', 'svelte', 'react', 'vue', 'astro'];
@@ -64,7 +65,7 @@ for (const item of [...sections, ...app, ...components, ...variants, ...blocks, 
   manifest(item, C);
 }
 
-for (const item of [...interactive, palette]) {
+for (const item of [...interactive, palette, scrollReveal]) {
   const C = css(`fl-${item.id}`, item.mods, item.css);
   emit(item.id, C, item.files(C));
   manifest(item, C);
