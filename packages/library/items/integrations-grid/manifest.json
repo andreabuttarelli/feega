@@ -1,0 +1,36 @@
+{
+  "id": "integrations-grid",
+  "name": "Integrations grid",
+  "description": "Tiles for the tools you connect to, each with a pixel mark, name and one line.",
+  "category": "section",
+  "tags": [
+    "integrations",
+    "grid",
+    "logos"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    },
+    {
+      "family": "Fragment Mono",
+      "weights": [
+        400
+      ]
+    }
+  ],
+  "tier": "free"
+}

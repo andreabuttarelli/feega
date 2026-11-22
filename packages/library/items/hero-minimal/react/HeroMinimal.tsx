@@ -1,0 +1,15 @@
+import './HeroMinimal.css';
+
+export function HeroMinimal() {
+  return (
+    <section className="fl-hero-minimal">
+      <div className="fl-container inner">
+        <h1>say the one thing <em>you do best</em></h1>
+        <div className="foot">
+          <p>One short line under the headline, if it earns its place.</p>
+          <a href="#">get started <svg className="fl-px" viewBox="0 0 7 5" aria-hidden="true"><path d="M4 0h1v1h-1zM5 1h1v1h-1zM0 2h1v1h-1zM1 2h1v1h-1zM2 2h1v1h-1zM3 2h1v1h-1zM4 2h1v1h-1zM5 2h1v1h-1zM6 2h1v1h-1zM5 3h1v1h-1zM4 4h1v1h-1z" /></svg></a>
+        </div>
+      </div>
+    </section>
+  );
+}

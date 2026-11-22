@@ -1,0 +1,39 @@
+<section class="fl-stats-cards" aria-label="Key metrics">
+  <article class="card"><header><span>Revenue</span><em class="fl-badge fl-badge--success">+8.2%</em></header><p class="v">$48,210</p><div class="spark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></article>
+  <article class="card"><header><span>Active users</span><em class="fl-badge fl-badge--success">+3.1%</em></header><p class="v">3,904</p><div class="spark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></article>
+  <article class="card"><header><span>Conversion</span><em class="fl-badge fl-badge--danger">−0.4%</em></header><p class="v">4.6%</p><div class="spark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></article>
+  <article class="card"><header><span>Open tickets</span><em class="fl-badge fl-badge--accent">5 new</em></header><p class="v">27</p><div class="spark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></article>
+</section>
+
+<style>
+.fl-stats-cards{font-family:var(--feega-font);font-size:var(--feega-text-body);line-height:1.5;letter-spacing:var(--feega-tracking);color:var(--feega-fg);background:var(--feega-bg);-webkit-font-smoothing:antialiased}
+:where(.fl-stats-cards) *,:where(.fl-stats-cards) *::before,:where(.fl-stats-cards) *::after{box-sizing:border-box}
+:where(.fl-stats-cards) :is(h1,h2,h3,h4,p,ul,ol,figure,blockquote,dl,dd){margin:0}
+:where(.fl-stats-cards) a{color:inherit;text-decoration:none}
+:where(.fl-stats-cards) :focus-visible{outline:2px solid var(--feega-focus);outline-offset:3px}
+.fl-px{display:block;flex:none;width:1em;height:auto;fill:currentColor;shape-rendering:crispEdges}
+.fl-badge{display:inline-flex;align-items:center;gap:6px;min-height:24px;padding:0 10px;border-radius:var(--feega-radius-full);background:var(--feega-surface);color:var(--feega-fg-muted);font-size:var(--feega-text-xs);font-weight:500;letter-spacing:0;white-space:nowrap}
+.fl-badge::before{content:"";width:6px;height:6px;border-radius:var(--feega-radius-full);background:currentColor}
+.fl-badge--accent{background:var(--feega-accent-soft);color:var(--feega-accent-text)}
+.fl-badge--success{background:var(--feega-success-soft);color:var(--feega-success)}
+.fl-badge--danger{background:var(--feega-danger-soft);color:var(--feega-danger)}
+.fl-stats-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(14rem,100%),1fr));gap:var(--feega-space-3);padding:var(--feega-space-6) var(--feega-gutter)}
+.fl-stats-cards .card{display:grid;gap:var(--feega-space-3);padding:var(--feega-space-6);border-radius:var(--feega-radius-lg);background:var(--feega-raised);box-shadow:inset 0 0 0 1px var(--feega-line)}
+.fl-stats-cards header{display:flex;justify-content:space-between;align-items:center;gap:var(--feega-space-2);color:var(--feega-fg-muted);font-size:var(--feega-text-sm);font-weight:500}
+.fl-stats-cards em{font-style:normal}
+.fl-stats-cards .v{font-size:clamp(2rem,3.4vw,2.5rem);font-weight:500;line-height:1;letter-spacing:var(--feega-tracking-tight);font-variant-numeric:tabular-nums}
+.fl-stats-cards .spark{display:flex;align-items:flex-end;gap:3px;height:32px}
+.fl-stats-cards .spark i{flex:1;height:var(--h);border-radius:1px;background:var(--feega-line-strong)}
+.fl-stats-cards .spark i:nth-child(1){--h:30%}
+.fl-stats-cards .spark i:nth-child(2){--h:45%}
+.fl-stats-cards .spark i:nth-child(3){--h:38%}
+.fl-stats-cards .spark i:nth-child(4){--h:52%}
+.fl-stats-cards .spark i:nth-child(5){--h:48%}
+.fl-stats-cards .spark i:nth-child(6){--h:60%}
+.fl-stats-cards .spark i:nth-child(7){--h:55%}
+.fl-stats-cards .spark i:nth-child(8){--h:68%}
+.fl-stats-cards .spark i:nth-child(9){--h:74%}
+.fl-stats-cards .spark i:nth-child(10){--h:90%}
+.fl-stats-cards .spark i:last-child{background:var(--feega-accent)}
+@media (prefers-reduced-motion:reduce){:where([class^="fl-"]) *,:where([class^="fl-"]) *::before,:where([class^="fl-"]) *::after{animation:none!important;transition:none!important}}
+</style>

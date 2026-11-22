@@ -1,0 +1,36 @@
+{
+  "id": "gallery",
+  "name": "Gallery showcase",
+  "description": "A grid of placeholder frames for work, screenshots or customer sites, with captions.",
+  "category": "section",
+  "tags": [
+    "gallery",
+    "showcase",
+    "images"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    },
+    {
+      "family": "Fragment Mono",
+      "weights": [
+        400
+      ]
+    }
+  ],
+  "tier": "free"
+}

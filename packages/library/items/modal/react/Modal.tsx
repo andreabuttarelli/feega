@@ -1,0 +1,23 @@
+import { useRef } from 'react';
+import './Modal.css';
+
+export function Modal() {
+  const dialog = useRef<HTMLDialogElement>(null);
+
+  return (
+    <div className="fl-modal">
+      <button className="fl-btn" type="button" onClick={() => dialog.current?.showModal()}>Delete project</button>
+      <dialog ref={dialog} aria-labelledby="fl-modal-title">
+        <form method="dialog">
+          <span className="icon"><svg class="fl-px" viewBox="0 0 9 8" aria-hidden="true"><path d="M4 0h1v1h-1zM3 1h1v1h-1zM4 1h1v1h-1zM5 1h1v1h-1zM2 2h1v1h-1zM3 2h1v1h-1zM5 2h1v1h-1zM6 2h1v1h-1zM2 3h1v1h-1zM3 3h1v1h-1zM5 3h1v1h-1zM6 3h1v1h-1zM1 4h1v1h-1zM2 4h1v1h-1zM3 4h1v1h-1zM5 4h1v1h-1zM6 4h1v1h-1zM7 4h1v1h-1zM1 5h1v1h-1zM2 5h1v1h-1zM3 5h1v1h-1zM4 5h1v1h-1zM5 5h1v1h-1zM6 5h1v1h-1zM7 5h1v1h-1zM0 6h1v1h-1zM1 6h1v1h-1zM2 6h1v1h-1zM3 6h1v1h-1zM5 6h1v1h-1zM6 6h1v1h-1zM7 6h1v1h-1zM8 6h1v1h-1zM0 7h1v1h-1zM1 7h1v1h-1zM2 7h1v1h-1zM3 7h1v1h-1zM4 7h1v1h-1zM5 7h1v1h-1zM6 7h1v1h-1zM7 7h1v1h-1zM8 7h1v1h-1z" /></svg></span>
+          <h2 id="fl-modal-title">Delete this project?</h2>
+          <p>The project, its pages and its history are removed for everyone. This can&apos;t be undone.</p>
+          <div className="actions">
+            <button className="fl-btn fl-btn--sm" value="cancel">Cancel</button>
+            <button className="fl-btn fl-btn--sm danger" value="confirm">Delete project</button>
+          </div>
+        </form>
+      </dialog>
+    </div>
+  );
+}

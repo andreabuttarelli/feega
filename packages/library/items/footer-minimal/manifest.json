@@ -1,0 +1,34 @@
+{
+  "id": "footer-minimal",
+  "name": "Footer, one line",
+  "description": "Copyright, a few links and a status dot on a single row that wraps on phones.",
+  "category": "section",
+  "tags": [
+    "footer"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    },
+    {
+      "family": "Fragment Mono",
+      "weights": [
+        400
+      ]
+    }
+  ],
+  "tier": "free"
+}

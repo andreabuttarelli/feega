@@ -1,0 +1,35 @@
+{
+  "id": "pricing",
+  "name": "Pricing",
+  "description": "Three tiers with one highlighted; placeholder prices.",
+  "category": "section",
+  "tags": [
+    "pricing",
+    "plans"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    },
+    {
+      "family": "Fragment Mono",
+      "weights": [
+        400
+      ]
+    }
+  ],
+  "tier": "free"
+}

@@ -1,0 +1,36 @@
+{
+  "id": "hero-bento",
+  "name": "Hero, bento",
+  "description": "Headline tile plus a grid of proof tiles: a metric, a quote, a feature and a call to action.",
+  "category": "section",
+  "tags": [
+    "hero",
+    "landing",
+    "bento"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    },
+    {
+      "family": "Fragment Mono",
+      "weights": [
+        400
+      ]
+    }
+  ],
+  "tier": "free"
+}
