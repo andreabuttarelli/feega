@@ -15,6 +15,7 @@ import type { OffsetSide } from '@feega/live-edit/authored-offsets';
 import type { Breakpoints } from '@feega/live-edit/breakpoints';
 import type { Theme } from '@feega/live-edit/themes';
 import type { CloudComment, CommentDraft } from './host/cloud-api';
+import type { Catalog } from '@feega/plugin-api/external';
 import type { Proposal } from '@feega/plugin-api/protocol';
 import type { Present, VisitorRole } from '../../packages/share-protocol/src/frame';
 import type { ReportFacts, SettingKey, SettingValue, Settings } from './settings';
@@ -116,6 +117,8 @@ export type PluginAsk = { call: PluginCall.Project } | { call: PluginCall.Source
 
 export type PluginResult = { ok: true; value: unknown } | { ok: false; reason: string };
 
+export type LibraryEntry = { id: string; name: string; description: string; category: string; tags: string[]; tier: string; page: string };
+
 export enum Mode {
   Design = 'design',
   Navigate = 'navigate'
@@ -169,7 +172,12 @@ export enum ToHost {
   ShareStop = 'share-stop',
   ShareKick = 'share-kick',
   ShareRole = 'share-role',
-  Plugin = 'plugin'
+  LibraryList = 'library-list',
+  LibraryInsert = 'library-insert',
+  Plugin = 'plugin',
+  PluginEnable = 'plugin-enable',
+  PluginRemove = 'plugin-remove',
+  PluginInstall = 'plugin-install'
 }
 
 export type ChangeRow = { id: number; at: string; prop: string; value: string; scope: string; files: string[]; time: number };
@@ -193,7 +201,9 @@ export enum ToView {
   Wiring = 'wiring',
   Comments = 'comments',
   Share = 'share',
+  Library = 'library',
   Plugin = 'plugin',
+  Plugins = 'plugins',
   Reload = 'reload'
 }
 
@@ -263,7 +273,12 @@ export type HostMessage =
   | { kind: ToHost.ShareStop }
   | { kind: ToHost.ShareKick; userId: string }
   | { kind: ToHost.ShareRole; userId: string; role: VisitorRole }
-  | { kind: ToHost.Plugin; id: number; ask: PluginAsk };
+  | { kind: ToHost.LibraryList }
+  | { kind: ToHost.LibraryInsert; id: string; at: string; place: AddPlace }
+  | { kind: ToHost.Plugin; id: number; ask: PluginAsk }
+  | { kind: ToHost.PluginEnable; id: string; enabled: boolean }
+  | { kind: ToHost.PluginRemove; id: string }
+  | { kind: ToHost.PluginInstall; source: string };
 
 export type ViewMessage =
   | { kind: ToView.App; url: string; styling: Styling; prefs: Prefs | null; route?: string; breakpoints: Breakpoints; themes: Theme[] }
@@ -282,7 +297,9 @@ export type ViewMessage =
   | { kind: ToView.Wiring; at: string; instance?: number; wiring: Wiring }
   | { kind: ToView.Comments; enabled: boolean; comments: CloudComment[]; error?: string }
   | { kind: ToView.Share; state: ShareState; available: boolean; name: string; canEdit: boolean; url?: string; expiresAt?: string; visitors: Present[]; notice: boolean; error?: string }
+  | { kind: ToView.Library; items: LibraryEntry[] }
   | { kind: ToView.Plugin; id: number; result: PluginResult }
+  | { kind: ToView.Plugins; catalog: Catalog; canInstall: boolean }
   | { kind: ToView.Reload };
 
 export const INSPECT = 'feega:inspect';

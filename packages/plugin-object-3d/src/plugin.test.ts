@@ -6,7 +6,8 @@ import { Control, OpKind, Place, type HostMessage, type Picked, type PluginMessa
 import manifest from '../feega-plugin.json';
 import { COMPONENT_NAME, DEFAULT_SCENE, RUNTIME_FILE } from './scene';
 import { FONT_FILE, SECTION, THREE_VERSION, objectPlugin } from './plugin';
-import font from './runtime/helvetiker_bold.typeface.json?raw';
+import font from './runtime/inter_bold.typeface.json?raw';
+import licence from './runtime/OFL.txt?raw';
 
 const TARGET = { file: 'src/routes/+page.svelte', line: 5, col: 3 };
 
@@ -127,8 +128,18 @@ describe('3D text', () => {
     await plugin.insert('shape:text');
     expect(plugin.fetched).toEqual([]);
     const ops = plugin.proposals[0].ops;
-    expect(ops.find((op) => op.kind === OpKind.Asset)).toMatchObject({ file: 'public/feega/fonts/helvetiker_bold.typeface.json', base64: Buffer.from(font).toString('base64') });
-    expect(ops.at(-1)).toMatchObject({ component: { attributes: expect.stringContaining('font="/feega/fonts/helvetiker_bold.typeface.json"') } });
+    expect(ops.filter((op) => op.kind === OpKind.Asset)).toEqual([
+      { kind: OpKind.Asset, file: 'public/feega/fonts/inter_bold.typeface.json', base64: Buffer.from(font).toString('base64') },
+      { kind: OpKind.Asset, file: 'public/feega/fonts/OFL.txt', base64: Buffer.from(licence).toString('base64') }
+    ]);
+    expect(ops.at(-1)).toMatchObject({ component: { attributes: expect.stringContaining('font="/feega/fonts/inter_bold.typeface.json"') } });
+  });
+
+  it('ships a font under the SIL OFL with no reserved name, under 150 KB', () => {
+    expect(licence).toContain('SIL OPEN FONT LICENSE Version 1.1');
+    expect(licence).not.toMatch(/with Reserved Font Name/);
+    expect(Buffer.byteLength(font)).toBeLessThan(150 * 1024);
+    expect(JSON.parse(font).glyphs['A'].o).toBeTruthy();
   });
 
 });

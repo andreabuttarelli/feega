@@ -1,6 +1,7 @@
 import type { PluginApi } from '@feega/plugin-api/client';
 import { Control, Framework, OpKind, Place, frameworkOf, type Op, type ProjectInfo, type Selection, type Source, type UiNode } from '@feega/plugin-api/protocol';
-import fontSource from './runtime/helvetiker_bold.typeface.json?raw';
+import fontSource from './runtime/inter_bold.typeface.json?raw';
+import licenceSource from './runtime/OFL.txt?raw';
 import runtimeSource from './runtime/mount-scene.ts?raw';
 import { COMPONENT_NAME, DEFAULT_SCENE, RUNTIME_FILE, attributeText, componentFor, sceneOf, type Scene } from './scene';
 
@@ -14,7 +15,8 @@ const MODEL_SHAPE = 'model';
 const TEXT_SHAPE = 'text';
 const FONT_DIR = 'feega/fonts';
 const MODEL_DIR = 'feega/models';
-const FONT_FILE = 'helvetiker_bold.typeface.json';
+const FONT_FILE = 'inter_bold.typeface.json';
+const LICENCE_FILE = 'OFL.txt';
 const MAX_HEIGHT = 800;
 const HEIGHT_STEP = 10;
 const NOT_A_COMPONENT = 'Add a 3D object to a Svelte, React, Vue or Astro file.';
@@ -70,7 +72,12 @@ export function objectPlugin(api: PluginApi) {
   }
 
   async function textOps(info: ProjectInfo): Promise<Extras | null> {
-    return { ops: [{ kind: OpKind.Asset, file: `${info.publicDir}/${FONT_DIR}/${FONT_FILE}`, base64: base64Of(fontSource) }], scene: { font: `/${FONT_DIR}/${FONT_FILE}` } };
+    const dir = `${info.publicDir}/${FONT_DIR}`;
+    const ops: Op[] = [
+      { kind: OpKind.Asset, file: `${dir}/${FONT_FILE}`, base64: base64Of(fontSource) },
+      { kind: OpKind.Asset, file: `${dir}/${LICENCE_FILE}`, base64: base64Of(licenceSource) }
+    ];
+    return { ops, scene: { font: `/${FONT_DIR}/${FONT_FILE}` } };
   }
 
   const EXTRAS: Record<string, (info: ProjectInfo) => Promise<Extras | null>> = {
