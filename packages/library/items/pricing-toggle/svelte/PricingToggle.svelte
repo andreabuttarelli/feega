@@ -1,0 +1,79 @@
+<section class="fl-pricing-toggle">
+  <div class="fl-container head">
+    <p class="fl-eyebrow">pricing</p>
+    <h2 class="fl-title">simple pricing</h2>
+    <label class="bill">monthly <input class="fl-switch" type="checkbox" aria-label="Bill annually" /> annual <span class="save">save 20%</span></label>
+  </div>
+  <ul class="fl-container plans">
+    <li class="plan">
+      <h3>starter</h3>
+      <p class="price"><b class="m">$0</b><b class="a">$0</b><span>per seat / month</span></p>
+      <p class="desc">For trying it out.</p>
+      <a class="fl-btn" href="#">start free</a>
+      <ul><li><svg class="fl-px" viewBox="0 0 8 6" aria-hidden="true"><path d="M7 0h1v1h-1zM6 1h1v1h-1zM7 1h1v1h-1zM0 2h1v1h-1zM5 2h1v1h-1zM6 2h1v1h-1zM0 3h1v1h-1zM1 3h1v1h-1zM4 3h1v1h-1zM5 3h1v1h-1zM1 4h1v1h-1zM2 4h1v1h-1zM3 4h1v1h-1zM4 4h1v1h-1zM2 5h1v1h-1zM3 5h1v1h-1z" /></svg>3 projects</li><li><svg class="fl-px" viewBox="0 0 8 6" aria-hidden="true"><path d="M7 0h1v1h-1zM6 1h1v1h-1zM7 1h1v1h-1zM0 2h1v1h-1zM5 2h1v1h-1zM6 2h1v1h-1zM0 3h1v1h-1zM1 3h1v1h-1zM4 3h1v1h-1zM5 3h1v1h-1zM1 4h1v1h-1zM2 4h1v1h-1zM3 4h1v1h-1zM4 4h1v1h-1zM2 5h1v1h-1zM3 5h1v1h-1z" /></svg>community support</li></ul>
+    </li>
+    <li class="plan hot">
+      <h3>pro</h3>
+      <p class="price"><b class="m">$15</b><b class="a">$12</b><span>per seat / month</span></p>
+      <p class="desc">For small teams shipping weekly.</p>
+      <a class="fl-btn fl-btn--primary" href="#">start trial</a>
+      <ul><li><svg class="fl-px" viewBox="0 0 8 6" aria-hidden="true"><path d="M7 0h1v1h-1zM6 1h1v1h-1zM7 1h1v1h-1zM0 2h1v1h-1zM5 2h1v1h-1zM6 2h1v1h-1zM0 3h1v1h-1zM1 3h1v1h-1zM4 3h1v1h-1zM5 3h1v1h-1zM1 4h1v1h-1zM2 4h1v1h-1zM3 4h1v1h-1zM4 4h1v1h-1zM2 5h1v1h-1zM3 5h1v1h-1z" /></svg>unlimited projects</li><li><svg class="fl-px" viewBox="0 0 8 6" aria-hidden="true"><path d="M7 0h1v1h-1zM6 1h1v1h-1zM7 1h1v1h-1zM0 2h1v1h-1zM5 2h1v1h-1zM6 2h1v1h-1zM0 3h1v1h-1zM1 3h1v1h-1zM4 3h1v1h-1zM5 3h1v1h-1zM1 4h1v1h-1zM2 4h1v1h-1zM3 4h1v1h-1zM4 4h1v1h-1zM2 5h1v1h-1zM3 5h1v1h-1z" /></svg>custom domain</li><li><svg class="fl-px" viewBox="0 0 8 6" aria-hidden="true"><path d="M7 0h1v1h-1zM6 1h1v1h-1zM7 1h1v1h-1zM0 2h1v1h-1zM5 2h1v1h-1zM6 2h1v1h-1zM0 3h1v1h-1zM1 3h1v1h-1zM4 3h1v1h-1zM5 3h1v1h-1zM1 4h1v1h-1zM2 4h1v1h-1zM3 4h1v1h-1zM4 4h1v1h-1zM2 5h1v1h-1zM3 5h1v1h-1z" /></svg>priority support</li></ul>
+    </li>
+    <li class="plan">
+      <h3>business</h3>
+      <p class="price"><b class="m">$49</b><b class="a">$39</b><span>per seat / month</span></p>
+      <p class="desc">For security reviews and SSO.</p>
+      <a class="fl-btn" href="#">talk to sales</a>
+      <ul><li><svg class="fl-px" viewBox="0 0 8 6" aria-hidden="true"><path d="M7 0h1v1h-1zM6 1h1v1h-1zM7 1h1v1h-1zM0 2h1v1h-1zM5 2h1v1h-1zM6 2h1v1h-1zM0 3h1v1h-1zM1 3h1v1h-1zM4 3h1v1h-1zM5 3h1v1h-1zM1 4h1v1h-1zM2 4h1v1h-1zM3 4h1v1h-1zM4 4h1v1h-1zM2 5h1v1h-1zM3 5h1v1h-1z" /></svg>SSO and audit log</li><li><svg class="fl-px" viewBox="0 0 8 6" aria-hidden="true"><path d="M7 0h1v1h-1zM6 1h1v1h-1zM7 1h1v1h-1zM0 2h1v1h-1zM5 2h1v1h-1zM6 2h1v1h-1zM0 3h1v1h-1zM1 3h1v1h-1zM4 3h1v1h-1zM5 3h1v1h-1zM1 4h1v1h-1zM2 4h1v1h-1zM3 4h1v1h-1zM4 4h1v1h-1zM2 5h1v1h-1zM3 5h1v1h-1z" /></svg>roles</li><li><svg class="fl-px" viewBox="0 0 8 6" aria-hidden="true"><path d="M7 0h1v1h-1zM6 1h1v1h-1zM7 1h1v1h-1zM0 2h1v1h-1zM5 2h1v1h-1zM6 2h1v1h-1zM0 3h1v1h-1zM1 3h1v1h-1zM4 3h1v1h-1zM5 3h1v1h-1zM1 4h1v1h-1zM2 4h1v1h-1zM3 4h1v1h-1zM4 4h1v1h-1zM2 5h1v1h-1zM3 5h1v1h-1z" /></svg>onboarding</li></ul>
+    </li>
+  </ul>
+</section>
+
+<style>
+.fl-pricing-toggle{font-family:var(--feega-font);font-size:var(--feega-text-body);line-height:1.5;letter-spacing:var(--feega-tracking);color:var(--feega-fg);background:var(--feega-bg);-webkit-font-smoothing:antialiased}
+:where(.fl-pricing-toggle) *,:where(.fl-pricing-toggle) *::before,:where(.fl-pricing-toggle) *::after{box-sizing:border-box}
+:where(.fl-pricing-toggle) :is(h1,h2,h3,h4,p,ul,ol,figure,blockquote,dl,dd){margin:0}
+:where(.fl-pricing-toggle) a{color:inherit;text-decoration:none}
+:where(.fl-pricing-toggle) :focus-visible{outline:2px solid var(--feega-focus);outline-offset:3px}
+.fl-container{width:min(var(--feega-max-width),100% - 2 * var(--feega-gutter));margin-inline:auto}
+.fl-px{display:block;flex:none;width:1em;height:auto;fill:currentColor;shape-rendering:crispEdges}
+.fl-btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--feega-space-2);min-height:44px;padding:0 var(--feega-space-6);border:1px solid var(--feega-line-strong);border-radius:var(--feega-radius-full);background:transparent;color:var(--feega-fg);font:inherit;font-size:0.9375rem;font-weight:500;letter-spacing:var(--feega-tracking);white-space:nowrap;text-decoration:none;cursor:pointer;transition:background-color var(--feega-dur-fast) var(--feega-ease),border-color var(--feega-dur-fast) var(--feega-ease),color var(--feega-dur-fast) var(--feega-ease),transform var(--feega-dur-fast) var(--feega-ease)}
+.fl-btn:hover{border-color:var(--feega-fg-subtle);background:var(--feega-surface)}
+.fl-btn:active{transform:scale(0.97)}
+.fl-btn--primary{border-color:var(--feega-accent);background:var(--feega-accent);color:var(--feega-accent-fg)}
+.fl-btn--primary:hover{border-color:var(--feega-accent-hover);background:var(--feega-accent-hover)}
+.fl-btn--ink{border-color:var(--feega-fg);background:var(--feega-fg);color:var(--feega-bg)}
+.fl-btn--ink:hover{border-color:var(--feega-fg-muted);background:var(--feega-fg-muted)}
+.fl-btn--ghost{border-color:transparent}
+.fl-btn--sm{min-height:36px;padding:0 var(--feega-space-4);font-size:var(--feega-text-sm)}
+.fl-btn .fl-px{width:10px;transition:transform var(--feega-dur) var(--feega-ease)}
+.fl-btn:hover .fl-px{transform:translateX(3px)}
+.fl-btn[disabled]{opacity:0.45;cursor:not-allowed}
+.fl-title{font-family:var(--feega-font-display);font-size:var(--feega-text-title);font-weight:500;line-height:0.95;letter-spacing:var(--feega-tracking-tight);text-wrap:balance}
+.fl-lead{max-width:34rem;font-size:var(--feega-text-lg);line-height:1.4;color:var(--feega-fg-muted);text-wrap:pretty}
+.fl-eyebrow{display:inline-flex;align-items:center;gap:var(--feega-space-2);font-family:var(--feega-font-mono);font-size:var(--feega-text-xs);letter-spacing:0.02em;color:var(--feega-fg-muted);text-transform:uppercase}
+.fl-eyebrow::before{content:"";width:6px;height:6px;background:var(--feega-accent)}
+.fl-switch{appearance:none;position:relative;flex:none;width:40px;height:24px;margin:0;border-radius:var(--feega-radius-full);background:var(--feega-line-strong);cursor:pointer;transition:background-color var(--feega-dur) var(--feega-ease)}
+.fl-switch::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:var(--feega-radius-full);background:var(--feega-raised);box-shadow:var(--feega-shadow);transition:transform var(--feega-dur) var(--feega-ease)}
+.fl-switch:checked{background:var(--feega-accent)}
+.fl-switch:checked::after{transform:translateX(16px)}
+.fl-pricing-toggle{padding-block:var(--feega-space-section)}
+.fl-pricing-toggle .head{display:flex;flex-direction:column;align-items:center;gap:var(--feega-space-6);margin-bottom:var(--feega-space-12);text-align:center}
+.fl-pricing-toggle .bill{display:inline-flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:var(--feega-space-3);font-weight:500;cursor:pointer}
+.fl-pricing-toggle .save{padding:2px 10px;border-radius:var(--feega-radius-full);background:var(--feega-accent-soft);color:var(--feega-accent-text);font-size:var(--feega-text-xs)}
+.fl-pricing-toggle .plans{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--feega-space-3);padding:0;list-style:none}
+.fl-pricing-toggle .plan{display:flex;flex-direction:column;gap:var(--feega-space-4);padding:var(--feega-space-8);border-radius:var(--feega-radius-lg);background:var(--feega-surface)}
+.fl-pricing-toggle .hot{background:var(--feega-raised);box-shadow:var(--feega-shadow-float),inset 0 0 0 1px var(--feega-accent)}
+.fl-pricing-toggle h3{font-size:var(--feega-text-xl);font-weight:500;letter-spacing:-0.04em}
+.fl-pricing-toggle .price{display:flex;align-items:baseline;gap:var(--feega-space-2);color:var(--feega-fg-muted);font-size:var(--feega-text-sm)}
+.fl-pricing-toggle .price b{color:var(--feega-fg);font-size:clamp(2.75rem,5vw,3.5rem);font-weight:500;line-height:1;letter-spacing:var(--feega-tracking-tight);animation:fl-pricing-toggle-in var(--feega-dur) var(--feega-ease)}
+@keyframes fl-pricing-toggle-in{from{opacity:0;transform:translateY(8px)}}
+.fl-pricing-toggle .a,.fl-pricing-toggle:has(.fl-switch:checked) .m{display:none}
+.fl-pricing-toggle:has(.fl-switch:checked) .a{display:inline}
+.fl-pricing-toggle .desc{color:var(--feega-fg-muted)}
+.fl-pricing-toggle .plan > ul{display:grid;gap:var(--feega-space-2);margin-top:var(--feega-space-2);padding:0;list-style:none;font-size:var(--feega-text-sm)}
+.fl-pricing-toggle .plan > ul li{display:flex;align-items:center;gap:10px}
+.fl-pricing-toggle .plan > ul .fl-px{width:11px;color:var(--feega-accent)}
+@media (max-width:900px){.fl-pricing-toggle .plans{grid-template-columns:minmax(0,1fr);max-width:28rem;margin-inline:auto}}
+@media (prefers-reduced-motion:reduce){:where([class^="fl-"]) *,:where([class^="fl-"]) *::before,:where([class^="fl-"]) *::after{animation:none!important;transition:none!important}}
+</style>

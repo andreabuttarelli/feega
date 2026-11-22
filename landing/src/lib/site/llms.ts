@@ -9,6 +9,11 @@ import { ALTERNATIVES, ALTERNATIVES_INDEX, ALTERNATIVES_PATH, alternativePath } 
 import { plainText } from './text';
 import type { Crumb } from './structured-data';
 import { HUBS } from './topics';
+import { TEMPLATE_PATHS, TEMPLATE_TITLES } from './templates';
+import { TEMPLATES } from './templates/library';
+import { CATEGORY_COPY, FRAMEWORK_COPY } from './templates/copy';
+import { CATEGORY_SLUGS, HUB_FRAMEWORKS, TEMPLATES_PATH, categoryPath, frameworkPath, templatePath } from './templates/paths';
+import type { Category } from './templates/template';
 import { topicPath } from './topics/topic';
 
 const SUMMARY = 'Feega is a free, open-source (Apache-2.0) VS Code extension to design in your codebase: click any element of your running app, edit it like in Figma, and the change is written to your code. No AI, no tokens, with diffs and undo. React, Next.js, SvelteKit, Vue, Nuxt, React Router, Astro and Vite, with Tailwind or plain CSS. Works in VS Code, Cursor, Windsurf and VSCodium on macOS, Windows and Linux, or in the browser with npx feega. Feega Cloud (GitHub sync, collaboration, sections and templates) is coming later.';
@@ -42,6 +47,7 @@ export const PAGE_TITLES: Record<string, string> = {
   '/changelog': 'Changelog',
   [CODEBASE_PATH]: CODEBASE.title,
   [ALTERNATIVES_PATH]: ALTERNATIVES_INDEX.title,
+  ...TEMPLATE_TITLES,
   ...Object.fromEntries(HUBS.map((h) => [h.path, h.title])),
   ...Object.fromEntries(HUBS.flatMap((h) => Object.entries(h.topics).map(([slug, t]) => [topicPath(h, slug), t.title]))),
   ...Object.fromEntries(Object.entries(ALTERNATIVES).map(([slug, a]) => [alternativePath(slug), a.title])),
@@ -54,6 +60,19 @@ const prefixesOf = (path: string) => path.split('/').filter(Boolean).map((_, i, 
 
 export const trailOf = (path: string): Crumb[] => prefixesOf(path).flatMap((p) => (PAGE_TITLES[p] ? [{ name: PAGE_TITLES[p], path: p }] : []));
 
+const OTHER_PATHS = SITE_PATHS.filter((p) => !TEMPLATE_PATHS.includes(p));
+
+const TEMPLATES_SUMMARY = `${TEMPLATES.length} free website sections, UI components and app screens, each in Svelte, React, Vue, Astro and HTML with --feega-* tokens, light and dark.`;
+
+const templatesIndex = () =>
+  [
+    `- [${TEMPLATE_TITLES[TEMPLATES_PATH]}](${SITE_URL}${TEMPLATES_PATH}): ${TEMPLATES_SUMMARY}`,
+    ...(Object.keys(CATEGORY_SLUGS) as Category[]).map((c) => `- [${CATEGORY_COPY[c].heading}](${SITE_URL}${categoryPath(c)}): ${CATEGORY_COPY[c].lead}`),
+    ...HUB_FRAMEWORKS.map((f) => `- [${FRAMEWORK_COPY[f].heading}](${SITE_URL}${frameworkPath(f)}): ${FRAMEWORK_COPY[f].lead}`)
+  ].join('\n');
+
+const templatesList = () => TEMPLATES.map((t) => `- [${t.name}](${SITE_URL}${templatePath(t.id)}): ${t.description}`).join('\n');
+
 const link = (path: string) => `- [${PAGE_TITLES[path]}](${SITE_URL}${path === '/' ? '' : path})`;
 
 export const llmsTxt = () =>
@@ -64,8 +83,11 @@ export const llmsTxt = () =>
     HOW_IT_WORKS,
     '## What it writes to your code',
     WRITES,
+    '## Templates',
+    templatesIndex(),
+    templatesList(),
     '## Pages',
-    SITE_PATHS.map(link).join('\n'),
+    OTHER_PATHS.map(link).join('\n'),
     '## Install',
     INSTALL_LINES.join('\n'),
     '## Source',
@@ -88,6 +110,10 @@ export const llmsFullTxt = () =>
     ...HUBS.flatMap((h) => [`## ${h.heading}`, Object.entries(h.topics).map(([slug, t]) => `### ${t.heading}\n${t.short}\n${SITE_URL}${topicPath(h, slug)}`).join('\n\n')]),
     '## FAQ',
     FAQ.map((f) => `### ${f.q}\n${plainText(f.a)}`).join('\n\n'),
+    '## Templates',
+    templatesIndex(),
+    '### All templates',
+    templatesList(),
     '## Pages',
-    SITE_PATHS.map(link).join('\n')
+    OTHER_PATHS.map(link).join('\n')
   ].join('\n\n') + '\n';

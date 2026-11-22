@@ -16,3 +16,7 @@ sidebar:
 - Text from props or interpolations (`{{ title }}`) is refused with a message.
 - Class names built by an expression are not written.
 - Items of a `v-for` cannot be moved one by one.
+
+## Free templates
+
+Free sections and UI components to start from, in Vue 3: [Feega templates](https://www.feega.app/templates/vue).

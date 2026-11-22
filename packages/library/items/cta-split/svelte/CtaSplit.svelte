@@ -1,0 +1,40 @@
+<section class="fl-cta-split">
+  <div class="fl-container card">
+    <h2>start building today</h2>
+    <div class="side">
+      <p>Free while you try it. No card, no call.</p>
+      <div class="cta"><a class="fl-btn fl-btn--ink" href="#">get started <svg class="fl-px" viewBox="0 0 7 5" aria-hidden="true"><path d="M4 0h1v1h-1zM5 1h1v1h-1zM0 2h1v1h-1zM1 2h1v1h-1zM2 2h1v1h-1zM3 2h1v1h-1zM4 2h1v1h-1zM5 2h1v1h-1zM6 2h1v1h-1zM5 3h1v1h-1zM4 4h1v1h-1z" /></svg></a><a class="fl-btn ghost" href="#">talk to us</a></div>
+    </div>
+  </div>
+</section>
+
+<style>
+.fl-cta-split{font-family:var(--feega-font);font-size:var(--feega-text-body);line-height:1.5;letter-spacing:var(--feega-tracking);color:var(--feega-fg);background:var(--feega-bg);-webkit-font-smoothing:antialiased}
+:where(.fl-cta-split) *,:where(.fl-cta-split) *::before,:where(.fl-cta-split) *::after{box-sizing:border-box}
+:where(.fl-cta-split) :is(h1,h2,h3,h4,p,ul,ol,figure,blockquote,dl,dd){margin:0}
+:where(.fl-cta-split) a{color:inherit;text-decoration:none}
+:where(.fl-cta-split) :focus-visible{outline:2px solid var(--feega-focus);outline-offset:3px}
+.fl-container{width:min(var(--feega-max-width),100% - 2 * var(--feega-gutter));margin-inline:auto}
+.fl-px{display:block;flex:none;width:1em;height:auto;fill:currentColor;shape-rendering:crispEdges}
+.fl-btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--feega-space-2);min-height:44px;padding:0 var(--feega-space-6);border:1px solid var(--feega-line-strong);border-radius:var(--feega-radius-full);background:transparent;color:var(--feega-fg);font:inherit;font-size:0.9375rem;font-weight:500;letter-spacing:var(--feega-tracking);white-space:nowrap;text-decoration:none;cursor:pointer;transition:background-color var(--feega-dur-fast) var(--feega-ease),border-color var(--feega-dur-fast) var(--feega-ease),color var(--feega-dur-fast) var(--feega-ease),transform var(--feega-dur-fast) var(--feega-ease)}
+.fl-btn:hover{border-color:var(--feega-fg-subtle);background:var(--feega-surface)}
+.fl-btn:active{transform:scale(0.97)}
+.fl-btn--primary{border-color:var(--feega-accent);background:var(--feega-accent);color:var(--feega-accent-fg)}
+.fl-btn--primary:hover{border-color:var(--feega-accent-hover);background:var(--feega-accent-hover)}
+.fl-btn--ink{border-color:var(--feega-fg);background:var(--feega-fg);color:var(--feega-bg)}
+.fl-btn--ink:hover{border-color:var(--feega-fg-muted);background:var(--feega-fg-muted)}
+.fl-btn--ghost{border-color:transparent}
+.fl-btn--sm{min-height:36px;padding:0 var(--feega-space-4);font-size:var(--feega-text-sm)}
+.fl-btn .fl-px{width:10px;transition:transform var(--feega-dur) var(--feega-ease)}
+.fl-btn:hover .fl-px{transform:translateX(3px)}
+.fl-btn[disabled]{opacity:0.45;cursor:not-allowed}
+.fl-cta-split{padding-block:var(--feega-space-16)}
+.fl-cta-split .card{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);align-items:end;gap:var(--feega-space-8);padding:clamp(1.75rem,6vw,4.5rem);border-radius:var(--feega-radius-lg);background:var(--feega-accent);color:var(--feega-accent-fg)}
+.fl-cta-split h2{font-size:clamp(2.75rem,7vw,5.5rem);font-weight:500;line-height:0.9;letter-spacing:var(--feega-tracking-tight);text-wrap:balance}
+.fl-cta-split .side{display:grid;gap:var(--feega-space-6);font-size:var(--feega-text-lg);font-weight:500}
+.fl-cta-split .cta{display:flex;flex-wrap:wrap;gap:var(--feega-space-3)}
+.fl-cta-split .ghost{border-color:var(--feega-accent-fg);color:var(--feega-accent-fg)}
+.fl-cta-split .ghost:hover{border-color:var(--feega-accent-fg);background:var(--feega-accent-hover)}
+@media (max-width:820px){.fl-cta-split .card{grid-template-columns:minmax(0,1fr)}}
+@media (prefers-reduced-motion:reduce){:where([class^="fl-"]) *,:where([class^="fl-"]) *::before,:where([class^="fl-"]) *::after{animation:none!important;transition:none!important}}
+</style>

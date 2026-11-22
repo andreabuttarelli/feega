@@ -75,5 +75,5 @@ export const REACT: Topic = {
     { label: 'React: rendering lists', href: 'https://react.dev/learn/rendering-lists' },
     { label: 'CSS Modules specification', href: 'https://github.com/css-modules/css-modules' }
   ],
-  readNext: ['/for/nextjs', '/for/tailwind', '/integrations/vscode', '/integrations/cursor', '/alternatives/onlook', '/download']
+  readNext: ['/for/nextjs', '/for/tailwind', '/integrations/vscode', '/templates/react', '/alternatives/onlook', '/download']
 };

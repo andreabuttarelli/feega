@@ -1,0 +1,30 @@
+{
+  "id": "navbar-mega",
+  "name": "Navbar, mega menu",
+  "description": "A product link that opens a wide panel of grouped links with icons; no JavaScript.",
+  "category": "section",
+  "tags": [
+    "navigation",
+    "header",
+    "menu"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    }
+  ],
+  "tier": "free"
+}

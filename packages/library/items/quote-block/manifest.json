@@ -1,0 +1,29 @@
+{
+  "id": "quote-block",
+  "name": "Quote block",
+  "description": "Three quote cards with clearly marked placeholder text; never ships invented people or companies.",
+  "category": "section",
+  "tags": [
+    "testimonials",
+    "social-proof"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    }
+  ],
+  "tier": "free"
+}

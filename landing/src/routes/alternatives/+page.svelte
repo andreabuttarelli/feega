@@ -38,6 +38,7 @@
     </div>
   {/each}
 
+  <p class="fine"><a href="/templates">Free sections and UI templates for Svelte, React, Vue and Astro</a></p>
   <p class="fine">{DISCLAIMER}</p>
 </article>
 </CatalogLayout>

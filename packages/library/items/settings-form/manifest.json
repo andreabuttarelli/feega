@@ -1,0 +1,29 @@
+{
+  "id": "settings-form",
+  "name": "Settings form",
+  "description": "Grouped settings: profile fields, a preference select and a toggle.",
+  "category": "app",
+  "tags": [
+    "form",
+    "settings"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    }
+  ],
+  "tier": "free"
+}

@@ -1,0 +1,29 @@
+{
+  "id": "footer-wordmark",
+  "name": "Footer, big wordmark",
+  "description": "Links on top, the brand name set edge to edge at the bottom.",
+  "category": "section",
+  "tags": [
+    "footer",
+    "navigation"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    }
+  ],
+  "tier": "free"
+}

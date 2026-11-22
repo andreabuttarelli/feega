@@ -13,3 +13,7 @@ sidebar:
 ## Limits
 
 - Feega must start the dev server. Attaching to an Astro server you already started does not map elements to source.
+
+## Free templates
+
+Free sections and UI components to start from, in Astro: [Feega templates](https://www.feega.app/templates/astro).

@@ -1,0 +1,29 @@
+{
+  "id": "navbar-centered",
+  "name": "Navbar, centered logo",
+  "description": "Links left, logo in the middle, actions right; collapses to a menu on small screens.",
+  "category": "section",
+  "tags": [
+    "navigation",
+    "header"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    }
+  ],
+  "tier": "free"
+}

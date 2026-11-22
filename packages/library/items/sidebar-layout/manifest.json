@@ -1,0 +1,36 @@
+{
+  "id": "sidebar-layout",
+  "name": "Sidebar layout",
+  "description": "App shell: side navigation and a content area; the sidebar goes on top below 720px.",
+  "category": "app",
+  "tags": [
+    "layout",
+    "navigation",
+    "shell"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    },
+    {
+      "family": "Fragment Mono",
+      "weights": [
+        400
+      ]
+    }
+  ],
+  "tier": "free"
+}

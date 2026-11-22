@@ -1,0 +1,35 @@
+{
+  "id": "footer",
+  "name": "Footer",
+  "description": "Brand blurb, three link columns and a legal row.",
+  "category": "section",
+  "tags": [
+    "footer",
+    "navigation"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    },
+    {
+      "family": "Fragment Mono",
+      "weights": [
+        400
+      ]
+    }
+  ],
+  "tier": "free"
+}

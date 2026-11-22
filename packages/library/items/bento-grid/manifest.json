@@ -1,0 +1,36 @@
+{
+  "id": "bento-grid",
+  "name": "Bento feature grid",
+  "description": "Six features in tiles of different sizes, each with a small pixel illustration.",
+  "category": "section",
+  "tags": [
+    "features",
+    "bento",
+    "grid"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    },
+    {
+      "family": "Fragment Mono",
+      "weights": [
+        400
+      ]
+    }
+  ],
+  "tier": "free"
+}
