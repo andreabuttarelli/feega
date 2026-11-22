@@ -3,24 +3,16 @@ import './QuoteBlock.css';
 export function QuoteBlock() {
   return (
     <section className="fl-quote-block">
-      <div className="fl-container">
-        <h2 className="fl-title">What people say</h2>
-        <p className="notice"><span className="fl-badge">Placeholder</span> Replace this text with real customer quotes.</p>
-        <div className="grid">
-          <figure>
-            <blockquote><p>Placeholder quote. Replace with a real customer sentence.</p></blockquote>
-            <figcaption>Placeholder name <span>Role, Company</span></figcaption>
-          </figure>
-          <figure>
-            <blockquote><p>Placeholder quote. Replace with a real customer sentence.</p></blockquote>
-            <figcaption>Placeholder name <span>Role, Company</span></figcaption>
-          </figure>
-          <figure>
-            <blockquote><p>Placeholder quote. Replace with a real customer sentence.</p></blockquote>
-            <figcaption>Placeholder name <span>Role, Company</span></figcaption>
-          </figure>
-        </div>
-      </div>
+      <figure className="fl-container inner">
+        <svg className="fl-px" viewBox="0 0 6 4" aria-hidden="true"><path d="M0 0h1v1h-1zM1 0h1v1h-1zM4 0h1v1h-1zM5 0h1v1h-1zM0 1h1v1h-1zM1 1h1v1h-1zM4 1h1v1h-1zM5 1h1v1h-1zM1 2h1v1h-1zM5 2h1v1h-1zM0 3h1v1h-1zM4 3h1v1h-1z" /></svg>
+        <blockquote>
+          <p>Replace this with a real quote from a customer. Keep it short, specific, and in their own words.</p>
+        </blockquote>
+        <figcaption>
+          <span className="fl-avatar" aria-hidden="true">NS</span>
+          <span className="who"><b>Name Surname</b><span>Role, Company</span></span>
+        </figcaption>
+      </figure>
     </section>
   );
 }

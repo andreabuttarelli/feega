@@ -4,9 +4,9 @@
     <button class="tab" role="tab" type="button" id="fl-tab-2" aria-controls="fl-panel-2" aria-selected="false" tabindex="-1">Activity</button>
     <button class="tab" role="tab" type="button" id="fl-tab-3" aria-controls="fl-panel-3" aria-selected="false" tabindex="-1">Settings</button>
   </div>
-  <div class="panel" role="tabpanel" id="fl-panel-1" aria-labelledby="fl-tab-1" tabindex="0"><p>Overview content.</p></div>
-  <div class="panel" role="tabpanel" id="fl-panel-2" aria-labelledby="fl-tab-2" tabindex="0" hidden><p>Activity content.</p></div>
-  <div class="panel" role="tabpanel" id="fl-panel-3" aria-labelledby="fl-tab-3" tabindex="0" hidden><p>Settings content.</p></div>
+  <div class="panel" role="tabpanel" id="fl-panel-1" aria-labelledby="fl-tab-1" tabindex="0"><h3>Traffic is up this week</h3><p>Visits grew 12% against last week, led by the pricing page.</p></div>
+  <div class="panel" role="tabpanel" id="fl-panel-2" aria-labelledby="fl-tab-2" tabindex="0" hidden><h3>Three changes today</h3><p>Two pages published and one form edited, all by your team.</p></div>
+  <div class="panel" role="tabpanel" id="fl-panel-3" aria-labelledby="fl-tab-3" tabindex="0" hidden><h3>Workspace defaults</h3><p>Pick who can publish, the default theme and the time zone.</p></div>
 </div>
 
 <script>
@@ -26,7 +26,8 @@ document.querySelectorAll('.fl-tabs:not([data-ready])').forEach((root) => {
 
   tabs.forEach((tab, i) => tab.addEventListener('click', () => select(i)));
   root.querySelector('[role="tablist"]').addEventListener('keydown', (event) => {
-    const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+    const key = (event).key;
+    const step = key === 'ArrowRight' ? 1 : key === 'ArrowLeft' ? -1 : 0;
     if (step === 0) {
       return;
     }

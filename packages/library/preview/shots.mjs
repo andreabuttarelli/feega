@@ -1,11 +1,11 @@
 import { chromium } from '@playwright/test';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const PAGE = join(dirname(fileURLToPath(import.meta.url)), 'index.html');
 const OUT = process.argv[2];
-const PICKS = ['navbar', 'hero-split', 'pricing', 'faq', 'data-table', 'login-form', 'sidebar-layout', 'modal', 'tabs', 'toast'];
+const PICKS = readdirSync(join(dirname(PAGE), '..', 'items'));
 const VIEWPORTS = [
   { name: 'desktop', width: 1280, height: 900 },
   { name: '375', width: 375, height: 800 }
@@ -19,7 +19,16 @@ for (const viewport of VIEWPORTS) {
   await page.goto(`file://${PAGE}`);
   for (const id of PICKS) {
     for (const theme of ['light', 'dark']) {
-      await page.locator(`[data-frame="${id}-${theme}"]`).screenshot({ path: join(OUT, `${id}-${theme}-${viewport.name}.png`) });
+      const frame = page.locator(`[data-frame="${id}-${theme}"]`);
+      const path = join(OUT, `${id}-${theme}-${viewport.name}.png`);
+      if (id !== 'modal') {
+        await frame.screenshot({ path });
+        continue;
+      }
+      await frame.locator('button').first().click();
+      await page.waitForTimeout(600);
+      await page.screenshot({ path });
+      await page.keyboard.press('Escape');
     }
   }
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

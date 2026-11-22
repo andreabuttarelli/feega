@@ -3,9 +3,9 @@ import type { KeyboardEvent } from 'react';
 import './Tabs.css';
 
 const tabs = [
-  { label: 'Overview', body: 'Overview content.' },
-  { label: 'Activity', body: 'Activity content.' },
-  { label: 'Settings', body: 'Settings content.' }
+  { label: 'Overview', title: 'Traffic is up this week', body: 'Visits grew 12% against last week, led by the pricing page.' },
+  { label: 'Activity', title: 'Three changes today', body: 'Two pages published and one form edited, all by your team.' },
+  { label: 'Settings', title: 'Workspace defaults', body: 'Pick who can publish, the default theme and the time zone.' }
 ];
 
 export function Tabs() {
@@ -31,7 +31,7 @@ export function Tabs() {
         ))}
       </div>
       {tabs.map((tab, i) => (
-        <div key={tab.label} className="panel" role="tabpanel" id={`${uid}-panel-${i}`} aria-labelledby={`${uid}-tab-${i}`} tabIndex={0} hidden={active !== i}><p>{tab.body}</p></div>
+        <div key={tab.label} className="panel" role="tabpanel" id={`${uid}-panel-${i}`} aria-labelledby={`${uid}-tab-${i}`} tabIndex={0} hidden={active !== i}><h3>{tab.title}</h3><p>{tab.body}</p></div>
       ))}
     </div>
   );
