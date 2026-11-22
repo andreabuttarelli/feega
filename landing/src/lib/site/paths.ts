@@ -1,6 +1,5 @@
 import { DOWNLOAD_PATH } from './links';
-import { PLUGINS_PATH, pluginPath } from './plugins/catalogue';
-import { FALLBACK_PLUGINS } from './plugins/fallback';
+import { PLUGINS, PLUGINS_PATH, pluginPath } from './plugins/plugins';
 import { LEGAL_DOCS } from './legal';
 import { CODEBASE_PATH } from './codebase';
 import { HUBS } from './topics';
@@ -9,7 +8,7 @@ import { ALTERNATIVES, ALTERNATIVES_PATH, alternativePath } from './alternatives
 
 export const PRICING_PATH = '/pricing';
 
-const pluginPaths = [PLUGINS_PATH, ...FALLBACK_PLUGINS.map((p) => pluginPath(p.id))];
+const pluginPaths = [PLUGINS_PATH, ...PLUGINS.map((p) => pluginPath(p.id))];
 
 export const SITE_PATHS: readonly string[] = [
   '/',

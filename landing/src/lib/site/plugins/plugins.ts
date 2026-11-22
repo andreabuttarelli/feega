@@ -1,8 +1,11 @@
 import { PixelIcon } from '../alternatives/pixel';
+import { permissionWords } from './permissions';
+
+export const PLUGINS_PATH = '/plugins';
 
 export type PluginTier = 'free' | 'pro';
 
-export type PluginSource = {
+type PluginSource = {
   id: string;
   name: string;
   summary: string;
@@ -12,9 +15,9 @@ export type PluginSource = {
   permissions: readonly string[];
 };
 
-export type PluginCopy = { description: string; icon: PixelIcon };
+type PluginCopy = { description: string; icon: PixelIcon };
 
-export const FALLBACK_PLUGINS: readonly PluginSource[] = [
+const SOURCES: readonly PluginSource[] = [
   {
     id: 'mesh-gradient',
     name: 'Mesh gradient',
@@ -31,13 +34,11 @@ export const FALLBACK_PLUGINS: readonly PluginSource[] = [
     author: 'Feega',
     tier: 'free',
     latestVersion: '1.0.0',
-    permissions: ['selection', 'project', 'edit.insert', 'edit.attributes', 'edit.dependency', 'edit.asset', 'file.pick', 'network:cdn.jsdelivr.net']
+    permissions: ['selection', 'project', 'edit.insert', 'edit.attributes', 'edit.dependency', 'edit.asset', 'file.pick']
   }
 ];
 
-export const DEFAULT_COPY: PluginCopy = { description: '', icon: PixelIcon.Plugin };
-
-export const PLUGIN_COPY: Readonly<Record<string, PluginCopy>> = {
+const COPY: Readonly<Record<string, PluginCopy>> = {
   'mesh-gradient': {
     icon: PixelIcon.MeshGradient,
     description:
@@ -49,3 +50,29 @@ export const PLUGIN_COPY: Readonly<Record<string, PluginCopy>> = {
       'Add a cube, sphere, torus knot, 3D text or your own .glb model to the selected element. Feega writes a small scene component and the three.js code into your project, adds the dependency, and lets you change material, lights, rotation and colour from the right bar. Everything is one undoable step you can review in Changes.'
   }
 };
+
+export type PluginView = {
+  id: string;
+  name: string;
+  summary: string;
+  description: string;
+  author: string;
+  tier: PluginTier;
+  version: string;
+  permissions: string[];
+  icon: PixelIcon;
+};
+
+export const pluginPath = (id: string): string => `${PLUGINS_PATH}/${id}`;
+
+export const PLUGINS: readonly PluginView[] = SOURCES.map((source) => ({
+  id: source.id,
+  name: source.name,
+  summary: source.summary,
+  description: COPY[source.id].description,
+  author: source.author,
+  tier: source.tier,
+  version: source.latestVersion,
+  permissions: source.permissions.map(permissionWords),
+  icon: COPY[source.id].icon
+}));
