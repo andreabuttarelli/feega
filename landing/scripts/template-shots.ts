@@ -13,6 +13,10 @@ const THUMB = { width: 640, height: 400 };
 const QUALITY = 78;
 const BACKGROUNDS = { light: '#f7f6f2', dark: '#050505' } as const;
 
+const HOVERS: Record<string, { target: string; x: number }> = {
+  'glass-button': { target: '.glass', x: 0.3 }
+};
+
 type Theme = keyof typeof BACKGROUNDS;
 
 const ids = readdirSync(resolve(LIBRARY, 'items'));
@@ -31,7 +35,15 @@ for (const id of picks) {
   for (const theme of Object.keys(BACKGROUNDS) as Theme[]) {
     const frame = page.locator(`[data-frame="${id}-${theme}"]`);
     await frame.scrollIntoViewIfNeeded();
+    await page.mouse.move(0, 0);
     await page.waitForTimeout(250);
+
+    const hover = HOVERS[id];
+    if (hover) {
+      const box = (await frame.locator(hover.target).boundingBox())!;
+      await page.mouse.move(box.x + box.width * hover.x, box.y + box.height / 2, { steps: 4 });
+      await page.waitForTimeout(700);
+    }
 
     const raw = await frame.screenshot();
     const scaled = await sharp(raw).resize({ width: THUMB.width }).toBuffer();
