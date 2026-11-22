@@ -29,6 +29,7 @@ import { swapIcon } from '@feega/live-edit/icon-swap';
 import { svgMarkup } from '@feega/live-edit/svg-markup';
 import { addGo, type GoAsk } from '@feega/live-edit/go-action';
 import { linkWrite, type LinkEdit } from '@feega/live-edit/link-edit';
+import { attributeWrite } from '@feega/live-edit/attribute-edit';
 import type { Proposal } from '@feega/plugin-api/protocol';
 import { Styling, type EditAsk } from '../messages';
 import { StylingChoice } from '../settings';
@@ -276,6 +277,16 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     return out.ok ? writtenAll(out.changes, '') : out;
   }
 
+  async function attributeWritten(rawAt: string, name: string, value: string): Promise<Written> {
+    meta = { at: rawAt, prop: name, value, scope: '' };
+    const at = placed(rawAt);
+    if (!at) {
+      return { ok: false, reason: `${rawAt} is not a file:line:col inside the workspace` };
+    }
+    const out = await attributeWrite(reader(root), at, name, value);
+    return out.ok ? writtenAll([out.change], '') : out;
+  }
+
   async function goWritten(rawAt: string, ask: GoAsk): Promise<Written> {
     meta = { at: rawAt, prop: 'go', value: `${ask.go} ${ask.target}`, scope: '' };
     const at = placed(rawAt);
@@ -430,6 +441,7 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     replaceFont: (from: string, to: string, google: boolean) => inTurn(() => fontReplaced(from, to, google)),
     loadFont: (family: string) => inTurn(() => fontLoaded(family)),
     link: (at: string, edit: LinkEdit, instance?: number) => inTurn(() => linkWritten(at, edit, instance)),
+    attribute: (at: string, name: string, value: string) => inTurn(() => attributeWritten(at, name, value)),
     go: (at: string, ask: GoAsk) => inTurn(() => goWritten(at, ask)),
     undo: () => inTurn(undoStep),
     redo: () => inTurn(redoStep),
