@@ -5,6 +5,8 @@ const entrySchema = z.object({
   title: z.string(),
   description: z.string(),
   date: z.coerce.date(),
+  updated: z.coerce.date().optional(),
+  archived: z.boolean().default(false),
   cover: z.string(),
   coverAlt: z.string(),
   tags: z.array(z.string()).default([]),

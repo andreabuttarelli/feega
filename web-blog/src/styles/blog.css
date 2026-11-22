@@ -144,3 +144,4 @@ a:hover { color: var(--sx-accent); }
 .cta-body p { margin: 0 0 var(--sx-s5); }
 .prose .cta-box .sx-pill { text-decoration: none; }
 .prose .cta-box .sx-pill:hover { color: #fff; }
+.archived-banner { margin: 0 0 var(--sx-s5); padding: var(--sx-s4) var(--sx-s5); border: 1px solid var(--sx-line); border-radius: var(--sx-radius-lg); background: var(--sx-grey-1); }
