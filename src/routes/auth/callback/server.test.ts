@@ -44,6 +44,15 @@ describe('OAuth callback', () => {
     });
   });
 
+  it('names the blocked email domain when the signup hook refused the user', async () => {
+    const description = encodeURIComponent('Please use a work or personal email address.');
+
+    await expect(redirectFor(`?error=server_error&error_description=${description}`)).resolves.toEqual({
+      status: 303,
+      location: '/login?error=blockedDomain'
+    });
+  });
+
   it('lands a first-time Google user on their canvas through the entry bootstrap', async () => {
     const user = { id: 'new-google-user', app_metadata: { provider: 'google' } };
     exchangeCodeForSession.mockResolvedValue({ data: { user }, error: null });

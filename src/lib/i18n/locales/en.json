@@ -30,6 +30,8 @@
       "weakPassword": "Password must be at least 6 characters.",
       "invalidCredentials": "Wrong email or password.",
       "emailExists": "An account with this email already exists. Sign in instead.",
+      "blockedDomain": "Please use a work or personal email address.",
+      "captchaFailed": "We could not verify you are human. Reload the page and try again.",
       "mismatch": "Passwords don't match.",
       "generic": "Something went wrong. Please try again.",
       "oauth": "Sign-in was cancelled or the provider refused it. Try again.",

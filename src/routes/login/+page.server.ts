@@ -11,6 +11,9 @@ import { START_URL_PARAM, startUrlOf } from '$lib/start-url';
 import { NATIVE_AUTH_BASE, isNativeShell } from '$lib/native-shell';
 import { appleSignInFlag, appleSignInShown } from '$lib/apple-sign-in/visibility';
 import { env } from '$env/dynamic/private';
+import { env as publicEnv } from '$env/dynamic/public';
+import { DomainVerdict, signupVerdict } from '$lib/server/email-policy/domain-policy';
+import { TURNSTILE_FIELD, TurnstileOutcome, turnstileConfig, verifyTurnstile } from '$lib/server/email-policy/turnstile';
 import type { Cookies, RequestEvent } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -36,6 +39,11 @@ function inviteErrorIn(url: URL): InviteError | null {
 
 const NOT_FOUND = 404;
 
+async function challengeFailed(data: FormData): Promise<boolean> {
+  const outcome = await verifyTurnstile(String(data.get(TURNSTILE_FIELD) ?? ''), turnstileConfig(env));
+  return outcome === TurnstileOutcome.Failed;
+}
+
 function appleSignInHere(url: URL, request: Request): boolean {
   return appleSignInShown({
     host: url.host,
@@ -50,7 +58,7 @@ export const load: PageServerLoad = async ({ url, request, cookies, locals: { sa
   const inviteToken = inviteTokenIn(url.searchParams);
   const inviteError = inviteErrorIn(url);
   const signInError = signInErrorIn(url);
-  const page = { cliPort, cliState, inviteToken, inviteError, signInError, homeHref: null as string | null, preferSignup: preferSignup(url), appleSignIn: appleSignInHere(url, request) };
+  const page = { cliPort, cliState, inviteToken, inviteError, signInError, homeHref: null as string | null, preferSignup: preferSignup(url), appleSignIn: appleSignInHere(url, request), turnstileSiteKey: publicEnv.PUBLIC_TURNSTILE_SITE_KEY ?? '' };
 
   const { session, user } = await safeGetSession();
   const client = session && user ? await db() : null;
@@ -127,6 +135,8 @@ export const actions: Actions = {
 
     if (!EMAIL_RE.test(email)) return fail(400, { errorCode: 'invalidEmail', email });
     if (password.length < MIN_PASSWORD) return fail(400, { errorCode: 'weakPassword', email });
+    if (signupVerdict(email) !== DomainVerdict.Allowed) return fail(400, { errorCode: 'blockedDomain', email });
+    if (await challengeFailed(data)) return fail(400, { errorCode: 'captchaFailed', email });
 
     const admin = createAdminClient();
     const { error: createErr } = await admin.auth.admin.createUser({
@@ -155,6 +165,8 @@ export const actions: Actions = {
     const data = await request.formData();
     const email = String(data.get('email') ?? '').trim().toLowerCase();
     if (!EMAIL_RE.test(email)) return fail(400, { errorCode: 'invalidEmail', email });
+    if (await challengeFailed(data)) return fail(400, { errorCode: 'captchaFailed', email });
+    if (signupVerdict(email) !== DomainVerdict.Allowed) return { reset: true, email };
 
     const locale = emailLocale(String(data.get('locale') ?? ''));
     try {
