@@ -1,0 +1,240 @@
+---
+title: Svelte 5 runes in practice, in the order you need them
+description: $props, $state, $derived, $effect and $bindable with code that ran on Svelte 5.59 in a SvelteKit 3 project, plus shared state in a .svelte.ts class and the mistakes to avoid.
+date: 2026-11-22
+cover: /covers/svelte-5-runes-in-practice.png
+coverAlt: "Cover: Runes, in the order you need them. Svelte 5 in practice"
+tags: [svelte, svelte-5, runes, tutorial]
+---
+
+import Callout from '../../components/Callout.astro';
+import Cta from '../../components/Cta.astro';
+
+Runes are the way Svelte 5 declares reactivity. They look like function calls that start with a dollar sign, and the compiler turns them into the real thing. You need five of them to build almost any component. This post introduces them in the order you will reach for them, with code I ran.
+
+I used Svelte 5.59.1 inside a SvelteKit 3.4.0 project created with `npx sv create`. Where a statement comes from the docs and not from my own run, I say so.
+
+<Callout icon="check" title="The five you need">
+`$props` to receive data. `$state` for values that change. `$derived` for values computed from others. `$effect` for side effects such as timers. `$bindable` to let a child write back to its parent. Everything else is a variation.
+</Callout>
+
+## How we checked
+
+On 22 November 2026 I read the Svelte docs for `$state`, and checked the npm registry for the current version: Svelte 5.59.1, published 20 November 2026. I then wrote one page, one component and one shared class, ran type checks with `svelte-check`, rendered the page on the server, and clicked through it in a real Chromium driven by Playwright. Every number below came out of that run.
+
+Limits: I tested a small page. I did not test `$inspect`, `$host`, snippets, or reactive collections like `SvelteMap`. I did not measure performance, and I make no claim about it. Svelte's own docs cover migration from Svelte 4, and I did not migrate anything.
+
+One setting you may not know about: the `sv create` template in this release turns on runes mode for your own code through `vite.config.ts`, with a comment that the option can be removed in Svelte 6. So in a new project, runes are not optional.
+
+## 1. $props: receive data
+
+A component reads its inputs with `$props()` and destructures them.
+
+```svelte
+<script lang="ts">
+  type Props = { label: string; step?: number; value?: number };
+
+  let { label, step = 1, value = $bindable(0) }: Props = $props();
+</script>
+
+<button onclick={() => (value += step)}>{label}: {value}</button>
+```
+
+That replaces `export let` from Svelte 4. Defaults are plain default values in the destructuring. The type goes on the pattern, and a SvelteKit page gets a ready-made `PageProps` type for `data` and `form`.
+
+## 2. $state: values that change
+
+`$state` makes a value reactive. You assign to it like any variable.
+
+```svelte
+<script lang="ts">
+  let score = $state(0);
+  let todos = $state([{ done: false, text: 'Ship it' }]);
+</script>
+
+<button onclick={() => todos.push({ done: false, text: 'Another' })}>add</button>
+<button onclick={() => (todos[0].done = true)}>finish first</button>
+```
+
+Arrays and plain objects become deeply reactive. In my test I pushed a new item and flipped `done` on an existing one, and both updated the page. No `todos = todos` trick. The docs say the state is proxied recursively until Svelte hits something that is not an array or a plain object.
+
+Two details from the docs. Destructuring a reactive object copies the values at that moment, so the copies are not reactive. And class instances are not proxied, so reactivity inside a class needs `$state` on its fields.
+
+## 3. $derived: values computed from others
+
+```svelte
+<script lang="ts">
+  let remaining = $derived(todos.filter((todo) => !todo.done).length);
+  let label = $derived.by(() => (remaining === 0 ? 'all done' : `${remaining} left`));
+</script>
+```
+
+`$derived(expression)` is for one expression. `$derived.by(() => { ... })` takes a function when you need statements. I ran both. With one open todo the label read `1 left`. After I clicked "finish first" it read `all done`. After I added another todo it read `1 left` again.
+
+The rule of thumb: if you are about to write an `$effect` that sets another `$state`, you want `$derived`.
+
+## 4. $effect: side effects only
+
+`$effect` runs after the DOM updates, and again when the values it reads change. It is for the outside world: timers, subscriptions, `document.title`.
+
+```svelte
+<script lang="ts">
+  let ticks = $state(0);
+
+  $effect(() => {
+    const id = setInterval(() => ticks++, 1000);
+    return () => clearInterval(id);
+  });
+</script>
+```
+
+The function you return is the cleanup. It runs before the effect runs again and when the component goes away. In my run, after a little over two seconds the counter read 2.
+
+`$effect` does not run during server rendering. I rendered the page on the server and the tick counter showed 0, as expected, so code that touches `window` or `document` inside an effect is safe there.
+
+## 5. $bindable: let the child write back
+
+A prop is read-only in the child unless the parent asks for a binding and the child allows it.
+
+```svelte
+<Counter label="Score" step={5} bind:value={score} />
+<p>{score}</p>
+```
+
+I clicked the button once and the paragraph in the parent said `5`. Without `$bindable` in the child, the `bind:` would be an error. Use it sparingly. Passing a callback prop is often clearer than two-way binding.
+
+## Shared state in a .svelte.ts file
+
+Runes also work outside components, in files named `.svelte.ts` or `.svelte.js`. That is how you share state between components without a store.
+
+```ts
+export type Line = { name: string; price: number; qty: number };
+
+export class Cart {
+  lines = $state<Line[]>([]);
+  total = $derived(this.lines.reduce((sum, line) => sum + line.price * line.qty, 0));
+
+  add(name: string, price: number) {
+    const existing = this.lines.find((line) => line.name === name);
+    if (existing) {
+      existing.qty += 1;
+      return;
+    }
+    this.lines.push({ name, price, qty: 1 });
+  }
+}
+
+export const cart = new Cart();
+```
+
+```svelte
+<button onclick={() => cart.add('Pen', 3)}>buy</button>
+<p>{cart.total}</p>
+```
+
+I clicked "buy" twice and the total read `6`: one line, quantity 2, price 3. The `$state` on the class field and the `$derived` on `total` are what the docs call for in classes.
+
+<Callout icon="warn" title="Shared state and the server">
+A module-level instance like `cart` is shared by every request the server handles. In a SvelteKit app, do not put per-user data in it. Keep per-user data in `load`, cookies or `locals`.
+</Callout>
+
+## $state.raw: when a deep proxy is wasteful
+
+Deep reactivity has a cost. If a big array or object is only ever replaced, not edited, `$state.raw` skips the proxy. The docs say raw state cannot be mutated, only reassigned.
+
+```svelte
+<script lang="ts">
+  let big = $state.raw({ rows: [1, 2, 3] });
+</script>
+
+<button onclick={() => (big = { rows: [...big.rows, big.rows.length + 1] })}>grow</button>
+```
+
+I clicked it once and the row count went from 3 to 4. For handing a value to code that does not expect a proxy, the docs offer `$state.snapshot(value)`, which returns a static copy. I did not run that one.
+
+## Runes and SvelteKit data
+
+A SvelteKit page receives what `load` returned through `$props()`. In my [load functions test](/posts/sveltekit-load-functions-server-vs-universal/) the page read `data.hits` straight from the prop, and when I called `invalidate`, the number on the page went from 1 to 2 without any extra code. So the prop updates when the load reruns, and anything you wrote with `$derived` from it recalculates too.
+
+That gives a clean split. Server data comes in as props. State that only the browser cares about, like an open menu, a form field draft or a counter, is `$state` in the component. Values computed from either are `$derived`. You rarely need an `$effect` at all, and when you do, it is for talking to something outside Svelte.
+
+If a value should start from a prop and then change locally, copy it into `$state` once. The docs on derived values and the Svelte 5 migration notes cover the cases where this gets subtle, and I did not test them here, so read those before building a form that edits server data in place.
+
+## From Svelte 4, at a glance
+
+| Svelte 4 | Svelte 5 |
+|---|---|
+| `export let name` | `let { name } = $props()` |
+| `let count = 0` | `let count = $state(0)` |
+| `$: doubled = count * 2` | `let doubled = $derived(count * 2)` |
+| `$: { document.title = ... }` | `$effect(() => { document.title = ... })` |
+| `export let value` + `bind:` | `let { value = $bindable() } = $props()` |
+| `on:click={fn}` | `onclick={fn}` |
+
+The event row matters: in the code above I used `onclick`, not `on:click`.
+
+## Mistakes to avoid
+
+Only the last one happened to me. The others are traps the docs call out.
+
+**An `$effect` that sets other state.** It runs a render late and adds a variable you did not need. A `$derived` value is shorter and cannot drift.
+
+**Mutating `$state.raw`.** The docs say raw state cannot be mutated, only reassigned. Replace the whole value.
+
+**Destructuring reactive state.** The docs say destructured values are copied at that moment and stay fixed. Read through the object, or wrap the read in `$derived`.
+
+**A wrong import path in the template.** Not a rune issue, but it stopped my first type check: this release's template wires `#lib` through `package.json`, and the import needs the file extension, `#lib/server/notes.ts`. It is in my [form actions post](/posts/sveltekit-form-actions-explained/) too.
+
+## Where Feega fits
+
+Feega is a free, open-source VS Code extension for editing your running app. It writes changes to your source: a Tailwind class, a CSS rule, a scoped style.
+
+Runes do not change that. The thing to know is what Feega can trace. Its SvelteKit docs say text that comes from a prop or a constant is refused with a message, so `{label}` in my counter button cannot be retyped from the editor, because the words are not in the markup. The styling is another matter: a Svelte scoped `<style>` block or Tailwind classes are supported.
+
+So put the words a designer might change in the markup, and let runes handle the behaviour.
+
+<Cta title="See your component change as a diff">
+Run Feega on a Svelte 5 app, click an element, and change its padding, colour or font. The edit lands in the `.svelte` file you are reading.
+</Cta>
+
+## Questions
+
+### Are runes required in Svelte 5?
+
+Not in every project, but a new `sv create` project in this release turns on runes mode for your code. The template notes the setting can go in Svelte 6.
+
+### When should I use $effect?
+
+For side effects: timers, subscriptions, DOM or `document.title` changes. If you are using it to compute a value from other state, use `$derived`.
+
+### Can I use runes outside a component?
+
+Yes, in files named `.svelte.ts` or `.svelte.js`. I shared a cart class between components that way.
+
+### What is the difference between $state and $state.raw?
+
+`$state` makes arrays and plain objects deeply reactive. `$state.raw` does not, so you replace the value instead of changing it.
+
+### Does $effect run on the server?
+
+No. In my server render it did not run. Code that needs `window` is safe inside it.
+
+### Does Feega work with Svelte 5?
+
+Yes, with SvelteKit projects. It edits markup and styles, not component logic, and it refuses text that comes from props or constants.
+
+## Sources
+
+Opened on 22 November 2026.
+
+- [Svelte docs: $state](https://svelte.dev/docs/svelte/$state)
+- npm registry: `svelte` 5.59.1 published 20 November 2026; `@sveltejs/kit` 3.4.0 published 18 November 2026.
+- [SvelteKit docs: Loading data](https://svelte.dev/docs/kit/load) for `PageProps` usage.
+- [Feega docs: SvelteKit](https://docs.feega.app/frameworks/sveltekit/)
+
+## Read next
+
+- [Form actions, without the magic](/posts/sveltekit-form-actions-explained/)
+- [Server load or universal load?](/posts/sveltekit-load-functions-server-vs-universal/)
+- [SvelteKit vs Next.js, with the same app built twice](/posts/sveltekit-vs-nextjs/)
+- [Using Feega alongside AI site builders and agents](/use-cases/feega-with-ai-site-builders/)
