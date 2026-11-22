@@ -66,6 +66,13 @@
   import { browseHistory } from './history';
   import { DEFAULT_ANCHOR, anchorBox, isAnchor, nearestAnchor, nextAnchor, type Anchor } from './anchors';
   import { PRESETS, SIZES, Size, Snap, fitOf, sizeForKey, snapped } from './sizes';
+  import { Where } from '@feega/plugin-api/manifest';
+  import type { Place as PluginPlace } from '@feega/plugin-api/protocol';
+  import PluginSections from './PluginSections.svelte';
+  import PluginOverlay from './PluginOverlay.svelte';
+  import { createPlugins } from './plugins.svelte';
+  import { selectionOf, sourceOfText } from './plugin-editor';
+  import { addMenuItems, contextMenuItems, parseItemId, pluginDrop } from './plugin-menus';
 
   const SETTLE_MS = 1200;
   const BAR_DEFAULT_PX = 300;
@@ -84,6 +91,7 @@
   const writtenThemeName = $derived(writtenTheme(themeName));
   let reach = $state(FOLLOW);
   let server = $state(ServerState.Detecting);
+  let restarting = $state(false);
   let serverReason = $state('');
   let serverInfo = $state<ServerInfo | null>(null);
   let bridged = $state(false);
@@ -165,7 +173,7 @@
   let drag = $state<{ x: number; y: number; active: boolean } | null>(null);
   let drop = $state<Drop | null>(null);
 
-  let tab = $state(Tab.Properties);
+  let tab = $state<string>(Tab.Properties);
   let share = $state<Extract<ViewMessage, { kind: ToView.Share }> | null>(null);
   let cloud = $state<{ enabled: boolean; comments: CloudComment[]; error: string }>({ enabled: false, comments: [], error: '' });
   let composing = $state(false);
@@ -273,6 +281,7 @@
       }
       bridged = true;
       server = ServerState.Running;
+      restarting = false;
       visited(path);
       bridge.mode(mode);
       showTheme();
@@ -314,6 +323,26 @@
       toHost({ kind: ToHost.Edit, ask: { at: source, prop: LiveProp.Text, value: text, was, instance: picked?.instanceIndex } });
     }
   });
+
+  const plugins = createPlugins({
+    pick: () => picked,
+    preview: (source, css) => (css ? bridge.preview(source, css) : bridge.clear(source)),
+    notify: showToast,
+    send: toHost
+  });
+
+  $effect(() => {
+    const selection = picked ? selectionOf(picked) : null;
+    untrack(() => plugins.host.selectionChanged(selection));
+  });
+
+  function runPluginItem(id: string, target: Source | null, place: PluginPlace | null = null) {
+    const item = parseItemId(id);
+    if (item) {
+      plugins.host.menu(item.plugin, item.item, target, place);
+    }
+    return item !== null;
+  }
 
   function trackPins() {
     const wanted = new Set(pins.map((pin) => pin.id));
@@ -388,6 +417,13 @@
     history.visited(path);
     navTick++;
     savePrefs();
+  }
+
+  function reloadAfterRestart() {
+    if (!url || !frame) {
+      return;
+    }
+    frame.src = new URL(route, url).toString();
   }
 
   function go(path: string | null) {
@@ -501,7 +537,8 @@
         size = preset;
       }
     },
-    [ToView.Server]: (m) => ((server = m.state), (serverReason = m.reason ?? ''), (serverInfo = m.info ?? serverInfo)),
+    [ToView.Server]: (m) => ((server = m.state), (restarting = restarting ? m.state !== ServerState.Stopped : m.state === ServerState.Restarting), (serverReason = m.reason ?? ''), (serverInfo = m.info ?? serverInfo)),
+    [ToView.Reload]: () => reloadAfterRestart(),
     [ToView.Status]: (m) => (problem = { text: m.text }),
     [ToView.Edited]: (m) => {
       const unsavedText = textPending;
@@ -536,6 +573,7 @@
         }
       }, SETTLE_MS);
     },
+    [ToView.Plugin]: (m) => plugins.answer(m.id, m.result),
     [ToView.Account]: (m) => (account = { state: m.state, email: m.email }),
     [ToView.Share]: (m) => (share = m),
     [ToView.Comments]: (m) => (cloud = { enabled: m.enabled, comments: m.comments, error: m.error ?? '' }),
@@ -640,7 +678,7 @@
     return wasDrag;
   }
 
-  let menu = $state<{ x: number; y: number } | null>(null);
+  let menu = $state<{ x: number; y: number; where: Where.Layers | Where.Preview } | null>(null);
 
   async function onMenu(e: MouseEvent) {
     e.preventDefault();
@@ -648,7 +686,7 @@
     if (!hit || !contains(selection, refOf(hit.source, hit.instanceIndex))) {
       setSingle(hit);
     }
-    menu = picked ? { x: e.clientX, y: e.clientY } : null;
+    menu = picked ? { x: e.clientX, y: e.clientY, where: Where.Preview } : null;
   }
 
   async function hitAt(e: MouseEvent): Promise<Pick | null> {
@@ -844,6 +882,11 @@
     const spot = addSpot;
     addSpot = null;
     addMenu = null;
+    const dropped = kind && spot ? pluginDrop(kind, spot) : null;
+    if (dropped) {
+      plugins.host.menu(dropped.plugin, dropped.item, dropped.target, dropped.place);
+      return;
+    }
     if (kind && spot) {
       insertElement(kind, spot.target, spot.place);
     }
@@ -853,7 +896,7 @@
     if (!contains(selection, refOf(source, instance))) {
       await select(source, instance);
     }
-    menu = { x: at.x, y: at.y };
+    menu = { x: at.x, y: at.y, where: Where.Layers };
   }
 
   function layerAdd(kind: AddKind, source: Source, place: AddPlace) {
@@ -881,6 +924,9 @@
   }
 
   function pickMenu(id: string) {
+    if (runPluginItem(id, picked?.source ?? null)) {
+      return;
+    }
     const chosen = pickedOf(id);
     const run: Record<Command, () => void> = {
       [Command.Copy]: copyForAgent,
@@ -1038,7 +1084,7 @@
   </aside>
   <section class="view">
     <header class="toolbar" bind:clientHeight={toolbarH}>
-      <FeegaMenu values={settings} {facts} {account} onaccount={(kind) => toHost({ kind })} onsetting={(key, value) => toHost({ kind: ToHost.Setting, key, value })} onlink={(link) => toHost({ kind: ToHost.External, url: link })} />
+      <FeegaMenu commands={plugins.commands} oncommand={(plugin, command) => plugins.host.command(plugin, command)} values={settings} {facts} {account} onaccount={(kind) => toHost({ kind })} onsetting={(key, value) => toHost({ kind: ToHost.Setting, key, value })} onlink={(link) => toHost({ kind: ToHost.External, url: link })} />
       <button type="button" class="icon" class:on={!leftClosed} title="Layers (⇧⌘\)" aria-label="Toggle Layers" data-testid="left-toggle" onclick={() => ((leftClosed = !leftClosed), savePrefs())}><PanelLeft size={15} /></button>
       <button type="button" class="icon" title="Back (⌘[)" disabled={!canBack} onclick={() => go(history.back())}><ArrowLeft size={15} /></button>
       <button type="button" class="icon" title="Forward (⌘])" disabled={!canForward} onclick={() => go(history.forward())}><ArrowRight size={15} /></button>
@@ -1048,6 +1094,7 @@
         <input bind:value={address} aria-label="Route" data-testid="address" spellcheck="false" />
       </form>
       <DeviceBar {size} {fit} onsize={pickSize} onwidth={(w) => ((custom = snapped(w)), (size = Size.Custom), savePrefs())} />
+      {#each plugins.topBar as item (item.plugin + item.entry.id)}<button type="button" class="plugin-action" data-testid="plugin-action" onclick={() => plugins.host.action(item.plugin, item.entry.id)}>{item.entry.title}</button>{/each}
       {#if themes.length > 1}<ThemeBar {themes} choice={themeName} onchoose={chooseTheme} />{/if}
       {#if fit.scale < 1}<span class="zoom" data-testid="zoom">{Math.round(fit.scale * 100)}%</span>{/if}
       <button type="button" class="icon" title="Open in browser" onclick={() => toHost({ kind: ToHost.External, url: new URL(route, url).toString() })}><ExternalLink size={14} /></button>
@@ -1058,6 +1105,7 @@
     <div class="backdrop" role="presentation" bind:clientWidth={stage.w} bind:clientHeight={stage.h} onpointermove={resizeFrame} onpointerup={endDrag}>
       <div class="frame" class:framed={size !== Size.Full} style={`width:${fit.width * fit.scale}px;height:${fit.height * fit.scale}px`}>
         {#if url}<iframe bind:this={frame} src={start} title="App" data-testid="app-frame" style={`width:${fit.width}px;height:${fit.height}px;transform:scale(${fit.scale})`}></iframe>{/if}
+        {#if restarting}<div class="restarting" data-testid="restarting" role="status"><span class="server-dot-inline amber"></span>Restarting dev server…</div>{/if}
         {#if mode === Mode.Design && bridged && !editing}
           <div class="overlay" role="presentation" onpointerdown={pressOverlay} onpointermove={dragOverlay} onpointerleave={() => (hover = null)} onclick={onPick} oncontextmenu={onMenu} ondragover={overAdd} ondragleave={() => (addSpot = null)} ondrop={dropAdd} ondblclick={onDouble} onwheel={(e) => bridge.scroll(e.deltaX / fit.scale, e.deltaY / fit.scale)}>
             {#if hover}<div class="outline hover" style={box(hover)}></div>{/if}
@@ -1067,6 +1115,7 @@
             {/if}
             {#if drop}<div class="drop-line" class:box={drop.kind === DropKind.Inside} style={`left:${drop.line.x * fit.scale - 1}px;top:${drop.line.y * fit.scale - 1}px;width:${Math.max(2, drop.line.w * fit.scale)}px;height:${Math.max(2, drop.line.h * fit.scale)}px`}></div>{/if}
           {#if picked && hint}{#each hintBoxes(picked, hint) as area, i (i)}<div class="hint {hint.group}" style={`left:${area.x * fit.scale}px;top:${area.y * fit.scale}px;width:${area.w * fit.scale}px;height:${area.h * fit.scale}px`}></div>{/each}{/if}
+          {#if picked}<PluginOverlay {plugins} {picked} scale={fit.scale} />{/if}
           {#each others as other (keyOf(refOf(other.source, other.instanceIndex)))}<div class="outline picked" data-testid="selected-outline" style={box(other)}></div>{/each}
           {#if picked}<div class="outline picked" style={box(picked)}><span class="label"><Breadcrumb pick={picked} onselect={select} compact state={elementState} /></span></div>{/if}
           {#each pins as pin (pin.id)}
@@ -1106,8 +1155,8 @@
           <button type="button" class="link" data-action={ServerAction.RestartUnderFeega} onclick={() => toHost({ kind: ToHost.Server, action: ServerAction.RestartUnderFeega })}>Let Feega start the server</button>
         </div>
       {/if}
-      {#if menu}<StructureMenu x={menu.x} y={menu.y} items={menuFor(selection.refs.length)} onpick={pickMenu} onclose={() => (menu = null)} />{/if}
-      {#if addMenu}<StructureMenu x={addMenu.x} y={addMenu.y} items={picked && picked.instances > 1 ? [...ADD_ITEMS, ADD_LOOP_ITEM] : ADD_ITEMS} label="add" draggable={true} onpick={(id) => (id === StructureOp.AddItem ? restructure(StructureOp.AddItem) : addElement(id as AddKind))} onclose={() => (addMenu = null)} />{/if}
+      {#if menu}<StructureMenu x={menu.x} y={menu.y} items={contextMenuItems(menuFor(selection.refs.length), plugins.contextMenu, menu.where)} onpick={pickMenu} onclose={() => (menu = null)} />{/if}
+      {#if addMenu}<StructureMenu x={addMenu.x} y={addMenu.y} items={addMenuItems(picked && picked.instances > 1 ? [...ADD_ITEMS, ADD_LOOP_ITEM] : ADD_ITEMS, plugins.addMenu)} label="add" draggable={true} onpick={(id) => (runPluginItem(id, picked?.source ?? null) ? undefined : id === StructureOp.AddItem ? restructure(StructureOp.AddItem) : addElement(id as AddKind))} onclose={() => (addMenu = null)} />{/if}
       {#if fontNotice}
         <div class="notice missingfont" data-testid="font-notice">
           <MissingFont missing={fontNotice} project={palette.fonts.filter((name) => !palette.missing.some((m) => m.family === name))} onreplace={replaceFont} onload={loadFont} />
@@ -1149,6 +1198,7 @@
         <Tabs.Trigger value={Tab.Properties} class="tab">Properties</Tabs.Trigger>
         <Tabs.Trigger value={Tab.Changes} class="tab" data-testid="changes-tab">Changes{changes.length ? ` ${changes.length}` : ''}</Tabs.Trigger>
         <Tabs.Trigger value={Tab.Comments} class="tab" data-testid="comments-tab">Comments{openComments ? ` ${openComments}` : ''}</Tabs.Trigger>
+        {#each plugins.sidePanel as panel (panel.plugin + panel.entry.id)}<Tabs.Trigger value={`plugin:${panel.plugin}/${panel.entry.id}`} class="tab" data-testid="plugin-tab">{panel.entry.title}</Tabs.Trigger>{/each}
       </Tabs.List>
       <Tabs.Content value={Tab.Properties}>
         {#if several}
@@ -1175,6 +1225,7 @@
             <button type="button" class:on={scope === Scope.Class} disabled={!picked.classCount || styling === Styling.Tailwind} onclick={() => (scope = Scope.Class)} title={styling === Styling.Tailwind ? 'Class scope needs CSS rules, not Tailwind' : `Every element with this class: ${picked.classCount}`}>All .{picked.classes.split(' ')[0] || 'class'}{picked.classCount ? ` (${picked.classCount})` : ''}</button>
           </div>
           <Properties pick={picked} {breakpoints} {palette} {elementState} {baseline} onstate={chooseState} onpreview={preview} onchange={change} onsavevar={saveVar} onhint={(h) => (hint = h)} onfont={pickFont} onfontreplace={replaceFont} onfontload={loadFont} onnotice={showToast} />
+          <PluginSections {plugins} {palette} />
           <Interactions pick={picked} {changes} />
         {:else}
           <p class="empty">{bridged ? 'Click an element to edit it. Double-click text to rewrite it.' : 'The page has no Feega source map: element picking needs the feega-source-map plugin.'}</p>
@@ -1183,6 +1234,11 @@
       <Tabs.Content value={Tab.Changes}>
         <ChangesList {changes} onselect={select} onopen={(at) => toHost({ kind: ToHost.Open, at })} ondiff={(id) => toHost({ kind: ToHost.Diff, id })} onrevert={(id) => toHost({ kind: ToHost.Revert, id })} onrevertall={() => toHost({ kind: ToHost.Revert, id: null })} onscm={() => toHost({ kind: ToHost.SourceControl })} />
       </Tabs.Content>
+      {#each plugins.sidePanel as panel (panel.plugin + panel.entry.id)}
+        <Tabs.Content value={`plugin:${panel.plugin}/${panel.entry.id}`}>
+          <iframe class="plugin-panel" title={panel.entry.title} sandbox="allow-scripts" srcdoc={panel.entry.html}></iframe>
+        </Tabs.Content>
+      {/each}
       <Tabs.Content value={Tab.Comments}>
         <CommentsList {cloud} {picked} {composing} onsubmit={(draft) => (draft.parentId ? toHost({ kind: ToHost.CommentAdd, draft }) : sendComment(draft))} oncancel={() => (composing = false)} onresolve={(id) => toHost({ kind: ToHost.CommentResolve, id })} onselect={select} oncopy={copyComment} />
       </Tabs.Content>
@@ -1341,6 +1397,25 @@
     display: block;
     border: 0;
     transform-origin: 0 0;
+  }
+
+  .plugin-action {
+    height: 24px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-input);
+    color: var(--ui-text);
+    font: inherit;
+    font-size: var(--ui-text-xs);
+    cursor: pointer;
+  }
+
+  .plugin-panel {
+    width: 100%;
+    height: 100%;
+    min-height: 240px;
+    border: 0;
   }
 
   .overlay {
@@ -1791,6 +1866,20 @@
     word-break: break-word;
   }
 
+  .restarting {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: color-mix(in srgb, var(--ui-panel) 70%, transparent);
+    backdrop-filter: blur(2px);
+    color: var(--ui-text);
+    font-size: var(--ui-text-sm);
+    pointer-events: none;
+  }
   .server-card {
     position: absolute;
     inset: 0;

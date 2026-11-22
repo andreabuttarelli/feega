@@ -14,6 +14,8 @@ import { previewQueue } from './icon-previews';
 import { appOfSource, firstStampedFile, urlOf } from './attach-url';
 import { serverInfo } from './server-info';
 import { Attach, attachDev, factsOf, startDev, type Refused, type Running } from './dev-server';
+import { RestartWatch, Signal, Step } from './restart-watch';
+import { shownFor, watchServer } from './server-watch';
 import { commentsHost } from './comments';
 import { shareSession } from './share/share-session';
 import { copyImage } from './image-copy';
@@ -27,6 +29,9 @@ import { themesOf } from './themes';
 import { usageSession } from './usage';
 import { selectionSync } from './selection-sync';
 import { wiringOf } from './wiring';
+import { pluginCalls } from './plugin-calls';
+import { dependenciesOf, offerInstall } from './install-offer';
+import { install } from './dev-server';
 
 const START_WITH_FEEGA = 'Start with Feega';
 const PICK_TIMEOUT_MS = 3000;
@@ -124,6 +129,36 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     }
     await edits.structure({ op: StructureOp.Add, at, add: { kind: AddKind.Image, src: copied.url, place } }).then((out) => edited(out, null));
   }
+
+  function installOffered(now: Running, packages: string[]) {
+    const { plan } = now;
+    const hooks = { log: (line: string) => platform.log(line), installing: () => undefined, spawned: () => undefined, signal: new AbortController().signal };
+    return offerInstall(
+      {
+        command: plan.install.join(' '),
+        confirm: (question, yes) => platform.confirm(question, yes),
+        install: () => install(join(root, plan.installDir), plan.install, hooks),
+        say: (text) => post({ kind: ToView.Status, text })
+      },
+      packages
+    );
+  }
+
+  const pluginRun = pluginCalls({
+    get root() {
+      return root;
+    },
+    appDir: () => running?.plan.appDir ?? '',
+    propose: async (proposal, appDir) => {
+      const out = await edits.proposal(proposal, appDir).then((written) => edited(written, null));
+      const packages = dependenciesOf(proposal);
+      if (out.ok && packages.length && running) {
+        void installOffered(running, packages);
+      }
+      return out;
+    },
+    fetch
+  });
 
   const comments = commentsHost(platform.cloud, post);
   const sharing = shareSession({ platform, workspace, appUrl: () => running?.url ?? null, post });
@@ -235,6 +270,15 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     return picked;
   }
 
+  const restarts = new RestartWatch();
+
+  function carryOut(step: Step, started: Running) {
+    shownFor(step, infoOf(started), lastError).forEach(post);
+    if (step === Step.Respawn) {
+      void startServer();
+    }
+  }
+
   function adopt(started: Running, current: () => boolean) {
     running = started;
     started.exited(() => {
@@ -242,9 +286,10 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
         forget(pids, started.pid);
       }
       if (current() && running === started) {
-        post({ kind: ToView.Server, state: ServerState.Stopped, reason: lastError || 'the dev server exited', info: infoOf(started) });
+        carryOut(restarts.feed(Signal.Exited, Date.now()), started);
       }
     });
+    void watchServer({ started, restarts, current: () => current() && running === started, act: (step) => carryOut(step, started) });
   }
 
   async function startServer(attach = Attach.IfRunning): Promise<Running | Refused> {
@@ -435,7 +480,8 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.ShareStart]: (m) => sharing.start(m.name, m.canEdit),
     [ToHost.ShareStop]: sharing.stop,
     [ToHost.ShareKick]: (m) => sharing.kick(m.userId),
-    [ToHost.ShareRole]: (m) => sharing.setRole(m.userId, m.role)
+    [ToHost.ShareRole]: (m) => sharing.setRole(m.userId, m.role),
+    [ToHost.Plugin]: async (m) => post({ kind: ToView.Plugin, id: m.id, result: await pluginRun(m.ask) })
   };
 
   platform.receive((message) => (handlers[message.kind] as (m: HostMessage) => unknown)(message));

@@ -39,7 +39,7 @@ const LAUNCH: Record<Framework, Launch> = {
   [Framework.Generic]: Launch.Script
 };
 
-export type Running = { url: string; plan: RunPlan; launch: Launch; attached: boolean; pid: number | null; command: string; stop: () => void; exited: (then: () => void) => void };
+export type Running = { url: string; upstream: string; plan: RunPlan; launch: Launch; attached: boolean; pid: number | null; command: string; stop: () => void; exited: (then: () => void) => void };
 
 export enum Attach {
   IfRunning = 'if-running',
@@ -135,7 +135,7 @@ const has = (path: string) => access(path).then(() => true, () => false);
 
 export type StartHooks = { log: (line: string) => void; installing: (app: string) => void; spawned: (pid: number) => void; declined: (text: string) => void; signal: AbortSignal };
 
-function install(dir: string, argv: string[], hooks: StartHooks): Promise<DepsOutcome | Failed> {
+export function install(dir: string, argv: string[], hooks: StartHooks): Promise<DepsOutcome | Failed> {
   const [bin, ...args] = argv;
   const child = spawn(bin, args, { cwd: dir, env: process.env, detached: process.platform !== 'win32', shell: process.platform === 'win32' });
   const seen = watchOutput(child);
@@ -217,7 +217,7 @@ async function attachedTo(url: string, plan: RunPlan, appRoot: string, launcherS
   const bridgeDir = join(appRoot, LAUNCHER_DIR);
   await cp(launcherSource, bridgeDir, { recursive: true });
   const proxy = await devProxy(url, bridgeDir);
-  return { url: proxy.url, plan, launch: LAUNCH[plan.framework], attached: true, pid: null, command: `already running on ${url}`, stop: proxy.close, exited: () => undefined };
+  return { url: proxy.url, upstream: url, plan, launch: LAUNCH[plan.framework], attached: true, pid: null, command: `already running on ${url}`, stop: proxy.close, exited: () => undefined };
 }
 
 export async function attachDev(root: string, launcherSource: string, url: string, asked: string | null): Promise<Running | Refused> {
@@ -315,5 +315,5 @@ export async function startDev(root: string, launcherSource: string, hooks: Star
   const proxy = row.proxied ? await devProxy(ready, bridgeDir) : null;
   const stop = () => (proxy?.close(), stopGroup(child));
   time.done('started');
-  return { url: proxy?.url ?? ready, plan: planned, launch, attached: false, pid: child.pid ?? null, command: shown, stop, exited: (then) => child.once('exit', then) };
+  return { url: proxy?.url ?? ready, upstream: ready, plan: planned, launch, attached: false, pid: child.pid ?? null, command: shown, stop, exited: (then) => child.once('exit', then) };
 }

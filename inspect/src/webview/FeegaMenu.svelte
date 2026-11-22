@@ -2,10 +2,11 @@
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import Coffee from '@lucide/svelte/icons/coffee';
   import { tick } from 'svelte';
+  import type { Contributed } from '@feega/plugin-api/host';
   import { AccountState, ToHost } from '../messages';
   import { LINKS, SETTINGS, issueUrl, type ReportFacts, type SettingKey, type SettingValue, type Settings } from '../settings';
 
-  let { values, facts, account, onaccount, onsetting, onlink }: { values: Settings | null; facts: ReportFacts | null; account: { state: AccountState; email?: string }; onaccount: (kind: ToHost.SignIn | ToHost.CancelSignIn | ToHost.SignOut) => void; onsetting: (key: SettingKey, value: SettingValue) => void; onlink: (url: string) => void } = $props();
+  let { commands = [], oncommand = () => undefined, values, facts, account, onaccount, onsetting, onlink }: { commands?: Contributed[]; oncommand?: (plugin: string, command: string) => void; values: Settings | null; facts: ReportFacts | null; account: { state: AccountState; email?: string }; onaccount: (kind: ToHost.SignIn | ToHost.CancelSignIn | ToHost.SignOut) => void; onsetting: (key: SettingKey, value: SettingValue) => void; onlink: (url: string) => void } = $props();
 
   let open = $state(false);
   let trigger = $state<HTMLButtonElement | null>(null);
@@ -91,6 +92,15 @@
           <span>Support with a coffee</span>
         </button>
       </section>
+
+      {#if commands.length}
+        <section>
+          <h3>Plugins</h3>
+          {#each commands as command (command.plugin + command.entry.id)}
+            <button type="button" class="row" data-testid="plugin-command" onclick={() => (oncommand(command.plugin, command.entry.id), close())}>{command.entry.title}</button>
+          {/each}
+        </section>
+      {/if}
 
       <section>
         <h3>Help</h3>

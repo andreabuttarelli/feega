@@ -6,7 +6,10 @@ import { chromium, type Page } from '@playwright/test';
 import { fileEdits, type ManyAsk } from '../src/host/file-edits.ts';
 import { stylingOf } from '../src/host/styling.ts';
 import { Attach, startDev } from '../src/host/dev-server.ts';
-import { ServerState, ToHost, ToView, type EditAsk, type Pick } from '../src/messages.ts';
+import { ServerState, ToHost, ToView, type EditAsk, type Pick, type PluginAsk } from '../src/messages.ts';
+import { pluginCalls } from '../src/host/plugin-calls.ts';
+import { RestartWatch } from '../src/host/restart-watch.ts';
+import { shownFor, watchServer } from '../src/host/server-watch.ts';
 import { liveAtOf } from '@feega/live-edit/live-ask';
 import { SETTINGS } from '../src/settings.ts';
 import { searchIcons } from '../src/host/icon-search.ts';
@@ -48,14 +51,28 @@ export async function openPanel(appRoot: string, theme = DARK, cloud?: CommentsC
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 });
   if (process.env.PROBE) {
-    page.on('console', (m) => console.log('console', m.text().slice(0, 160)));
+    page.on('console', (m) => console.log('console', m.text().slice(0, 800)));
     page.on('pageerror', (e) => console.log('pageerror', e.message));
   }
   const reply = (m: unknown) => page.evaluate((msg) => window.postMessage(msg, '*'), m);
+  let closed = false;
+  void watchServer({ started: running, restarts: new RestartWatch(), current: () => !closed, act: (step) => shownFor(step, undefined, '').forEach(reply) });
   const picks = new Map<number, (p: Pick | null) => void>();
   const saves: unknown[] = [];
   const copied: string[] = [];
   const comments = commentsHost(cloud, reply);
+  const history = () => reply({ kind: ToView.History, changes: edits.history(), canUndo: edits.canUndo(), canRedo: edits.canRedo() });
+  const runPlugin = pluginCalls({
+    root: appRoot,
+    appDir: () => '',
+    fetch,
+    propose: async (proposal, appDir) => {
+      const out = await edits.proposal(proposal, appDir);
+      await history();
+      await reply(out.ok ? { kind: ToView.Edited, ok: true, written: '' } : { kind: ToView.Edited, ok: false, reason: out.reason });
+      return out;
+    }
+  });
   const previewIcons = previewQueue(fetch, (name, svg) => reply({ kind: ToView.IconPreview, name, svg }));
 
   await page.exposeFunction('toHost', async (m: { kind: ToHost; from?: string; to?: string; google?: boolean; family?: string; ask?: EditAsk; id?: number | string; pick?: Pick | null; query?: string; names?: string[]; text?: string; draft?: CommentDraft }) => {
@@ -105,7 +122,12 @@ export async function openPanel(appRoot: string, theme = DARK, cloud?: CommentsC
       await comments.resolve(m.id as string);
     }
     if (m.kind === ToHost.Undo) {
-      await edits.undo();
+      const out = await edits.undo();
+      await history();
+      await reply(out.ok ? { kind: ToView.Edited, ok: true, written: '' } : { kind: ToView.Edited, ok: false, reason: out.reason });
+    }
+    if (m.kind === ToHost.Plugin) {
+      await reply({ kind: ToView.Plugin, id: m.id as number, result: await runPlugin(m.ask as unknown as PluginAsk) });
     }
   });
 
@@ -124,6 +146,7 @@ export async function openPanel(appRoot: string, theme = DARK, cloud?: CommentsC
   }
 
   const close = async () => {
+    closed = true;
     await browser.close();
     server.close();
     running.stop();
