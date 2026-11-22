@@ -116,20 +116,37 @@ function htmlTags(code: string): Tag[] {
   return tags;
 }
 
-type AstroNode = { type: string; name?: string; position?: { start: { line: number; column: number; offset: number } }; children?: AstroNode[] };
+type AstroNode = { type: string; name?: string; position?: { start: { offset: number } }; children?: AstroNode[] };
 
 function astroTags(code: string): Tag[] {
   const { parse } = require('@astrojs/compiler/sync') as { parse: (src: string) => { ast: AstroNode } };
+  const lineStarts = lineStartsOf(code);
+  const charOffsetOf = charOffsets(code);
   const tags: Tag[] = [];
   const visit = (node: AstroNode) => {
-    const start = node.position?.start;
-    if (node.type === 'element' && node.name && start && !NOT_STAMPED.has(node.name)) {
-      tags.push({ nameEnd: start.offset + 1 + node.name.length, line: start.line, col: start.column });
+    const byteStart = node.position?.start.offset;
+    if (node.type === 'element' && node.name && byteStart !== undefined && !NOT_STAMPED.has(node.name)) {
+      const start = charOffsetOf(byteStart);
+      tags.push({ nameEnd: start + 1 + node.name.length, ...position(lineStarts, start) });
     }
     node.children?.forEach(visit);
   };
   visit(parse(code).ast);
   return tags;
+}
+
+function charOffsets(code: string): (byteOffset: number) => number {
+  const byteToChar: number[] = [];
+  let char = 0;
+  for (const point of code) {
+    const bytes = Buffer.byteLength(point);
+    for (let i = 0; i < bytes; i++) {
+      byteToChar.push(char);
+    }
+    char += point.length;
+  }
+  byteToChar.push(char);
+  return (byteOffset) => byteToChar[byteOffset];
 }
 
 const VUE_ELEMENT = 1;

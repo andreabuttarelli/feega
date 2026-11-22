@@ -4066,3 +4066,7 @@ property reads on ~2,000 items (`src/lib/canvas/counted-list.testkit.ts`), not w
 ## A fixture package.json changes by itself after the first run
 
 **Signal:** a framework e2e fails with `package.json` in the changed files. React Router adds `isbot` to the app when it is missing, and the test cleanup then reverts your uncommitted fixture edit. **Move:** declare the dependency the framework wants in the committed fixture, and commit fixture edits before running the e2e.
+
+## Astro compiler offsets are UTF-8 bytes
+
+**Signal:** raw `data-feega-src="..."` shows as visible text in the middle of words on an Astro page, only after the first non-ASCII character (`·`, `€`, accents) in the file. **Move:** convert `position.start.offset` from bytes to string indices before inserting, and keep a non-ASCII case in the Astro stamping test and fixture.
