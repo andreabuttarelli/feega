@@ -17,6 +17,9 @@
   let { headline = HERO_HEADLINE, size = HeadlineSize.Display, lead, art }: { headline?: string; size?: HeadlineSize; lead?: Snippet; art?: Snippet } = $props();
 
   const MOCK_WIDTH = 960;
+  const NARROW_FIT_MAX = 400;
+  const NARROW_VIEW = { x: 200, y: 82, width: 400 } as const;
+  const NARROW_ASPECT = 0.9;
 
   let front = $state(Window.Editor);
 
@@ -30,7 +33,10 @@
   let fitWidth = $state(MOCK_WIDTH);
   let mockHeight = $state(0);
 
-  const scale = $derived(fitWidth / MOCK_WIDTH);
+  const narrow = $derived(fitWidth <= NARROW_FIT_MAX);
+  const scale = $derived(fitWidth / (narrow ? NARROW_VIEW.width : MOCK_WIDTH));
+  const fitHeight = $derived(narrow ? fitWidth * NARROW_ASPECT : mockHeight * scale);
+  const shift = $derived(narrow ? `translate(${-NARROW_VIEW.x * scale}px, ${-NARROW_VIEW.y * scale}px) ` : '');
 </script>
 
 <svelte:head>
@@ -71,8 +77,8 @@
   {#if art}
     <div class="art">{@render art()}</div>
   {:else}
-  <div class="fit" bind:clientWidth={fitWidth} style:height="{mockHeight * scale}px">
-    <div class="mock" bind:offsetHeight={mockHeight} style:transform="scale({scale})">
+  <div class="fit" class:cropped={narrow} bind:clientWidth={fitWidth} style:height="{fitHeight}px">
+    <div class="mock" bind:offsetHeight={mockHeight} style:transform="{shift}scale({scale})">
       <AsciiField fit={FieldFit.Box} />
       <div class="term" class:front={front === Window.Terminal} role="button" tabindex="0" aria-label="Bring the terminal to front" onclick={(e) => raise(Window.Terminal, e)} onkeydown={(e) => raise(Window.Terminal, e)}><TerminalMock /></div>
       <div class="win" class:front={front === Window.Editor} role="button" tabindex="0" aria-label="Bring the editor to front" onclick={(e) => raise(Window.Editor, e)} onkeydown={(e) => raise(Window.Editor, e)}><EditorMock /></div>
@@ -176,6 +182,11 @@
     width: 100%;
     max-width: var(--site-max);
     margin: 36px auto 0;
+  }
+
+  .fit.cropped {
+    overflow: hidden;
+    border-radius: var(--ui-radius-lg, 10px);
   }
 
   .art {
