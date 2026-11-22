@@ -12,8 +12,13 @@ Feega Inspect is a small editor extension, separate from the Feega canvas. No ac
    app's dev server (the `dev`/`start` script it detects) and shows the page in a panel.
 3. Click an element. The right bar shows its tag, the component and `file:line` (click it to open
    the source), and the Properties controls: auto layout, size, spacing, typography, colour,
-   radius, opacity, shadow. Closed sections below them cover position and inset, display,
-   overflow, min/max size, aspect ratio, object fit, grid, flex child, per-side border, outline,
+   radius, opacity, shadow. Under W and H, **min/max** reveals Min W, Max W, Min H and Max H (open
+   by default when the element has one). They take px, %, rem, em, vw, vh, dvh and ch, or the
+   keywords `none`, `auto`, `fit-content`, `min-content` and `max-content`; scrub or use the arrow
+   keys like any number, and `×` clears the value. With Tailwind they write `max-w-[720px]` or the
+   theme class when one matches exactly (`max-w-prose`). W and H also take `fit-content` and
+   `auto`. At a breakpoint they write `md:max-w-[720px]` or a media query. Closed sections below
+   them cover position and inset, display, overflow, aspect ratio, object fit, grid, flex child, per-side border, outline,
    blend and blur, transform, transition, cursor, text options and list markers. A dimmed value
    is inherited (the ancestor is named next to it); `×` removes the element's own value.
 4. Change a value. With Tailwind, the one class that owns it is rewritten (or your own theme
