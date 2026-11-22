@@ -98,6 +98,19 @@ describe('cloud api client', () => {
     await expect(api.setMember('abcdefghij', 'ada', VisitorRole.Editor)).rejects.toMatchObject({ failure: CloudFailure.SeatsExhausted });
   });
 
+  it('fetches the files of a Pro item for one framework', async () => {
+    const { api, calls } = recorder(200, { id: 'hover-reveal', version: 'v1', framework: 'svelte', files: [{ path: 'HoverReveal.svelte', content: '<div />' }] });
+
+    expect(await api.libraryPro('hover-reveal', 'svelte')).toEqual([{ path: 'HoverReveal.svelte', content: '<div />' }]);
+    expect(calls).toEqual([{ url: 'https://oh.test/api/v1/library/pro/hover-reveal?framework=svelte', method: 'GET', auth: 'Bearer jwt-1', body: undefined }]);
+  });
+
+  it('maps a 401 from the server to not signed in', async () => {
+    const { api } = recorder(401, { error: 'Invalid or expired token' });
+
+    await expect(api.libraryPro('hover-reveal', 'svelte')).rejects.toMatchObject({ failure: CloudFailure.NotSignedIn });
+  });
+
   it('maps other failures to the status and server message', async () => {
     const { api } = recorder(500, { error: 'boom' });
 

@@ -50,7 +50,7 @@
   <ul class="grid">
     {#each shown as item (item.id)}
       {@const locked = item.tier === PRO_TIER}
-      <li class="card" data-testid="library-item" data-id={item.id} data-locked={locked} draggable={!locked} ondragstart={(e) => drag(e, item)}>
+      <li class="card" data-testid="library-item" data-id={item.id} data-locked={locked} draggable="true" ondragstart={(e) => drag(e, item)}>
         <div class="thumb" bind:clientWidth={cardWidth} style={`height:${PAGE_HEIGHT_PX * scale}px`}>
           <iframe title={item.name} sandbox="" loading="lazy" tabindex="-1" srcdoc={framedPage(item, theme)} style={`width:${PAGE_WIDTH_PX}px;height:${PAGE_HEIGHT_PX}px;transform:scale(${scale})`}></iframe>
         </div>
@@ -58,9 +58,8 @@
           <span class="name" title={item.description}>{item.name}</span>
           {#if locked}
             <span class="lock" data-testid="library-locked">{INCLUDED_IN_CLOUD}</span>
-          {:else}
-            <button type="button" class="insert" data-testid="library-insert" disabled={!canInsert} title={canInsert ? 'Insert after the selection' : 'Select an element first'} onclick={() => oninsert(item.id)}>Insert</button>
           {/if}
+          <button type="button" class="insert" data-testid="library-insert" disabled={!canInsert} title={canInsert ? 'Insert after the selection' : 'Select an element first'} onclick={() => oninsert(item.id)}>Insert</button>
         </div>
       </li>
     {:else}
@@ -196,10 +195,6 @@
     cursor: grab;
   }
 
-  .card[data-locked='true'] {
-    cursor: default;
-  }
-
   .thumb {
     position: relative;
     overflow: hidden;
@@ -218,6 +213,7 @@
 
   .meta {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 8px;
     font-size: var(--ui-text-sm);

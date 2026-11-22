@@ -1,5 +1,6 @@
 export const CLOUD_BASE = 'https://oh.feega.app';
 
+const HTTP_UNAUTHORIZED = 401;
 const HTTP_PAYMENT_REQUIRED = 402;
 const PLAN_REQUIRED = 'plan_required';
 const SEATS_EXHAUSTED = 'seats_exhausted';
@@ -44,6 +45,8 @@ export type CloudComment = {
 
 export type CommentDraft = { body: string; selector: string; sourceFile: string; sourceLine: number; sourceCol: number; parentId?: string };
 
+export type ProFile = { path: string; content: string };
+
 export type StartedSession = { id: string; url: string; hostToken: string; expiresAt: string };
 
 export type LiveSession = { id: string; url: string; projectName: string; hostName: string; startedAt: string; expiresAt: string; status: string };
@@ -76,6 +79,9 @@ export function cloudApi({ base = CLOUD_BASE, token, fetch: send = fetch }: Clou
     if (response.status === HTTP_PAYMENT_REQUIRED || payload.error === PLAN_REQUIRED) {
       throw new CloudError(CloudFailure.PlanRequired, 'Feega Cloud needs a paid plan', response.status);
     }
+    if (response.status === HTTP_UNAUTHORIZED) {
+      throw new CloudError(CloudFailure.NotSignedIn, 'not signed in to Feega', response.status);
+    }
     if (!response.ok) {
       throw new CloudError(CloudFailure.Http, payload.error ?? `request failed (${response.status})`, response.status);
     }
@@ -92,6 +98,7 @@ export function cloudApi({ base = CLOUD_BASE, token, fetch: send = fetch }: Clou
     comments: async (id: string, openOnly: boolean) => (await call<{ comments: CloudComment[] }>(Verb.Get, `${commentsPath(id)}${openOnly ? '?open=1' : ''}`)).comments,
     addComment: (id: string, draft: CommentDraft) => call<CloudComment>(Verb.Post, commentsPath(id), draft),
     resolve: (id: string, commentId: string, note?: string) => call<CloudComment>(Verb.Patch, `${commentsPath(id)}/${commentId}`, { resolved: true, ...(note && { note }) }),
-    setMember: (id: string, userId: string, role: VisitorRole) => call<unknown>(Verb.Post, `/sessions/${id}/members/${userId}`, { role })
+    setMember: (id: string, userId: string, role: VisitorRole) => call<unknown>(Verb.Post, `/sessions/${id}/members/${userId}`, { role }),
+    libraryPro: async (id: string, framework: string) => (await call<{ files: ProFile[] }>(Verb.Get, `/library/pro/${id}?framework=${framework}`)).files
   };
 }

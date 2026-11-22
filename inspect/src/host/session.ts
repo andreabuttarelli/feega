@@ -1,4 +1,4 @@
-import { rm } from 'node:fs/promises';
+import { readFile, rm } from 'node:fs/promises';
 import { join, relative, resolve } from 'node:path';
 import { appsIn } from '@feega/dev-run/run-plan';
 import { AddKind, type AddPlace } from '@feega/live-edit/add-node';
@@ -29,7 +29,8 @@ import { themesOf } from './themes';
 import { usageSession } from './usage';
 import { selectionSync } from './selection-sync';
 import { wiringOf } from './wiring';
-import { entriesOf, insertAskOf } from './library';
+import { INCLUDED_IN_CLOUD, entriesOf, insertAskOf } from './library';
+import { PRICING_URL, ProRefusal, SEE_PRICING, SIGN_IN, SIGN_IN_FOR_PRO, proItemFor } from './pro-insert';
 import { pluginCalls } from './plugin-calls';
 import { pluginsSession } from './plugins-session';
 import { dependenciesOf, offerInstall } from './install-offer';
@@ -143,10 +144,33 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     await post({ kind: ToView.Library, items: catalog ? entriesOf(catalog) : [] });
   }
 
+  const proPrompts: Record<ProRefusal, { text: string; action: string; accept: () => unknown }> = {
+    [ProRefusal.SignIn]: { text: SIGN_IN_FOR_PRO, action: SIGN_IN, accept: () => startSignIn() },
+    [ProRefusal.Plan]: { text: INCLUDED_IN_CLOUD, action: SEE_PRICING, accept: () => platform.openExternal(PRICING_URL) }
+  };
+
+  async function proPrompted(refusal: ProRefusal | null) {
+    if (!refusal) {
+      return;
+    }
+    const prompt = proPrompts[refusal];
+    if (await platform.warn(prompt.text, prompt.action)) {
+      await prompt.accept();
+    }
+  }
+
   async function libraryInserted(m: Extract<HostMessage, { kind: ToHost.LibraryInsert }>) {
     const ask = insertAskOf((await platform.library?.()) ?? null, m.id);
-    const out: Written = ask.ok ? await edits.library(m.at, m.place, ask.item, ask.tokens) : ask;
+    if (!ask.ok) {
+      await edited(ask, null);
+      return;
+    }
+    const ready = ask.pro ? await proItemFor(ask.item, await readFile(join(root, 'package.json'), 'utf8').catch(() => null), platform.proFiles) : { ok: true as const, item: ask.item };
+    const out: Written = ready.ok ? await edits.library(m.at, m.place, ready.item, ask.tokens) : ready;
     await edited(out, null);
+    if (!ready.ok && ready.refusal) {
+      void proPrompted(ready.refusal);
+    }
   }
 
   function installOffered(now: Running, packages: string[]) {
