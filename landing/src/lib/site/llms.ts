@@ -22,7 +22,7 @@ const SURFACES = [
   '- VS Code extension: the same editor inside VS Code, and inside VS Code-based editors Cursor, Windsurf and VSCodium. VS Code installs from the Visual Studio Marketplace; Cursor, Windsurf and VSCodium install from Open VSX. macOS, Windows and Linux.',
   '- Terminal: `npx feega` in the app folder opens the same editor in your browser, no IDE needed. It finds the app, starts its dev server and opens the editor.',
   '- Desktop app: coming soon, in beta.',
-  '- Feega Cloud: coming soon, paid, EUR 15 per editor a month (EUR 144 a year), viewers free. It adds GitHub sync, collaboration, sections and templates, and all Pro templates. The extension and npx feega stay free.'
+  '- Feega Cloud: coming soon, paid, €15 per editor a month (€12 a month billed annually, €144 a year), viewers free. It adds GitHub sync, collaboration, sections and templates, and all Pro templates. The extension and npx feega stay free.'
 ].join('\n');
 
 const HOW_IT_WORKS = [

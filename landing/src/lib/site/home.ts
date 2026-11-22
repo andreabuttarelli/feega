@@ -1,4 +1,4 @@
-import { PLAN, freeAnswer } from './pricing/plan';
+import { freeAnswer } from './pricing/plan';
 import { GITHUB_URL } from './links';
 
 const VIDEO_BASE = 'https://klnswzhhgrqvbfjzioul.supabase.co/storage/v1/object/public/website';
@@ -43,7 +43,7 @@ export const FAQ = [
   },
   {
     q: "Can I use Feega for free?",
-    a: freeAnswer(PLAN)
+    a: freeAnswer()
   },
   {
     q: "Which editors and frameworks does it support?",
@@ -55,7 +55,7 @@ export const FAQ = [
   },
   {
     q: "What is Feega Cloud?",
-    a: "Coming later: GitHub sync, collaboration, sections and templates. The extension stays free."
+    a: "Coming soon: GitHub sync, collaboration, sections and templates. The extension stays free."
   },
   {
     q: "Who owns my work, and is it used to train AI?",

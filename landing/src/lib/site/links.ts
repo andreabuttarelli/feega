@@ -10,7 +10,7 @@ export const COFFEE_URL = 'https://buy.stripe.com/5kQ00k2A97C08sd94LeME07';
 
 export const EXTENSION_PUBLISHED = true;
 
-export const DESKTOP_PUBLISHED = true;
+export const DESKTOP_PUBLISHED = false;
 
 export const DESKTOP_RELEASE_URL = `${GITHUB_URL}/releases/download/desktop-latest`;
 
@@ -25,7 +25,7 @@ export const DOWNLOAD_PATH = '/download';
 
 export const FEEGA_VERSION = __FEEGA_VERSION__;
 
-export const NODE_REQUIREMENT = 'Node 18 or newer';
+export const NODE_REQUIREMENT = 'Node 20 or newer';
 
 export const VSCODE_REQUIREMENT = 'VS Code 1.90 or newer';
 

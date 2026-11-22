@@ -15,7 +15,7 @@ export const OG = {
 
 export const PRICING_META = {
   title: 'Pricing: the Feega extension is free | Feega',
-  description: 'The Feega VS Code extension is free. Feega Cloud, with GitHub sync, collaboration, sections and templates, is coming later.'
+  description: 'The Feega VS Code extension is free. Feega Cloud, with GitHub sync, collaboration, sections and templates, is coming soon.'
 } as const;
 
 export const PLUGINS_META = {
