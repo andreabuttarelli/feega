@@ -1,5 +1,12 @@
 <script lang="ts">
   const DEFAULT_RADIUS = 220;
+  const DEFAULT_GAIN = 2.2;
+  const DEFAULT_SOFTNESS = 0.18;
+  const THRESHOLD = 0.5;
+  const FLOOR = 0.6;
+  const HALO = 0.75;
+  const SHINE = { low: 0.04, high: 0.6, peak: 0.4 };
+  const LUMA = [0.2126, 0.7152, 0.0722];
   const EASE = 7;
   const TRAIL = 1.4;
   const IDLE = 2;
@@ -41,16 +48,197 @@
     return left * left * (1 + 2 * age);
   }
 
+  function ease(low: number, high: number, x: number): number {
+    const k = Math.min(1, Math.max(0, (x - low) / (high - low)));
+    return k * k * (3 - 2 * k);
+  }
+
+  function shine(r: number, g: number, b: number): number {
+    const luma = r * LUMA[0] + g * LUMA[1] + b * LUMA[2];
+    const peak = Math.max(r, g, b);
+    return ease(SHINE.low, SHINE.high, luma + (peak - luma) * SHINE.peak);
+  }
+
+  const VERTEX = [
+    '#version 300 es',
+    'in vec2 p;',
+    'out vec2 uv;',
+    'void main() { uv = vec2(p.x * 0.5 + 0.5, 0.5 - p.y * 0.5); gl_Position = vec4(p, 0.0, 1.0); }'
+  ].join('\n');
+
+  const FRAGMENT = [
+    '#version 300 es',
+    'precision mediump float;',
+    'uniform sampler2D lit;',
+    'uniform sampler2D light;',
+    'uniform vec4 crop;',
+    'uniform float gain;',
+    'uniform float soft;',
+    'in vec2 uv;',
+    'out vec4 tint;',
+    'float shine(vec3 c) {',
+    '  float luma = dot(c, vec3(' + LUMA.join(', ') + '));',
+    '  float peak = max(c.r, max(c.g, c.b));',
+    '  return smoothstep(' + SHINE.low.toFixed(3) + ', ' + SHINE.high.toFixed(3) + ', mix(luma, peak, ' + SHINE.peak.toFixed(3) + '));',
+    '}',
+    'void main() {',
+    '  vec2 st = (uv - crop.xy) / crop.zw;',
+    '  vec4 c = texture(lit, st);',
+    '  float lum = shine(texture(lit, st, 2.5).xyz);',
+    '  float l = texture(light, uv).a;',
+    '  float a = smoothstep(' + THRESHOLD.toFixed(3) + ' - soft, ' + THRESHOLD.toFixed(3) + ' + soft, l * (' + FLOOR.toFixed(3) + ' + gain * lum));',
+    '  a *= smoothstep(0.0, ' + HALO.toFixed(3) + ', l);',
+    '  tint = vec4(c.xyz * a, a);',
+    '}'
+  ].join('\n');
+
+  type Box = { x: number; y: number; w: number; h: number };
+  type Size = { w: number; h: number; dpr: number };
+  type Tune = { gain: number; soft: number };
+  type Painter = { draw: (field: HTMLCanvasElement, box: Box, size: Size) => boolean };
+
+  function webgl(canvas: HTMLCanvasElement, lit: HTMLImageElement, tune: Tune): Painter | null {
+    const gl = canvas.getContext('webgl2', { premultipliedAlpha: true, antialias: false });
+    if (!gl) {
+      return null;
+    }
+
+    const program = gl.createProgram()!;
+    for (const [kind, source] of [[gl.VERTEX_SHADER, VERTEX], [gl.FRAGMENT_SHADER, FRAGMENT]] as [number, string][]) {
+      const shader = gl.createShader(kind)!;
+      gl.shaderSource(shader, source);
+      gl.compileShader(shader);
+      gl.attachShader(program, shader);
+    }
+    gl.bindAttribLocation(program, 0, 'p');
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      return null;
+    }
+
+    gl.useProgram(program);
+    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+    const texture = (unit: number, filter: number) => {
+      gl.activeTexture(gl.TEXTURE0 + unit);
+      gl.bindTexture(gl.TEXTURE_2D, gl.createTexture());
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    };
+    texture(1, gl.LINEAR);
+    texture(0, gl.LINEAR_MIPMAP_LINEAR);
+    gl.uniform1i(gl.getUniformLocation(program, 'lit'), 0);
+    gl.uniform1i(gl.getUniformLocation(program, 'light'), 1);
+    gl.uniform1f(gl.getUniformLocation(program, 'gain'), tune.gain);
+    gl.uniform1f(gl.getUniformLocation(program, 'soft'), tune.soft);
+    const crop = gl.getUniformLocation(program, 'crop');
+    let loaded = '';
+
+    function upload(): boolean {
+      const src = lit.currentSrc || lit.src;
+      if (loaded === src) {
+        return true;
+      }
+      try {
+        gl!.activeTexture(gl!.TEXTURE0);
+        gl!.texImage2D(gl!.TEXTURE_2D, 0, gl!.RGBA, gl!.RGBA, gl!.UNSIGNED_BYTE, lit);
+        gl!.generateMipmap(gl!.TEXTURE_2D);
+      } catch {
+        return false;
+      }
+      loaded = src;
+      return true;
+    }
+
+    return {
+      draw(field, box, size) {
+        if (!upload()) {
+          return false;
+        }
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        gl.activeTexture(gl.TEXTURE1);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, field);
+        gl.uniform4f(crop, box.x / size.w, box.y / size.h, box.w / size.w, box.h / size.h);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        return true;
+      }
+    };
+  }
+
+  function pixels(canvas: HTMLCanvasElement, lit: HTMLImageElement, tune: Tune): Painter | null {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      return null;
+    }
+    let lum = new Float32Array(0);
+    let key = '';
+
+    function measure(field: HTMLCanvasElement, box: Box, size: Size): boolean {
+      const next = field.width + 'x' + field.height + (lit.currentSrc || lit.src);
+      if (key === next) {
+        return true;
+      }
+      const probe = document.createElement('canvas');
+      probe.width = field.width;
+      probe.height = field.height;
+      const g = probe.getContext('2d', { willReadFrequently: true })!;
+      const scale = field.width / size.w;
+      g.drawImage(lit, box.x * scale, box.y * scale, box.w * scale, box.h * scale);
+      try {
+        const data = g.getImageData(0, 0, probe.width, probe.height).data;
+        lum = new Float32Array(probe.width * probe.height);
+        for (let i = 0; i < lum.length; i++) {
+          lum[i] = shine(data[i * 4] / 255, data[i * 4 + 1] / 255, data[i * 4 + 2] / 255);
+        }
+      } catch {
+        return false;
+      }
+      key = next;
+      return true;
+    }
+
+    return {
+      draw(field, box, size) {
+        if (!measure(field, box, size)) {
+          return false;
+        }
+        const fctx = field.getContext('2d', { willReadFrequently: true })!;
+        const image = fctx.getImageData(0, 0, field.width, field.height);
+        const data = image.data;
+        for (let i = 0; i < lum.length; i++) {
+          const l = data[i * 4 + 3] / 255;
+          data[i * 4 + 3] = 255 * ease(THRESHOLD - tune.soft, THRESHOLD + tune.soft, l * (FLOOR + tune.gain * lum[i])) * ease(0, HALO, l);
+        }
+        fctx.putImageData(image, 0, 0);
+        ctx.setTransform(size.dpr, 0, 0, size.dpr, 0, 0);
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1;
+        ctx.clearRect(0, 0, size.w, size.h);
+        ctx.imageSmoothingEnabled = true;
+        ctx.drawImage(field, 0, 0, size.w, size.h);
+        ctx.globalCompositeOperation = 'source-in';
+        ctx.drawImage(lit, box.x, box.y, box.w, box.h);
+        return true;
+      }
+    };
+  }
+
   function reveal(root: HTMLElement): () => void {
     const radius = Number(root.dataset.radius) || DEFAULT_RADIUS;
+    const tune = { gain: Number(root.dataset.gain) || DEFAULT_GAIN, soft: Number(root.dataset.softness) || DEFAULT_SOFTNESS };
     const lit = root.querySelector<HTMLImageElement>('img.lit')!;
     const canvas = root.querySelector<HTMLCanvasElement>('canvas')!;
-    const ctx = canvas.getContext('2d');
     const mask = document.createElement('canvas');
-    const mctx = mask.getContext('2d');
+    const mctx = mask.getContext('2d', { willReadFrequently: true });
+    let painter = webgl(canvas, lit, tune) || pixels(canvas, lit, tune);
     const sprite = glow();
     const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    let size = { w: 0, h: 0, dpr: 1 };
+    let size: Size = { w: 0, h: 0, dpr: 1 };
     let target = { x: 0, y: 0 };
     let spot = { x: 0, y: 0 };
     let last = { x: 0, y: 0 };
@@ -62,9 +250,14 @@
     let frame = 0;
     let then = 0;
 
-    if (!ctx || !mctx) {
+    function fallback() {
+      painter = null;
       root.dataset.mode = 'mask';
       root.style.setProperty('--r', radius * 1.6 + 'px');
+    }
+
+    if (!painter || !mctx) {
+      fallback();
     }
 
     function resize() {
@@ -82,7 +275,7 @@
       wake();
     }
 
-    function cover() {
+    function cover(): Box {
       const iw = lit.naturalWidth;
       const ih = lit.naturalHeight;
       const scale = Math.max(size.w / iw, size.h / ih);
@@ -135,15 +328,11 @@
     }
 
     function paint() {
-      if (!ctx || !mctx) {
+      if (!painter || !mctx) {
         root.style.setProperty('--x', spot.x + 'px');
         root.style.setProperty('--y', spot.y + 'px');
         return;
       }
-      ctx.setTransform(size.dpr, 0, 0, size.dpr, 0, 0);
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.globalAlpha = 1;
-      ctx.clearRect(0, 0, size.w, size.h);
       if (!lit.complete || !lit.naturalWidth) {
         return;
       }
@@ -151,11 +340,10 @@
       mctx.globalAlpha = 1;
       mctx.clearRect(0, 0, size.w, size.h);
       light(mctx);
-      ctx.imageSmoothingEnabled = true;
-      ctx.drawImage(mask, 0, 0, size.w, size.h);
-      ctx.globalCompositeOperation = 'source-in';
-      const box = cover();
-      ctx.drawImage(lit, box.x, box.y, box.w, box.h);
+      if (!painter.draw(mask, cover(), size)) {
+        fallback();
+        paint();
+      }
     }
 
     function tick(now: number) {
@@ -245,9 +433,9 @@
   $effect(() => reveal(root));
 </script>
 
-<section class="fl-hover-reveal" data-theme="dark" data-radius="220" bind:this={root}>
+<section class="fl-hover-reveal" data-theme="dark" data-radius="220" data-gain="2.2" data-softness="0.18" bind:this={root}>
   <img class="dark" src="https://www.feega.app/templates-assets/hover-reveal/dark-1670.webp" srcset="https://www.feega.app/templates-assets/hover-reveal/dark-960.webp 960w, https://www.feega.app/templates-assets/hover-reveal/dark-1670.webp 1670w" sizes="100vw" alt="A moonlit jungle with floating islands" />
-  <img class="lit" src="https://www.feega.app/templates-assets/hover-reveal/lit-1670.webp" srcset="https://www.feega.app/templates-assets/hover-reveal/lit-960.webp 960w, https://www.feega.app/templates-assets/hover-reveal/lit-1670.webp 1670w" sizes="100vw" alt="" aria-hidden="true" />
+  <img class="lit" src="https://www.feega.app/templates-assets/hover-reveal/lit-1670.webp" srcset="https://www.feega.app/templates-assets/hover-reveal/lit-960.webp 960w, https://www.feega.app/templates-assets/hover-reveal/lit-1670.webp 1670w" sizes="100vw" alt="" aria-hidden="true" crossorigin="anonymous" />
   <canvas aria-hidden="true"></canvas>
   <div class="overlay"><h2>Bring the night to life</h2></div>
 </section>
