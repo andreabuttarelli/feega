@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import sharp from 'sharp';
 import { jpegIfHeic } from './raster-image';
 
-const heicPath = join(dirname(fileURLToPath(import.meta.url)), 'fixtures/youtube-thumb.heic');
+const heicPath = join(dirname(fileURLToPath(import.meta.url)), 'fixtures/sample.heic');
 
 describe('jpegIfHeic', () => {
 	it('leaves PNG (including transparency) untouched', async () => {

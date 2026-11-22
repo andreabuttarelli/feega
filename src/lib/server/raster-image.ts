@@ -150,16 +150,3 @@ export async function readUploadImage(
 	if (!out.ok) return out;
 	return { ok: true, bytes: out.bytes, mime: out.mime, filename: out.filename };
 }
-
-/** Gemini / generator inline part from a picker file (HEIC becomes JPEG). */
-export async function fileToInlineImagePart(
-	file: File,
-	maxOutBytes = 6_000_000
-): Promise<{ inlineData: { mimeType: string; data: string } } | null> {
-	const out = await readUploadImage(file, {
-		maxOutBytes,
-		maxSourceBytes: RASTER_SOURCE_MAX_BYTES
-	});
-	if (!out.ok) return null;
-	return { inlineData: { mimeType: out.mime, data: out.bytes.toString('base64') } };
-}
