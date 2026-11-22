@@ -1,0 +1,32 @@
+{
+  "id": "hover-reveal",
+  "name": "Hover reveal",
+  "description": "A full-bleed dark scene where a soft spotlight follows the cursor or finger and reveals the lit scene, with a fading trail.",
+  "category": "section",
+  "tags": [
+    "image",
+    "hover",
+    "reveal",
+    "interactive"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    }
+  ],
+  "tier": "pro",
+  "preview": "https://www.feega.app/templates-shots/hover-reveal-light.webp"
+}
