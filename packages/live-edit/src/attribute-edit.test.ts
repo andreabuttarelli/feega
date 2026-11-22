@@ -15,6 +15,24 @@ describe('isEditableAttribute', () => {
 });
 
 describe('attributeWrite', () => {
+  it('writes a custom property into the inline style', async () => {
+    const files = { 'a.html': '<div class="x" style="color: red"></div>\n' };
+    const out = await attributeWrite(reading(files), AT, '--ascii-c1', 'tomato');
+    expect(out.ok && out.change.after).toBe('<div class="x" style="color: red; --ascii-c1: tomato"></div>\n');
+  });
+
+  it('writes a custom property as a quoted key in a jsx style', async () => {
+    const files = { 'a.tsx': 'const a = <div className="x" />;\n' };
+    const out = await attributeWrite(reading(files), { file: 'a.tsx', line: 1, col: 11 }, '--ascii-c1', 'gold');
+    expect(out.ok && out.change.after).toBe(`const a = <div className="x" style={{ '--ascii-c1': 'gold' }}/>;\n`);
+  });
+
+  it('keeps a quoted custom property when a jsx style changes again', async () => {
+    const files = { 'a.tsx': `const a = <div style={{ '--ascii-c1': 'gold' }} />;\n` };
+    const out = await attributeWrite(reading(files), { file: 'a.tsx', line: 1, col: 11 }, '--ascii-c2', 'teal');
+    expect(out.ok && out.change.after).toBe(`const a = <div style={{ '--ascii-c1': 'gold', '--ascii-c2': 'teal' }} />;\n`);
+  });
+
   it('changes a quoted data attribute', async () => {
     const files = { 'a.html': '<section data-speed="0.9" class="x">\n</section>\n' };
     const out = await attributeWrite(reading(files), AT, 'data-speed', '2');

@@ -34,6 +34,8 @@ const INHERITED_PROPERTIES = new Set([
 ]);
 
 const SOURCE_PATTERN = /^(.+):(\d+):(\d+)$/;
+const CUSTOM_PROPERTY = /^--/;
+const CSS_WIDE = new Set(['', 'initial', 'inherit', 'unset', 'revert', 'revert-layer']);
 
 export function parseSource(value) {
   const match = SOURCE_PATTERN.exec(value ?? '');
@@ -144,6 +146,7 @@ function inspectTagged(tagged, maxHtml) {
     parentWidth: tagged.parentElement?.getBoundingClientRect().width ?? 0,
     ancestors: ancestorsOf(tagged),
     attributes: [...tagged.attributes].filter((a) => !BOOKKEEPING_ATTRS.has(a.name)).map(({ name, value }) => ({ name, value })),
+    variables: colourVariables(tagged),
     ownText: [...tagged.childNodes].some((n) => n.nodeType === TEXT_NODE && n.textContent.trim()),
     elements: tagged.children.length,
     inlineText: inlineTextOnly(tagged),
@@ -514,6 +517,52 @@ function originOf(element, name, value) {
 function inheritedStyles(element, styles) {
   const found = [...INHERITED_PROPERTIES].map((name) => [name, originOf(element, name, styles[name])]);
   return Object.fromEntries(found.filter(([, origin]) => origin));
+}
+
+function matching(element, selector) {
+  try {
+    return element.matches(selector);
+  } catch {
+    return false;
+  }
+}
+
+function sheetRules(sheet) {
+  try {
+    return [...sheet.cssRules];
+  } catch {
+    return [];
+  }
+}
+
+function declaringRules(element, rules) {
+  return rules.flatMap((rule) => {
+    if (rule.cssRules && !rule.selectorText) {
+      return declaringRules(element, [...rule.cssRules]);
+    }
+
+    return rule.selectorText && matching(element, rule.selectorText) ? [rule.style] : [];
+  });
+}
+
+function declaredVariables(element) {
+  const sheets = [...element.ownerDocument.styleSheets].flatMap(sheetRules);
+  const styles = [...declaringRules(element, sheets), element.style].filter(Boolean);
+  const names = (style) => Array.from({ length: style.length }, (_, i) => style[i]);
+  return [...new Set(styles.flatMap((style) => names(style).filter((name) => CUSTOM_PROPERTY.test(name))))];
+}
+
+function isColour(doc, value) {
+  const probe = doc.createElement('i').style;
+  probe.color = value;
+  return !CSS_WIDE.has(value) && probe.color !== '';
+}
+
+function colourVariables(element) {
+  const computed = element.ownerDocument.defaultView.getComputedStyle(element);
+  return declaredVariables(element)
+    .map((name) => ({ name, value: computed.getPropertyValue(name).trim() }))
+    .filter((v) => isColour(element.ownerDocument, v.value));
 }
 
 function designStyles(element) {

@@ -19,6 +19,8 @@ const proItems = loadItems(PRO_DIR);
 const items = [...freeItems, ...proItems];
 const tokens = readFileSync(TOKENS_FILE, 'utf8');
 const COLOR_LITERAL = /#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\(/;
+const PALETTE_TABLES: Readonly<Record<string, RegExp>> = { 'ascii-pride': /--ascii-c\d+:#[0-9a-fA-F]{6}\b/g };
+const withoutPalette = (id: string, source: string) => (id in PALETTE_TABLES ? source.replace(PALETTE_TABLES[id], '') : source);
 const NAMED_COLOR =
 	/(?:^|[;{\s])(?:color|background(?:-color)?|border(?:-[a-z]+)?-color|border|outline|fill|stroke)\s*:\s*[^;}]*\b(?:white|black|red|green|blue|gray|grey|orange|purple|yellow)\b/;
 const TOKEN_REF = /var\(\s*(--feega-[a-z0-9-]+)/g;
@@ -101,6 +103,12 @@ describe('library items', () => {
 		expect(() => parseManifest({ ...VALID_MANIFEST, fonts: [{ family: SANS, weights: [] }] })).toThrow();
 	});
 
+	it('allows colour literals only in a declared palette table', () => {
+		expect(COLOR_LITERAL.test(withoutPalette('ascii-pride', '--ascii-c1:#E40303;'))).toBe(false);
+		expect(COLOR_LITERAL.test(withoutPalette('ascii-pride', '--ascii-c1:#E40303;color:#fff'))).toBe(true);
+		expect(COLOR_LITERAL.test(withoutPalette('card', '--ascii-c1:#E40303;'))).toBe(true);
+	});
+
 	it('covers every category', () => {
 		for (const category of CATEGORIES) {
 			expect(items.some((item) => item.category === category)).toBe(true);
@@ -127,7 +135,7 @@ describe('library items', () => {
 			it('uses only tokens for colour', () => {
 				for (const framework of item.frameworks) {
 					for (const file of itemFiles(item, framework)) {
-						const source = readFileSync(file, 'utf8');
+						const source = withoutPalette(item.id, readFileSync(file, 'utf8'));
 						expect(COLOR_LITERAL.test(source), file).toBe(false);
 						expect(NAMED_COLOR.test(source), file).toBe(false);
 					}

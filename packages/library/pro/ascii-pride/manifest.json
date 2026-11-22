@@ -1,0 +1,38 @@
+{
+  "id": "ascii-pride",
+  "name": "ASCII pride gradient",
+  "description": "An animated ASCII field flowing in pride flag colours: sixteen flag presets or your own palette, with a soft fade.",
+  "category": "component",
+  "tags": [
+    "ascii",
+    "gradient",
+    "pride",
+    "animation"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    },
+    {
+      "family": "Fragment Mono",
+      "weights": [
+        400
+      ]
+    }
+  ],
+  "tier": "pro",
+  "preview": "https://www.feega.app/templates-shots/ascii-pride-light.webp"
+}
