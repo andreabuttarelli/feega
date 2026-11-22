@@ -1,5 +1,5 @@
 import { CalloutTone, type Extras } from '../alternative';
-import { CLAUDE_HERO, CLAUDE_DIFF, CODEX_HERO, CURSOR_HERO, EDITOR_PROPERTIES, PROPERTIES_CROP } from './shots';
+import { CHANGES_SHOT, EDITOR_PROPERTIES, OVERVIEW_SHOT, SELECTED_SHOT, PROPERTIES_CROP } from './shots';
 import {
   CHANGES_DOCS, CLAUDE_MEMORY, CLAUDE_SKILLS, CODEX_CLI, CODEX_REPO, CURSOR_AGENT, CURSOR_DESIGN, FEEGA_AGENTS, FRAMER_AI, FRAMER_DEVELOPERS, FRAMER_PRICING, FRAMER_PUBLISHING, PROPERTIES_DOCS, QUICK_START_DOCS, cite
 } from './sources';
@@ -16,7 +16,7 @@ export const FRAMER_CLAUDE_CODE: Extras = {
     'The pages we read do not describe code export or git sync for a Framer site.',
     'Keep Framer when designers publish the site without a developer.'
   ],
-  hero: CLAUDE_HERO,
+  hero: EDITOR_PROPERTIES,
   tables: [
     {
       heading: 'Framer, Claude Code and Feega side by side',
@@ -36,7 +36,7 @@ export const FRAMER_CLAUDE_CODE: Extras = {
     {
       heading: 'Claude Code can drive Framer, and that is a different job',
       html: `<p>${cite(FRAMER_AI)} says Framer MCP connects tools like Claude to your projects so they can create pages, edit content and manage CMS collections, and it describes a local CLI setup as an alternative. ${cite(FRAMER_DEVELOPERS)} lists Claude Code, Codex and Cursor as external agents that update a Framer project.</p><p>In both cases the output lands in Framer. If your landing page is a Svelte, Next.js or Vue file in the same repo as the app, that route adds a second home for it. The better question is whether the page should live in the repo at all. If yes, <a href="/alternatives/framer">the Framer overview</a> explains what changes.</p>`,
-      image: CLAUDE_DIFF,
+      image: CHANGES_SHOT,
       callout: { tone: CalloutTone.Tip, title: 'Tip', text: 'Decide who edits the page next quarter. If the answer is a developer with Claude Code, keep it in the repo.' }
     },
     {
@@ -61,7 +61,7 @@ export const FRAMER_CODEX: Extras = {
     'Feega gives a terminal agent what it lacks: the running page and the exact source line.',
     'Keep Framer for designer-owned sites. Move only pages that already live in code.'
   ],
-  hero: CODEX_HERO,
+  hero: OVERVIEW_SHOT,
   tables: [
     {
       heading: 'Framer, Codex and Feega side by side',
@@ -106,7 +106,7 @@ export const FRAMER_CURSOR: Extras = {
     'Cursor Design Mode sends your note to the agent. Feega writes the value you set.',
     'Keep Framer for designer-owned sites. Pages shared with your app belong in the repo.'
   ],
-  hero: CURSOR_HERO,
+  hero: SELECTED_SHOT,
   tables: [
     {
       heading: 'Framer, Cursor and Feega side by side',

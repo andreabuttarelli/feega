@@ -1,5 +1,5 @@
 import { CalloutTone, type Extras } from '../alternative';
-import { CLAUDE_HERO, EDITOR_PROPERTIES, PROPERTIES_CROP } from './shots';
+import { CHANGES_SHOT, EDITOR_PROPERTIES, OVERVIEW_SHOT, PROPERTIES_CROP } from './shots';
 import {
   BLOG_POST, CHANGES_DOCS, CLAUDE_SKILLS, CODEX_CLI, CURSOR_DESIGN, FEEGA_AGENTS, FRAMER_AI, FRAMER_DEVELOPERS, FRAMER_PRICING, FRAMER_PUBLISHING, LOVABLE_GITHUB, LOVABLE_PLANS, PROPERTIES_DOCS, QUICK_START_DOCS, cite
 } from './sources';
@@ -40,7 +40,7 @@ export const LOVABLE_HUB: Extras = {
     {
       heading: 'Pairing your agent with Feega on a repo',
       html: `<p>Your agent writes structure and Feega sets values. In Claude Code, ${cite(CLAUDE_SKILLS)} explains that a project skill lives in <code>.claude/skills</code> and can be committed. In Codex, ${cite(CODEX_CLI)} describes a local terminal tool. In Cursor, ${cite(CURSOR_DESIGN)} sends your annotation to the agent, while Feega sets the value yourself.</p><p>You open the running page, click an element and change it in <a href="${PROPERTIES_DOCS}" rel="noopener">Properties</a>, then read the diff in <a href="${CHANGES_DOCS}" rel="noopener">Changes</a>. The ${cite(FEEGA_AGENTS)} list which agents read the editor selection. The idea behind it is in <a href="${BLOG_POST}" rel="noopener">Design in your codebase</a>.</p>`,
-      image: CLAUDE_HERO,
+      image: OVERVIEW_SHOT,
       cta: DOWNLOAD_CTA
     },
     {
@@ -86,7 +86,7 @@ export const FRAMER_HUB: Extras = {
     {
       heading: 'Hosting, domains and the proxy option',
       html: `<p>${cite(FRAMER_PUBLISHING)} says you publish to a Framer subdomain or a custom domain, and that you can self-host through a reverse proxy to control headers, authentication and delivery, with Vercel, Netlify, NGINX, Cloudflare and AWS named. The page does not mention exporting your site or files.</p><p>${cite(FRAMER_PRICING)} lists 1 GB of bandwidth on Free, 50 GB on Basic and 100 GB on Pro, with a custom domain from Basic. In a repo, hosting is yours. The ${cite(FEEGA_AGENTS)} show how your agent and Feega share the files, and the <a href="/pricing">Feega pricing page</a> shows what Feega costs.</p>`,
-      image: CLAUDE_HERO,
+      image: CHANGES_SHOT,
       cta: DOWNLOAD_CTA
     },
     {

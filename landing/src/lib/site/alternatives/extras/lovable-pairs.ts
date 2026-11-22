@@ -1,5 +1,5 @@
 import { CalloutTone, type Extras } from '../alternative';
-import { CLAUDE_DIFF, CLAUDE_HERO, CODEX_HERO, CURSOR_HERO, EDITOR_PROPERTIES } from './shots';
+import { CHANGES_SHOT, EDITOR_PROPERTIES, OVERVIEW_SHOT, SELECTED_SHOT } from './shots';
 import {
   BLOG_POST, CHANGES_DOCS, CLAUDE_MEMORY, CLAUDE_SKILLS, CODEX_CLI, CODEX_REPO, CURSOR_AGENT, CURSOR_DESIGN, FEEGA_AGENTS, LOVABLE_GITHUB, LOVABLE_PLANS, PROPERTIES_DOCS, QUICK_START_DOCS, cite
 } from './sources';
@@ -16,7 +16,7 @@ export const LOVABLE_CLAUDE_CODE: Extras = {
     'Commits stay yours: Lovable’s are authored by lovable-dev[bot], Feega never commits.',
     'Keep Lovable when there is no code yet and you want a hosted app from a prompt.'
   ],
-  hero: CLAUDE_HERO,
+  hero: EDITOR_PROPERTIES,
   tables: [
     {
       heading: 'Lovable, Claude Code and Feega side by side',
@@ -36,7 +36,7 @@ export const LOVABLE_CLAUDE_CODE: Extras = {
     {
       heading: 'What Lovable keeps, and what Claude Code keeps',
       html: `<p>Per ${cite(LOVABLE_GITHUB)}, a Lovable project links to one repository, the sync covers one branch at a time, and you cannot switch branches while Lovable is editing. Claude Code has none of those limits because it works on a folder: any branch, any worktree, any commit you make yourself.</p><p>That difference decides where a visual tweak belongs. If the page already sits in your repo and Claude Code wrote it, opening it in Lovable first means a ZIP upload and a second copy. Opening it in Feega means clicking the element in the running page. The <a href="/alternatives/lovable">Lovable overview</a> goes through the same trade-off without an agent in the picture.</p>`,
-      image: CLAUDE_DIFF,
+      image: CHANGES_SHOT,
       callout: { tone: CalloutTone.Tip, title: 'Tip', text: 'Ask Claude Code to keep class names literal on elements you will tweak. Feega can then trace each click to one line.' }
     },
     {
@@ -61,7 +61,7 @@ export const LOVABLE_CODEX: Extras = {
     'Lovable’s sync cannot link an existing repository, so a Codex project would need a ZIP upload first.',
     'Use Codex for routes, forms and refactors, and Feega for spacing, color and type.'
   ],
-  hero: CODEX_HERO,
+  hero: OVERVIEW_SHOT,
   tables: [
     {
       heading: 'Lovable, Codex and Feega side by side',
@@ -106,7 +106,7 @@ export const LOVABLE_CURSOR: Extras = {
     'Lovable would add a hosted project and a bot-authored sync to a repo you already work in.',
     'Keep Lovable for a first version from a prompt, and Cursor plus Feega for the app you ship.'
   ],
-  hero: CURSOR_HERO,
+  hero: SELECTED_SHOT,
   tables: [
     {
       heading: 'Lovable, Cursor and Feega side by side',
