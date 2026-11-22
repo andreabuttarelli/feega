@@ -1,10 +1,10 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createServer, type Plugin } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
-import { feegaSource } from './vite.ts';
+import { Bridge, feegaSource } from './vite.ts';
 
 const FIXTURES_DIR = fileURLToPath(new URL('../fixtures/', import.meta.url));
 const VITE_CLIENT = '/app/node_modules/vite/dist/client/client.mjs';
@@ -26,6 +26,10 @@ describe('feegaSource', () => {
     expect(transformOf(feegaSource())('export const hot = 1;', VITE_CLIENT, { ssr: true })).toBeNull();
   });
 
+  it('leaves the Vite client alone when the page gets the bridge from the proxy', () => {
+    expect(transformOf(feegaSource({ bridge: Bridge.Proxy }))('export const hot = 1;', VITE_CLIENT)).toBeNull();
+  });
+
   it('leaves other dependencies untouched', () => {
     expect(transformOf(feegaSource())('export const a = 1;', '/app/node_modules/react/index.js')).toBeNull();
   });
@@ -38,6 +42,35 @@ describe('feegaSource', () => {
     try {
       const out = await server.transformRequest('/App.svelte');
       expect(out?.code).toContain('data-feega-src="App.svelte:2:1"');
+    } finally {
+      await server.close();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('names files from the project root when the framework serves from a subfolder', async () => {
+    const root = mkdtempSync(join(FIXTURES_DIR, '.src-'));
+    mkdirSync(join(root, 'app'));
+    writeFileSync(join(root, 'app', 'App.svelte'), '<button id="buy">1</button>\n');
+    const server = await createServer({ root: join(root, 'app'), configFile: false, logLevel: 'silent', server: { middlewareMode: true, hmr: false }, optimizeDeps: { noDiscovery: true }, plugins: [svelte(), feegaSource({ root })] });
+
+    try {
+      const out = await server.transformRequest('/App.svelte');
+      expect(out?.code).toContain(`data-feega-src="app/App.svelte:1:1"`);
+    } finally {
+      await server.close();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('tags the elements of index.html before Vite serves it', async () => {
+    const root = mkdtempSync(join(FIXTURES_DIR, '.html-'));
+    writeFileSync(join(root, 'index.html'), '<!doctype html>\n<html><body>\n<h1>Hi</h1>\n</body></html>\n');
+    const server = await createServer({ root, configFile: false, logLevel: 'silent', server: { middlewareMode: true, hmr: false }, optimizeDeps: { noDiscovery: true }, plugins: [feegaSource()] });
+
+    try {
+      const out = await server.transformIndexHtml('/index.html', '<!doctype html>\n<html><body>\n<h1>Hi</h1>\n</body></html>\n', '/index.html');
+      expect(out).toContain('<h1 data-feega-src="index.html:3:1">Hi</h1>');
     } finally {
       await server.close();
       rmSync(root, { recursive: true, force: true });

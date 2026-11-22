@@ -41,7 +41,12 @@ export default withFeegaSource(nextConfig);
 | Framework | Files | How |
 |---|---|---|
 | Vite + React | `.jsx`, `.tsx` | Vite plugin, dev server only |
-| Vite + Svelte 5 | `.svelte` | Vite plugin, dev server only |
+| Vite + Svelte 5, SvelteKit | `.svelte` | Vite plugin, dev server only |
+| Vite + Vue 3 | `.vue` | Vite plugin, dev server only |
+| Vite, plain pages | `index.html` and other `.html` pages | Vite plugin, dev server only |
+| React Router (framework mode) | `.jsx`, `.tsx` | Vite plugin, dev server only |
+| Astro | `.astro` | added by Feega when it starts the dev server |
+| Nuxt | `.vue` | added by Feega when it starts the dev server |
 | Next.js 15 (webpack) | `.jsx`, `.tsx`, server and client components | webpack loader, `next dev` only |
 
 Only host elements (`div`, `button`, ...) are tagged. Components, fragments and member tags like `motion.div` are not: their elements carry the line inside the component.
@@ -64,5 +69,6 @@ With Vite the bridge loads with Vite's own client module, so it also runs in fra
 ## Limits
 
 - **Next.js with Turbopack** (`next dev --turbopack`): not tagged yet; use the default webpack dev server.
-- **Vue SFC** templates and **MDX**: not tagged yet.
+- **MDX**: not tagged yet.
+- **Astro** and **Nuxt**: tagged only when Feega starts the dev server. Attaching to a dev server you already started does not tag them.
 - Elements created outside JSX or templates (`document.createElement`, `innerHTML`) climb to the nearest tagged ancestor.
