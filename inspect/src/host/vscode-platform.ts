@@ -5,6 +5,7 @@ import { SettingKey, settingsWith } from '../settings';
 import { Column, openTarget, revealColumn } from './open-source';
 import type { Account, AccountStore } from './account';
 import { IMAGE_EXTENSIONS } from './image-copy';
+import { pluginsRoot } from '@feega/plugin-store/registry';
 import { deviceOnboardingStore, globalStateOnboardingStore } from './onboarding';
 import type { Platform } from './platform';
 import { Device, editorOf, globalStateInstallStore, installIdOf, type UsageHost } from './usage';
@@ -14,6 +15,10 @@ const BEFORE_SCHEME = 'feega-before';
 const COLUMNS: Record<Column, vscode.ViewColumn> = { [Column.First]: vscode.ViewColumn.One, [Column.Beside]: vscode.ViewColumn.Beside };
 
 const SECRET_KEY = 'feegaInspect.account';
+
+export const DEV_PLUGINS_SETTING = 'feegaInspect.plugins.dev';
+
+export const approveInModal = async (question: string, yes: string) => (await vscode.window.showWarningMessage(question, { modal: true }, yes)) === yes;
 
 const config = () => vscode.workspace.getConfiguration();
 
@@ -103,7 +108,7 @@ export function vsCodePlatform(host: VsCodeHost, panel: PanelLike, befores: Map<
     copyText: async (text) => vscode.env.clipboard.writeText(text),
     revealSource,
     showDiff,
-    confirm: async (question, yes) => (await vscode.window.showWarningMessage(question, { modal: true }, yes)) === yes,
+    confirm: approveInModal,
     chooseApp: async (apps, workspace) => {
       const items = apps.map((app) => ({ label: app || basename(workspace), description: app || 'workspace root', app }));
       return (await vscode.window.showQuickPick(items, { placeHolder: 'Which app should Feega open?' }))?.app ?? null;
@@ -116,7 +121,8 @@ export function vsCodePlatform(host: VsCodeHost, panel: PanelLike, befores: Map<
     pickImage,
     account: secretAccountStore(context.secrets),
     onboarding: deviceOnboardingStore(globalStateOnboardingStore(context.globalState)),
-    usage: vsCodeUsage(context)
+    usage: vsCodeUsage(context),
+    plugins: { root: pluginsRoot(), dev: () => config().get<string[]>(DEV_PLUGINS_SETTING, []), approve: approveInModal }
   };
 }
 

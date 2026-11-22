@@ -96,6 +96,9 @@ Open in editor uses `code -g` when VS Code is on the PATH, else `$VISUAL`/`$EDIT
 `file:line:col`. Settings live in `.feega/settings.json` in the app folder. Ctrl+C stops the
 editor and the dev server.
 
+`npx feega plugin add|remove|list|dev` manages third-party plugins; see
+[Write a plugin](/integrations/write-a-plugin/).
+
 ## Install the dev build
 
 ```bash

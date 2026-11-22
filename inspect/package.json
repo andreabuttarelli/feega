@@ -62,6 +62,11 @@
         "command": "feegaInspect.openFromUrl",
         "title": "Open from URL…",
         "category": "Feega"
+      },
+      {
+        "command": "feegaInspect.installPlugin",
+        "title": "Install plugin…",
+        "category": "Feega"
       }
     ],
     "configuration": {
@@ -113,6 +118,14 @@
           "type": "boolean",
           "default": true,
           "description": "Reveal the source of the selected element in a text editor beside Feega, with its line selected, without taking focus. Coding agents that read the editor selection then see it."
+        },
+        "feegaInspect.plugins.dev": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Folders of plugins you are developing. Each holds a feega-plugin.json and its built entry file. Feega loads them marked dev and reloads them when their files change."
         }
       }
     },
