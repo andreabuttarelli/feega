@@ -38,12 +38,22 @@ describe('visit', () => {
 
     expect(result.kind).toBe(VisitKind.Enter);
     const url = new URL((result as { url: string }).url);
-    expect(url.origin).toBe(`https://${SID}.s.feega.app`);
+    expect(url.origin).toBe(`http://${SID}.localhost:8787`);
     expect(url.pathname).toBe('/__feega/auth');
     expect(url.searchParams.get('next')).toBe('/dashboard');
 
     const verdict = await verifyToken(url.searchParams.get('token')!, SECRET, NOW.getTime());
     expect(verdict).toMatchObject({ check: TokenCheck.Valid, claims: { sid: SID, role: 'viewer', sub: 'ada', org: 'org-1' } });
+  });
+
+  it('builds the session origin from SESSION_ORIGIN_TEMPLATE', async () => {
+    env.SESSION_ORIGIN_TEMPLATE = 'https://{sid}.sessions.test';
+    const db = fakeDb({ share_sessions: [session()] });
+
+    const result = await run(db, 'ada');
+
+    expect(new URL((result as { url: string }).url).origin).toBe(`https://${SID}.sessions.test`);
+    delete env.SESSION_ORIGIN_TEMPLATE;
   });
 
   it('records the visitor as a member with the session role', async () => {

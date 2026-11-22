@@ -1,6 +1,6 @@
 import { env } from '$env/dynamic/private';
 
-const DEFAULT_ORIGIN_TEMPLATE = 'https://{sid}.s.feega.app';
+const DEFAULT_ORIGIN_TEMPLATE = 'http://{sid}.localhost:8787';
 const AUTH_PATH = '/__feega/auth';
 const SID_PLACEHOLDER = '{sid}';
 
