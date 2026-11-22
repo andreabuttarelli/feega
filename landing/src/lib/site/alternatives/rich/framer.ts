@@ -1,5 +1,5 @@
 import { VisualKind, table, type Rich } from '../alternative';
-import { EDITOR_VISUAL, OWN_STEPS, TAILWIND_DIFF } from './shared';
+import { EDITOR_VISUAL, OWN_STEPS, RESPONSIVE_VISUAL, TAILWIND_DIFF } from './shared';
 
 export const FRAMER: Rich = {
   verdict:
@@ -45,8 +45,8 @@ export const FRAMER: Rich = {
         'Framer’s plans cap pages, CMS collections and bandwidth. Basic includes 30 pages and 50 GB of bandwidth, Pro 150 pages and 100 GB, with paid steps above that, as listed on its pricing page.',
         'A repo has no such caps, since you host it yourself. Whether that is a relief or a chore depends on whether you already run a deploy pipeline.'
       ],
-      visual: EDITOR_VISUAL,
-      caption: 'Feega edits the running app next to your code.'
+      visual: RESPONSIVE_VISUAL,
+      caption: 'The preview at a tablet width. Feega edits the running app next to your code.'
     }
   ],
   cost: {

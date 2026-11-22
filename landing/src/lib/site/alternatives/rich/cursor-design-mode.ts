@@ -38,7 +38,7 @@ export const CURSOR_DESIGN_MODE: Rich = {
         'It is built for people who think in controls. If that is you, or if the person making the change is a designer who does not want to write prompts, this is the shape that fits.'
       ],
       visual: EDITOR_VISUAL,
-      caption: 'The Feega editor, running inside VS Code.'
+      caption: 'The Feega editor: layers, the live page and the Properties bar.'
     },
     {
       heading: 'The same edit, written the same way',

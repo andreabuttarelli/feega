@@ -1,10 +1,12 @@
+import type { EditorShotId } from '../editor-shots';
+
 export type Figure = { readonly src: string; readonly alt: string; readonly width: number; readonly height: number };
 
 export type Question = { readonly q: string; readonly a: string };
 
 export type Source = { readonly label: string; readonly href: string };
 
-export type Section = { readonly heading: string; readonly html: string; readonly figure?: Figure };
+export type Section = { readonly heading: string; readonly html: string; readonly figure?: Figure; readonly editor?: EditorShotId };
 
 
 export type Topic = {

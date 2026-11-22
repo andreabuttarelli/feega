@@ -1,5 +1,5 @@
 <script lang="ts">
-  import EditorMock from '../EditorMock.svelte';
+  import EditorPicture from '../EditorPicture.svelte';
   import { DiffSign, VisualKind, type Visual } from './alternative';
 
   let { visual }: { visual: Visual } = $props();
@@ -12,7 +12,7 @@
 </script>
 
 {#if visual.kind === VisualKind.Editor}
-  <div class="vis editor"><EditorMock /></div>
+  <div class="vis editor"><EditorPicture id={visual.shot} /></div>
 {:else if visual.kind === VisualKind.Diff}
   <div class="vis diff" role="img" aria-label="A source diff in {visual.file}">
     <div class="file">{visual.file}</div>

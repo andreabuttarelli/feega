@@ -1,3 +1,5 @@
+import type { EditorShotId } from '../editor-shots';
+
 export enum ArticleKind {
   Roundup = 'roundup',
   UseCase = 'use-case',
@@ -26,7 +28,7 @@ export type DiffLine = { readonly sign: DiffSign; readonly text: string };
 export type FlowLane = { readonly title: string; readonly steps: readonly string[] };
 
 export type Visual =
-  | { readonly kind: VisualKind.Editor }
+  | { readonly kind: VisualKind.Editor; readonly shot: EditorShotId }
   | { readonly kind: VisualKind.Diff; readonly file: string; readonly lines: readonly DiffLine[] }
   | { readonly kind: VisualKind.Flow; readonly them: FlowLane; readonly us: FlowLane };
 

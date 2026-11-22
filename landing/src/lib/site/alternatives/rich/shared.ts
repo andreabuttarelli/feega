@@ -1,6 +1,13 @@
+import { EditorShotId } from '../../editor-shots';
 import { DiffSign, VisualKind, diff, type Visual } from '../alternative';
 
-export const EDITOR_VISUAL: Visual = { kind: VisualKind.Editor };
+const editor = (shot: EditorShotId): Visual => ({ kind: VisualKind.Editor, shot });
+
+export const EDITOR_VISUAL = editor(EditorShotId.Overview);
+export const PROPERTIES_VISUAL = editor(EditorShotId.Selected);
+export const CHANGES_VISUAL = editor(EditorShotId.Changes);
+export const LAYERS_MENU_VISUAL = editor(EditorShotId.LayersMenu);
+export const RESPONSIVE_VISUAL = editor(EditorShotId.Responsive);
 
 export const BUTTON_DIFF: Visual = {
   kind: VisualKind.Diff,
