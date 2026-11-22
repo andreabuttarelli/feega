@@ -2,24 +2,25 @@ import { AsciiField } from "../AsciiField";
 import { useCurrentFrame } from "remotion";
 import { lift, tween } from "../../ease";
 import { FeegaMark } from "../../components/brandIcons";
-import { Heading, Pixel, Runner, hop, type Sprite } from "../pixel";
+import { float } from "../motion";
+import { Heading, Pixel, Tumble, type Sprite } from "../pixel";
 import { Ending, Place, Section } from "../Section";
 import { DISPLAY, INK, MONO, ORANGE, PAPER, Tone } from "../style";
 
-export const END_FRAMES = 135;
+export const END_FRAMES = 120;
 export const END_TONE = Tone.Ink;
 
 const RUN_IN = 18;
 export const LOGO_AT = 4;
 
 const AROUND: { x: number; y: number; s: Sprite }[] = [
-  { x: 260, y: 180, s: "blob" },
-  { x: 1560, y: 160, s: "ghost" },
+  { x: 260, y: 180, s: "palette" },
+  { x: 1560, y: 160, s: "code" },
   { x: 180, y: 520, s: "brush" },
   { x: 1680, y: 520, s: "layers" },
   { x: 300, y: 830, s: "frame" },
-  { x: 1520, y: 840, s: "blob" },
-  { x: 900, y: 900, s: "pointer" },
+  { x: 1520, y: 840, s: "terminal" },
+  { x: 900, y: 900, s: "cursor" },
   { x: 640, y: 120, s: "star" },
   { x: 1200, y: 110, s: "plug" },
 ];
@@ -38,7 +39,7 @@ export const EndCard = () => {
         const offstage = a.x < 960 ? -a.x - 200 : 2120 - a.x;
 
         return (
-          <Place key={i} x={a.x} y={a.y} style={{ transform: `translate(${(1 - p) * offstage}px, ${hop(frame, i * 3)}px) rotate(${(1 - p) * (a.x < 960 ? 14 : -14)}deg)` }}>
+          <Place key={i} x={a.x} y={a.y} style={{ transform: `translate(${(1 - p) * offstage}px, ${float(frame, i * 7, 10)}px) rotate(${(1 - p) * (a.x < 960 ? 14 : -14) + float(frame, i * 11, 6)}deg)` }}>
             <Pixel sprite={a.s} size={11} />
           </Place>
         );
@@ -54,8 +55,8 @@ export const EndCard = () => {
           feega.app
         </div>
       </Place>
-      <Runner sprite="ghost" size={9} y={980} from={70} frames={60} heading={Heading.Right} />
-      <Runner sprite="blob" size={9} y={980} from={78} frames={60} heading={Heading.Right} />
+      <Tumble sprite="code" size={9} y={980} from={60} frames={60} heading={Heading.Right} />
+      <Tumble sprite="palette" size={9} y={980} from={68} frames={60} heading={Heading.Right} />
     </Section>
   );
 };

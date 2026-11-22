@@ -88,7 +88,7 @@ export const AsciiField = ({ fade, strength = 1 }: { fade: string; strength?: nu
         }
 
         ctx.fillStyle = tint(1 - e, phase);
-        ctx.globalAlpha = (0.25 + d * 0.45) * strength;
+        ctx.globalAlpha = Math.min(1, (0.3 + d * 0.55) * strength);
         ctx.fillText(glyph, c * CELL + CELL / 2, row * CELL + CELL / 2);
       }
     }
@@ -97,7 +97,7 @@ export const AsciiField = ({ fade, strength = 1 }: { fade: string; strength?: nu
   return (
     <div style={{ position: "absolute", inset: 0 }}>
       <canvas ref={canvas} width={WIDTH} height={HEIGHT} style={{ position: "absolute", inset: 0 }} />
-      <div style={{ position: "absolute", inset: 0, background: `radial-gradient(ellipse 46% 40% at 50% 46%, ${fade} 0%, ${fade} 45%, transparent 100%)` }} />
+      <div style={{ position: "absolute", inset: 0, background: `radial-gradient(ellipse 40% 32% at 50% 44%, ${fade} 0%, ${fade} 40%, transparent 100%)` }} />
     </div>
   );
 };

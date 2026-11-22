@@ -3,18 +3,20 @@ import { mix, tween } from "../../ease";
 import { Align, Headline } from "../Headline";
 import { float } from "../motion";
 import { Scatter, hop, specks } from "../pixel";
-import { Pointer, pointerAt } from "../Pointer";
+import { Pointer, pointerAt, type Click } from "../Pointer";
+import { EditorFrame } from "../editor/EditorFrame";
+import { EDITOR_REST, FeegaEditor, pressAmount } from "../editor/FeegaEditor";
+import { MESH_BOX } from "../editor/layout";
+import { EDITOR_AT } from "./Select";
 import { Place, Section } from "../Section";
-import { BLUE, ORANGE, PAPER, Tone } from "../style";
+import { BLUE, ORANGE, Tone } from "../style";
 
-export const PLUGINS_FRAMES = 105;
-export const PLUGINS_TONE = Tone.Paper;
+export const PLUGINS_FRAMES = 95;
+export const PLUGINS_TONE = Tone.White;
 
 const ORBIT = 26;
 export const DRAG_FROM = 24;
 
-const MESH_W = 620;
-const MESH_H = 420;
 const CUBE = 170;
 const SPECKS = specks(6, 18, [ORANGE, BLUE]);
 
@@ -25,7 +27,14 @@ const POINTS = [
   { x: 470, y: 320, c: "#c026d3" },
 ];
 
-const DRAG_TO = { x: 330, y: 250 };
+const DRAG_TO = { x: 330, y: 230 };
+const HANDLE = { x: MESH_BOX.x + POINTS[0].x - 10, y: MESH_BOX.y + POINTS[0].y - 10, w: 20, h: 20 };
+const PATH = [
+  { at: 6, x: 700, y: 660 },
+  { at: DRAG_FROM - 4, x: MESH_BOX.x + POINTS[0].x, y: MESH_BOX.y + POINTS[0].y },
+];
+
+export const PLUGINS_CLICKS: Click[] = [{ label: "grab mesh point", at: DRAG_FROM, path: PATH, rect: HANDLE }];
 
 const FACES = [
   { t: "", c: ORANGE },
@@ -51,28 +60,21 @@ export const Plugins = () => {
   const enter = tween(frame, 4, 20);
   const drag = tween(frame, DRAG_FROM, 34);
   const points = POINTS.map((p, i) => (i === 0 ? { ...p, x: mix(p.x, DRAG_TO.x, drag), y: mix(p.y, DRAG_TO.y, drag) } : { ...p, x: p.x + float(frame, i * 15, ORBIT), y: p.y + float(frame, i * 15 + 11, ORBIT) }));
-  const pointer = pointerAt(frame, [
-    { at: 6, x: 560, y: 500 },
-    { at: DRAG_FROM, x: POINTS[0].x, y: POINTS[0].y },
-  ]);
-  const held = frame >= DRAG_FROM ? points[0] : pointer;
-  const background = points.map((p) => `radial-gradient(circle at ${p.x}px ${p.y}px, ${p.c} 0, transparent 62%)`).join(", ");
+  const pointer = pointerAt(frame, PATH);
+  const held = frame >= DRAG_FROM ? { x: MESH_BOX.x + points[0].x, y: MESH_BOX.y + points[0].y } : pointer;
+  const zoom = 1 + 0.2 * tween(frame, 12, 18) - 0.2 * tween(frame, 70, 16);
 
   return (
     <Section tone={PLUGINS_TONE} eyebrow="05 · plugins">
       <Scatter specks={SPECKS} />
       <Place x={100} y={380}>
-        <Headline lines={["plugins, if you", "want more."]} boxed="more" tone={Tone.Paper} size={116} align={Align.Left} />
+        <Headline lines={["plugins, if you", "want more."]} boxed="more" tone={PLUGINS_TONE} size={116} align={Align.Left} />
       </Place>
-      <Place x={1060} y={250} style={{ transform: `translateX(${(1 - enter) * 1000}px) rotate(${(1 - enter) * 8}deg) translateY(${float(frame, 0, 8)}px)` }}>
-        <div style={{ width: MESH_W, height: MESH_H, borderRadius: 18, background: `${background}, ${PAPER}`, position: "relative", boxShadow: "0 30px 80px rgba(0,0,0,.18)" }}>
-          {points.map((p, i) => (
-            <div key={i} style={{ position: "absolute", left: p.x - 11, top: p.y - 11, width: 22, height: 22, borderRadius: 11, background: "#fff", border: `4px solid ${i === 0 && frame >= DRAG_FROM ? ORANGE : "#0b0b0a"}` }} />
-          ))}
-          <Pointer x={held.x + 4} y={held.y + 4} pressed={frame >= DRAG_FROM && frame < DRAG_FROM + 36} />
-        </div>
-      </Place>
-      <Place x={1520} y={720} style={{ transform: `translateY(${(1 - tween(frame, 16, 18)) * 600}px)` }}>
+      <EditorFrame x={EDITOR_AT.x} y={EDITOR_AT.y} scale={EDITOR_AT.scale} enter={enter} zoom={zoom} focus={{ x: MESH_BOX.x + DRAG_TO.x, y: MESH_BOX.y + DRAG_TO.y }}>
+        <FeegaEditor state={{ ...EDITOR_REST, selected: 1, mesh: points, presses: [{ rect: HANDLE, amount: pressAmount(frame, DRAG_FROM) }] }} />
+        <Pointer x={held.x} y={held.y} pressed={frame >= DRAG_FROM && frame < DRAG_FROM + 36} scale={EDITOR_AT.scale * zoom} />
+      </EditorFrame>
+      <Place x={1690} y={840} style={{ transform: `translateY(${(1 - tween(frame, 16, 18)) * 600}px)` }}>
         <div style={{ transform: `translateY(${hop(frame, 0) * 1.5}px)` }}>
           <Cube angle={frame * 4} />
         </div>

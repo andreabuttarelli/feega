@@ -1,180 +1,297 @@
 import type { ReactNode } from "react";
-import { siClaude, siCursor, siGooglegemini } from "simple-icons";
+import { siClaude, siCursor } from "simple-icons";
 import { useCurrentFrame } from "remotion";
 import { Mark } from "../../components/brandIcons";
 import { Sound, type Cue } from "../../components/Sfx";
-import { lift, tween } from "../../ease";
+import { lift, mix, tween } from "../../ease";
+import { EDITOR_REST, FeegaEditor, Press, pressAmount } from "../editor/FeegaEditor";
+import { BASE_FONT, COPY_BUTTON, FONT_SIZE_FIELD, TABS, Tab, WIN, center, h1Rect, toStage, type Point, type Rect } from "../editor/layout";
 import { Align, Headline } from "../Headline";
-import { Pixel, hop } from "../pixel";
-import { Pointer, pointerAt } from "../Pointer";
+import { Pointer, pointerAt, type Click } from "../Pointer";
 import { Place, Section } from "../Section";
-import { DISPLAY, INK, MONO, ORANGE, PAPER, Tone, UI } from "../style";
+import { MONO, PAPER, Tone, UI } from "../style";
 
-export const AGENTS_FRAMES = 120;
+export const AGENTS_FRAMES = 220;
 export const AGENTS_TONE = Tone.Orange;
-export const AGENTS_LINES = ["works with your agent."];
+export const AGENTS_LINES = ["you edit.", "your agents build."];
 
+const EDITOR_ORIGIN = { x: 130, y: 330 };
+const EDITOR_SCALE = 0.74;
+const TERMINAL: Rect = { x: 780, y: 380, w: 1010, h: 630 };
 const BOX = "0 0 24 24";
-const PANEL = { x: 260, y: 300, width: 1400, height: 690 };
-const LIST_W = 470;
-const ROW_H = 104;
-const LIST_TOP = 70;
-const PICKED = 0;
-const CLICK = 30;
-const CONTEXT_AT = 38;
-const LINE_STEP = 5;
-const TYPING_AT = 64;
-const REPLY_AT = 76;
-const DIFF_STEP = 4;
-const LINE = "#e6e3dc";
-const DIM = "#8a8780";
-const TEXT = "#1d1c1a";
+const CLAUDE = `#${siClaude.hex}`;
+const TARGET_FONT = 76;
 
-const Avatar = ({ children, bg }: { children: ReactNode; bg: string }) => (
-  <div style={{ width: 54, height: 54, borderRadius: 14, background: bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{children}</div>
-);
+const SELECT_AT = 34;
+const SCRUB_AT = 46;
+const SCRUB_END = 62;
+const CHANGES_AT = 76;
+const COPY_AT = 100;
+const SWAP_AT = 118;
+const PASTE_AT = 124;
+const REPLY_AT = 146;
+const DIFF_AT = 156;
+const DIFF_STEP = 3;
+const DONE_AT = 176;
+const BACK_AT = 182;
+const BUILD_AT = 186;
+const POP = 10;
 
-const CHATS = [
-  { name: "Claude Code", preview: "Updated the hero heading.", time: "now", avatar: <Avatar bg="#f6ece4"><Mark mark={{ path: siClaude.path, viewBox: BOX }} size={32} color={`#${siClaude.hex}`} /></Avatar> },
-  { name: "Codex", preview: "Tests pass on the pricing page.", time: "2m", avatar: <Avatar bg={INK}><span style={{ fontFamily: DISPLAY, fontWeight: 600, fontSize: 17, letterSpacing: "-0.04em", color: PAPER }}>codex</span></Avatar> },
-  { name: "Cursor", preview: "Applied the spacing change.", time: "9m", avatar: <Avatar bg={INK}><Mark mark={{ path: siCursor.path, viewBox: BOX }} size={30} color={PAPER} /></Avatar> },
-  { name: "Gemini CLI", preview: "Footer links now open in a tab.", time: "1h", avatar: <Avatar bg="#eef2fd"><Mark mark={{ path: siGooglegemini.path, viewBox: BOX }} size={30} color={`#${siGooglegemini.hex}`} /></Avatar> },
+const stage = (r: Rect) => toStage(r, EDITOR_ORIGIN, EDITOR_SCALE);
+
+const H1 = stage(h1Rect(BASE_FONT));
+const SIZE = stage(FONT_SIZE_FIELD);
+const CHANGES = stage(TABS[Tab.Changes]);
+const COPY = stage(COPY_BUTTON);
+const EDITOR_BOX = stage({ x: 0, y: 0, w: WIN.w, h: WIN.h });
+const TERMINAL_PEEK: Rect = { x: EDITOR_BOX.x + EDITOR_BOX.w + 16, y: TERMINAL.y + 20, w: TERMINAL.x + TERMINAL.w - EDITOR_BOX.x - EDITOR_BOX.w - 32, h: TERMINAL.h - 40 };
+const EDITOR_PEEK: Rect = { x: EDITOR_BOX.x + 16, y: EDITOR_BOX.y + 70, w: TERMINAL.x - EDITOR_BOX.x - 32, h: EDITOR_BOX.h - 90 };
+
+const PATH = [
+  { at: 18, x: 900, y: 1000 },
+  { at: SELECT_AT - 6, x: H1.x + 90, y: H1.y + 24 },
+  { at: SCRUB_AT - 4, ...center(SIZE) },
+  { at: SCRUB_AT, ...center(SIZE) },
+  { at: SCRUB_END, x: center(SIZE).x + 46, y: center(SIZE).y },
+  { at: CHANGES_AT - 4, ...center(CHANGES) },
+  { at: CHANGES_AT + 4, ...center(CHANGES) },
+  { at: COPY_AT - 4, ...center(COPY) },
+  { at: COPY_AT + 4, ...center(COPY) },
+  { at: SWAP_AT - 4, ...center(TERMINAL_PEEK) },
+  { at: SWAP_AT + 6, ...center(TERMINAL_PEEK) },
+  { at: BACK_AT - 10, x: TERMINAL_PEEK.x + 120, y: TERMINAL_PEEK.y + 140 },
+  { at: BACK_AT - 2, ...center(EDITOR_PEEK) },
 ];
+
+export const AGENTS_CLICKS: Click[] = [
+  { label: "select h1", at: SELECT_AT, path: PATH, rect: H1 },
+  { label: "scrub size", at: SCRUB_AT, path: PATH, rect: SIZE },
+  { label: "changes tab", at: CHANGES_AT, path: PATH, rect: CHANGES },
+  { label: "copy for agent", at: COPY_AT, path: PATH, rect: COPY },
+  { label: "terminal to front", at: SWAP_AT, path: PATH, rect: TERMINAL_PEEK },
+  { label: "editor to front", at: BACK_AT, path: PATH, rect: EDITOR_PEEK },
+];
+
+const PROMPT = "build a refill plans section under the hero, same card style";
 
 const CONTEXT = [
-  ["selector", "main > h1.hero"],
-  ["file", "src/routes/+page.svelte:12"],
-  ["change", "font-size 64 → 72px"],
-  ["change", "color #0b0b0a → #ff5100"],
+  ["element", "section.hero > h1.title"],
+  ["source", "src/lib/Hero.svelte:14"],
+  ["change", "font-size 64 → 76px"],
 ];
 
-const DIFF = [
-  { sign: "-", text: "font-size: 64px;", bg: "#fde8e6", fg: "#b42318" },
-  { sign: "+", text: "font-size: 72px;", bg: "#e5f6ea", fg: "#18794e" },
-  { sign: "-", text: "color: #0b0b0a;", bg: "#fde8e6", fg: "#b42318" },
-  { sign: "+", text: "color: #ff5100;", bg: "#e5f6ea", fg: "#18794e" },
+enum Line {
+  Same = "same",
+  Added = "added",
+}
+
+const LINE_COLOR: Record<Line, { fg: string; bg: string; sign: string }> = {
+  [Line.Same]: { fg: "#a8a59e", bg: "transparent", sign: " " },
+  [Line.Added]: { fg: "#9be3b4", bg: "rgba(80,220,140,.12)", sign: "+" },
+};
+
+const DIFF: { kind: Line; n: number; text: string }[] = [
+  { kind: Line.Same, n: 24, text: '  <div class="actions">…</div>' },
+  { kind: Line.Added, n: 25, text: '  <section class="plans">' },
+  { kind: Line.Added, n: 26, text: "    <h2>Refill plans</h2>" },
+  { kind: Line.Added, n: 27, text: "    {#each plans as plan}" },
+  { kind: Line.Added, n: 28, text: "      <PlanCard {...plan} />" },
+  { kind: Line.Added, n: 29, text: "    {/each}" },
+  { kind: Line.Added, n: 30, text: "  </section>" },
 ];
 
-const contextAt = (i: number) => CONTEXT_AT + i * LINE_STEP;
-const diffAt = (i: number) => REPLY_AT + 8 + i * DIFF_STEP;
+const diffAt = (i: number) => DIFF_AT + i * DIFF_STEP;
 
 export const AGENTS_CUES: Cue[] = [
-  { at: CLICK, sound: Sound.ClickB, volume: 0.6 },
-  ...CONTEXT.map((_, i) => ({ at: contextAt(i), sound: Sound.Tap, volume: 0.35 })),
+  ...AGENTS_CLICKS.map((c) => ({ at: c.at, sound: Sound.ClickB, volume: 0.6 })),
+  { at: SWAP_AT + 2, sound: Sound.Whoosh, volume: 0.3 },
+  { at: BACK_AT + 2, sound: Sound.Whoosh, volume: 0.3 },
+  { at: PASTE_AT, sound: Sound.Tap, volume: 0.4 },
   { at: REPLY_AT, sound: Sound.Pop, volume: 0.45 },
-  ...DIFF.map((_, i) => ({ at: diffAt(i), sound: Sound.Tap, volume: 0.3 })),
+  ...DIFF.map((_, i) => ({ at: diffAt(i), sound: Sound.Tap, volume: 0.28 })),
+  { at: DONE_AT, sound: Sound.Pop, volume: 0.4 },
+  { at: BUILD_AT + 4, sound: Sound.Chime, volume: 0.35 },
 ];
 
 const Appear = ({ at, children }: { at: number; children: ReactNode }) => {
   const frame = useCurrentFrame();
-  const p = lift(frame, at, 10);
 
-  return <div style={{ opacity: p, transform: `translateY(${(1 - p) * 16}px)` }}>{children}</div>;
-};
-
-const Typing = () => {
-  const frame = useCurrentFrame();
-
-  if (frame < TYPING_AT || frame >= REPLY_AT) {
+  if (frame < at) {
     return null;
   }
 
+  const p = lift(frame, at, 10);
+  return <div style={{ opacity: p, transform: `translateY(${(1 - p) * 14}px)` }}>{children}</div>;
+};
+
+const TABS_AGENT = [
+  { name: "claude", mark: <Mark mark={{ path: siClaude.path, viewBox: BOX }} size={16} color={CLAUDE} /> },
+  { name: "codex", mark: <span style={{ width: 16, height: 16, borderRadius: 4, background: "#f0eee9", color: "#0b0b0a", fontSize: 10, fontWeight: 700, display: "grid", placeItems: "center" }}>&gt;_</span> },
+  { name: "cursor-agent", mark: <Mark mark={{ path: siCursor.path, viewBox: BOX }} size={16} color="#f0eee9" /> },
+];
+
+const Terminal = () => {
+  const frame = useCurrentFrame();
+  const typed = Math.max(0, Math.floor((frame - PASTE_AT) * 3.2));
+  const thinking = frame >= PASTE_AT + 14 && frame < REPLY_AT;
+  const spinner = "✻✳✢·"[Math.floor(frame / 3) % 4];
+
   return (
-    <div style={{ display: "flex", gap: 6, padding: "14px 18px", background: "#f2f0eb", borderRadius: 16, width: "fit-content" }}>
-      {[0, 1, 2].map((i) => (
-        <span key={i} style={{ width: 9, height: 9, borderRadius: 5, background: DIM, opacity: 0.4 + 0.6 * Math.abs(Math.sin((frame + i * 4) / 5)) }} />
-      ))}
+    <div style={{ width: TERMINAL.w, height: TERMINAL.h, borderRadius: 14, overflow: "hidden", background: "#141413", boxShadow: "0 0 0 1px #3a3a38, 0 40px 100px rgba(0,0,0,.45)", fontFamily: MONO, fontSize: 19, color: "#e9e7e2", display: "flex", flexDirection: "column" }}>
+      <div style={{ height: 44, display: "flex", alignItems: "center", gap: 8, padding: "0 16px", background: "#1d1d1c", borderBottom: "1px solid #2e2e2c", fontFamily: UI, fontSize: 14 }}>
+        {["#ff5f57", "#febc2e", "#28c840"].map((c) => (
+          <span key={c} style={{ width: 12, height: 12, borderRadius: 6, background: c }} />
+        ))}
+        <div style={{ display: "flex", gap: 4, marginLeft: 18 }}>
+          {TABS_AGENT.map((tab, i) => (
+            <span key={tab.name} style={{ display: "flex", alignItems: "center", gap: 8, height: 30, padding: "0 14px", borderRadius: 7, background: i === 0 ? "#2c2c2a" : "transparent", color: i === 0 ? "#f0eee9" : "#8a8780" }}>
+              {tab.mark}
+              {tab.name}
+            </span>
+          ))}
+        </div>
+        <span style={{ marginLeft: "auto", color: "#8a8780" }}>~/aurel</span>
+      </div>
+      <div style={{ flex: 1, padding: "18px 24px", display: "flex", flexDirection: "column", gap: 12, overflow: "hidden" }}>
+        <div style={{ border: `1.5px solid ${CLAUDE}`, borderRadius: 10, padding: "10px 16px", width: 520 }}>
+          <div>
+            <span style={{ color: CLAUDE }}>✻</span> Welcome to <b>Claude Code</b>
+          </div>
+          <div style={{ color: "#8a8780", fontSize: 16 }}>cwd: ~/aurel · feega context on</div>
+        </div>
+        {frame >= PASTE_AT ? (
+          <div style={{ borderRadius: 10, background: "#1f1f1e", padding: "10px 16px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, color: "#ff8a3d", fontSize: 16 }}>
+              <span style={{ width: 9, height: 9, background: "#ff5100" }} />
+              pasted from Feega · 1 element · 2 changes
+            </div>
+            {CONTEXT.map(([key, value]) => (
+              <div key={key} style={{ display: "flex", gap: 16, fontSize: 16 }}>
+                <span style={{ width: 80, color: "#8a8780" }}>{key}</span>
+                {value}
+              </div>
+            ))}
+            <div style={{ marginTop: 6 }}>
+              <span style={{ color: "#8a8780" }}>&gt; </span>
+              {PROMPT.slice(0, typed)}
+              {typed < PROMPT.length && frame % 10 < 6 ? <span style={{ background: "#e9e7e2" }}>&nbsp;</span> : null}
+            </div>
+          </div>
+        ) : (
+          <div style={{ border: "1px solid #3a3a38", borderRadius: 8, padding: "8px 14px", color: "#8a8780" }}>&gt; ▍</div>
+        )}
+        {thinking ? (
+          <div style={{ color: CLAUDE }}>
+            {spinner} Reading Hero.svelte… <span style={{ color: "#8a8780" }}>(esc to interrupt)</span>
+          </div>
+        ) : null}
+        <Appear at={REPLY_AT}>
+          <div>
+            <span style={{ color: "#e9e7e2" }}>⏺</span> I'll add a refill plans section below the hero, reusing your card styles.
+          </div>
+        </Appear>
+        <Appear at={DIFF_AT - 4}>
+          <div>
+            <span style={{ color: "#3ccf6e" }}>⏺</span> <b>Update</b>(src/lib/Hero.svelte)
+            <div style={{ marginTop: 6, marginLeft: 22, borderLeft: "1px solid #3a3a38", fontSize: 16 }}>
+              {DIFF.map((d, i) => {
+                const s = LINE_COLOR[d.kind];
+                const p = lift(frame, diffAt(i), 8);
+
+                return frame >= diffAt(i) ? (
+                  <div key={i} style={{ display: "flex", gap: 12, padding: "2px 12px", background: s.bg, color: s.fg, whiteSpace: "pre", opacity: p, transform: `translateX(${(1 - p) * 16}px)` }}>
+                    <span style={{ width: 24, color: "#6b6964", textAlign: "right" }}>{d.n}</span>
+                    <span>{s.sign}</span>
+                    {d.text}
+                  </div>
+                ) : null;
+              })}
+            </div>
+          </div>
+        </Appear>
+        <Appear at={DONE_AT}>
+          <div style={{ color: "#3ccf6e" }}>
+            ✓ <span style={{ color: "#e9e7e2" }}>2 files changed · PlanCard.svelte created</span>
+          </div>
+        </Appear>
+      </div>
     </div>
   );
 };
 
+enum Front {
+  Editor = "editor",
+  Terminal = "terminal",
+}
+
+const frontAt = (frame: number) => (frame >= SWAP_AT && frame < BACK_AT ? Front.Terminal : Front.Editor);
+
+const raise = (frame: number, front: Front, who: Front) => {
+  const since = who === Front.Terminal ? SWAP_AT : BACK_AT;
+  const pop = who === front && frame >= since ? Math.sin(Math.PI * Math.min(1, (frame - since) / POP)) * 0.025 : 0;
+  return { scale: (who === front ? 1 : 0.97) + pop, dim: who === front ? 1 : 0.78, z: who === front ? 2 : 1 };
+};
+
+const cameraAt = (frame: number): { zoom: number; focus: Point } => {
+  const edit = 0.14 * tween(frame, 38, 16) - 0.14 * tween(frame, 104, 12);
+  const talk = 0.22 * tween(frame, PASTE_AT, 14) - 0.22 * tween(frame, DONE_AT + 2, 10);
+  const editFocus = { x: SIZE.x, y: SIZE.y };
+  const message = { x: TERMINAL.x + 120, y: TERMINAL.y + 200 };
+  const reply = { x: TERMINAL.x + 200, y: TERMINAL.y + 470 };
+  const toReply = tween(frame, REPLY_AT, 18);
+  const inTerminal = frame >= SWAP_AT;
+  const focus = inTerminal ? { x: mix(message.x, reply.x, toReply), y: mix(message.y, reply.y, toReply) } : editFocus;
+
+  return { zoom: 1 + edit + talk, focus };
+};
+
 export const Agents = () => {
   const frame = useCurrentFrame();
-  const panel = tween(frame, 4, 16);
-  const selected = frame >= CLICK;
-  const pointer = pointerAt(frame, [
-    { at: 12, x: 700, y: 760 },
-    { at: CLICK - 2, x: 320, y: LIST_TOP + PICKED * ROW_H + 60 },
-    { at: CLICK + 14, x: 360, y: LIST_TOP + PICKED * ROW_H + 70 },
-  ]);
+  const enter = tween(frame, 4, 18);
+  const behind = tween(frame, 10, 18);
+  const front = frontAt(frame);
+  const editor = raise(frame, front, Front.Editor);
+  const terminal = raise(frame, front, Front.Terminal);
+  const pointer = pointerAt(frame, PATH);
+  const cam = cameraAt(frame);
+  const scrubbing = frame >= SCRUB_AT - 2 && frame < SCRUB_END + 2;
+  const tab = frame >= CHANGES_AT ? Tab.Changes : Tab.Properties;
+  const editorState = {
+    ...EDITOR_REST,
+    tab,
+    hover: tween(frame, SELECT_AT - 6, 6),
+    selected: tween(frame, SELECT_AT, 6),
+    fontSize: Math.round(mix(BASE_FONT, TARGET_FONT, tween(frame, SCRUB_AT, SCRUB_END - SCRUB_AT))),
+    scrub: scrubbing,
+    changes: Math.max(0, (frame - CHANGES_AT - 2) / 2),
+    copied: frame >= COPY_AT ? 1 : 0,
+    built: tween(frame, BUILD_AT, 18),
+    presses: [
+      { rect: h1Rect(BASE_FONT), amount: pressAmount(frame, SELECT_AT) },
+      { rect: FONT_SIZE_FIELD, amount: pressAmount(frame, SCRUB_AT) },
+      { rect: TABS[Tab.Changes], amount: pressAmount(frame, CHANGES_AT) },
+      { rect: COPY_BUTTON, amount: pressAmount(frame, COPY_AT) },
+    ],
+  };
 
   return (
     <Section tone={AGENTS_TONE} eyebrow="08 · agents">
-      <Place x={0} y={120} style={{ width: 1920 }}>
-        <Headline lines={AGENTS_LINES} boxed="agent" tone={AGENTS_TONE} size={110} align={Align.Center} />
-      </Place>
-      <Place x={PANEL.x} y={PANEL.y} style={{ transform: `translateY(${(1 - panel) * 500}px)` }}>
-        <div style={{ position: "relative", width: PANEL.width, height: PANEL.height, borderRadius: 22, background: "#fbfaf7", boxShadow: "0 40px 90px rgba(0,0,0,.25)", display: "flex", overflow: "hidden", fontFamily: UI, color: TEXT }}>
-          <div style={{ width: LIST_W, borderRight: `1px solid ${LINE}`, background: "#f5f3ee" }}>
-            <div style={{ height: LIST_TOP, display: "flex", alignItems: "center", padding: "0 26px", fontSize: 22, fontWeight: 600 }}>Agents</div>
-            {CHATS.map((chat, i) => {
-              const on = selected && i === PICKED;
-
-              return (
-                <div key={chat.name} style={{ height: ROW_H, display: "flex", alignItems: "center", gap: 16, padding: "0 22px", margin: "0 10px", borderRadius: 14, background: on ? ORANGE : "transparent", color: on ? PAPER : TEXT }}>
-                  {chat.avatar}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 21, fontWeight: 600 }}>
-                      {chat.name}
-                      <span style={{ fontSize: 15, fontWeight: 400, color: on ? PAPER : DIM }}>{chat.time}</span>
-                    </div>
-                    <div style={{ fontSize: 17, color: on ? PAPER : DIM, marginTop: 5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{chat.preview}</div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-            <div style={{ height: LIST_TOP, display: "flex", alignItems: "center", gap: 12, padding: "0 28px", borderBottom: `1px solid ${LINE}`, fontSize: 21, fontWeight: 600, opacity: selected ? 1 : 0.3 }}>
-              <Mark mark={{ path: siClaude.path, viewBox: BOX }} size={24} color={`#${siClaude.hex}`} />
-              Claude Code
-            </div>
-            <div style={{ flex: 1, padding: "28px 32px", display: "flex", flexDirection: "column", gap: 18 }}>
-              {frame >= CONTEXT_AT ? (
-                <div style={{ alignSelf: "flex-end", width: 560, background: INK, color: PAPER, borderRadius: 18, padding: "18px 22px", fontFamily: MONO, fontSize: 19, lineHeight: 1.6 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, color: ORANGE, marginBottom: 6 }}>
-                    <span style={{ width: 10, height: 10, background: ORANGE }} />
-                    feega · copy for agent
-                  </div>
-                  {CONTEXT.map(([key, value], i) =>
-                    frame >= contextAt(i) ? (
-                      <div key={i} style={{ display: "flex", gap: 18 }}>
-                        <span style={{ width: 96, color: DIM }}>{key}</span>
-                        <span>{value.slice(0, Math.ceil((frame - contextAt(i) + 1) * 6))}</span>
-                      </div>
-                    ) : null,
-                  )}
-                </div>
-              ) : null}
-              <Typing />
-              {frame >= REPLY_AT ? (
-                <Appear at={REPLY_AT}>
-                  <div style={{ width: 600, background: "#f2f0eb", borderRadius: 18, padding: "18px 22px" }}>
-                    <div style={{ fontSize: 21 }}>
-                      Done — updated <span style={{ fontFamily: MONO, fontSize: 19 }}>src/routes/+page.svelte</span>
-                    </div>
-                    <div style={{ marginTop: 12, borderRadius: 10, overflow: "hidden", border: `1px solid ${LINE}`, fontFamily: MONO, fontSize: 18 }}>
-                      {DIFF.map((d, i) =>
-                        frame >= diffAt(i) ? (
-                          <div key={i} style={{ display: "flex", gap: 14, padding: "6px 14px", background: d.bg, color: d.fg }}>
-                            <span style={{ color: DIM }}>{12 + Math.floor(i / 2)}</span>
-                            <span>{d.sign}</span>
-                            {d.text}
-                          </div>
-                        ) : null,
-                      )}
-                    </div>
-                  </div>
-                </Appear>
-              ) : null}
-            </div>
-          </div>
-          {frame >= 12 ? <Pointer x={pointer.x} y={pointer.y} pressed={Math.abs(frame - CLICK) < 3} /> : null}
+      <div style={{ position: "absolute", inset: 0, transform: `scale(${cam.zoom})`, transformOrigin: `${cam.focus.x}px ${cam.focus.y}px` }}>
+        <Place x={0} y={80} style={{ width: 1920, opacity: 1 - 0.85 * tween(frame, SWAP_AT, 10) + 0.85 * tween(frame, BACK_AT, 10) }}>
+          <Headline lines={AGENTS_LINES} boxed="build" tone={AGENTS_TONE} size={104} align={Align.Center} />
+        </Place>
+        <Place x={TERMINAL.x} y={TERMINAL.y} style={{ zIndex: terminal.z, transform: `translateX(${(1 - behind) * 1100}px) scale(${terminal.scale})`, filter: `brightness(${terminal.dim})` }}>
+          <Terminal />
+        </Place>
+        <Place x={EDITOR_ORIGIN.x} y={EDITOR_ORIGIN.y} style={{ zIndex: editor.z, transform: `translateY(${(1 - enter) * 800}px) scale(${EDITOR_SCALE * editor.scale})`, transformOrigin: "0 0", filter: `brightness(${editor.dim})` }}>
+          <FeegaEditor state={editorState} />
+        </Place>
+        <div style={{ position: "absolute", inset: 0, zIndex: 3 }}>
+          <Press rect={TERMINAL_PEEK} amount={pressAmount(frame, SWAP_AT) * 0.6} />
+          <Press rect={EDITOR_PEEK} amount={pressAmount(frame, BACK_AT) * 0.6} />
+          {frame >= PATH[0].at ? <Pointer x={pointer.x} y={pointer.y} pressed={scrubbing || AGENTS_CLICKS.some((c) => Math.abs(frame - c.at) < 3)} scale={cam.zoom} /> : null}
         </div>
-      </Place>
-      <Place x={1640} y={990} style={{ transform: `translateY(${hop(frame, 0) - (1 - lift(frame, 50, 10)) * -120}px)` }}>
-        <Pixel sprite="blob" size={9} />
-      </Place>
+      </div>
     </Section>
   );
 };

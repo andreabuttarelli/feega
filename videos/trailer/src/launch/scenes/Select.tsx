@@ -1,56 +1,45 @@
 import { useCurrentFrame } from "remotion";
 import { tween } from "../../ease";
-import { CARD_GEOMETRY, EditorCard } from "../EditorCard";
+import { EditorFrame } from "../editor/EditorFrame";
+import { EDITOR_REST, FeegaEditor, pressAmount } from "../editor/FeegaEditor";
+import { BASE_FONT, center, h1Rect } from "../editor/layout";
 import { Align, Headline } from "../Headline";
-import { Pointer, pointerAt } from "../Pointer";
+import { Pointer, pointerAt, type Click } from "../Pointer";
 import { Scatter, specks } from "../pixel";
 import { Place, Section } from "../Section";
-import { BLUE, INK, ORANGE, Tone } from "../style";
+import { BLUE, ORANGE, Tone } from "../style";
 
-export const SELECT_FRAMES = 114;
-export const SELECT_TONE = Tone.Ink;
-export const SELECT_CLICK = 70;
-export const BASE_FONT = 56;
+export const SELECT_FRAMES = 110;
+export const SELECT_TONE = Tone.Raised;
+export const SELECT_CLICK = 66;
 
-export const CARD_SCALE = 0.78;
-export const CARD_X = 930;
-export const CARD_Y = 300;
+export const EDITOR_AT = { x: 970, y: 300, scale: 0.72 };
 
-const { heading } = CARD_GEOMETRY;
+const H1 = h1Rect(BASE_FONT);
+const TARGET = { x: H1.x + 130, y: H1.y + 34 };
 const SPECKS = specks(2, 14, [ORANGE, BLUE]);
 const PATH = [
-  { at: 26, x: 1000, y: 640 },
-  { at: 58, x: heading.x + 120, y: heading.y + 30 },
+  { at: 24, x: 1000, y: 680 },
+  { at: SELECT_CLICK - 8, x: TARGET.x, y: TARGET.y },
 ];
 
-const ENTER_TILT = 8;
-const PUSH_ORIGIN = `${heading.x + 120}px ${heading.y + 30}px`;
-
-export const CardFrame = ({ enter, zoom, origin, children }: { enter: number; zoom: number; origin: string; children: React.ReactNode }) => (
-  <Place x={CARD_X} y={CARD_Y} style={{ transform: `translateX(${(1 - enter) * 1100}px) rotate(${(1 - enter) * ENTER_TILT}deg) scale(${CARD_SCALE})`, transformOrigin: "0 0" }}>
-    <div style={{ transform: `scale(${zoom})`, transformOrigin: origin }}>{children}</div>
-  </Place>
-);
+export const SELECT_CLICKS: Click[] = [{ label: "select h1", at: SELECT_CLICK, path: PATH, rect: H1 }];
 
 export const Select = () => {
   const frame = useCurrentFrame();
-  const enter = tween(frame, 4, 20);
-  const zoom = 1 + 0.16 * tween(frame, 50, 22) - 0.16 * tween(frame, 96, 16);
+  const zoom = 1 + 0.22 * tween(frame, 46, 22) - 0.22 * tween(frame, 92, 16);
   const pointer = pointerAt(frame, PATH);
-  const hover = tween(frame, 52, 6);
-  const selected = tween(frame, SELECT_CLICK, 8);
-  const pressed = frame >= SELECT_CLICK - 2 && frame < SELECT_CLICK + 4;
 
   return (
     <Section tone={SELECT_TONE} eyebrow="01 · select">
       <Scatter specks={SPECKS} />
-      <Place x={100} y={330}>
-        <Headline lines={["click any", "element of your", "running app."]} boxed="app" tone={Tone.Ink} size={104} align={Align.Left} />
+      <Place x={100} y={340}>
+        <Headline lines={["click any", "element of your", "running app."]} boxed="app" tone={SELECT_TONE} size={100} align={Align.Left} />
       </Place>
-      <CardFrame enter={enter} zoom={zoom} origin={PUSH_ORIGIN}>
-        <EditorCard state={{ hover, selected, fontSize: BASE_FONT, headColor: INK, scrubbing: false, swatchOpen: 0 }} />
-        {frame >= PATH[0].at ? <Pointer x={pointer.x} y={pointer.y} pressed={pressed} /> : null}
-      </CardFrame>
+      <EditorFrame x={EDITOR_AT.x} y={EDITOR_AT.y} scale={EDITOR_AT.scale} enter={tween(frame, 4, 20)} zoom={zoom} focus={center(H1)}>
+        <FeegaEditor state={{ ...EDITOR_REST, hover: tween(frame, 50, 6), selected: tween(frame, SELECT_CLICK, 6), presses: [{ rect: H1, amount: pressAmount(frame, SELECT_CLICK) }] }} />
+        {frame >= PATH[0].at ? <Pointer x={pointer.x} y={pointer.y} pressed={Math.abs(frame - SELECT_CLICK) < 3} scale={EDITOR_AT.scale * zoom} /> : null}
+      </EditorFrame>
     </Section>
   );
 };

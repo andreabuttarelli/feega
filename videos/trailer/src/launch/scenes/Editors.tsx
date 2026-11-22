@@ -5,29 +5,31 @@ import { FeegaMark, MARKS, Mark, type BrandMark } from "../../components/brandIc
 import { Sound, type Cue } from "../../components/Sfx";
 import { glide, lift, mix, tween } from "../../ease";
 import { float } from "../motion";
-import { Heading, Runner, Scatter, specks } from "../pixel";
+import { Heading, Tumble, Scatter, specks } from "../pixel";
 import { Section } from "../Section";
 import { INK, MONO, ORANGE, PAPER, Tone, UI } from "../style";
+import { EDITOR_REST, FeegaEditor } from "../editor/FeegaEditor";
+import { WIN } from "../editor/layout";
 
-export const EDITORS_FRAMES = 105;
-export const EDITORS_TONE = Tone.Paper;
+export const EDITORS_FRAMES = 100;
+export const EDITORS_TONE = Tone.White;
 
 const GAP_OPEN = 8;
 const FIRST_SWAP = 16;
 const SWAP_STEP = 11;
 const FLIP = 7;
-const CARD = { width: 500, height: 320 };
+const CARD = { width: 660, height: 430 };
 const FONT = 64;
 const BOX = "0 0 24 24";
 
-type Window = { name: string; mark?: BrandMark; color: string; chrome: string; terminal?: boolean };
+type Window = { name: string; mark?: BrandMark; color: string; chrome: string; status: string; terminal?: boolean };
 
 const WINDOWS: Window[] = [
-  { name: "VS Code", mark: MARKS.vscode, color: "#2f9cf4", chrome: "#1f1f1f" },
-  { name: "Cursor", mark: MARKS.cursor, color: PAPER, chrome: "#141414" },
-  { name: "Windsurf", mark: { path: siWindsurf.path, viewBox: BOX }, color: "#58e6c4", chrome: "#0d1413" },
-  { name: "VSCodium", mark: { path: siVscodium.path, viewBox: BOX }, color: "#2f80ed", chrome: "#1b1d22" },
-  { name: "npx feega", color: ORANGE, chrome: INK, terminal: true },
+  { name: "VS Code", mark: MARKS.vscode, color: "#2f9cf4", chrome: "#181818", status: "#007acc" },
+  { name: "Cursor", mark: MARKS.cursor, color: PAPER, chrome: "#0e0e0e", status: "#2a2a2a" },
+  { name: "Windsurf", mark: { path: siWindsurf.path, viewBox: BOX }, color: "#58e6c4", chrome: "#0b1a17", status: "#0f8a72" },
+  { name: "VSCodium", mark: { path: siVscodium.path, viewBox: BOX }, color: "#2f80ed", chrome: "#1b1d22", status: "#3b5bdb" },
+  { name: "npx feega", color: ORANGE, chrome: INK, status: ORANGE, terminal: true },
 ];
 
 const DECK_TILT = [-7, 5, -4, 6, -2];
@@ -37,39 +39,24 @@ export const swapAt = (i: number) => FIRST_SWAP + i * SWAP_STEP;
 
 export const EDITORS_CUES: Cue[] = WINDOWS.map((_, i) => ({ at: swapAt(i), sound: Sound.ClickA, volume: 0.55 }));
 
-const CODE_LINES = [0.62, 0.48, 0.7, 0.36, 0.55, 0.44, 0.66];
+const ACTIVITY_W = 46;
+const TITLE_H = 38;
+const STATUS_H = 24;
+const MINI = Math.min((CARD.width - ACTIVITY_W) / WIN.w, (CARD.height - TITLE_H - STATUS_H) / WIN.h);
 
-const FeegaPanel = () => (
-  <div style={{ width: 150, borderLeft: "1px solid #2e2e2c", padding: "10px 10px", display: "flex", flexDirection: "column", gap: 7 }}>
-    <div style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: UI, fontSize: 12, color: PAPER }}>
-      <FeegaMark size={14} />
-      Feega
+const EditorBody = ({ window }: { window: Window }) => (
+  <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
+    <div style={{ width: ACTIVITY_W, background: window.chrome, borderRight: "1px solid #2e2e2c", display: "flex", flexDirection: "column", alignItems: "center", gap: 16, paddingTop: 12 }}>
+      {window.mark ? <Mark mark={window.mark} size={24} color={window.color} /> : null}
+      {[0, 1, 2, 3].map((i) => (
+        <span key={i} style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${i === 3 ? ORANGE : "#5c5b57"}` }} />
+      ))}
     </div>
-    {["Size", "Weight", "Fill", "Margin"].map((label, i) => (
-      <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontFamily: UI, fontSize: 10, color: "#8a8780" }}>
-        {label}
-        <span style={{ width: 46, height: 16, borderRadius: 4, background: i === 2 ? ORANGE : "#2a2a28" }} />
+    <div style={{ flex: 1, background: "#1f1f1f", overflow: "hidden" }}>
+      <div style={{ transform: `scale(${MINI})`, transformOrigin: "0 0" }}>
+        <FeegaEditor state={{ ...EDITOR_REST, selected: 1, hover: 1 }} />
       </div>
-    ))}
-  </div>
-);
-
-const EditorBody = ({ accent }: { accent: string }) => (
-  <div style={{ flex: 1, display: "flex" }}>
-    <div style={{ width: 92, borderRight: "1px solid #2e2e2c", padding: "10px 8px", display: "flex", flexDirection: "column", gap: 7 }}>
-      {[0.8, 0.6, 0.7, 0.5, 0.65].map((w, i) => (
-        <span key={i} style={{ height: 6, width: `${w * 100}%`, borderRadius: 3, background: i === 2 ? accent : "#3a3a37" }} />
-      ))}
     </div>
-    <div style={{ flex: 1, padding: "12px 12px", display: "flex", flexDirection: "column", gap: 9 }}>
-      {CODE_LINES.map((w, i) => (
-        <span key={i} style={{ display: "flex", gap: 5 }}>
-          <span style={{ height: 6, width: 18, borderRadius: 3, background: "#4a4a46" }} />
-          <span style={{ height: 6, width: `${w * 100}%`, borderRadius: 3, background: i % 3 === 0 ? accent : "#5c5b57", opacity: i % 3 === 0 ? 0.8 : 1 }} />
-        </span>
-      ))}
-    </div>
-    <FeegaPanel />
   </div>
 );
 
@@ -88,16 +75,20 @@ const TerminalBody = () => (
 
 const WindowCard = ({ window }: { window: Window }) => (
   <div style={{ width: CARD.width, height: CARD.height, borderRadius: 14, background: window.chrome, border: "1px solid #2e2e2c", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 24px 50px rgba(0,0,0,.28)" }}>
-    <div style={{ height: 38, display: "flex", alignItems: "center", gap: 8, padding: "0 14px", borderBottom: "1px solid #2e2e2c" }}>
+    <div style={{ height: TITLE_H, display: "flex", alignItems: "center", gap: 8, padding: "0 14px", borderBottom: "1px solid #2e2e2c", background: window.chrome }}>
       {["#ff5f57", "#febc2e", "#28c840"].map((c) => (
         <span key={c} style={{ width: 11, height: 11, borderRadius: 6, background: c }} />
       ))}
-      <span style={{ flex: 1, display: "flex", justifyContent: "center", alignItems: "center", gap: 8, fontFamily: window.terminal ? MONO : UI, fontSize: 14, color: "#cfcdc7", marginRight: 54 }}>
+      <span style={{ flex: 1, display: "flex", justifyContent: "center", alignItems: "center", gap: 8, fontFamily: window.terminal ? MONO : UI, fontSize: 15, color: "#cfcdc7", marginRight: 54 }}>
         {window.mark ? <Mark mark={window.mark} size={16} color={window.color} /> : <span style={{ color: ORANGE }}>&gt;_</span>}
         {window.name}
       </span>
     </div>
-    {window.terminal ? <TerminalBody /> : <EditorBody accent={window.color} />}
+    {window.terminal ? <TerminalBody /> : <EditorBody window={window} />}
+    <div style={{ height: STATUS_H, background: window.status, display: "flex", alignItems: "center", gap: 10, padding: "0 12px", fontFamily: UI, fontSize: 12, color: "#fff" }}>
+      <FeegaMark size={12} />
+      Feega · localhost:5173
+    </div>
   </div>
 );
 
@@ -143,6 +134,25 @@ const Slot = ({ children }: { children: ReactNode }) => {
   return <span style={{ display: "inline-flex", justifyContent: "center", width: open * (CARD.width + 60), height: CARD.height }}>{children}</span>;
 };
 
+const Label = () => {
+  const frame = useCurrentFrame();
+  const top = WINDOWS.reduce((current, _, i) => (frame >= swapAt(i) ? i : current), -1);
+
+  if (top < 0) {
+    return null;
+  }
+
+  const window = WINDOWS[top];
+  const p = lift(frame, swapAt(top), 8);
+
+  return (
+    <div style={{ position: "absolute", left: 0, right: 0, top: 540 + CARD.height / 2 + 56, display: "flex", justifyContent: "center", alignItems: "center", gap: 14, fontFamily: MONO, fontSize: 34, color: INK, opacity: p, transform: `translateY(${(1 - p) * 14}px)` }}>
+      {window.mark ? <Mark mark={window.mark} size={30} color={window.status} /> : <span style={{ color: ORANGE }}>&gt;_</span>}
+      {window.name}
+    </div>
+  );
+};
+
 export const Editors = () => {
   const frame = useCurrentFrame();
 
@@ -156,8 +166,9 @@ export const Editors = () => {
         </Slot>
         <Words text="your editor." from={4} align="left" />
       </div>
-      <Runner sprite="ghost" size={8} y={930} from={30} frames={80} heading={Heading.Right} />
-      <Runner sprite="blob" size={8} y={930} from={38} frames={80} heading={Heading.Right} />
+      <Label />
+      <Tumble sprite="code" size={8} y={140} from={30} frames={80} heading={Heading.Right} />
+      <Tumble sprite="palette" size={8} y={150} from={38} frames={80} heading={Heading.Right} />
     </Section>
   );
 };

@@ -15,21 +15,24 @@ const PALETTE: Record<string, string> = {
 };
 
 export const SPRITES = {
-  blob: ["..####..", ".######.", "#ww##ww#", "#wk##wk#", "########", "###oo###", ".######.", ".#....#."],
-  pointer: ["k.......", "kk......", "kwk.....", "kwwk....", "kwwwk...", "kwwwwk..", "kwwkkk..", "kk.kwk..", "....kk.."],
+  cursor: ["k.......", "kk......", "kwk.....", "kwwk....", "kwwwk...", "kwwwwk..", "kwwkkk..", "kk.kwk..", "....kk.."],
   brush: ["......##", ".....###", "....###.", "...###..", "..###...", ".##o....", "##......"],
   layers: ["..bbbb..", ".b....b.", "b..oo..b", "b.oooo.b", "b..oo..b", ".b....b.", "..bbbb.."],
   plug: ["..b..b..", "..b..b..", ".######.", ".#oooo#.", ".#oooo#.", "..####..", "...##..."],
   frame: ["########", "#oooooo#", "########", "#.#bbb#.", "#.#bbb#.", "#.#####.", "........"],
   mesh: ["bbbooo##", "bbboooo#", "nbbbooo#", "nnbbooo#", "nnnbboo#", "nnnnbboo", "nnnnnbbo"],
   cube: ["...bb...", "..bbbb..", ".bbbnnb.", "bbbnnnnb", "bbnnnnn.", ".bnnnn..", "..nnn..."],
-  ghost: ["..bbbb..", ".bbbbbb.", "bwwbbwwb", "bwkbbwkb", "bbbbbbbb", "bbbbbbbb", "bbbbbbbb", "b.bb.bb."],
   star: ["...#....", "...#....", "#######.", ".#####..", "..###...", ".##.##..", "#.....#."],
+  spark: ["...#....", "..###...", ".#####..", "#######.", "..o.o...", ".o.o.o..", "........"],
+  palette: ["..####..", ".#oooo#.", "#obo#on#", "#oooooo#", "#ow...o#", ".#o..#..", "..###..."],
+  code: ["...........", "..b...#.b..", ".b...#...b.", "b....#....b", ".b..#....b.", "..b.#...b.."],
+  terminal: ["nnnnnnnn", "n......n", "n.w....n", "n..w...n", "n.w.##.n", "n......n", "nnnnnnnn"],
+  folder: ["###.....", "#oo#####", "#oooooo#", "#oooooo#", "#oooooo#", "########"],
 } satisfies Record<string, string[]>;
 
 export type Sprite = keyof typeof SPRITES;
 
-export const CREW: Sprite[] = ["blob", "ghost", "pointer", "brush", "layers", "blob", "plug", "frame", "ghost", "cube", "star"];
+export const ICONS: Sprite[] = ["cursor", "layers", "brush", "palette", "code", "plug", "frame", "star", "terminal", "folder", "mesh"];
 
 export const Pixel = ({ sprite, size }: { sprite: Sprite; size: number }) => {
   const rows = SPRITES[sprite];
@@ -45,14 +48,14 @@ export const Pixel = ({ sprite, size }: { sprite: Sprite; size: number }) => {
 };
 
 const HOP_PERIOD = 14;
-const HOP_HEIGHT = 16;
+const HOP_HEIGHT = 8;
 
 export const hop = (frame: number, phase: number) => {
   const t = ((frame + phase) % HOP_PERIOD) / HOP_PERIOD;
   return -HOP_HEIGHT * Math.sin(Math.PI * t) ** 2;
 };
 
-export const Parade = ({ sprites, size, start, gap, stagger }: { sprites: Sprite[]; size: number; start: number; gap: number; stagger: number }) => {
+export const IconRow = ({ sprites, size, start, gap, stagger }: { sprites: Sprite[]; size: number; start: number; gap: number; stagger: number }) => {
   const frame = useCurrentFrame();
 
   return (
@@ -60,10 +63,11 @@ export const Parade = ({ sprites, size, start, gap, stagger }: { sprites: Sprite
       {sprites.map((s, i) => {
         const at = start + i * stagger;
         const p = lift(frame, at, 8);
-        const y = (1 - p) * 90 + (frame > at + 8 ? hop(frame, i * 5) : 0);
+        const y = (1 - p) * 90 + float(frame, i * 9, 8);
+        const turn = (1 - p) * 90 + float(frame, i * 13, 8);
 
         return (
-          <div key={i} style={{ transform: `translateY(${y}px) scale(${p})`, transformOrigin: "bottom center" }}>
+          <div key={i} style={{ transform: `translateY(${y}px) rotate(${turn}deg) scale(${p})` }}>
             <Pixel sprite={s} size={size} />
           </div>
         );
@@ -78,11 +82,11 @@ export enum Heading {
 }
 
 const RUN_HOP = 7;
-const RUN_HEIGHT = 22;
-const RUN_LEAN = 8;
+const RUN_HEIGHT = 12;
+const SPIN = 3;
 const OFFSTAGE = 200;
 
-export const Runner = ({ sprite, size, y, from, frames, heading }: { sprite: Sprite; size: number; y: number; from: number; frames: number; heading: Heading }) => {
+export const Tumble = ({ sprite, size, y, from, frames, heading }: { sprite: Sprite; size: number; y: number; from: number; frames: number; heading: Heading }) => {
   const frame = useCurrentFrame();
   const t = (frame - from) / frames;
 
@@ -95,7 +99,7 @@ export const Runner = ({ sprite, size, y, from, frames, heading }: { sprite: Spr
   const bounce = -Math.abs(Math.sin(((frame - from) / RUN_HOP) * Math.PI)) * RUN_HEIGHT;
 
   return (
-    <div style={{ position: "absolute", left: x, top: y, transform: `translateY(${bounce}px) rotate(${heading * RUN_LEAN}deg) scaleX(${heading})` }}>
+    <div style={{ position: "absolute", left: x, top: y, transform: `translateY(${bounce}px) rotate(${heading * SPIN * (frame - from)}deg)` }}>
       <Pixel sprite={sprite} size={size} />
     </div>
   );

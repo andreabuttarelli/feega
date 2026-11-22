@@ -9,10 +9,9 @@ import { Scatter, specks } from "../pixel";
 import { Section } from "../Section";
 import { INK, MONO, ORANGE, PAPER, Tone } from "../style";
 
-export const FRAMEWORKS_FRAMES = 105;
-export const FRAMEWORKS_TONE = Tone.Paper;
+export const FRAMEWORKS_FRAMES = 95;
+export const FRAMEWORKS_TONE = Tone.White;
 
-const FIELD = "#e7e5df";
 const ENTER_FROM = 4;
 const ENTER_STEP = 4;
 const SUCK = 18;
@@ -62,7 +61,6 @@ export const Frameworks = () => {
 
   return (
     <Section tone={FRAMEWORKS_TONE} eyebrow="07 · frameworks">
-      <div style={{ position: "absolute", inset: 0, background: FIELD }} />
       <div style={{ position: "absolute", inset: 0, transform: `scale(${1 - suck})`, transformOrigin: "50% 50%", opacity: 1 - suck }}>
         <Scatter specks={specks(7, 26, [ORANGE, "#004dff", INK])} />
       </div>

@@ -3,23 +3,31 @@ import { useCurrentFrame } from "remotion";
 import { lift, tween } from "../../ease";
 import { Mark } from "../../components/brandIcons";
 import { Align, Headline } from "../Headline";
-import { CREW, Parade, Pixel } from "../pixel";
-import { Pointer, pointerAt } from "../Pointer";
+import { ICONS, IconRow, Pixel } from "../pixel";
+import { Pointer, pointerAt, type Click } from "../Pointer";
+import { Press, pressAmount } from "../editor/FeegaEditor";
 import { Place, Section } from "../Section";
 import { INK, ORANGE, PAPER, Tone, UI } from "../style";
 
-export const OPEN_SOURCE_FRAMES = 105;
+export const OPEN_SOURCE_FRAMES = 95;
 export const STAR_CLICK = 66;
 export const OPEN_SOURCE_TONE = Tone.Orange;
 
 const BURST = 9;
 const BURST_REACH = 260;
-const CREW_JUMP = 70;
+const ROW_JUMP = 70;
 
 const OPEN_BOXED = "open\u00a0source";
 export const OPEN_LINES = ["free and", `${OPEN_BOXED}.`];
 
-const CHIP_W = 640;
+const CHIP_W = 880;
+const STAR_RECT = { x: 34, y: 26, w: 44, h: 44 };
+const PATH = [
+  { at: 36, x: 700, y: 260 },
+  { at: STAR_CLICK - 6, x: STAR_RECT.x + 24, y: STAR_RECT.y + 22 },
+];
+
+export const OPEN_CLICKS: Click[] = [{ label: "star repo", at: STAR_CLICK, path: PATH, rect: STAR_RECT }];
 
 export const OpenSource = () => {
   const frame = useCurrentFrame();
@@ -28,10 +36,7 @@ export const OpenSource = () => {
   const pop = tween(frame, STAR_CLICK, 8);
   const burst = lift(frame, STAR_CLICK, 22);
   const jump = Math.sin(Math.PI * tween(frame, STAR_CLICK + 2, 12));
-  const pointer = pointerAt(frame, [
-    { at: 36, x: 700, y: 260 },
-    { at: STAR_CLICK - 2, x: 70, y: 46 },
-  ]);
+  const pointer = pointerAt(frame, PATH);
 
   return (
     <Section tone={OPEN_SOURCE_TONE} eyebrow="09 · open source">
@@ -44,7 +49,7 @@ export const OpenSource = () => {
             {starred ? <Pixel sprite="star" size={6} /> : <Mark mark={{ path: siGithub.path, viewBox: "0 0 24 24" }} size={44} color={INK} />}
           </div>
           <span style={{ flex: 1 }}>{starred ? "starred" : "star on github"}</span>
-          <span style={{ color: starred ? ORANGE : "#8a8780", fontSize: 24 }}>github.com/…/feega</span>
+          <span style={{ color: starred ? ORANGE : "#8a8780", fontSize: 24 }}>github.com/andreabuttarelli/feega</span>
           {starred
             ? Array.from({ length: BURST }, (_, i) => {
                 const angle = (i / BURST) * Math.PI * 2;
@@ -56,11 +61,12 @@ export const OpenSource = () => {
                 );
               })
             : null}
+          <Press rect={STAR_RECT} amount={pressAmount(frame, STAR_CLICK)} />
           {frame >= 36 ? <Pointer x={pointer.x} y={pointer.y} pressed={Math.abs(frame - STAR_CLICK) < 3} /> : null}
         </div>
       </Place>
-      <Place x={0} y={880} style={{ width: 1920, display: "flex", justifyContent: "center", transform: `translateY(${-CREW_JUMP * jump}px)` }}>
-        <Parade sprites={CREW} size={8} start={30} gap={38} stagger={2} />
+      <Place x={0} y={880} style={{ width: 1920, display: "flex", justifyContent: "center", transform: `translateY(${-ROW_JUMP * jump}px)` }}>
+        <IconRow sprites={ICONS} size={8} start={30} gap={38} stagger={2} />
       </Place>
     </Section>
   );

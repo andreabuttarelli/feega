@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "clicks": "esbuild scripts/clicks.ts --bundle --platform=node --jsx=automatic --log-level=error --outfile=out/clicks.cjs && node out/clicks.cjs"
   },
   "keywords": [],
   "author": "",

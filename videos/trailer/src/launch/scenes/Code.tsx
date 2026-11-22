@@ -1,11 +1,11 @@
 import { useCurrentFrame } from "remotion";
 import { lift, tween } from "../../ease";
 import { Align, Headline } from "../Headline";
-import { Parade } from "../pixel";
+import { IconRow } from "../pixel";
 import { Place, Section } from "../Section";
 import { MONO, Tone } from "../style";
 
-export const CODE_FRAMES = 120;
+export const CODE_FRAMES = 105;
 export const DIFF_LINES_AT = 30;
 export const CODE_TONE = Tone.Orange;
 export const PUSH_AT = 66;
@@ -27,13 +27,13 @@ const KIND_STYLE: Record<Kind, { sign: string; bg: string; fg: string }> = {
 };
 
 const LINES: { kind: Kind; text: string }[] = [
-  { kind: Kind.Same, text: '<main class="hero">' },
-  { kind: Kind.Removed, text: '  <h1 class="text-[56px] text-black">' },
-  { kind: Kind.Added, text: '  <h1 class="text-[80px] text-[#ff5100]">' },
-  { kind: Kind.Same, text: "    ship faster." },
+  { kind: Kind.Same, text: '<section class="hero">' },
+  { kind: Kind.Removed, text: '  <h1 class="text-[64px] text-[#2a1c12]">' },
+  { kind: Kind.Added, text: '  <h1 class="text-[76px] text-[#ff5100]">' },
+  { kind: Kind.Same, text: "    Scent, slowly made." },
   { kind: Kind.Same, text: "  </h1>" },
   { kind: Kind.Same, text: '  <p class="lead">…</p>' },
-  { kind: Kind.Same, text: "</main>" },
+  { kind: Kind.Same, text: "</section>" },
 ];
 
 const LINE_STAGGER = 5;
@@ -51,11 +51,11 @@ export const Code = () => {
       </Place>
       <Place x={880} y={290} style={{ transform: `translateX(${(1 - enter) * 1100}px) rotate(${(1 - enter) * -6}deg) scale(${zoom})`, transformOrigin: `0px ${80 + ROW_H * ADDED_ROW}px` }}>
         <div style={{ position: "absolute", left: 40, top: -56 }}>
-          <Parade sprites={["blob", "pointer", "ghost"]} size={7} start={DIFF_LINES_AT + 20} gap={24} stagger={4} />
+          <IconRow sprites={["cursor", "code", "palette"]} size={7} start={DIFF_LINES_AT + 20} gap={24} stagger={4} />
         </div>
         <div style={{ width: 920, borderRadius: 16, background: "#141413", fontFamily: MONO, fontSize: 25, overflow: "hidden", boxShadow: "0 40px 90px rgba(0,0,0,.25)" }}>
           <div style={{ padding: "18px 26px", color: "#8a8780", borderBottom: "1px solid #2a2a28", display: "flex", justifyContent: "space-between" }}>
-            <span>src/routes/+page.svelte</span>
+            <span>src/lib/Hero.svelte</span>
             <span><span style={{ color: "#8fe8b4" }}>+1</span> <span style={{ color: "#ff9a9a" }}>−1</span></span>
           </div>
           <div style={{ padding: "14px 0" }}>
