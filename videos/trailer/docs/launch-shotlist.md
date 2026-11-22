@@ -69,3 +69,14 @@ Every section pushes in 3.5 % over its length and, in its last 12 f, slides 140 
 shrinks 6 % under the wipe. SFX: pop on each word box, click on cursor clicks/grab/drop, whoosh on
 wipes and the terminal reveal, taps on diff lines, chime when the agent finishes and on the logo.
 `npm run clicks` checks every click lands inside its target.
+
+## Music
+
+1. Drop the track in `public/music/` (e.g. `public/music/track.mp3`).
+2. In `src/launch/beat.ts` set `MUSIC`: `file` (name inside `public/music/`), `bpm`, `firstBeat`
+   (frame of the first downbeat at 30 fps), `volume`, `fadeOut` (frames), `sfxDuck` (SFX gain
+   while music plays).
+3. Render. Scene boundaries (cuts and wipes), boxed-word pops and the editor flips snap to the
+   nearest half-beat; total length stays the same.
+
+With `file: null` nothing snaps and only the generated SFX play.

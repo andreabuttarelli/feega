@@ -106,7 +106,7 @@ export const COLLAB_CUES: Cue[] = [
   { at: DROP_AT + 4, sound: Sound.Pop, volume: 0.5 },
   { at: TERM_AT, sound: Sound.Whoosh, volume: 0.35 },
   ...assembleTicks(HEAD_AT).map((at) => ({ at, sound: Sound.Tap, volume: 0.12 })),
-  { at: boxPopAt(HEAD_AT), sound: Sound.Pop, volume: 0.55 },
+  { at: boxPopAt(HEAD_AT), sound: Sound.Pop, volume: 0.55, beat: true },
   { at: PROMPT_AT, sound: Sound.Tap, volume: 0.4 },
   { at: PROMPT_AT + 18, sound: Sound.Enter, volume: 0.4 },
   { at: REPLY_AT, sound: Sound.Pop, volume: 0.4 },

@@ -1,5 +1,6 @@
 import { interpolate, useCurrentFrame } from "remotion";
 import { lift, tween } from "../ease";
+import { useOnBeat } from "./beat";
 import { noise } from "./motion";
 import { DISPLAY, TONES, Tone } from "./style";
 
@@ -48,7 +49,7 @@ export const assembleTicks = (start = 0) => Array.from({ length: ASSEMBLE.durati
 export const Headline = ({ lines, boxed, tone, size, align, start = 0 }: { lines: string[]; boxed: string; tone: Tone; size: number; align: Align; start?: number }) => {
   const frame = useCurrentFrame();
   const colors = TONES[tone];
-  const boxAt = boxPopAt(start);
+  const boxAt = useOnBeat()(boxPopAt(start));
   const box = tween(frame, boxAt, BOX_WIPE);
   const grow = lift(frame, boxAt, 8);
   const seed = seedOf(lines);

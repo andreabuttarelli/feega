@@ -12,7 +12,7 @@ import { INK, MONO, ORANGE, PAPER, Tone } from "../style";
 export const FRAMEWORKS_FRAMES = 95;
 export const FRAMEWORKS_TONE = Tone.White;
 
-const ENTER_FROM = 4;
+const ENTER_FROM = 0;
 const ENTER_STEP = 4;
 const SUCK = 18;
 const STEP = 8;
@@ -57,7 +57,7 @@ export const Frameworks = () => {
   const frame = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();
   const suck = glide(frame, durationInFrames - SUCK - 4, SUCK);
-  const text = lift(frame, 2, 12);
+  const text = lift(frame, -8, 12);
 
   return (
     <Section tone={FRAMEWORKS_TONE}>

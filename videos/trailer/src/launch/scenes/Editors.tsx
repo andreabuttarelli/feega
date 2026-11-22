@@ -4,6 +4,7 @@ import { useCurrentFrame } from "remotion";
 import { MARKS, Mark, type BrandMark } from "../../components/brandIcons";
 import { Sound, type Cue } from "../../components/Sfx";
 import { glide, lift, tween } from "../../ease";
+import { useOnBeat } from "../beat";
 import { float } from "../motion";
 import { Heading, Tumble, Scatter, specks } from "../pixel";
 import { Section } from "../Section";
@@ -33,7 +34,7 @@ const TOOLS: Tool[] = [
 
 export const swapAt = (i: number) => FIRST_SWAP + i * SWAP_STEP;
 
-export const EDITORS_CUES: Cue[] = TOOLS.map((_, i) => ({ at: swapAt(i), sound: Sound.ClickA, volume: 0.55 }));
+export const EDITORS_CUES: Cue[] = TOOLS.map((_, i) => ({ at: swapAt(i), sound: Sound.ClickA, volume: 0.55, beat: true }));
 
 const Terminal = () => (
   <span style={{ width: ICON, height: ICON, borderRadius: 32, background: INK, display: "grid", placeItems: "center", fontFamily: MONO, fontSize: 64, color: ORANGE, letterSpacing: "-0.05em" }}>&gt;_</span>
@@ -41,17 +42,18 @@ const Terminal = () => (
 
 const Logo = ({ tool }: { tool: Tool }) => (tool.mark ? <Mark mark={tool.mark} size={ICON} color={tool.color} /> : <Terminal />);
 
-const current = (frame: number) => TOOLS.reduce((top, _, i) => (frame >= swapAt(i) ? i : top), -1);
+const current = (frame: number, snap: (f: number) => number) => TOOLS.reduce((top, _, i) => (frame >= snap(swapAt(i)) ? i : top), -1);
 
 const Flip = () => {
   const frame = useCurrentFrame();
-  const top = current(frame);
+  const snap = useOnBeat();
+  const top = current(frame, snap);
 
   if (top < 0) {
     return null;
   }
 
-  const at = swapAt(top);
+  const at = snap(swapAt(top));
   const turn = tween(frame, at, FLIP);
   const leaving = top > 0 && frame < at + FLIP / 2 ? TOOLS[top - 1] : null;
   const shown = leaving ?? TOOLS[top];

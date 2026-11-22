@@ -1,6 +1,7 @@
 import type { FC } from "react";
-import { AbsoluteFill, Series } from "remotion";
+import { AbsoluteFill, Audio, Series, interpolate, staticFile } from "remotion";
 import { Sfx, Sound, type Cue } from "../components/Sfx";
+import { MUSIC, SceneOrigin, onBeat, sfxGain } from "./beat";
 import { assembleTicks, boxPopAt } from "./Headline";
 import { COLLAB_CUES, COLLAB_FRAMES, COLLAB_TONE, Collab } from "./scenes/Collab";
 import { CODE_FRAMES, CODE_TONE, Code, DIFF_IN, DIFF_TICKS } from "./scenes/Code";
@@ -17,7 +18,7 @@ import { Exit, ExitWipe, LANDSCAPE_FRAMES, WIPE_FRAMES } from "./Transition";
 
 type Shot = { scene: FC; frames: number; tone: Tone; exit: Exit; cues: Cue[] };
 
-const pop = (at: number): Cue => ({ at, sound: Sound.Pop, volume: 0.55 });
+const pop = (at: number): Cue => ({ at, sound: Sound.Pop, volume: 0.55, beat: true });
 const click = (at: number): Cue => ({ at, sound: Sound.ClickB, volume: 0.6 });
 const whoosh = (at: number): Cue => ({ at, sound: Sound.Whoosh, volume: 0.35 });
 const tap = (at: number): Cue => ({ at, sound: Sound.Tap, volume: 0.4 });
@@ -37,19 +38,31 @@ const SHOTS: Shot[] = [
   { scene: EndCard, frames: END_FRAMES, tone: END_TONE, exit: Exit.Cut, cues: [{ at: LOGO_AT, sound: Sound.Chime, volume: 0.5 }] },
 ];
 
-const starts = SHOTS.reduce<number[]>((acc, shot, i) => [...acc, i === 0 ? 0 : acc[i - 1] + SHOTS[i - 1].frames], []);
+const RAW_TOTAL = SHOTS.reduce((sum, shot) => sum + shot.frames, 0);
 
-export const LAUNCH_FRAMES = SHOTS.reduce((sum, shot) => sum + shot.frames, 0);
+const rawStarts = SHOTS.map((_, i) => SHOTS.slice(0, i).reduce((sum, shot) => sum + shot.frames, 0));
 
-const exitCue = (shot: Shot): Cue[] => {
+const starts = rawStarts.map((at, i) => (i === 0 ? 0 : onBeat(at)));
+
+const lengths = starts.map((at, i) => (i + 1 < starts.length ? starts[i + 1] : RAW_TOTAL) - at);
+
+export const LAUNCH_FRAMES = RAW_TOTAL;
+
+const exitCue = (shot: Shot, frames: number): Cue[] => {
   if (shot.exit === Exit.Cut) {
-    return [{ at: shot.frames, sound: Sound.ClickC, volume: 0.5 }];
+    return [{ at: frames, sound: Sound.ClickC, volume: 0.5 }];
   }
 
-  return [whoosh(shot.frames - (shot.exit === Exit.Landscape ? LANDSCAPE_FRAMES : WIPE_FRAMES))];
+  return [whoosh(frames - (shot.exit === Exit.Landscape ? LANDSCAPE_FRAMES : WIPE_FRAMES))];
 };
 
-const CUES = SHOTS.flatMap((shot, i) => [...shot.cues, ...exitCue(shot)].map((cue) => ({ ...cue, at: cue.at + starts[i] }))).filter((cue) => cue.at < LAUNCH_FRAMES);
+const place = (cue: Cue, origin: number) => (cue.beat ? onBeat(cue.at + origin) : cue.at + origin);
+
+const CUES = SHOTS.flatMap((shot, i) => [...shot.cues, ...exitCue(shot, lengths[i])].map((cue) => ({ ...cue, at: place(cue, starts[i]) }))).filter((cue) => cue.at < LAUNCH_FRAMES);
+
+const musicVolume = (frame: number) => MUSIC.volume * interpolate(frame, [LAUNCH_FRAMES - MUSIC.fadeOut, LAUNCH_FRAMES], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+
+const Music = () => (MUSIC.file ? <Audio src={staticFile(`music/${MUSIC.file}`)} volume={musicVolume} /> : null);
 
 const nextColor = (i: number) => TONES[SHOTS[Math.min(i + 1, SHOTS.length - 1)].tone].bg;
 
@@ -59,14 +72,17 @@ export const Launch = () => {
   return (
     <AbsoluteFill>
       <Series>
-        {SHOTS.map(({ scene: Scene, frames, exit }, i) => (
-          <Series.Sequence key={i} durationInFrames={frames}>
-            <Scene />
-            <ExitWipe exit={exit} color={nextColor(i)} />
+        {SHOTS.map(({ scene: Scene, exit }, i) => (
+          <Series.Sequence key={i} durationInFrames={lengths[i]}>
+            <SceneOrigin.Provider value={starts[i]}>
+              <Scene />
+              <ExitWipe exit={exit} color={nextColor(i)} />
+            </SceneOrigin.Provider>
           </Series.Sequence>
         ))}
       </Series>
-      <Sfx cues={CUES} />
+      <Sfx cues={CUES} gain={sfxGain()} />
+      <Music />
     </AbsoluteFill>
   );
 };
