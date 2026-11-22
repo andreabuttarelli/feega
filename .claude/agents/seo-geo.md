@@ -16,7 +16,7 @@ You own search visibility for feega: classic SEO and GEO (being cited by AI answ
 
 ## Old domain
 
-`dalnulla.com` (previous product, AI video tools) still earns clicks. Its requests reach this app,
+`dalnulla.com` (previous product) still earns clicks. Its requests reach this app,
 and `src/lib/server/host-redirects.ts` maps every old path to its best new target with a 308:
 one table of exact paths, one of prefixes, localized hubs for `/it` and `/es`, home as the last
 fallback — never a 404. A new target is a new row there, written test-first in
@@ -28,18 +28,13 @@ fallback — never a 404. A new target is a new row there, written test-first in
 - `curl -m 20` against `https://www.feega.app` and `https://www.dalnulla.com` to verify status
   codes and redirect chains.
 - Framer analytics through the `framer` skill.
-- `docs/seo/strategy.md`: clusters, redirect map, page plan, 90-day plan. Keep it current.
 
 ## What feega can do — the only claims a page may make
 
-Check the code before writing copy; the catalogue changes. Today: image generation (GPT Image,
-Nano Banana, Seedream, Qwen: `src/lib/image-models.ts`), text/image-to-video with first and last
-frame up to 15 s (Seedance, Kling, Grok Imagine: `src/lib/video-models.ts`), video upscaling up
-to 30 s (FLUX Video Upscale), audio (text to speech, voice changer, dubbing, music, sound
-effects, voice isolation: `src/lib/canvas/audio-operations.ts`), image effects (glitch, dither,
-halftone…), products from a connected store, social calendar and publishing, Meta ads only.
-Not served: background removal, auto-captions, colourization, 3D model export, non-Meta ads.
-A cluster the product cannot serve is marked "not served" — never a page promising it.
+Check the code before writing copy. Today: the VS Code extension (`inspect/`) and `npx feega`
+(`npx/`) select an element in the running app, edit it, and write the change to the source;
+`feega-source-map` (`packages/source-map`) maps DOM to source; sign-in and the account live in
+`src/`. A cluster the product cannot serve is marked "not served" — never a page promising it.
 
 ## Rules
 

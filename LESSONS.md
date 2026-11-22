@@ -34,32 +34,6 @@ i gestori di Svelte 5 (proprietà `Symbol` sull'elemento), non da `networkidle`.
 background va interrogata a intervalli brevi: aspettarla ferma oltre dieci minuti fa uccidere la
 sessione dal watchdog.
 
-### Una cache letta di sincrono sceglie il modello sbagliato senza dire niente
-Spostato il default della chat da `LLM_DEFAULT_MODEL` a una riga in Supabase, la riga marcata
-diceva `z-ai/glm-5.3-flash` e il turno e` girato su `google/gemini-3.8-flash` — l'env. Nessun
-errore, nessun log: `resolveChatModel` e` sincrono (lo chiamano una dozzina di superfici che poi
-fanno `streamText`), quindi legge una cache di modulo, e su quel percorso nessuno l'aveva
-scaldata. Segnale: la configurazione in database «non ha effetto», il turno riesce lo stesso, e
-`ai_calls` mostra il modello vecchio mentre la tabella mostra quello nuovo. Mossa: scaldare la
-cache al confine della richiesta (`hooks.server.ts`, prima di ogni handler), non nel primo
-chiamante che capita — e il test che vale e` quello che confronta la riga del database col
-modello finito in `ai_calls`, non quello che chiede alla cache cosa ha in pancia.
-
-**La regola dietro**: un valore che l'operatore cambia da fuori NON puo` vivere dietro una cache
-riempita da un chiamante di passaggio. O lo si legge dove si puo` aspettare, o lo si scalda in un
-punto per cui passano tutti. La terza via — «tanto qualcuno l'avra` letta» — e` il difetto piu`
-silenzioso che ci sia, perche' il prodotto continua a funzionare.
-
-### Lo Storage locale non salva immagini: «extended attributes disabled»
-Verificando una grafica dalla chat, ogni upload falliva e l'agente riferiva onestamente «Upload
-failed». Nel log del dev server: `[uploadPostImage] storage upload failed: The file system does not
-support extended attributes or has the feature disabled`. Non e` il codice: il container Storage
-del self-hosted, sul filesystem montato da Docker su macOS, non riesce a scrivere gli xattr.
-Segnale: OGNI upload fallisce allo stesso modo, anche su percorsi che non hai toccato — la prova
-decisiva e` chiedere una foto AI (percorso vecchio) e vedere lo stesso errore. Mossa: verifica la
-LOGICA con i test (il caricamento si mocka) e nel browser verifica quello che il difetto riguardava
-— quale tool viene scelto, quali righe nascono — senza pretendere che il file arrivi in Storage.
-
 ### Il worktree nuovo ha bisogno di `npm ci` — e ancora dopo ogni rebase su dev
 Un worktree parte senza `node_modules`, e `vite.config.ts` muore subito (`Cannot find package '@sentry/sveltekit'`). Ma il caso insidioso è l'altro: dopo aver ribasato su dev che ha accolto PR nuove, il `node_modules` installato col vecchio lockfile produce guasti **deterministici e fuori posto** — v. `extractUserText is not a function` in un test di immagini: il codice era giusto, le dipendenze vecchie. Segnale: un errore `X is not a function` su codice mai toccato, in un worktree ribasato. Mossa: `npm ci` nel worktree, sempre, dopo il rebase.
 
@@ -109,9 +83,6 @@ Un eval o un test lanciato da un worktree misura un ibrido: `$lib` punta alla co
 
 ### Il worktree DENTRO la repo dir: la pagina è viva ma non risponde (403 su `entry.js`)
 Un worktree creato dentro la cartella della repo (`dazero/dazero-wt/<slug>`) risolve `@sveltejs/kit` dal `node_modules` del checkout padre: vite lo serve via `/@fs/...` **fuori dalla root del worktree** e risponde 403 — il bundle client non parte, la hydratazione non arriva, e ogni click "riuscito" dell'automazione browser non cambia nulla (SSR morto senza errori in console). Segnale: `performance.getEntriesByType('resource')` mostra `entry.js` con `responseStatus: 403`, i click vanno a un DOM senza handler. Mossa: il worktree sta **fuori** dalla repo (`../dazero-wt/<slug>`, come da docs/e2e-testing.md §1) con `npm ci` proprio.
-
-### Node 25: l'editor motion dà 500 in SSR con `browserStore(...)?.getItem is not a function`
-Node ≥ 25 ha un `localStorage` globale anche sul server, senza metodi se manca `--localstorage-file`: un `typeof localStorage !== 'undefined'` passa e `getItem` esplode in SSR. Segnale: la spec Playwright `@real` resta appesa sulla pagina "Something broke on our side", e il log del webServer mostra quello stack su `MotionEditorShell.svelte`. Mossa: `NODE_OPTIONS=--no-experimental-webstorage` per il dev server dei test (`node -v` prima di sospettare il tuo diff).
 
 ### Verifica il `workdir` prima di ogni Edit
 Con più worktree aperti (feature + verifica), un edit fatto nel checkout sbagliato tocca dev. È successo: `live.ts` modificato nel checkout principale per un secondo, poi `git checkout --` e riapplicato nel posto giusto. Il tool Edit non ti proteggere — proteggiti tu: guarda il percorso del file che stai per toccare, sempre.
@@ -215,12 +186,6 @@ o liste con un modello in più, e in CI sono verdi. Causa: i test leggono la con
 (chiavi Kie, Stripe) invece dei default vuoti. Mossa: sposta `.env` fuori dal worktree prima di
 `vitest`, rimettilo solo per l'e2e.
 
-### Un'op nuova che il chat elenca sfora il budget di caratteri
-Segnale: `tool-budget.test.ts` rosso di poche decine di caratteri su una PR che aggiunge un'op
-`canvas_tool`. Causa: il chat elenca nome e campi di ogni op, quindi ogni op costa il suo nome.
-Mossa: prima accorcia i riepiloghi; se non basta, alza `CANVAS_CHAT_MAX_CHARS` di poco (come
-#1172) nello stesso commit. Un'op con un enum di strumenti (`image_tool`) costa meno di un'op per strumento.
-
 ## Test: distinguere il tuo difetto dal rumore
 
 ### Un test "lento a intermittenza" può non essere lento affatto
@@ -278,30 +243,11 @@ Dopo un merge da dev, un test della PR entra in timeout di 30s invece di fallire
 ### Le factory `vi.mock` invecchiano col merge, non col typecheck
 Il mock scritto nell'era della PR non dichiara gli export nuovi di dev (`createSubagentTools`, `MAX_CRITERION_CHARS`, `loadMemoryEntries`): l'errore `No "X" export is defined on the "Y" mock` esplode a runtime a metà test, mai in compilazione. Stesso segno per il fake supabase che manca di un metodo nuovo (`query.or is not a function`). Mossa: a ogni errore di quel tipo aggiungi l'export — o meglio `...actual` via `importOriginal` e override selettivi.
 
-### Il fake di una RPC che torna `null` dove il plpgsql torna una riga di NULL
-Una funzione `returns public.<tabella>` che non prende righe NON torna `null`: la riga composita esce tutta NULL e PostgREST la consegna come oggetto con ogni colonna a `null`. Un fake che risponde `{ data: null }` rende verde un client che controlla `if (!data)` e lascia passare in produzione un record fantasma — `agent_kit_claim_run` faceva girare turni interi con `run.id === null`: ogni scrittura filtrata per `id` toccava zero righe e la chiusura non depositava il messaggio, quindi il turno spariva dalla chat dopo aver speso il modello. Segnale: `run null` nei log, o «sfrattato prima della chiusura» su un run che nessuno ha sfrattato. Mossa: nel fake torna la riga di NULL, e nel client controlla la CHIAVE (`if (!row?.id)`), mai la sola presenza dell'oggetto.
-
-### Un id di modello non dichiarato non fallisce: scivola su un altro provider
-`harness-pi` considera il gateway Vercel configurato appena vede `AI_GATEWAY_API_KEY` **o** `VERCEL_OIDC_TOKEN` (che su Vercel c'è sempre), e da lì risolve il modello cercando prima un match sul provider `vercel-ai-gateway`. Se l'id che chiediamo non sta nel `models.json` del nostro provider, non arriva un errore che dice «modello sconosciuto»: arriva un 403 di un provider che non abbiamo scelto, su un modello che nessuno ha chiesto, mentre i nostri log stampano l'id che avevamo selezionato. Segnale: `originalModelId` nel `providerMetadata` diverso dal `Model:` del nostro log. Mossa: dichiarare le credenziali a pi come `customEnv` (con un customEnv configurato l'ambiente non viene più guardato) e mettere l'id del turno fra i modelli dichiarati, sempre — non basta la lista dell'env, perché il default esce dal database e il listino del gateway è freddo al primo turno del processo.
-
 ### Lo script fuori dalla suite marcisce in silenzio, e il `null as never` è la data di scadenza
 `scripts/eval/creative.ts` moriva al primo passo con `TypeError: Cannot read properties of undefined`: `proposeRubrics`, `planStrategy` ed `executePlan` avevano perso il parametro `ai` in `80666f7e` («Drop the dead ai parameter from every signature»), e la sonda passava ancora `(null as never, BRAND, …)`. Nessun test la copre — è uno script, non un test — e nessuno la lanciava perché costa soldi veri, quindi il difetto è rimasto lì per settimane senza che niente diventasse rosso. Segnale: un `null as never` (o un `as any`) in testa a una chiamata, che è esattamente il cast che impedisce al compilatore di dire «quella firma è cambiata». Mossa: quando togli un parametro da una firma, cerca i chiamanti **fuori** da `src/` (`scripts/`, `cli/`) — e togli il cast, perché un argomento che ha bisogno di `as never` per passare il typecheck è un argomento che non dovrebbe essere lì.
 
-### Un controllo sull'output di un modello, tarato col runner finto, è verde e non funziona
-Quindici test col runner finto verdi, e sul modello vero `enhance_prompt` rifiutava **ogni** riscrittura. I controlli misuravano quanto era COMPARSO (crescita e vocabolario nuovo), e la misura vera dice che un brief di 46 caratteri torna in 1.010 — ventidue volte — perché nominare luce, materiale e ottica è esattamente il mestiere che gli avevamo chiesto: il controllo misurava il craft e lo chiamava invenzione. Segnale: soglie scelte senza un numero misurato dietro, e una fixture di test scritta a mano che «sembra» quello che il modello produrrebbe. Mossa: prima di tarare un controllo su output di modello, fai chiamate vere e misura; e gira la domanda verso ciò che è SPARITO invece che verso ciò che è comparso — è l'unica metà che non dipende né dal craft né dalla lingua.
-
-**E UNA CHIAMATA NON BASTA: il modello scrive diverso ogni volta.** Corretto il primo difetto, un giro solo dava verde e il secondo rifiutava — su cinque giri il tasso vero era 3/5, e i due rifiuti erano riscritture GIUSTE che avevano scritto «Low morning sun rakes in at 3800K» invece della parola «light». Un controllo che pretende ogni parola non sopravvive ai sinonimi, e l'elenco dei sinonimi non finisce mai (sun/light, dawn/morning, in ogni lingua): la soglia è tollerarne UNA persa, che lascia passare il sinonimo e boccia lo stesso la scena sostituita, che di parole ne perde molte insieme. Misura il TASSO su almeno cinque giri, prima e dopo: 3/5 → 5/5 è un verdetto, «ha funzionato» su un campione non lo è.
-
-### Cercare il nome del VECCHIO trasporto è il modo più naturale di non trovare quello nuovo
-Concluso due volte che OpenRouter non reggesse i riferimenti video, e sbagliato due volte. Primo: interrogato `/api/v1/models`, zero modelli video — ma quello è il catalogo TESTUALE, i video stanno su `/api/v1/videos/models` e sono 29. Secondo: cercato `referenceImages` nei tipi dell'SDK, assente — il nome di kie, mentre quello vero è `inputReferences`. Segnale: una migrazione fra due provider in cui il campo "non esiste" ma la capacità è documentata altrove. Mossa: cerca per CAPACITÀ (audio, video, reference) e non per nome, e leggi i tipi dell'SDK invece della pagina di panoramica — `npm pack @openrouter/sdk && grep -r inputReferences package/` dice in dieci secondi ciò che due pagine di documentazione non dicono.
-
-**I nomi giusti, per non ricercarli:** su OpenRouter il catalogo testuale è `/api/v1/models`, quello video `/api/v1/videos/models` (29 modelli, con durate, rapporti, risoluzioni, `generate_audio`, `supported_frame_images`). I riferimenti multimodali di un video sono `input_references` — `image_url` | `audio_url` | `video_url` in un elenco solo — mentre `frame_images` è un'altra cosa: il primo e l'ultimo fotogramma. Su kie gli stessi concetti si chiamavano `referenceImageUrls`, `referenceAudioUrls`, `referenceVideoUrls`, tre liste separate.
-
 ### Su un'API che ignora i campi sconosciuti, una prova che «passa» non prova niente
 Mandato a OpenRouter un `reference_images` con un URL invalido: accettato, quindi sembrava supportato-ma-rotto. Poi mandato un campo chiamato `pippo_inesistente`: accettato uguale. L'API **scarta in silenzio ciò che non conosce**, quindi il primo test misurava solo il mio errore di nome. Mossa: prima di concludere qualcosa da una richiesta accettata, manda un campo inventato di sana pianta — se passa anche quello, l'accettazione non dice nulla sul campo che ti interessa.
-
-### Il giudice che non sbaglia mai non sta guardando
-Un giudizio LLM su un artefatto reso va provato su DUE input, o non è provato: uno pulito e uno costruito apposta per rompere ogni controllo. Il giudice del mestiere fotografico (`photo-craft-review.ts`) dà `6/6 passati` su un barattolo reso bene e `5 su 6 caduti` su un brief che ordina esplicitamente il tappo tolto, il softbox in scena e il testo inventato — e nomina proprio quelli. Un solo giro verde non distingue «l'immagine è a posto» da «il modello risponde true a tutto», che è il modo normale in cui un controllo estetico muore. Mossa: prima di fidarti di un giudice, rendigli un input che DEVE bocciare; se non lo boccia, il difetto è nella domanda — troppo vaga, o non decidibile guardando.
 
 ### 402 dalla sonda di drift e «Unauthorized» da `db:types`: è la quota di egress, non il codice
 Con il progetto Supabase oltre la quota di egress, PostgREST risponde 402 a tutto (lo
@@ -989,29 +935,6 @@ benissimo; è il fallimento a diventare muto, quindi la sonda sembra corretta fi
 messaggio d'errore leggibile, e un rifiuto anonimo costa molto di più: non si riconosce, quindi non
 si spiega, quindi il giro dopo è identico al primo.
 
-## Un fornitore che risponde `200` può avere già detto di no
-
-**Segnale.** Le metriche di un fornitore mancano da settimane e `ai_calls` non mostra niente: la
-percentuale di successo è alta, il prodotto risponde, e il numero che arriva al cliente è uno zero
-che sembra una diagnosi. Oppure il contrario: `ai_calls` mostra il 96% di fallimenti su una label
-e nessuno se ne accorge, perché ogni chiamante traduce il rifiuto in `null` e ogni lettore traduce
-`null` in «non c'è nessun dato per questo dominio».
-
-**Cosa succede.** Due cose insieme, e si coprono a vicenda. La prima: leggere solo `res.ok` non
-basta. DataForSEO — ma è la norma nelle API a task — risponde `HTTP 200` con il verdetto vero
-dentro il task (`status_code: 40200 Payment Required.`), e quel caso viene loggato come successo
-mentre torna zero righe. La seconda: `catch { return null }` e `catch { return [] }` cancellano la
-differenza fra «ha risposto, non c'è niente» e «non ha risposto». Sono la stessa forma, e chi legge
-— soprattutto se chi legge è un modello che scrive l'analisi al cliente — sceglie la lettura
-sbagliata con la stessa sicurezza della giusta.
-
-**La mossa.** Leggere il verdetto **dove nasce** — una funzione sola, quella che fa la POST — e
-tenere dentro il log la frase del fornitore, non lo status: `Payment Required.` chiude la diagnosi,
-`HTTP 402` la comincia soltanto. Poi far arrivare il rifiuto a chi legge sotto forma di frase, come
-`truncated` dichiara una lista tagliata: un risultato vuoto che non dice perché è vuoto è una
-bugia con la stessa faccia della verità. E prima di dare la colpa al codice, chiedere il saldo:
-quasi ogni fornitore ha un endpoint gratuito che dice quanto credito resta (`appendix/user_data`),
-e un `402` non si debugga, si ricarica.
 ## Un vincolo nuovo rende raggiungibile ogni `catch` muto sulla stessa tabella
 
 **Segnale.** Una funzione che ha sempre funzionato comincia a perdere dati, e nel diff del giorno
@@ -1215,14 +1138,6 @@ sensi: il server vede il dato, un utente estraneo (`set local role authenticated
 Leggere sempre la definizione IN PRODUZIONE (`pg_get_functiondef`), non il file: questa guardia
 era stata aggiunta al database e mai scritta in una migration del repo.
 
-### Uno script lanciato da `vite-node` non vede il proprio percorso in `process.argv`
-Segnale: `npm run <script>` finisce con exit 0 e non stampa niente, né in prova né sul serio (lo
-script di import dei talent "non faceva nulla" in silenzio). `vite-node` toglie il percorso dello
-script da `argv` (resta solo `node`, `vite-node` e i flag), quindi la guardia
-`import.meta.url === file://${process.argv[1]}` è sempre falsa e `run()` non parte mai. Mossa: la
-guardia è `!process.env.VITEST` (vitest la imposta sempre; così il test importa le funzioni pure
-senza far partire lo script). Diffidare di un exit 0 muto: uno script che deve fare qualcosa lo dice.
-
 ### `Cannot find module '@dazero/…'` o di un pacchetto transitivo dopo un `bun install`
 Segnale: il dev server e metà della suite muoiono su `@dazero/api-contracts`, `intl-messageformat`
 o simili, e `node_modules/.bun/` esiste. Bun 1.3 in un repo con `workspaces` installa con il
@@ -1230,27 +1145,6 @@ linker "isolated": collega solo le dipendenze dichiarate, quindi spariscono i wo
 non li dichiara) e ogni transitivo importato direttamente. Mossa: `bunfig.toml` fissa
 `linker = "hoisted"`, poi `bun install`. Non aggiungere dipendenze una per una: è il layout, non
 il codice.
-
-### `\b` in una regex di prefisso non ferma al trattino, e un `.find` misto sceglie il primo ramo sbagliato
-`videoModelSpec` cercava lo spec giusto con un solo `.find((s) => s.id === v || s.match.test(v))`,
-in ordine di riga. `\b` è un confine fra carattere di parola e non-parola: dopo una cifra, un
-trattino È quel confine, quindi `/^bytedance\/seedance-2\b/` (lo spec di `seedance-2`) intercetta
-anche `seedance-2-fast` e `seedance-2-mini` prima che il `.find` arrivi alle loro righe con l'id
-esatto. Tre id diversi finivano sullo stesso `ModelChoice`, e il dropdown della barra selezione
-— keyed su `c.id` — lanciava `each_key_duplicate`: uno stato Svelte a metà crash lascia il
-floating layer a intercettare i click, e ogni menu della tela sembra rotto, non solo quello.
-Segnale: un `{#each ... (id)}` che crasha con id duplicati mentre la fonte a monte sembra
-un elenco di righe distinte. Mossa: mai un `.find` che alterna corrispondenza esatta e prefissa
-nello stesso passaggio — prima tutti gli id esatti, POI il fallback a prefisso
-(`SPECS.find(id-esatto) ?? SPECS.find(prefisso)`), e un test che chiede a ogni id esatto del
-registro di risolvere a se stesso, non solo al capostipite della famiglia.
-
-### Un video (o un loop) resta "in caricamento" per sempre in locale
-Segnale: `node_runs` in `running` con `external_job_id` valorizzato, `attempts = 0`,
-`claimed_at` null. In produzione `vercel.json` chiama `/api/v1/canvas/runs/tick` ogni minuto;
-sotto `npm run dev` nessuno la chiamava. Mossa: il plugin `devCrons` (`scripts/dev-crons.ts`)
-chiama le cron al minuto di `vercel.json` in sviluppo (`cronAuthorized` le lascia passare in
-dev). Per forzarne una subito: `curl localhost:5173/api/v1/canvas/runs/tick`.
 
 ### Edit non committati nel working tree condiviso finiscono nel commit di un altro agente
 Segnale: più agenti lavorano nello stesso checkout (non un worktree a testa), e `git status`
@@ -1286,32 +1180,6 @@ di ricaricare la pagina) un `ReferenceError` di un'API del browser dentro `node_
 modulo server la carica all'avvio della funzione, e in Node `DOMMatrix` non esiste. Mossa:
 `await import('libreria')` dentro la funzione che la usa, e un test che importa il modulo e
 verifica che la libreria non si carichi.
-
-### Un bucket per-utente + una riga condivisa dall'org: la RLS della riga non basta, va firmata con un client diverso
-Segnale: l'asset e il file in Storage esistono entrambi (verificabile con SQL a chiave anon), la
-RLS su `assets` lo mostra a ogni membro dell'org, eppure per chiunque non sia chi l'ha generato
-l'immagine sparisce dal canvas e dal pannello Media. `brand-knowledge` tiene cartelle per UTENTE
-(`<userId>/media/...`), e la sua unica policy di lettura confronta il primo segmento del path con
-`auth.uid()` — non con `auth_org_ids()` come ogni altra policy dell'app. Firmare con il client
-dell'utente eredita quel confine per-utente anche dove il dato che conta è condiviso per-org.
-Mossa: leggere la riga con il client dell'utente (prova l'appartenenza all'org via RLS), poi
-firmare il path con un client service-role dichiarato in `service-role-uses.ts` — mai il
-contrario, e mai un service client passato al posto del client utente per la lettura: la firma è
-un passo deliberatamente più permissivo della lettura, non un modo per saltarla.
-
-### Un URL firmato scritto in `nodes.data` scade, e l'immagine sparisce senza che il file si muova
-Segnale: la riga e il file in Storage sono entrambi sani (verificabile con SQL), `data` porta
-`assetId` ma non `refId`, e `data.url` è un URL `/storage/v1/object/sign/...` — non la rotta
-stabile `/p/<project>/c/<canvas>/assets/<id>`. Un URL firmato dura ~2 ore su Supabase Storage;
-persisterlo in una colonna che sopravvive a una ricarica è la stessa classe di errore di un
-token di sessione salvato in una colonna "permanente". Tre scritture da drag-and-drop
-(`assetDrag`, `brandFieldDrag`, `colourDrag` in `drag-payload.ts`) lo facevano, mentre l'upload
-diretto (`registerCanvasUpload`) già scriveva la rotta stabile. Mossa: mai un URL effimero in
-stato durevole — si persiste solo il riferimento stabile (`refId`/`assetId`), e l'URL firmato si
-calcola SOLO alla lettura (`signAssetPaths`/la rotta `/assets/<id>`, mai in scrittura). Il
-confine si valida al bordo di scrittura, una volta sola: `validateNodeData` rifiuta oggi
-qualunque `/storage/v1/object/sign/` trovato ovunque nel payload, ricorsivamente — non un
-controllo per campo che la prossima scrittura aggirerebbe.
 
 ### Un indice unico PARZIALE non può mai essere il bersaglio di un upsert PostgREST — `42P10` anche quando l'indice esiste
 `upsertNodeProducts`/`insertBrandProducts` chiamavano `.upsert(rows, { onConflict:
@@ -1439,58 +1307,14 @@ Signal: a test of code under `packages/` hangs or ignores your edit in a worktre
 
 **Signal:** every save shows "The server failed to save this change", Vercel logs are empty, `schema-drift-check` lists an unapplied migration. **Move:** new optional columns/RPC args are written with a fallback (retry without on PGRST202/PGRST204/42703), and `handleError` must `console.error` — Sentry's wrapper alone shows nothing in Vercel. Migrations merged to `dev` are applied to production (which `dev` uses) before the user tests `dev`.
 
-## URL import fidelity from a worktree: every fixed text black and wrapped
-
-**Signal:** a local fidelity run paints imported texts black, centred and wrapping; `plan.skipped` lists `textWrap Invalid option`. **Move:** the worktree resolves `@feega/motion-core` from the main checkout, whose schema lacks newer values. Make `node_modules` a folder of symlinks to the main one with `@feega/*` pointing at the worktree's `packages/`, then score again; earlier numbers are not comparable.
-
-## A Next.js app imported from code has no components, a Vite one does
-
-**Signal:** code import of a Next.js 16 app answers `components: 0`; the page in the reference screenshot looks right, `__reactFiber$` keys are missing on every element, the console shows the `/_next/hmr` websocket failing with 500. **Move:** Next dev blocks `/_next/*` requests whose `Origin` is not localhost or in `allowedDevOrigins`, and without the HMR socket the client never hydrates, so there are no fibers to read. The sandbox puts `origin-proxy.ts` in front of the dev server: it rewrites `Host`, `Origin` and `Referer` to `localhost:<devPort>`, HTTP and websocket upgrade alike. Probe with `scripts/code-import/probe.mts <repo> <route>` (counts fibers, Svelte and Vue metas) before blaming the marker.
-
-
-## A breakpoint round trip writes overrides nobody made
-
-**Signal:** after making breakpoint code walk compositions, `liftViewEdit` of an untouched view adds overrides to a top-level clip (the landing fixture's `cta`). **Move:** clip ids are unique per composition, not per doc; a `Map` by id over top-level and composition clips mixes two clips with the same id. Keep id lookups scoped (top-level, or one composition), and only walk every composition for per-clip work that needs no lookup.
-
-## A URL import on Browserless takes four minutes and then succeeds
-
-**Signal:** `ai_calls` shows two `browserless` sessions per import, the first ~128 s, the second ~120 s. **Move:** the session cap is 120 s (`BROWSERLESS_SESSION_MS`); a read that runs out answers `too_slow` now instead of starting over. Profile with timers around each `AppTab` method (a `Proxy` over the tab) over Browserless, not locally: stripe takes 15 s in local Chrome. Most of it reproduces for free: connect puppeteer to local Chrome through a WebSocket proxy that delays each message by half the round trip (~180 ms to `production-sfo`) and count CDP methods there; per-call cost is round trips, so batch work into one evaluate. What does not reproduce is software WebGL: a CPU profile (`Profiler.start` on a CDP session) full of `(program)` and a main thread that answers an evaluate after 30-40 s means the page's WebGL scenes are drawing; rerun with `getContext('webgl')` returning null to confirm. `goto` with `networkidle2` never fires there (a worker and iframes puppeteer never sees end): wait for `load`, then a quiet network.
-
-## A fidelity reference screenshot loses images after a speed-up of the snapshots
-
-**Signal:** `url-fidelity` drops on apple (0.974 to 0.93-0.96) in bands that move between runs; the side by side shows the import with its pictures and the reference (`-source.png`) without them, while the DOM reports every image loaded and visible. **Move:** a `Page.captureScreenshot` sent on a CDP session other than the page's own leaves Chrome painting later `captureBeyondViewport` shots without some images (`Page.enable` on that session does not help). Take screenshots with `page.screenshot`; a second session is fine for `Emulation` overrides.
-
 ## A probe script outside the worktree runs old package code
 
 **Signal:** a fix to `packages/motion-core` passes its unit test, but a `vite-node` script you keep in the scratchpad still prints the old numbers, and a debug log you add never shows. **Move:** imports such as `@feega/motion-core/...` resolve from the nearest `node_modules` up the script's path, which may be a stray install, not your worktree. Keep probe scripts inside the worktree (an ignored folder) so they resolve the code you are editing.
-
-## A whole nav comes in as one picture
-
-**Signal:** an imported block with links and buttons is a single image layer. **Move:** ask why the walker took the snapshot (`shape` in `page-tree.ts`: filter, mask, clip path, blend with children, `turned`). On supabase.com it was Tailwind's `transform` utility: it computes to `matrix3d(... 0, 0, 999, 1)` (a `translateZ`), which `matrixOf` did not parse, so `turned` read it as a rotation. Blocks holding text never snapshot now (`holdsContent`); a new snapshot reason must still keep them as layers.
-
-## Media emulation alone does not make a page light
-
-**Signal:** the same light site imports dark in some runs over Browserless, never locally; `emulateMediaFeatures` is set. **Move:** the stealth fingerprint answers scripts that call `matchMedia`; pin light from a script registered with `evaluateOnNewDocument` after the browser's own, plus `color-scheme` and the `Sec-CH-Prefers-Color-Scheme` hint. Check with five reads over Browserless (about $0.01): locally it never reproduces.
 
 ## A dev server started inside an agent worktree never reloads
 
 **Signal:** `vite dev` runs from `.claude/worktrees/<agent>`, a source edit is on disk, yet the served module (`curl` its URL) still lacks it and debug logs never print. **Move:** `vite.config.ts` ignores `**/.claude/worktrees/**` in the watcher, which matches every file of that checkout. Restart the server after each edit, or start it with a scratch config that spreads the repo config and replaces `server.watch.ignored`.
 
-## One capture scores old and new code badly on the same page
-
-**Signal:** a fresh capture drops a page for both the old and the new code (stripe desktop full 0.98 → 0.69, apple phone fold 0.98 → 0.59); the source screenshot shows another accordion item open, or a search panel. **Move:** the capture reads the tree and screenshots a moment later; a page that moves on its own in between (rotating accordion, a narrow-width panel) makes the two disagree. Compare code on one capture, and keep the capture whose screenshot matches its tree as the reference.
-
-## URL import answers 500 with `Error: [object Object]` from `connected`
-
-**Signal:** the preview log shows `unhandled server error` on `/url-import` with `Error: [object Object]` at `hidden` → `connected`; imports with breakpoints fail about half the time, a breakpoint view goes missing the rest. **Move:** the Browserless plan admits two sessions; a third connect gets `429`, which the server bundle receives as an `ErrorEvent` (stringified to `[object Object]`). Count the sessions one import opens at once (`importPageAt` reads views in turn beside the desktop read) and probe the limit with parallel `puppeteer.connect` calls before blaming the page.
-
-## Two imports at once: `busy`, or 429 behind `[object Object]`
-
-**Signal:** concurrent imports answer 503 `busy` or the dialog shows "Browsers are busy, retrying…"; a log line shows `BrowserBusy`. **Move:** one import opens two Browserless sessions, the plan admits two. `sessionSlots` queues connects per server process (`BROWSERLESS_MAX_SESSIONS`, wait 10 s); it does not span deployments, so two instances can still meet a 429, which now retries with backoff and then reads as `BrowserBusy`. A refusal that is not an `Error` goes through `errorText`, never `String(e)`.
-
-## Local mode must resolve before any Supabase key check
-
-**Signal:** 500 `SUPABASE_SERVICE_ROLE_KEY not configured` in local mode with no `.env`, only on routes that use the service-role or admin client. **Move:** `createClient` already routes to `localStore()`, but a key guard placed before it throws first; check `localStore()` ahead of every env-key guard in `db/client.ts` and `supabase-admin.ts`. Test: `src/lib/server/db/client.local.test.ts`.
 ## A dialog that closes itself before reading its props throws in silence
 
 **Signal:** clicking the action in a dialog closes it and nothing happens; `pageerror` says `Cannot read properties of null (reading 'history')`, no network request, no notice. **Move:** the handler called `onclose()` and then read props derived from the dialog's own state (`session`, `doc`); closing unmounts the component and the props turn null. Read and compute everything first, close last (`insertThenClose`); capture what a later `await` needs before closing.
@@ -1508,25 +1332,9 @@ Signal: a test of code under `packages/` hangs or ignores your edit in a worktre
 
 **Signal:** `ps` shows `npm exec vite dev --port <n>` with parent pid 1 after the feega server stopped; the desktop app needs its SIGKILL fallback to close the local server. **Move:** a non-detached child keeps the parent's event loop alive and does not die with it, and `child.kill()` reaches only the npm wrapper. Spawn through `spawnGroup` (`code-import/dev-children.ts`): own process group, `kill(-pid)` on release, exit and signals, pid file for the next start. Test with a fake `npm run dev` that spawns a grandchild, and assert the grandchild's pid is gone.
 
-## A text lifted out of its frame into a stack moves
-
-**Signal:** after removing a text's same-box wrapper inside a stack, glyphs sit up to 1 px off (Supabase checklist, Vercel buttons) while the layer box is identical. **Move:** page-tree boxes every text in a flex flow on purpose; the engine lays out a text flow item differently from a text inside a frame. Keep the box; only `label` (one line, fixed, aligned) may replace it.
-
 ## A browser run on a worktree dev server goes strange the moment a file is saved
 
 **Signal:** mid-run the page loses state (a pending import shows nothing, a panel vanishes, a map entry is missing), and the dev server log shows `page reload .svelte-kit/generated/client/...` at the same second as an edit to any file in the worktree, docs and changelogs included. **Move:** never edit the worktree while a Playwright run drives its dev server; write notes and PR text in the scratchpad, edit after the run, and redo the run from a fresh canvas file.
-
-## An origin written at the end of a long server job drops a sibling's change
-
-**Signal:** two imports into one frame both land on the canvas, but the code map lists only the second. **Move:** `codeAdd` read the origin when it started and wrote it ~40 s later; anything written in between was lost. Merge into the origin as it is right before the write (`rememberLatest`), and test with two calls in `Promise.all`, the first one slower.
-
-## Quadratic edit: a lookup by id inside a loop
-
-**Signal:** an edit or panel rebuild slows with document size (`laidIncrementally` cost ~28 ms per
-edit on 2,125 clips); the code has `find`/`findIndex`/`some`/`includes`/`filter` by id or parent
-inside a `map`/`filter`/`forEach` over clips, tracks, nodes or layers. **Move:** lookup by id
-inside a loop → build a `Map`/`Set` once outside it. Prove it with a test that counts scans or
-property reads on ~2,000 items (`src/lib/canvas/counted-list.testkit.ts`), not wall time.
 
 ## A CI audit matrix holds runners for hours when one row wedges the page
 
