@@ -28,6 +28,19 @@ export const SPRITES = {
   code: ["...........", "..b...#.b..", ".b...#...b.", "b....#....b", ".b..#....b.", "..b.#...b.."],
   terminal: ["nnnnnnnn", "n......n", "n.w....n", "n..w...n", "n.w.##.n", "n......n", "nnnnnnnn"],
   folder: ["###.....", "#oo#####", "#oooooo#", "#oooooo#", "#oooooo#", "########"],
+  font: ["...##...", "..#..#..", "..#..#..", ".######.", ".#....#.", "#......#", "#......#"],
+  image: ["nnnnnnnn", "n......n", "n.w..o.n", "n...b..n", "n..bbb.n", "n.bbbbbn", "nnnnnnnn"],
+  grid: ["##.##.bb", "##.##.bb", "........", "bb.##.##", "bb.##.##", "........", "##.bb.##"],
+  ring: ["..nnnn..", ".n....n.", "n..bb..n", "n.b..b.n", "n..bb..n", ".n....n.", "..nnnn.."],
+  feather: ["......##", ".....#o#", "....#oo.", "...#oo..", "..#oo...", ".#.#....", "#......."],
+  wave: ["#o#o#o#o", "o#o#o#o#", "oobboobb", "bboobboo", "bbnnbbnn", "nnbbnnbb"],
+  sticker: ["######..", "#oooo##.", "#oooo#w#", "#oooo#ww", "#oooooo#", "#oooooo#", "########"],
+  type: ["#######.", "#######n", "...##.nn", "...##n..", "...##n..", "...##n..", "....nn.."],
+  grain: ["g.g..g.g", ".g.gg.g.", "g..g.g..", ".gg...gg", "g..gg.g.", ".g..g..g", "g.g.g.g."],
+  shadow: ["........", ".#####..", ".#####g.", ".#####g.", ".#####g.", "..ggggg.", "........"],
+  chart: [".......#", "....#..#", "....#.##", ".b..#.##", ".b.##.##", "bb.##.##", "kkkkkkkk"],
+  play: ["bbbbbbbb", "b.#....b", "b.##...b", "b.###..b", "b.##...b", "b.#....b", "bbbbbbbb"],
+  qr: ["kkk.k.kk", "k.k..kkk", "kkk.k...", "...kk.k.", "k.k.kkkk", "kk...k.k", "k.kkk.kk"],
 } satisfies Record<string, string[]>;
 
 export type Sprite = keyof typeof SPRITES;
