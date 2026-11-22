@@ -1535,3 +1535,7 @@ property reads on ~2,000 items (`src/lib/canvas/counted-list.testkit.ts`), not w
 ## A service-role credential carries no role unless the request re-derives it
 **Signal:** a token row (`api_keys`) is checked for hash, revocation and expiry, then the request runs on the service-role client. RLS role rules (viewers read-only) do not apply, and a demotion or removal changes nothing for the token. **Move:** derive the effective scopes from the holder's current membership on every request (`scopesOfHolder`); never trust what was stored at mint time.
 
+
+## A worktree sees the main checkout's workspace packages, and `vite dev` misses in-place edits
+
+**Signal:** a test for an edited `packages/*` file keeps seeing the old schema (zod `.strict()` rejects a new field) although the worktree file is right; or a dev server keeps serving a styled component as it was before a `perl -pi` edit. **Move:** make `node_modules` a real directory of symlinks and point `@feega/*` at the worktree's own `packages/` (a plain symlink to the main `node_modules` resolves them in the main checkout); restart `vite dev` after a scripted edit, it does not always notice a replaced file.

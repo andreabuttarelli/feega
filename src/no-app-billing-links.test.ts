@@ -6,7 +6,7 @@ import { BILLING_PATH } from '$lib/billing-path';
 
 const SRC = fileURLToPath(new URL('.', import.meta.url));
 const SOURCE = /\.(ts|svelte)$/;
-const DEAD_LINKS = ['/app/billing', '/settings/billing', '}/credits'];
+const DEAD_LINKS = ['/app/billing', '/app/credits', '}/credits'];
 const HISTORY = join('lib', 'content', 'changelog');
 
 function sources(dir: string): string[] {
@@ -19,9 +19,9 @@ function sources(dir: string): string[] {
   });
 }
 
-describe('i crediti vivono nel workspace, non nel progetto', () => {
+describe('the billing page lives in the workspace settings, not in a project', () => {
   it('il percorso non porta né progetto né brand', () => {
-    expect(BILLING_PATH).toBe('/app/credits');
+    expect(BILLING_PATH).toBe('/app/settings/billing');
   });
 
   it('nessun link punta a un vecchio indirizzo dei crediti', () => {

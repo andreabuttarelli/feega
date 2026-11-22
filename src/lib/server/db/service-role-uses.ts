@@ -29,6 +29,11 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
     tables: ['usage_events']
   },
   {
+    path: 'src/lib/server/cloud-emails/send-once.ts — dbStore (sendOnce)',
+    why: "An email goes out from a webhook, a cron or another user's action (an invite, a share, a failed payment), so the recipient has no session, and user_emails grants nothing to anon/authenticated: only the server writes it. user_id is the recipient the caller resolved, never a value chosen by a request. It inserts one (user_id, kind, ref_id) row to claim the send, deletes that same row if the send fails, and reads nothing.",
+    tables: ['user_emails']
+  },
+  {
     path: 'src/lib/server/product-events/track.ts — track',
     why: "Il funnel nasce prima del login (un visitatore anonimo che arriva dalla landing) e la tabella non concede nulla ad anon/authenticated: solo il server scrive. Inserisce una riga con evento, id e props senza testo dei prompt; non legge nulla.",
     tables: ['product_events']
@@ -87,6 +92,11 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
     path: 'src/lib/server/tenancy/bootstrap.ts — createFirstOrg (also every org made with "New organisation", team/orgs.ts createOrg)',
     why: "Alla creazione non esiste ancora una riga in orgs_members, quindi auth_org_ids() è vuoto e la policy rifiuterebbe l'insert della org e del suo primo membro. È l'unico punto in cui la RLS non può funzionare per costruzione: l'appartenenza sta nascendo. Non accetta un org_id da chi chiama — lo crea, e il membro è sempre l'utente della sessione. Legge/scrive anche credit_ledger (assertFreeOrgLimit): il limite di org gratuite è deciso qui, non altrove.",
     tables: ['orgs', 'orgs_members', 'credit_ledger']
+  },
+  {
+    path: 'src/lib/server/tenancy/rename-org.ts — renameOrg',
+    why: "The database refuses UPDATE on orgs to authenticated (20261114_orgs_read_only.sql), so a session cannot rename its own org. The onboarding action calls it only after listMemberships, with the user's own client (RLS), confirmed the caller is an owner of that org and its name is still the auto-created one; the org_id comes from that membership, never from the form. Writes only orgs.name and updated_at.",
+    tables: ['orgs']
   },
   {
     path: 'src/routes/api/v1/orgs/[orgId]/team/+server.ts — TeamCtx.writer (setRole, invite, resend, invite link)',

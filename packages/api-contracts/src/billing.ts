@@ -20,7 +20,8 @@ const CheckoutInputSchema = z
       .number()
       .positive()
       .optional()
-      .describe('The one plan: 500 credits a month per editor for €9 (100 credits = €1). Any other amount is refused')
+      .describe('The one plan: 500 credits a month per editor for €9 (100 credits = €1). Any other amount is refused'),
+    interval: z.enum(['monthly', 'annual']).optional().describe('Billing interval of the Cloud seat price: monthly or annual. Omit it for the original monthly plan')
   })
   .strict();
 

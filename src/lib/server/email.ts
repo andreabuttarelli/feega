@@ -12,7 +12,7 @@ const FROM = env.EMAIL_FROM || `feega <noreply@${EMAIL_DOMAIN}>`;
 
 // Always send a plain-text part alongside the HTML: a missing text/plain alternative is a strong
 // spam signal, so this materially improves inbox placement (and degrades gracefully everywhere).
-export async function sendEmail(opts: { to: string; subject: string; html: string; text?: string; headers?: Record<string, string> }): Promise<void> {
+export async function sendEmail(opts: { to: string; subject: string; html: string; text?: string; headers?: Record<string, string>; from?: string; replyTo?: string }): Promise<void> {
   // La posta è l'unica cosa che arriva a una PERSONA. La suite gira col `.env` di chi la lancia,
   // quindi da qui partivano davvero: ops ha ricevuto incidenti con dentro thread e run finti. Si
   // ferma qui e non nei mock dei singoli file, perché basta un file che se ne dimentica.
@@ -27,7 +27,7 @@ export async function sendEmail(opts: { to: string; subject: string; html: strin
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: FROM, to: [opts.to], subject: opts.subject, html: opts.html, text: opts.text, ...(opts.headers ? { headers: opts.headers } : {}) }),
+    body: JSON.stringify({ from: opts.from ?? FROM, to: [opts.to], subject: opts.subject, html: opts.html, text: opts.text, ...(opts.replyTo ? { reply_to: opts.replyTo } : {}), ...(opts.headers ? { headers: opts.headers } : {}) }),
     signal: AbortSignal.timeout(10_000)
   });
   if (!res.ok) throw new Error(`Resend ${res.status}: ${await res.text()}`);
