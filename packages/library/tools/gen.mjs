@@ -15,6 +15,7 @@ import { parallaxGallery } from './parallax-gallery.mjs';
 import { hoverReveal } from './hover-reveal.mjs';
 import { glassButton } from './glass-button.mjs';
 import { asciiPrideItem } from './ascii-pride.mjs';
+import { pixelCode } from './pixel-code.mjs';
 
 const PACKAGE = join(dirname(fileURLToPath(import.meta.url)), '..');
 const TIER_DIRS = { free: join(PACKAGE, 'items'), pro: join(PACKAGE, 'pro') };
@@ -74,7 +75,7 @@ for (const item of [...sections, ...app, ...components, ...variants, ...blocks, 
   manifest(item, C);
 }
 
-for (const item of [...interactive, palette, scrollReveal, imageTunnel, parallaxGallery, hoverReveal, glassButton, asciiPrideItem]) {
+for (const item of [...interactive, palette, scrollReveal, imageTunnel, parallaxGallery, hoverReveal, glassButton, asciiPrideItem, pixelCode]) {
   const C = css(`fl-${item.id}`, item.mods, item.css);
   emit(item, C, item.files(C));
   manifest(item, C);

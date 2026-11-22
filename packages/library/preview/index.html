@@ -1155,6 +1155,13 @@ body{margin:0;padding:2rem 1rem;background:#0b0b0b;color:#f0eee9;font-family:"In
 .fl-pagination .next{transform:rotate(-90deg)}
 .fl-pagination .count{display:none;color:var(--feega-fg-muted)}
 @media (max-width:560px){.fl-pagination{justify-content:space-between}.fl-pagination ol{display:none}.fl-pagination .count{display:block}}
+.fl-pixel-code{font-family:var(--feega-font);font-size:var(--feega-text-body);line-height:1.5;letter-spacing:var(--feega-tracking);color:var(--feega-fg);background:var(--feega-bg);-webkit-font-smoothing:antialiased}
+:where(.fl-pixel-code) *,:where(.fl-pixel-code) *::before,:where(.fl-pixel-code) *::after{box-sizing:border-box}
+:where(.fl-pixel-code) :is(h1,h2,h3,h4,p,ul,ol,figure,blockquote,dl,dd){margin:0}
+:where(.fl-pixel-code) a{color:inherit;text-decoration:none}
+:where(.fl-pixel-code) :focus-visible{outline:2px solid var(--feega-focus);outline-offset:3px}
+.fl-pixel-code{--px-bg:#0038a8;--px-blue:#004dff;--px-ink:#0a0a0a;--px-line:#f0eee9;--px-line-dim:#8a8780;position:relative;height:clamp(24rem,70svh,44rem);overflow:hidden;background:var(--px-bg)}
+.fl-pixel-code canvas{position:absolute;top:0;left:0;image-rendering:crisp-edges;image-rendering:pixelated}
 .fl-pricing{font-family:var(--feega-font);font-size:var(--feega-text-body);line-height:1.5;letter-spacing:var(--feega-tracking);color:var(--feega-fg);background:var(--feega-bg);-webkit-font-smoothing:antialiased}
 :where(.fl-pricing) *,:where(.fl-pricing) *::before,:where(.fl-pricing) *::after{box-sizing:border-box}
 :where(.fl-pricing) :is(h1,h2,h3,h4,p,ul,ol,figure,blockquote,dl,dd){margin:0}
@@ -1460,7 +1467,7 @@ body{margin:0;padding:2rem 1rem;background:#0b0b0b;color:#f0eee9;font-family:"In
 </style>
 </head>
 <body>
-<header class="intro"><h1>feega library</h1><p>64 free items. Svelte, React, Vue, Astro and HTML. Light and dark.</p></header>
+<header class="intro"><h1>feega library</h1><p>65 free items. Svelte, React, Vue, Astro and HTML. Light and dark.</p></header>
 <section class="item" id="announcement-bar">
   <h2>Announcement bar <small>section / banner, announcement</small></h2>
   <div class="frame" data-theme="light" data-frame="announcement-bar-light"><aside class="fl-announcement-bar" aria-label="Announcement">
@@ -4114,6 +4121,547 @@ document.querySelectorAll('.fl-modal:not([data-ready])').forEach((root) => {
   <span class="count">Page 3 of 12</span>
   <a class="step" href="#" aria-label="Next page"><span>Next</span><svg class="fl-px next" viewBox="0 0 5 3" aria-hidden="true"><path d="M0 0h1v1h-1zM4 0h1v1h-1zM1 1h1v1h-1zM3 1h1v1h-1zM2 2h1v1h-1z" /></svg></a>
 </nav>
+</div>
+</section>
+<section class="item" id="pixel-code">
+  <h2>Pixel code <small>section / pixel, texture, dither, animation, code</small></h2>
+  <div class="frame" data-theme="light" data-frame="pixel-code-light"><section class="fl-pixel-code" aria-hidden="true" data-pixel="8" data-speed="1" data-density="0.5" data-lines="0.75" data-dither="bayer" data-dither-options="bayer,checker">
+  <canvas></canvas>
+</section>
+
+<script>
+(() => {
+  const DEFAULT_PIXEL = 8;
+  const DEFAULT_SPEED = 1;
+  const DEFAULT_DENSITY = 0.5;
+  const DEFAULT_LINES = 0.75;
+  const MATRICES = {
+    bayer: [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5],
+    checker: [0, 2, 3, 1]
+  };
+  const SCROLL = 0.5;
+  const TYPE = 28;
+  const LINE_GAP = 2;
+  const CLUSTER = 5;
+  const LEAD = 8;
+  const GRID = 20;
+  const REWRITE = 16;
+  const FADE = 0.3;
+  const FLICKER = 0.9993;
+  const FRAME_MS = 33;
+  const STILL_AT = 120;
+
+  function hash(x, y, seed) {
+    let h = Math.imul(x + 374761393, 668265263) ^ Math.imul(y + 1274126177, -2048144777) ^ Math.imul(seed + 3266489917, 374761393);
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+  }
+
+  function noise(x, y, seed) {
+    const xi = Math.floor(x);
+    const yi = Math.floor(y);
+    const fx = x - xi;
+    const fy = y - yi;
+    const u = fx * fx * (3 - 2 * fx);
+    const v = fy * fy * (3 - 2 * fy);
+    const a = hash(xi, yi, seed);
+    const b = hash(xi + 1, yi, seed);
+    const c = hash(xi, yi + 1, seed);
+    const d = hash(xi + 1, yi + 1, seed);
+    return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+  }
+
+  function knob(value, fallback) {
+    const n = Number(value);
+    return value && Number.isFinite(n) ? n : fallback;
+  }
+
+  function pixelCode(root) {
+    const canvas = root.querySelector('canvas');
+    const ctx = canvas.getContext('2d');
+    const probe = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+    const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const pixel = Math.max(1, knob(root.dataset.pixel, DEFAULT_PIXEL));
+    const speed = knob(root.dataset.speed, DEFAULT_SPEED);
+    const density = knob(root.dataset.density, DEFAULT_DENSITY);
+    const lines = knob(root.dataset.lines, DEFAULT_LINES);
+    const matrix = MATRICES[root.dataset.dither ?? ''] ?? MATRICES.bayer;
+    const side = Math.sqrt(matrix.length);
+
+    let cols = 0;
+    let rows = 0;
+    let image = null;
+    let cells = new Uint32Array(0);
+    let thresholds = new Float32Array(0);
+    let bg = 0;
+    let blue = 0;
+    let ink = 0;
+    let line = 0;
+    let dim = 0;
+    let visible = true;
+    let frame = 0;
+    let begun = 0;
+    let drawn = 0;
+
+    function packed(value) {
+      probe.clearRect(0, 0, 1, 1);
+      probe.fillStyle = value;
+      probe.fillRect(0, 0, 1, 1);
+      const [r, g, b, a] = probe.getImageData(0, 0, 1, 1).data;
+      return ((a << 24) | (b << 16) | (g << 8) | r) >>> 0;
+    }
+
+    function palette() {
+      const style = getComputedStyle(root);
+      const read = (name) => packed(style.getPropertyValue(`--px-${name}`).trim());
+      bg = read('bg');
+      blue = read('blue');
+      ink = read('ink');
+      line = read('line');
+      dim = read('line-dim');
+    }
+
+    function measure() {
+      const ratio = devicePixelRatio || 1;
+      const cell = Math.max(1, Math.round(pixel * ratio)) / ratio;
+      cols = Math.ceil(root.clientWidth / cell);
+      rows = Math.ceil(root.clientHeight / cell);
+      canvas.width = cols;
+      canvas.height = rows;
+      canvas.style.width = `${cols * cell}px`;
+      canvas.style.height = `${rows * cell}px`;
+      image = ctx.createImageData(cols, rows);
+      cells = new Uint32Array(image.data.buffer);
+      thresholds = new Float32Array(cols * rows);
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          thresholds[y * cols + x] = (matrix[(y % side) * side + (x % side)] + 0.5) / matrix.length;
+        }
+      }
+      palette();
+    }
+
+    function field(time) {
+      const drift = time * 0.04;
+      for (let y = 0; y < rows; y++) {
+        const fall = 0.3 + (1 - y / rows) * 0.15 + density - 0.5;
+        const wave = Math.sin(y * 0.11 - time * 0.2) * 0.08;
+        for (let x = 0; x < cols; x++) {
+          const i = y * cols + x;
+          let v = (x / cols) * 0.45 + fall + (noise(x * 0.07 + drift, y * 0.1 - drift, 1) - 0.5) * 0.4 + Math.sin(x * 0.08 + time * 0.3) * wave;
+          if (x % GRID === 0 && v > 0.7) {
+            v = 0.55;
+          }
+          const scaled = Math.min(Math.max(v, 0), 0.9999) * 2;
+          const step = scaled | 0;
+          const upper = scaled - step > thresholds[i];
+          cells[i] = step === 0 ? (upper ? bg : ink) : upper ? blue : bg;
+          if (hash(x, y, (time * 6) | 0) > FLICKER) {
+            cells[i] = cells[i] === blue ? bg : blue;
+          }
+        }
+      }
+    }
+
+    function code(k, y, time, enter) {
+      const rewrites = hash(k, 2, 5) < 0.4;
+      const period = REWRITE / Math.max(speed, 0.01);
+      const phase = hash(k, 3, 5) * period;
+      const version = rewrites ? Math.floor((time + phase) / period) : 0;
+      const since = rewrites ? time + phase - version * period : enter;
+      const typed = Math.min(enter, since) * TYPE * Math.max(speed, 0.2);
+      const fade = Math.min(1, y / (rows * FADE));
+      const tone = hash(k, version, 7) < 0.6 ? line : dim;
+      const cluster = Math.floor(k / CLUSTER);
+      let x = 3 + Math.floor(hash(cluster, 4, 5) * 8) * 4 + Math.floor(hash(k, version, 8) * 3) * 3;
+      const start = x;
+      const tokens = 3 + Math.floor(hash(k, version, 9) * 5);
+      const row = y * cols;
+
+      for (let n = 0; n < tokens && x < cols; n++) {
+        const dotted = hash(k + n, version, 10) < 0.55;
+        const length = dotted ? 5 + Math.floor(hash(k + n, version, 11) * 6) * 2 : 3 + Math.floor(hash(k + n, version, 12) * 14);
+        const end = Math.min(cols, x + length);
+        for (let c = x; c < end; c++) {
+          if (c - start > typed) {
+            return;
+          }
+          if (dotted && (c - x) % 2 === 1) {
+            cells[row + c] = bg;
+            continue;
+          }
+          const i = row + c;
+          if (fade <= thresholds[i]) {
+            continue;
+          }
+          cells[i] = (c - start) / LEAD < thresholds[i] ? blue : tone;
+        }
+        x = end + 1 + Math.floor(hash(k + n, version, 13) * 2);
+      }
+    }
+
+    function codeLines(time) {
+      const rate = SCROLL * Math.max(speed, 0.01);
+      const scroll = time * rate;
+      const shift = Math.floor(scroll);
+      for (let y = 0; y < rows; y++) {
+        const a = y + shift;
+        if (a % LINE_GAP !== 0) {
+          continue;
+        }
+        const k = a / LINE_GAP;
+        const cluster = Math.floor(k / CLUSTER);
+        if (hash(k, 0, 3) > lines || hash(cluster, 1, 3) > 0.2 + lines * 0.7) {
+          continue;
+        }
+        code(k, y, time, (rows - y + scroll - shift) / rate);
+      }
+    }
+
+    function draw(time) {
+      if (!image) {
+        return;
+      }
+      field(time);
+      codeLines(time);
+      ctx.putImageData(image, 0, 0);
+    }
+
+    function clock() {
+      return STILL_AT + (performance.now() - begun) / 1000;
+    }
+
+    function tick(now) {
+      frame = requestAnimationFrame(tick);
+      if (now - drawn < FRAME_MS) {
+        return;
+      }
+      drawn = now;
+      draw(clock());
+    }
+
+    function start() {
+      if (frame || still || !visible || document.hidden) {
+        return;
+      }
+      frame = requestAnimationFrame(tick);
+    }
+
+    function stop() {
+      cancelAnimationFrame(frame);
+      frame = 0;
+    }
+
+    function sync() {
+      if (document.hidden) {
+        stop();
+        return;
+      }
+      start();
+    }
+
+    const sizes = new ResizeObserver(() => {
+      measure();
+      draw(clock());
+    });
+    const view = new IntersectionObserver(([entry]) => {
+      visible = entry.isIntersecting;
+      if (visible) {
+        start();
+        return;
+      }
+      stop();
+    });
+
+    begun = performance.now();
+    sizes.observe(root);
+    view.observe(root);
+    document.addEventListener('visibilitychange', sync);
+    start();
+
+    return () => {
+      stop();
+      sizes.disconnect();
+      view.disconnect();
+      document.removeEventListener('visibilitychange', sync);
+    };
+  }
+
+  document.querySelectorAll('.fl-pixel-code:not([data-ready])').forEach((root) => {
+    root.setAttribute('data-ready', '');
+    pixelCode(root);
+  });
+})();
+</script>
+</div>
+  <div class="frame" data-theme="dark" data-frame="pixel-code-dark"><section class="fl-pixel-code" aria-hidden="true" data-pixel="8" data-speed="1" data-density="0.5" data-lines="0.75" data-dither="bayer" data-dither-options="bayer,checker">
+  <canvas></canvas>
+</section>
+
+<script>
+(() => {
+  const DEFAULT_PIXEL = 8;
+  const DEFAULT_SPEED = 1;
+  const DEFAULT_DENSITY = 0.5;
+  const DEFAULT_LINES = 0.75;
+  const MATRICES = {
+    bayer: [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5],
+    checker: [0, 2, 3, 1]
+  };
+  const SCROLL = 0.5;
+  const TYPE = 28;
+  const LINE_GAP = 2;
+  const CLUSTER = 5;
+  const LEAD = 8;
+  const GRID = 20;
+  const REWRITE = 16;
+  const FADE = 0.3;
+  const FLICKER = 0.9993;
+  const FRAME_MS = 33;
+  const STILL_AT = 120;
+
+  function hash(x, y, seed) {
+    let h = Math.imul(x + 374761393, 668265263) ^ Math.imul(y + 1274126177, -2048144777) ^ Math.imul(seed + 3266489917, 374761393);
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+  }
+
+  function noise(x, y, seed) {
+    const xi = Math.floor(x);
+    const yi = Math.floor(y);
+    const fx = x - xi;
+    const fy = y - yi;
+    const u = fx * fx * (3 - 2 * fx);
+    const v = fy * fy * (3 - 2 * fy);
+    const a = hash(xi, yi, seed);
+    const b = hash(xi + 1, yi, seed);
+    const c = hash(xi, yi + 1, seed);
+    const d = hash(xi + 1, yi + 1, seed);
+    return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+  }
+
+  function knob(value, fallback) {
+    const n = Number(value);
+    return value && Number.isFinite(n) ? n : fallback;
+  }
+
+  function pixelCode(root) {
+    const canvas = root.querySelector('canvas');
+    const ctx = canvas.getContext('2d');
+    const probe = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+    const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const pixel = Math.max(1, knob(root.dataset.pixel, DEFAULT_PIXEL));
+    const speed = knob(root.dataset.speed, DEFAULT_SPEED);
+    const density = knob(root.dataset.density, DEFAULT_DENSITY);
+    const lines = knob(root.dataset.lines, DEFAULT_LINES);
+    const matrix = MATRICES[root.dataset.dither ?? ''] ?? MATRICES.bayer;
+    const side = Math.sqrt(matrix.length);
+
+    let cols = 0;
+    let rows = 0;
+    let image = null;
+    let cells = new Uint32Array(0);
+    let thresholds = new Float32Array(0);
+    let bg = 0;
+    let blue = 0;
+    let ink = 0;
+    let line = 0;
+    let dim = 0;
+    let visible = true;
+    let frame = 0;
+    let begun = 0;
+    let drawn = 0;
+
+    function packed(value) {
+      probe.clearRect(0, 0, 1, 1);
+      probe.fillStyle = value;
+      probe.fillRect(0, 0, 1, 1);
+      const [r, g, b, a] = probe.getImageData(0, 0, 1, 1).data;
+      return ((a << 24) | (b << 16) | (g << 8) | r) >>> 0;
+    }
+
+    function palette() {
+      const style = getComputedStyle(root);
+      const read = (name) => packed(style.getPropertyValue(`--px-${name}`).trim());
+      bg = read('bg');
+      blue = read('blue');
+      ink = read('ink');
+      line = read('line');
+      dim = read('line-dim');
+    }
+
+    function measure() {
+      const ratio = devicePixelRatio || 1;
+      const cell = Math.max(1, Math.round(pixel * ratio)) / ratio;
+      cols = Math.ceil(root.clientWidth / cell);
+      rows = Math.ceil(root.clientHeight / cell);
+      canvas.width = cols;
+      canvas.height = rows;
+      canvas.style.width = `${cols * cell}px`;
+      canvas.style.height = `${rows * cell}px`;
+      image = ctx.createImageData(cols, rows);
+      cells = new Uint32Array(image.data.buffer);
+      thresholds = new Float32Array(cols * rows);
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          thresholds[y * cols + x] = (matrix[(y % side) * side + (x % side)] + 0.5) / matrix.length;
+        }
+      }
+      palette();
+    }
+
+    function field(time) {
+      const drift = time * 0.04;
+      for (let y = 0; y < rows; y++) {
+        const fall = 0.3 + (1 - y / rows) * 0.15 + density - 0.5;
+        const wave = Math.sin(y * 0.11 - time * 0.2) * 0.08;
+        for (let x = 0; x < cols; x++) {
+          const i = y * cols + x;
+          let v = (x / cols) * 0.45 + fall + (noise(x * 0.07 + drift, y * 0.1 - drift, 1) - 0.5) * 0.4 + Math.sin(x * 0.08 + time * 0.3) * wave;
+          if (x % GRID === 0 && v > 0.7) {
+            v = 0.55;
+          }
+          const scaled = Math.min(Math.max(v, 0), 0.9999) * 2;
+          const step = scaled | 0;
+          const upper = scaled - step > thresholds[i];
+          cells[i] = step === 0 ? (upper ? bg : ink) : upper ? blue : bg;
+          if (hash(x, y, (time * 6) | 0) > FLICKER) {
+            cells[i] = cells[i] === blue ? bg : blue;
+          }
+        }
+      }
+    }
+
+    function code(k, y, time, enter) {
+      const rewrites = hash(k, 2, 5) < 0.4;
+      const period = REWRITE / Math.max(speed, 0.01);
+      const phase = hash(k, 3, 5) * period;
+      const version = rewrites ? Math.floor((time + phase) / period) : 0;
+      const since = rewrites ? time + phase - version * period : enter;
+      const typed = Math.min(enter, since) * TYPE * Math.max(speed, 0.2);
+      const fade = Math.min(1, y / (rows * FADE));
+      const tone = hash(k, version, 7) < 0.6 ? line : dim;
+      const cluster = Math.floor(k / CLUSTER);
+      let x = 3 + Math.floor(hash(cluster, 4, 5) * 8) * 4 + Math.floor(hash(k, version, 8) * 3) * 3;
+      const start = x;
+      const tokens = 3 + Math.floor(hash(k, version, 9) * 5);
+      const row = y * cols;
+
+      for (let n = 0; n < tokens && x < cols; n++) {
+        const dotted = hash(k + n, version, 10) < 0.55;
+        const length = dotted ? 5 + Math.floor(hash(k + n, version, 11) * 6) * 2 : 3 + Math.floor(hash(k + n, version, 12) * 14);
+        const end = Math.min(cols, x + length);
+        for (let c = x; c < end; c++) {
+          if (c - start > typed) {
+            return;
+          }
+          if (dotted && (c - x) % 2 === 1) {
+            cells[row + c] = bg;
+            continue;
+          }
+          const i = row + c;
+          if (fade <= thresholds[i]) {
+            continue;
+          }
+          cells[i] = (c - start) / LEAD < thresholds[i] ? blue : tone;
+        }
+        x = end + 1 + Math.floor(hash(k + n, version, 13) * 2);
+      }
+    }
+
+    function codeLines(time) {
+      const rate = SCROLL * Math.max(speed, 0.01);
+      const scroll = time * rate;
+      const shift = Math.floor(scroll);
+      for (let y = 0; y < rows; y++) {
+        const a = y + shift;
+        if (a % LINE_GAP !== 0) {
+          continue;
+        }
+        const k = a / LINE_GAP;
+        const cluster = Math.floor(k / CLUSTER);
+        if (hash(k, 0, 3) > lines || hash(cluster, 1, 3) > 0.2 + lines * 0.7) {
+          continue;
+        }
+        code(k, y, time, (rows - y + scroll - shift) / rate);
+      }
+    }
+
+    function draw(time) {
+      if (!image) {
+        return;
+      }
+      field(time);
+      codeLines(time);
+      ctx.putImageData(image, 0, 0);
+    }
+
+    function clock() {
+      return STILL_AT + (performance.now() - begun) / 1000;
+    }
+
+    function tick(now) {
+      frame = requestAnimationFrame(tick);
+      if (now - drawn < FRAME_MS) {
+        return;
+      }
+      drawn = now;
+      draw(clock());
+    }
+
+    function start() {
+      if (frame || still || !visible || document.hidden) {
+        return;
+      }
+      frame = requestAnimationFrame(tick);
+    }
+
+    function stop() {
+      cancelAnimationFrame(frame);
+      frame = 0;
+    }
+
+    function sync() {
+      if (document.hidden) {
+        stop();
+        return;
+      }
+      start();
+    }
+
+    const sizes = new ResizeObserver(() => {
+      measure();
+      draw(clock());
+    });
+    const view = new IntersectionObserver(([entry]) => {
+      visible = entry.isIntersecting;
+      if (visible) {
+        start();
+        return;
+      }
+      stop();
+    });
+
+    begun = performance.now();
+    sizes.observe(root);
+    view.observe(root);
+    document.addEventListener('visibilitychange', sync);
+    start();
+
+    return () => {
+      stop();
+      sizes.disconnect();
+      view.disconnect();
+      document.removeEventListener('visibilitychange', sync);
+    };
+  }
+
+  document.querySelectorAll('.fl-pixel-code:not([data-ready])').forEach((root) => {
+    root.setAttribute('data-ready', '');
+    pixelCode(root);
+  });
+})();
+</script>
 </div>
 </section>
 <section class="item" id="pricing">

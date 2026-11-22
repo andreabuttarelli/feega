@@ -19,7 +19,10 @@ const proItems = loadItems(PRO_DIR);
 const items = [...freeItems, ...proItems];
 const tokens = readFileSync(TOKENS_FILE, 'utf8');
 const COLOR_LITERAL = /#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\(/;
-const PALETTE_TABLES: Readonly<Record<string, RegExp>> = { 'ascii-pride': /--ascii-c\d+:#[0-9a-fA-F]{6}\b/g };
+const PALETTE_TABLES: Readonly<Record<string, RegExp>> = {
+	'ascii-pride': /--ascii-c\d+:#[0-9a-fA-F]{6}\b/g,
+	'pixel-code': /--px-[a-z-]+:#[0-9a-fA-F]{6}\b/g
+};
 const withoutPalette = (id: string, source: string) => (id in PALETTE_TABLES ? source.replace(PALETTE_TABLES[id], '') : source);
 const NAMED_COLOR =
 	/(?:^|[;{\s])(?:color|background(?:-color)?|border(?:-[a-z]+)?-color|border|outline|fill|stroke)\s*:\s*[^;}]*\b(?:white|black|red|green|blue|gray|grey|orange|purple|yellow)\b/;

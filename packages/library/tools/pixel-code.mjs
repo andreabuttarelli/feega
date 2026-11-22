@@ -1,0 +1,361 @@
+const PIXEL = 8;
+const SPEED = 1;
+const DENSITY = 0.5;
+const LINES = 0.75;
+const DITHERS = ['bayer', 'checker'];
+
+const css = [
+  '.fl-pixel-code{--px-bg:#0038a8;--px-blue:#004dff;--px-ink:#0a0a0a;--px-line:#f0eee9;--px-line-dim:#8a8780;position:relative;height:clamp(24rem,70svh,44rem);overflow:hidden;background:var(--px-bg)}',
+  '.fl-pixel-code canvas{position:absolute;top:0;left:0;image-rendering:crisp-edges;image-rendering:pixelated}'
+];
+
+const t = (typed, s) => (typed ? s : '');
+
+const engine = (typed) => `const DEFAULT_PIXEL = ${PIXEL};
+const DEFAULT_SPEED = ${SPEED};
+const DEFAULT_DENSITY = ${DENSITY};
+const DEFAULT_LINES = ${LINES};
+const MATRICES${t(typed, ': Record<string, number[]>')} = {
+  bayer: [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5],
+  checker: [0, 2, 3, 1]
+};
+const SCROLL = 0.5;
+const TYPE = 28;
+const LINE_GAP = 2;
+const CLUSTER = 5;
+const LEAD = 8;
+const GRID = 20;
+const REWRITE = 16;
+const FADE = 0.3;
+const FLICKER = 0.9993;
+const FRAME_MS = 33;
+const STILL_AT = 120;
+
+function hash(x${t(typed, ': number')}, y${t(typed, ': number')}, seed${t(typed, ': number')})${t(typed, ': number')} {
+  let h = Math.imul(x + 374761393, 668265263) ^ Math.imul(y + 1274126177, -2048144777) ^ Math.imul(seed + 3266489917, 374761393);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+
+function noise(x${t(typed, ': number')}, y${t(typed, ': number')}, seed${t(typed, ': number')})${t(typed, ': number')} {
+  const xi = Math.floor(x);
+  const yi = Math.floor(y);
+  const fx = x - xi;
+  const fy = y - yi;
+  const u = fx * fx * (3 - 2 * fx);
+  const v = fy * fy * (3 - 2 * fy);
+  const a = hash(xi, yi, seed);
+  const b = hash(xi + 1, yi, seed);
+  const c = hash(xi, yi + 1, seed);
+  const d = hash(xi + 1, yi + 1, seed);
+  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+}
+
+function knob(value${t(typed, ': string | undefined')}, fallback${t(typed, ': number')})${t(typed, ': number')} {
+  const n = Number(value);
+  return value && Number.isFinite(n) ? n : fallback;
+}
+
+function pixelCode(root${t(typed, ': HTMLElement')})${t(typed, ': () => void')} {
+  const canvas = root.querySelector('canvas')${t(typed, ' as HTMLCanvasElement')};
+  const ctx = canvas.getContext('2d')${t(typed, ' as CanvasRenderingContext2D')};
+  const probe = document.createElement('canvas').getContext('2d', { willReadFrequently: true })${t(typed, ' as CanvasRenderingContext2D')};
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const pixel = Math.max(1, knob(root.dataset.pixel, DEFAULT_PIXEL));
+  const speed = knob(root.dataset.speed, DEFAULT_SPEED);
+  const density = knob(root.dataset.density, DEFAULT_DENSITY);
+  const lines = knob(root.dataset.lines, DEFAULT_LINES);
+  const matrix = MATRICES[root.dataset.dither ?? ''] ?? MATRICES.bayer;
+  const side = Math.sqrt(matrix.length);
+
+  let cols = 0;
+  let rows = 0;
+  let image${t(typed, ': ImageData | null')} = null;
+  let cells = new Uint32Array(0);
+  let thresholds = new Float32Array(0);
+  let bg = 0;
+  let blue = 0;
+  let ink = 0;
+  let line = 0;
+  let dim = 0;
+  let visible = true;
+  let frame = 0;
+  let begun = 0;
+  let drawn = 0;
+
+  function packed(value${t(typed, ': string')})${t(typed, ': number')} {
+    probe.clearRect(0, 0, 1, 1);
+    probe.fillStyle = value;
+    probe.fillRect(0, 0, 1, 1);
+    const [r, g, b, a] = probe.getImageData(0, 0, 1, 1).data;
+    return ((a << 24) | (b << 16) | (g << 8) | r) >>> 0;
+  }
+
+  function palette() {
+    const style = getComputedStyle(root);
+    const read = (name${t(typed, ': string')}) => packed(style.getPropertyValue(\`--px-\${name}\`).trim());
+    bg = read('bg');
+    blue = read('blue');
+    ink = read('ink');
+    line = read('line');
+    dim = read('line-dim');
+  }
+
+  function measure() {
+    const ratio = devicePixelRatio || 1;
+    const cell = Math.max(1, Math.round(pixel * ratio)) / ratio;
+    cols = Math.ceil(root.clientWidth / cell);
+    rows = Math.ceil(root.clientHeight / cell);
+    canvas.width = cols;
+    canvas.height = rows;
+    canvas.style.width = \`\${cols * cell}px\`;
+    canvas.style.height = \`\${rows * cell}px\`;
+    image = ctx.createImageData(cols, rows);
+    cells = new Uint32Array(image.data.buffer);
+    thresholds = new Float32Array(cols * rows);
+    for (let y = 0; y < rows; y++) {
+      for (let x = 0; x < cols; x++) {
+        thresholds[y * cols + x] = (matrix[(y % side) * side + (x % side)] + 0.5) / matrix.length;
+      }
+    }
+    palette();
+  }
+
+  function field(time${t(typed, ': number')}) {
+    const drift = time * 0.04;
+    for (let y = 0; y < rows; y++) {
+      const fall = 0.3 + (1 - y / rows) * 0.15 + density - 0.5;
+      const wave = Math.sin(y * 0.11 - time * 0.2) * 0.08;
+      for (let x = 0; x < cols; x++) {
+        const i = y * cols + x;
+        let v = (x / cols) * 0.45 + fall + (noise(x * 0.07 + drift, y * 0.1 - drift, 1) - 0.5) * 0.4 + Math.sin(x * 0.08 + time * 0.3) * wave;
+        if (x % GRID === 0 && v > 0.7) {
+          v = 0.55;
+        }
+        const scaled = Math.min(Math.max(v, 0), 0.9999) * 2;
+        const step = scaled | 0;
+        const upper = scaled - step > thresholds[i];
+        cells[i] = step === 0 ? (upper ? bg : ink) : upper ? blue : bg;
+        if (hash(x, y, (time * 6) | 0) > FLICKER) {
+          cells[i] = cells[i] === blue ? bg : blue;
+        }
+      }
+    }
+  }
+
+  function code(k${t(typed, ': number')}, y${t(typed, ': number')}, time${t(typed, ': number')}, enter${t(typed, ': number')}) {
+    const rewrites = hash(k, 2, 5) < 0.4;
+    const period = REWRITE / Math.max(speed, 0.01);
+    const phase = hash(k, 3, 5) * period;
+    const version = rewrites ? Math.floor((time + phase) / period) : 0;
+    const since = rewrites ? time + phase - version * period : enter;
+    const typed = Math.min(enter, since) * TYPE * Math.max(speed, 0.2);
+    const fade = Math.min(1, y / (rows * FADE));
+    const tone = hash(k, version, 7) < 0.6 ? line : dim;
+    const cluster = Math.floor(k / CLUSTER);
+    let x = 3 + Math.floor(hash(cluster, 4, 5) * 8) * 4 + Math.floor(hash(k, version, 8) * 3) * 3;
+    const start = x;
+    const tokens = 3 + Math.floor(hash(k, version, 9) * 5);
+    const row = y * cols;
+
+    for (let n = 0; n < tokens && x < cols; n++) {
+      const dotted = hash(k + n, version, 10) < 0.55;
+      const length = dotted ? 5 + Math.floor(hash(k + n, version, 11) * 6) * 2 : 3 + Math.floor(hash(k + n, version, 12) * 14);
+      const end = Math.min(cols, x + length);
+      for (let c = x; c < end; c++) {
+        if (c - start > typed) {
+          return;
+        }
+        if (dotted && (c - x) % 2 === 1) {
+          cells[row + c] = bg;
+          continue;
+        }
+        const i = row + c;
+        if (fade <= thresholds[i]) {
+          continue;
+        }
+        cells[i] = (c - start) / LEAD < thresholds[i] ? blue : tone;
+      }
+      x = end + 1 + Math.floor(hash(k + n, version, 13) * 2);
+    }
+  }
+
+  function codeLines(time${t(typed, ': number')}) {
+    const rate = SCROLL * Math.max(speed, 0.01);
+    const scroll = time * rate;
+    const shift = Math.floor(scroll);
+    for (let y = 0; y < rows; y++) {
+      const a = y + shift;
+      if (a % LINE_GAP !== 0) {
+        continue;
+      }
+      const k = a / LINE_GAP;
+      const cluster = Math.floor(k / CLUSTER);
+      if (hash(k, 0, 3) > lines || hash(cluster, 1, 3) > 0.2 + lines * 0.7) {
+        continue;
+      }
+      code(k, y, time, (rows - y + scroll - shift) / rate);
+    }
+  }
+
+  function draw(time${t(typed, ': number')}) {
+    if (!image) {
+      return;
+    }
+    field(time);
+    codeLines(time);
+    ctx.putImageData(image, 0, 0);
+  }
+
+  function clock()${t(typed, ': number')} {
+    return STILL_AT + (performance.now() - begun) / 1000;
+  }
+
+  function tick(now${t(typed, ': number')}) {
+    frame = requestAnimationFrame(tick);
+    if (now - drawn < FRAME_MS) {
+      return;
+    }
+    drawn = now;
+    draw(clock());
+  }
+
+  function start() {
+    if (frame || still || !visible || document.hidden) {
+      return;
+    }
+    frame = requestAnimationFrame(tick);
+  }
+
+  function stop() {
+    cancelAnimationFrame(frame);
+    frame = 0;
+  }
+
+  function sync() {
+    if (document.hidden) {
+      stop();
+      return;
+    }
+    start();
+  }
+
+  const sizes = new ResizeObserver(() => {
+    measure();
+    draw(clock());
+  });
+  const view = new IntersectionObserver(([entry]) => {
+    visible = entry.isIntersecting;
+    if (visible) {
+      start();
+      return;
+    }
+    stop();
+  });
+
+  begun = performance.now();
+  sizes.observe(root);
+  view.observe(root);
+  document.addEventListener('visibilitychange', sync);
+  start();
+
+  return () => {
+    stop();
+    sizes.disconnect();
+    view.disconnect();
+    document.removeEventListener('visibilitychange', sync);
+  };
+}`;
+
+const shell = (root) => `<section class="fl-pixel-code" aria-hidden="true" data-pixel="${PIXEL}" data-speed="${SPEED}" data-density="${DENSITY}" data-lines="${LINES}" data-dither="${DITHERS[0]}" data-dither-options="${DITHERS.join(',')}"${root}>
+  <canvas></canvas>
+</section>`;
+
+const pad = (text, n) =>
+  text
+    .split('\n')
+    .map((l) => (l ? ' '.repeat(n) + l : l))
+    .join('\n');
+
+const domBoot = (typed) => `${engine(typed)}
+
+document.querySelectorAll${t(typed, '<HTMLElement>')}('.fl-pixel-code:not([data-ready])').forEach((root) => {
+  root.setAttribute('data-ready', '');
+  pixelCode(root);
+});`;
+
+const jsx = (markup) => markup.replace(/class="/g, 'className="').replace('<canvas></canvas>', '<canvas />');
+
+export const pixelCode = {
+  id: 'pixel-code',
+  name: 'Pixel code',
+  description: 'An animated pixel texture: a dithered blue field with lines of code that type, scroll and dissolve.',
+  category: 'section',
+  tags: ['pixel', 'texture', 'dither', 'animation', 'code'],
+  mods: [],
+  css,
+  files: (C) => ({
+    html: `${shell('')}\n\n<script>\n(() => {\n${pad(domBoot(false), 2)}\n})();\n</script>\n`,
+    astro: `---
+---
+
+${shell('')}
+
+<script>
+${domBoot(true)}
+</script>
+
+<style is:global>
+${C}</style>
+`,
+    svelte: `<script lang="ts">
+${pad(engine(true), 2)}
+
+  let root: HTMLElement;
+
+  $effect(() => pixelCode(root));
+</script>
+
+${shell(' bind:this={root}')}
+
+<style>
+${C}</style>
+`,
+    react: `import { useEffect, useRef } from 'react';
+import './PixelCode.css';
+
+${engine(true)}
+
+export function PixelCode() {
+  const root = useRef<HTMLElement>(null);
+
+  useEffect(() => (root.current ? pixelCode(root.current) : undefined), []);
+
+  return (
+${pad(jsx(shell(' ref={root}')), 4)}
+  );
+}
+`,
+    vue: `<script setup lang="ts">
+import { onBeforeUnmount, onMounted, ref } from 'vue';
+
+${engine(true)}
+
+const root = ref<HTMLElement | null>(null);
+let stop = () => {};
+
+onMounted(() => {
+  stop = pixelCode(root.value as HTMLElement);
+});
+onBeforeUnmount(() => stop());
+</script>
+
+<template>
+${pad(shell(' ref="root"'), 2)}
+</template>
+
+<style scoped>
+${C}</style>
+`
+  })
+};
