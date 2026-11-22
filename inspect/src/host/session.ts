@@ -45,6 +45,11 @@ const ERROR_LINES = 6;
 const MINUTE_MS = 60_000;
 const ERROR = /error|failed|cannot|exception/i;
 
+enum Replay {
+  Fresh,
+  History
+}
+
 export type Session = ReturnType<typeof inspectSession>;
 
 export const appOf = (platform: Platform, workspace: string, root: string) => (root === workspace ? (platform.stored<string>(Stored.App) ?? null) : relative(workspace, root));
@@ -82,13 +87,13 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     await post({ kind: ToView.History, changes: edits.history(), canUndo: edits.canUndo(), canRedo: edits.canRedo() });
   }
 
-  async function edited(out: Written, ask: EditAsk | null) {
+  async function edited(out: Written, ask: EditAsk | null, replay = Replay.Fresh) {
     if (out.ok) {
       usage?.edit();
     }
     await postHistory();
     const saved = ask ? (liveAtOf(ask.at) ?? undefined) : undefined;
-    await post(out.ok ? { kind: ToView.Edited, ok: true, written: out.written, saved, note: out.note, select: out.selected } : { kind: ToView.Edited, ok: false, reason: out.reason, at: out.at });
+    await post(out.ok ? { kind: ToView.Edited, ok: true, fromHistory: replay === Replay.History, written: out.written, saved, note: out.note, select: out.selected } : { kind: ToView.Edited, ok: false, reason: out.reason, at: out.at });
     return out;
   }
 
@@ -238,12 +243,21 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   });
 
   const edit = (ask: EditAsk) => edits.edit(ask).then((out) => edited(out, ask));
-  const undo = () => edits.undo().then((out) => edited(out, null));
+  const undo = () => edits.undo().then((out) => edited(out, null, Replay.History));
 
   async function revert(id: number | null) {
     if (id === null) {
-      while (edits.canUndo() && (await edits.undo()).ok) {
+      let last: Written | null = null;
+      while (edits.canUndo()) {
+        last = await edits.undo();
+        if (!last.ok) {
+          break;
+        }
         await postHistory();
+      }
+      if (last) {
+        await edited(last, null, Replay.History);
+        return;
       }
       await postHistory();
       return;
@@ -478,7 +492,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.Font]: (m) => edits.font(m.ask, m.google).then((out) => edited(out, m.ask)),
     [ToHost.FontReplace]: (m) => edits.replaceFont(m.from, m.to, m.google).then((out) => edited(out, null)),
     [ToHost.FontLoad]: (m) => edits.loadFont(m.family).then((out) => edited(out, null)),
-    [ToHost.Redo]: () => edits.redo().then((out) => edited(out, null)),
+    [ToHost.Redo]: () => edits.redo().then((out) => edited(out, null, Replay.History)),
     [ToHost.Revert]: (m) => revert(m.id),
     [ToHost.Diff]: (m) => showDiff(m.id),
     [ToHost.SourceControl]: () => platform.sourceControl(),

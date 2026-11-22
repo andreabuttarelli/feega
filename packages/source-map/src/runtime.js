@@ -281,6 +281,11 @@ export function clearPreview(doc, source, state) {
   render(doc);
 }
 
+export function clearPreviews(doc) {
+  previewsOf(doc).clear();
+  render(doc);
+}
+
 export function settlePreview(doc, source, state) {
   const all = previewsOf(doc);
   const key = keyOf(source, undefined, state);

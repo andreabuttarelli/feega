@@ -1,5 +1,5 @@
 import { stampSources } from './framework-meta.js';
-import { SOURCE_ATTR, rectOf, deepestAt, clearPreview, hidePreview, paletteOf, relativeOf, treeOf, inspectElement, keepPreviews, previewEdit, settlePreview } from './runtime.js';
+import { SOURCE_ATTR, rectOf, deepestAt, clearPreview, clearPreviews, hidePreview, paletteOf, relativeOf, treeOf, inspectElement, keepPreviews, previewEdit, settlePreview } from './runtime.js';
 import { missingFontsOf } from './missing-fonts.js';
 import { trackRects } from './track.js';
 import { keepScroll } from './reload-restore.js';
@@ -11,6 +11,7 @@ export const INSPECT_RESULT = 'feega:inspect:result';
 export const READY = 'feega:source-map:ready';
 export const PREVIEW = 'feega:preview';
 export const PREVIEW_CLEAR = 'feega:preview:clear';
+export const PREVIEW_CLEAR_ALL = 'feega:preview:clear-all';
 export const PREVIEW_SETTLE = 'feega:preview:settle';
 export const PREVIEW_SETTLED = 'feega:preview:settled';
 export const LOCATION = 'feega:location';
@@ -101,6 +102,7 @@ export function installBridge(win) {
   const handlers = {
     [PREVIEW]: (request) => previewEdit(doc, request),
     [PREVIEW_CLEAR]: (request) => clearPreview(doc, request.source, request.state),
+    [PREVIEW_CLEAR_ALL]: () => clearPreviews(doc),
     [PREVIEW_SETTLE]: (request) => reply({ type: PREVIEW_SETTLED, source: request.source, unapplied: settlePreview(doc, request.source, request.state) }),
     [FORCE]: (request) => forceState(doc, request.source, request.state),
     [THEME]: (request) => applyTheme(doc, request),
