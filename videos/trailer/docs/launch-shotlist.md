@@ -74,7 +74,8 @@ wipes and the terminal reveal, taps on diff lines, chime when the agent finishes
 
 Track: "The Classic Groove" by BOSNOW, 130 BPM, first downbeat at 0.875 s, 16-beat phrases
 (one lighter bar, three full). The mp3 is not in git (`public/music/*.mp3` is ignored): copy it
-locally to `public/music/classic-groove.mp3` before rendering.
+locally to `public/music/classic-groove.mp3` before rendering. The durable copy of the track lives
+at `~/Documents/feega-videos/trailer/music/classic-groove.mp3`.
 
 1. Drop the track in `public/music/`.
 2. In `src/launch/beat.ts` set `MUSIC`: `file` (name inside `public/music/`), `bpm`, `firstBeat`
