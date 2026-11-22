@@ -18,7 +18,7 @@
   const FAQ_HEADING = 'questions from this switch';
 </script>
 
-<div class="site-home">
+<div class="site-home" data-alt-page={variant.slug}>
   <Hero headline={variant.h1} size={HeadlineSize.Compact}>
     {#snippet lead()}{variant.subhead}{/snippet}
     {#snippet art()}<EditorPicture id={variant.shot} loading="eager" />{/snippet}

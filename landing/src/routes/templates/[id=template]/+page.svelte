@@ -62,7 +62,7 @@
         <Callout item={{ tone: CalloutTone.Note, title: 'Included in Feega Cloud', text: 'This template is part of the Pro library in Feega Cloud. The preview above is the real thing; the code is available to Cloud teams.' }} />
       </div>
     {:else}
-      <CodeTabs code={data.code} initial={Framework.Svelte} />
+      <CodeTabs id={template.id} code={data.code} initial={Framework.Svelte} />
       <details class="tokens">
         <summary>tokens.css, the shared file every template reads</summary>
         <div class="tpl-code">

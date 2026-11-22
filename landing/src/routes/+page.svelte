@@ -2,6 +2,7 @@
   import Hero from '$lib/site/home/Hero.svelte';
   import OpenSource from '$lib/site/home/OpenSource.svelte';
   import Codebase from '$lib/site/home/Codebase.svelte';
+  import TemplatesTeaser from '$lib/site/home/TemplatesTeaser.svelte';
   import Pricing from '$lib/site/pricing/Pricing.svelte';
   import { PLAN } from '$lib/site/pricing/plan';
   import FreeSection from '$lib/site/home/FreeSection.svelte';
@@ -9,6 +10,8 @@
   import { HOME_JSON_LD } from '$lib/site/structured-data';
 
   import { HOME_META } from '$lib/site/seo';
+
+  let { data } = $props();
 </script>
 
 <svelte:head>
@@ -27,6 +30,8 @@
 <div class="chapters">
   <Codebase />
 </div>
+
+<TemplatesTeaser count={data.freeTemplates} />
 
 <div class="cool">
   <FreeSection />
