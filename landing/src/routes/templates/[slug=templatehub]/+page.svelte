@@ -6,6 +6,7 @@
   import { DOWNLOAD_PATH } from '$lib/site/links';
   import { faqJsonLd } from '$lib/site/structured-data';
   import Gallery from '$lib/site/templates/Gallery.svelte';
+  import TemplatesHero from '$lib/site/templates/TemplatesHero.svelte';
   import TemplatesLayout from '$lib/site/templates/TemplatesLayout.svelte';
   import { CATEGORY_COPY, FRAMEWORK_COPY } from '$lib/site/templates/copy';
   import { collectionJsonLd } from '$lib/site/templates/jsonld';
@@ -41,6 +42,7 @@
 </svelte:head>
 
 <TemplatesLayout>
+  <TemplatesHero>
   <p class="crumbs"><a href={TEMPLATES_PATH}>{lower(TEMPLATES_HEADING)}</a> <span>/</span> <span>{lower(category ? CATEGORY_COPY[category].label : FRAMEWORK_COPY[framework!].label)}</span></p>
   <h1>{lower(copy.heading)}</h1>
   <p class="fine">By {AUTHOR.name}, {AUTHOR.role}</p>
@@ -54,6 +56,7 @@
       </p>
     {/if}
   {/if}
+  </TemplatesHero>
 
   <Gallery templates={items} filters={framework ? Filters.Full : Filters.Tags} {framework} />
 

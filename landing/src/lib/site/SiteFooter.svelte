@@ -10,6 +10,7 @@
   import { CODEBASE_PATH } from './codebase';
   import { HUBS } from './topics';
   import { TEMPLATES_PATH } from './templates/paths';
+  import { eventAttrs } from './analytics/attrs';
 
   const legal = Object.entries(LEGAL_DOCS).map(([slug, doc]) => ({ href: `/${slug}`, label: doc.label }));
   const year = new Date().getFullYear();
@@ -32,18 +33,18 @@
     <nav class="col" aria-label="Product">
       <p class="head">product</p>
       <a href="/">home</a>
-      <a href={DOWNLOAD_PATH}>download</a>
+      <a href={DOWNLOAD_PATH} {...eventAttrs('download_click', { target: 'download_page', place: 'footer' })}>download</a>
       <a href={PRICING_PATH}>pricing</a>
       <a href={TEMPLATES_PATH}>templates</a>
       <a href={CODEBASE_PATH}>codebase</a>
       <a href="/changelog">changelog</a>
-      <a href={GITHUB_URL}>star on github</a>
+      <a href={GITHUB_URL} {...eventAttrs('github_click', { place: 'footer' })}>star on github</a>
       <a href={COFFEE_URL}>support with a coffee</a>
     </nav>
 
     <nav class="col" aria-label="Learn">
       <p class="head">learn</p>
-      <a href={DOCS_URL}>docs</a>
+      <a href={DOCS_URL} {...eventAttrs('docs_click', { place: 'footer' })}>docs</a>
       {#each HUBS as hub (hub.path)}
         <a href={hub.path}>{hub.menuLabel}</a>
       {/each}

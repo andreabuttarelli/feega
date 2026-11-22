@@ -1,5 +1,6 @@
 <script lang="ts">
   import { lower } from '../lower';
+  import { eventAttrs } from '../analytics/attrs';
   import { alternativePath } from '../alternatives';
   import { CHECKED_LABEL, FULL_COMPARISON_LABEL } from './index';
   import type { Variant } from './variant';
@@ -34,7 +35,7 @@
   <p class="keep">{variant.keepTool}</p>
   <p class="more">
     <span class="date">checked {CHECKED_LABEL}</span>
-    <a href={alternativePath(variant.slug)}>{FULL_COMPARISON_LABEL} →</a>
+    <a href={alternativePath(variant.slug)} {...eventAttrs('alt_landing_cta', { page: variant.slug, cta: 'full_comparison' })}>{FULL_COMPARISON_LABEL} →</a>
   </p>
 </section>
 

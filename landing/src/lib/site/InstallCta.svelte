@@ -1,6 +1,7 @@
 <script lang="ts">
   import { primaryCta, secondaryCtas, starCta } from './install';
-  import InstallMenu from './InstallMenu.svelte'
+  import InstallMenu from './InstallMenu.svelte';
+  import { eventAttrs } from './analytics/attrs';
 
   let { id }: { id: string } = $props();
 
@@ -12,8 +13,8 @@
 
 <div class="install" data-agent-id={id}>
   <div class="buttons">
-    <InstallMenu label={primary.label} />
-    <a class="star" href={starCta.href}>{starCta.label}</a>
+    <InstallMenu label={primary.label} place={id} />
+    <a class="star" href={starCta.href} {...eventAttrs('github_click', { place: id })}>{starCta.label}</a>
   </div>
   <p class="more">
     {#each secondary as cta (cta.label)}<a href={cta.href}>{cta.label}</a>{/each}

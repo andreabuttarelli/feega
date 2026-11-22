@@ -2,6 +2,7 @@
   import PriceGrid from './PriceGrid.svelte';
   import PricingFaq from './PricingFaq.svelte';
   import { PRICING_PATH } from '../paths';
+  import { eventAttrs } from '../analytics/attrs';
   import type { CloudPlan } from './plan';
 
   let { plan }: { plan: CloudPlan } = $props();
@@ -14,7 +15,7 @@
 
   <PricingFaq />
 
-  <a class="full" href={PRICING_PATH}>see full pricing →</a>
+  <a class="full" href={PRICING_PATH} {...eventAttrs('pricing_cta', { plan: 'full_pricing' })}>see full pricing →</a>
 </section>
 
 <style>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import Pixel from '../alternatives/Pixel.svelte';
+  import { eventAttrs } from '../analytics/attrs';
   import { lower } from '../lower';
   import { pluginPath, type PluginView } from './plugins';
   import TierBadge from './TierBadge.svelte';
@@ -7,11 +8,13 @@
   let { plugin }: { plugin: PluginView } = $props();
 </script>
 
-<a class="card" href={pluginPath(plugin.id)}>
+<a class="card" href={pluginPath(plugin.id)} {...eventAttrs('plugin_open', { id: plugin.id })}>
   <div class="top">
     <span class="icon"><Pixel icon={plugin.icon} size={6} /></span>
     <TierBadge tier={plugin.tier} />
   </div>
+
+  <img class="cover" src={plugin.cover.src} alt={plugin.cover.alt} width={plugin.cover.width} height={plugin.cover.height} loading="lazy" decoding="async" />
 
   <h2>{lower(plugin.name)}</h2>
   <p class="summary">{lower(plugin.summary)}</p>
@@ -40,6 +43,13 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+  }
+
+  .cover {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 6px;
   }
 
   .icon {

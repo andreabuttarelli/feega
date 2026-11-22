@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { ASSISTANTS, askUrl } from './assistants';
+  import { eventAttrs } from '../analytics/attrs';
   import { browserStorage, dismiss, inFrame, isDismissed } from './visibility';
 
   let shown = $state(false);
@@ -25,7 +26,7 @@
     <ul id="ask-ai-links">
       {#each ASSISTANTS as assistant (assistant.name)}
         <li>
-          <a href={askUrl(assistant)} target="_blank" rel="noopener noreferrer" aria-label={`Ask ${assistant.name} what Feega is`} title={assistant.name}>
+          <a href={askUrl(assistant)} {...eventAttrs('ask_ai_click', { assistant: assistant.name })} target="_blank" rel="noopener noreferrer" aria-label={`Ask ${assistant.name} what Feega is`} title={assistant.name}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d={assistant.logo} /></svg>
           </a>
         </li>
