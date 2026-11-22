@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { accountOfBody } from './account';
-import { SignInEnd, signIn, signInFromUri } from './sign-in';
+import { SignInClient, SignInEnd, signIn, signInFromUri } from './sign-in';
 
 const jwt = `h.${Buffer.from(JSON.stringify({ sub: 'u1', email: 'a@b.co' })).toString('base64url')}.s`;
 const tokens = { access_token: jwt, refresh_token: 'r', expires_at: 99 };
@@ -59,6 +59,22 @@ describe('signIn', () => {
     run.abort.abort();
     expect((await run.outcome).end).toBe(SignInEnd.Cancelled);
     await expect(run.post('app.s1')).rejects.toThrow();
+  });
+
+  it.each([
+    [undefined, 'app.'],
+    [SignInClient.Extension, 'app.'],
+    [SignInClient.Desktop, 'desktop.']
+  ])('lo state generato per il client %s inizia con %s e il login lo accetta', async (client, prefix) => {
+    const abort = new AbortController();
+    const opened = Promise.withResolvers<URL>();
+    const outcome = signIn({ openBrowser: (url) => opened.resolve(new URL(url)), signal: abort.signal, client });
+    const url = await opened.promise;
+    const state = url.searchParams.get('cli_state') as string;
+    expect(state.startsWith(prefix)).toBe(true);
+    const query = new URLSearchParams({ ...tokens, expires_at: '99', state }).toString();
+    expect(signInFromUri(query)).toBe(true);
+    expect((await outcome).end).toBe(SignInEnd.Done);
   });
 
   it('risponde anche su ::1, dove localhost puo risolvere', async () => {
