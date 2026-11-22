@@ -43,7 +43,18 @@ Feega Inspect is a small editor extension, separate from the Feega canvas. No ac
    that state's value. States set by JavaScript, `:has()` and CSS nesting are not forced.
 8. **Design** (D) selects and edits; **Navigate** (N) uses the app normally. The top bar has
    back/forward/reload, the route, a dev server status dot, and device widths (keys 1–4).
-9. Cmd/Ctrl+Z restores the file. It never overwrites a change made after the edit.
+9. When text uses a font that is not installed on your machine, not loaded by the page and not
+   available from the page's own CSS, Feega shows "*Font* isn't installed or loaded. Text falls
+   back to *fallback*." as a notice over the page and under **Font** in Typography. **Load from
+   Google Fonts** appears when the family is on Google Fonts: it adds the `@import` to your global
+   stylesheet, or a `<link>` to `index.html`, `app.html` or the root layout. **Replace everywhere**
+   opens a searchable list of your installed fonts and Google Fonts; the choice rewrites that
+   family in every `font-family` and `font` declaration, CSS custom property (including Tailwind
+   `@theme`), inline style, `fontFamily` object, Tailwind `fontFamily` config and `font-['…']`
+   class of the project (`@font-face` blocks stay), and adds the Google Fonts loading when needed.
+   It is one change in the Changes list and one undo. The Google Fonts list is bundled; refresh it
+   with `node scripts/google-fonts.mjs`.
+10. Cmd/Ctrl+Z restores the file. It never overwrites a change made after the edit.
 
 ## In the browser: `npx feega`
 
@@ -71,6 +82,11 @@ code --install-extension feega-inspect-0.1.0.vsix
 
 - Element picking needs the [source map](/integrations/source-map/). Vite, SvelteKit, React Router,
   Astro and Nuxt apps get it when Feega starts their dev server.
+- **Astro and Nuxt cannot attach to a server that already runs.** Feega must start the dev server to
+  link elements to your source files. If you attach by address (the Open from URL command or
+  `npx feega --url`), Feega refuses and offers **Start with Feega**; `npx feega --url` exits with an
+  error. If your own server is already on the port, Feega starts its own on a free one and leaves
+  yours running.
 - Select, text, style and structure edits are tested on Vite (React, Vue, plain HTML), SvelteKit,
   React Router, Astro, Nuxt and Next.js. Angular, Gatsby and Create React App are not supported.
 - `hover:`/`dark:` variants, class expressions and non-literal text are not written.

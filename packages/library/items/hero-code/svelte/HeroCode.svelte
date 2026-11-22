@@ -1,0 +1,59 @@
+<section class="fl-hero-code">
+  <div class="fl-container grid">
+    <div class="copy">
+      <p class="fl-eyebrow">for developers</p>
+      <h1 class="fl-title">one command, then it just works</h1>
+      <p class="fl-lead">Say what runs after install and what the developer no longer has to do by hand.</p>
+      <div class="cta">
+        <a class="fl-btn fl-btn--primary" href="#">read the docs</a>
+        <a class="fl-btn fl-btn--ghost" href="#">view on GitHub <svg class="fl-px" viewBox="0 0 7 5" aria-hidden="true"><path d="M4 0h1v1h-1zM5 1h1v1h-1zM0 2h1v1h-1zM1 2h1v1h-1zM2 2h1v1h-1zM3 2h1v1h-1zM4 2h1v1h-1zM5 2h1v1h-1zM6 2h1v1h-1zM5 3h1v1h-1zM4 4h1v1h-1z" /></svg></a>
+      </div>
+    </div>
+    <figure class="term" aria-label="Terminal example">
+      <div class="bar"><i></i><i></i><i></i><span>terminal</span></div>
+      <pre><code><span class="p">$</span> npx yourbrand init<br /><span class="m">✓ found a Vite project</span><br /><span class="m">✓ added the plugin to vite.config.ts</span><br /><span class="m">✓ wrote yourbrand.json</span><br /><br /><span class="p">$</span> npm run dev<br /><span class="a">ready</span> <span class="m">in 312 ms on</span> localhost:5173<span class="caret"></span></code></pre>
+    </figure>
+  </div>
+</section>
+
+<style>
+.fl-hero-code{font-family:var(--feega-font);font-size:var(--feega-text-body);line-height:1.5;letter-spacing:var(--feega-tracking);color:var(--feega-fg);background:var(--feega-bg);-webkit-font-smoothing:antialiased}
+:where(.fl-hero-code) *,:where(.fl-hero-code) *::before,:where(.fl-hero-code) *::after{box-sizing:border-box}
+:where(.fl-hero-code) :is(h1,h2,h3,h4,p,ul,ol,figure,blockquote,dl,dd){margin:0}
+:where(.fl-hero-code) a{color:inherit;text-decoration:none}
+:where(.fl-hero-code) :focus-visible{outline:2px solid var(--feega-focus);outline-offset:3px}
+.fl-container{width:min(var(--feega-max-width),100% - 2 * var(--feega-gutter));margin-inline:auto}
+.fl-px{display:block;flex:none;width:1em;height:auto;fill:currentColor;shape-rendering:crispEdges}
+.fl-btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--feega-space-2);min-height:44px;padding:0 var(--feega-space-6);border:1px solid var(--feega-line-strong);border-radius:var(--feega-radius-full);background:transparent;color:var(--feega-fg);font:inherit;font-size:0.9375rem;font-weight:500;letter-spacing:var(--feega-tracking);white-space:nowrap;text-decoration:none;cursor:pointer;transition:background-color var(--feega-dur-fast) var(--feega-ease),border-color var(--feega-dur-fast) var(--feega-ease),color var(--feega-dur-fast) var(--feega-ease),transform var(--feega-dur-fast) var(--feega-ease)}
+.fl-btn:hover{border-color:var(--feega-fg-subtle);background:var(--feega-surface)}
+.fl-btn:active{transform:scale(0.97)}
+.fl-btn--primary{border-color:var(--feega-accent);background:var(--feega-accent);color:var(--feega-accent-fg)}
+.fl-btn--primary:hover{border-color:var(--feega-accent-hover);background:var(--feega-accent-hover)}
+.fl-btn--ink{border-color:var(--feega-fg);background:var(--feega-fg);color:var(--feega-bg)}
+.fl-btn--ink:hover{border-color:var(--feega-fg-muted);background:var(--feega-fg-muted)}
+.fl-btn--ghost{border-color:transparent}
+.fl-btn--sm{min-height:36px;padding:0 var(--feega-space-4);font-size:var(--feega-text-sm)}
+.fl-btn .fl-px{width:10px;transition:transform var(--feega-dur) var(--feega-ease)}
+.fl-btn:hover .fl-px{transform:translateX(3px)}
+.fl-btn[disabled]{opacity:0.45;cursor:not-allowed}
+.fl-title{font-family:var(--feega-font-display);font-size:var(--feega-text-title);font-weight:500;line-height:0.95;letter-spacing:var(--feega-tracking-tight);text-wrap:balance}
+.fl-lead{max-width:34rem;font-size:var(--feega-text-lg);line-height:1.4;color:var(--feega-fg-muted);text-wrap:pretty}
+.fl-eyebrow{display:inline-flex;align-items:center;gap:var(--feega-space-2);font-family:var(--feega-font-mono);font-size:var(--feega-text-xs);letter-spacing:0.02em;color:var(--feega-fg-muted);text-transform:uppercase}
+.fl-eyebrow::before{content:"";width:6px;height:6px;background:var(--feega-accent)}
+.fl-hero-code{padding-block:var(--feega-space-section)}
+.fl-hero-code .grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:center;gap:var(--feega-space-16)}
+.fl-hero-code .copy{display:flex;flex-direction:column;align-items:flex-start;gap:var(--feega-space-6)}
+.fl-hero-code .cta{display:flex;flex-wrap:wrap;gap:var(--feega-space-3)}
+.fl-hero-code .term{min-width:0;overflow:hidden;border-radius:var(--feega-radius-lg);background:var(--feega-fg);color:var(--feega-bg);box-shadow:var(--feega-shadow-float)}
+.fl-hero-code .bar{display:flex;align-items:center;gap:6px;height:40px;padding:0 16px}
+.fl-hero-code .bar i{width:9px;height:9px;border-radius:var(--feega-radius-full);background:var(--feega-fg-muted)}
+.fl-hero-code .bar span{margin-left:auto;font-family:var(--feega-font-mono);font-size:11px;color:var(--feega-fg-subtle)}
+.fl-hero-code pre{margin:0;padding:var(--feega-space-6);overflow-x:auto;font-family:var(--feega-font-mono);font-size:clamp(0.75rem,1.3vw,0.875rem);line-height:1.8;letter-spacing:0}
+.fl-hero-code .p{color:var(--feega-accent)}
+.fl-hero-code .m{color:var(--feega-fg-subtle)}
+.fl-hero-code .a{color:var(--feega-success)}
+.fl-hero-code .caret{display:inline-block;width:8px;height:1.1em;margin-left:4px;vertical-align:text-bottom;background:var(--feega-accent);animation:fl-hero-code-blink 1s steps(1) infinite}
+@keyframes fl-hero-code-blink{50%{opacity:0}}
+@media (max-width:900px){.fl-hero-code .grid{grid-template-columns:minmax(0,1fr);gap:var(--feega-space-12)}}
+@media (prefers-reduced-motion:reduce){:where([class^="fl-"]) *,:where([class^="fl-"]) *::before,:where([class^="fl-"]) *::after{animation:none!important;transition:none!important}}
+</style>

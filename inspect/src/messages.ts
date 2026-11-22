@@ -99,7 +99,9 @@ export type ColourPick = { css: string; token?: string };
 
 export type FontChoice = { family: string; google: boolean };
 
-export type Palette = { document: string[]; tokens: { name: string; value: string }[]; fonts: string[] };
+export type MissingFont = { family: string; fallback: string; declared: boolean };
+
+export type Palette = { document: string[]; tokens: { name: string; value: string }[]; fonts: string[]; missing: MissingFont[] };
 
 export enum Mode {
   Design = 'design',
@@ -122,6 +124,8 @@ export enum ToHost {
   Server = 'server',
   Redo = 'redo',
   Font = 'font',
+  FontReplace = 'font-replace',
+  FontLoad = 'font-load',
   SaveVariable = 'save-variable',
   Revert = 'revert',
   Diff = 'diff',
@@ -210,6 +214,8 @@ export type HostMessage =
   | { kind: ToHost.Server; action: ServerAction }
   | { kind: ToHost.Redo }
   | { kind: ToHost.Font; ask: EditAsk; google: boolean }
+  | { kind: ToHost.FontReplace; from: string; to: string; google: boolean }
+  | { kind: ToHost.FontLoad; family: string }
   | { kind: ToHost.SaveVariable; ask: EditAsk; name: string }
   | { kind: ToHost.Revert; id: number | null }
   | { kind: ToHost.Diff; id: number }

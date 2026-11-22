@@ -1,0 +1,81 @@
+<section class="fl-data-table">
+  <header class="head">
+    <div><h2>Members</h2><p>24 people in this workspace.</p></div>
+    <div class="tools">
+      <label class="search"><svg class="fl-px" viewBox="0 0 7 7" aria-hidden="true"><path d="M1 0h1v1h-1zM2 0h1v1h-1zM3 0h1v1h-1zM4 0h1v1h-1zM0 1h1v1h-1zM5 1h1v1h-1zM0 2h1v1h-1zM5 2h1v1h-1zM0 3h1v1h-1zM5 3h1v1h-1zM1 4h1v1h-1zM2 4h1v1h-1zM3 4h1v1h-1zM4 4h1v1h-1zM5 5h1v1h-1zM6 6h1v1h-1z" /></svg><input type="search" placeholder="Filter members" aria-label="Filter members" /></label>
+      <button class="fl-btn fl-btn--sm fl-btn--ink" type="button"><svg class="fl-px" viewBox="0 0 6 6" aria-hidden="true"><path d="M2 0h1v1h-1zM3 0h1v1h-1zM2 1h1v1h-1zM3 1h1v1h-1zM0 2h1v1h-1zM1 2h1v1h-1zM2 2h1v1h-1zM3 2h1v1h-1zM4 2h1v1h-1zM5 2h1v1h-1zM0 3h1v1h-1zM1 3h1v1h-1zM2 3h1v1h-1zM3 3h1v1h-1zM4 3h1v1h-1zM5 3h1v1h-1zM2 4h1v1h-1zM3 4h1v1h-1zM2 5h1v1h-1zM3 5h1v1h-1z" /></svg>Invite</button>
+    </div>
+  </header>
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr><th scope="col">Name</th><th scope="col">Role</th><th scope="col">Status</th><th scope="col">Last active</th><th scope="col"><span class="sr">Actions</span></th></tr>
+      </thead>
+      <tbody>
+        <tr><td><span class="who"><span class="fl-avatar" aria-hidden="true">SE</span><span><b>Sam Example</b><small>sam@example.com</small></span></span></td><td>Owner</td><td><span class="fl-badge fl-badge--success">Active</span></td><td class="mono">2 min ago</td><td><button class="more" type="button" aria-label="Actions for Sam Example"><svg class="fl-px" viewBox="0 0 5 1" aria-hidden="true"><path d="M0 0h1v1h-1zM2 0h1v1h-1zM4 0h1v1h-1z" /></svg></button></td></tr>
+        <tr><td><span class="who"><span class="fl-avatar" aria-hidden="true">RS</span><span><b>Robin Sample</b><small>robin@example.com</small></span></span></td><td>Admin</td><td><span class="fl-badge fl-badge--success">Active</span></td><td class="mono">1 h ago</td><td><button class="more" type="button" aria-label="Actions for Robin Sample"><svg class="fl-px" viewBox="0 0 5 1" aria-hidden="true"><path d="M0 0h1v1h-1zM2 0h1v1h-1zM4 0h1v1h-1z" /></svg></button></td></tr>
+        <tr><td><span class="who"><span class="fl-avatar" aria-hidden="true">KP</span><span><b>Kai Placeholder</b><small>kai@example.com</small></span></span></td><td>Editor</td><td><span class="fl-badge">Invited</span></td><td class="mono">never</td><td><button class="more" type="button" aria-label="Actions for Kai Placeholder"><svg class="fl-px" viewBox="0 0 5 1" aria-hidden="true"><path d="M0 0h1v1h-1zM2 0h1v1h-1zM4 0h1v1h-1z" /></svg></button></td></tr>
+        <tr><td><span class="who"><span class="fl-avatar" aria-hidden="true">AD</span><span><b>Alex Demo</b><small>alex@example.com</small></span></span></td><td>Viewer</td><td><span class="fl-badge fl-badge--danger">Suspended</span></td><td class="mono">12 days ago</td><td><button class="more" type="button" aria-label="Actions for Alex Demo"><svg class="fl-px" viewBox="0 0 5 1" aria-hidden="true"><path d="M0 0h1v1h-1zM2 0h1v1h-1zM4 0h1v1h-1z" /></svg></button></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <footer class="foot">
+    <p>Showing 1–4 of 24</p>
+    <div><button class="fl-btn fl-btn--sm" type="button" disabled>Previous</button><button class="fl-btn fl-btn--sm" type="button">Next</button></div>
+  </footer>
+</section>
+
+<style>
+.fl-data-table{font-family:var(--feega-font);font-size:var(--feega-text-body);line-height:1.5;letter-spacing:var(--feega-tracking);color:var(--feega-fg);background:var(--feega-bg);-webkit-font-smoothing:antialiased}
+:where(.fl-data-table) *,:where(.fl-data-table) *::before,:where(.fl-data-table) *::after{box-sizing:border-box}
+:where(.fl-data-table) :is(h1,h2,h3,h4,p,ul,ol,figure,blockquote,dl,dd){margin:0}
+:where(.fl-data-table) a{color:inherit;text-decoration:none}
+:where(.fl-data-table) :focus-visible{outline:2px solid var(--feega-focus);outline-offset:3px}
+.fl-px{display:block;flex:none;width:1em;height:auto;fill:currentColor;shape-rendering:crispEdges}
+.fl-btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--feega-space-2);min-height:44px;padding:0 var(--feega-space-6);border:1px solid var(--feega-line-strong);border-radius:var(--feega-radius-full);background:transparent;color:var(--feega-fg);font:inherit;font-size:0.9375rem;font-weight:500;letter-spacing:var(--feega-tracking);white-space:nowrap;text-decoration:none;cursor:pointer;transition:background-color var(--feega-dur-fast) var(--feega-ease),border-color var(--feega-dur-fast) var(--feega-ease),color var(--feega-dur-fast) var(--feega-ease),transform var(--feega-dur-fast) var(--feega-ease)}
+.fl-btn:hover{border-color:var(--feega-fg-subtle);background:var(--feega-surface)}
+.fl-btn:active{transform:scale(0.97)}
+.fl-btn--primary{border-color:var(--feega-accent);background:var(--feega-accent);color:var(--feega-accent-fg)}
+.fl-btn--primary:hover{border-color:var(--feega-accent-hover);background:var(--feega-accent-hover)}
+.fl-btn--ink{border-color:var(--feega-fg);background:var(--feega-fg);color:var(--feega-bg)}
+.fl-btn--ink:hover{border-color:var(--feega-fg-muted);background:var(--feega-fg-muted)}
+.fl-btn--ghost{border-color:transparent}
+.fl-btn--sm{min-height:36px;padding:0 var(--feega-space-4);font-size:var(--feega-text-sm)}
+.fl-btn .fl-px{width:10px;transition:transform var(--feega-dur) var(--feega-ease)}
+.fl-btn:hover .fl-px{transform:translateX(3px)}
+.fl-btn[disabled]{opacity:0.45;cursor:not-allowed}
+.fl-avatar{display:inline-grid;flex:none;place-items:center;width:32px;height:32px;border-radius:var(--feega-radius-full);background:var(--feega-surface);color:var(--feega-fg-muted);font-size:var(--feega-text-xs);font-weight:600;letter-spacing:0}
+.fl-badge{display:inline-flex;align-items:center;gap:6px;min-height:24px;padding:0 10px;border-radius:var(--feega-radius-full);background:var(--feega-surface);color:var(--feega-fg-muted);font-size:var(--feega-text-xs);font-weight:500;letter-spacing:0;white-space:nowrap}
+.fl-badge::before{content:"";width:6px;height:6px;border-radius:var(--feega-radius-full);background:currentColor}
+.fl-badge--accent{background:var(--feega-accent-soft);color:var(--feega-accent-text)}
+.fl-badge--success{background:var(--feega-success-soft);color:var(--feega-success)}
+.fl-badge--danger{background:var(--feega-danger-soft);color:var(--feega-danger)}
+.fl-data-table{padding:var(--feega-space-6) var(--feega-gutter)}
+.fl-data-table .head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:var(--feega-space-4);margin-bottom:var(--feega-space-6)}
+.fl-data-table h2{font-size:var(--feega-text-xl);font-weight:600;letter-spacing:-0.04em}
+.fl-data-table .head p{color:var(--feega-fg-muted);font-size:var(--feega-text-sm)}
+.fl-data-table .tools{display:flex;gap:var(--feega-space-2)}
+.fl-data-table .tools .fl-px{width:10px}
+.fl-data-table .tools .fl-btn:hover .fl-px{transform:none}
+.fl-data-table .search{display:flex;align-items:center;gap:8px;height:36px;padding:0 12px;border-radius:var(--feega-radius-full);background:var(--feega-surface);color:var(--feega-fg-subtle)}
+.fl-data-table .search:focus-within{box-shadow:inset 0 0 0 1px var(--feega-accent),0 0 0 3px var(--feega-accent-soft)}
+.fl-data-table .search .fl-px{width:12px}
+.fl-data-table .search input{width:10rem;border:0;background:transparent;color:var(--feega-fg);font:inherit;font-size:var(--feega-text-sm);outline:none}
+.fl-data-table .scroll{position:relative;overflow-x:auto;border:1px solid var(--feega-line);border-radius:var(--feega-radius-md)}
+.fl-data-table table{width:100%;min-width:40rem;border-collapse:collapse;font-size:var(--feega-text-sm)}
+.fl-data-table th{padding:10px 16px;background:var(--feega-surface);color:var(--feega-fg-subtle);font-family:var(--feega-font-mono);font-size:11px;font-weight:400;letter-spacing:0.02em;text-align:left;text-transform:uppercase}
+.fl-data-table td{padding:12px 16px;border-top:1px solid var(--feega-line);color:var(--feega-fg-muted);transition:background-color var(--feega-dur-fast) var(--feega-ease)}
+.fl-data-table tbody tr:hover td{background:var(--feega-surface)}
+.fl-data-table .who{display:flex;align-items:center;gap:12px}
+.fl-data-table .who > span:last-child{display:grid;line-height:1.3}
+.fl-data-table .who b{color:var(--feega-fg);font-weight:500}
+.fl-data-table .who small{color:var(--feega-fg-subtle)}
+.fl-data-table .mono{font-family:var(--feega-font-mono);font-size:var(--feega-text-xs);letter-spacing:0;white-space:nowrap}
+.fl-data-table .more{display:grid;place-items:center;width:32px;height:32px;margin-left:auto;border:0;border-radius:var(--feega-radius-sm);background:transparent;color:var(--feega-fg-subtle);cursor:pointer}
+.fl-data-table .more:hover{background:var(--feega-line);color:var(--feega-fg)}
+.fl-data-table .more .fl-px{width:14px}
+.fl-data-table .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.fl-data-table .foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:var(--feega-space-3);margin-top:var(--feega-space-4);color:var(--feega-fg-muted);font-size:var(--feega-text-sm)}
+.fl-data-table .foot div{display:flex;gap:var(--feega-space-2)}
+@media (prefers-reduced-motion:reduce){:where([class^="fl-"]) *,:where([class^="fl-"]) *::before,:where([class^="fl-"]) *::after{animation:none!important;transition:none!important}}
+</style>

@@ -57,7 +57,7 @@ export async function openPanel(appRoot: string, theme = DARK, cloud?: CommentsC
   const comments = commentsHost(cloud, reply);
   const previewIcons = previewQueue(fetch, (name, svg) => reply({ kind: ToView.IconPreview, name, svg }));
 
-  await page.exposeFunction('toHost', async (m: { kind: ToHost; ask?: EditAsk; id?: number | string; pick?: Pick | null; query?: string; names?: string[]; draft?: CommentDraft }) => {
+  await page.exposeFunction('toHost', async (m: { kind: ToHost; from?: string; to?: string; google?: boolean; family?: string; ask?: EditAsk; id?: number | string; pick?: Pick | null; query?: string; names?: string[]; draft?: CommentDraft }) => {
     if (m.kind === ToHost.Ready) {
       await reply({ kind: ToView.App, url: running.url, styling, prefs: null, breakpoints: await breakpointsOf(appRoot), themes: await themesOf(appRoot) });
       await reply({ kind: ToView.Server, state: ServerState.Running });
@@ -71,6 +71,10 @@ export async function openPanel(appRoot: string, theme = DARK, cloud?: CommentsC
       const out = await edits.edit(m.ask!);
       saves.push(out);
       await reply(out.ok ? { kind: ToView.Edited, ok: true, written: out.written, saved: liveAtOf(m.ask!.at), note: out.note } : { kind: ToView.Edited, ok: false, reason: out.reason, at: out.at });
+    }
+    if (m.kind === ToHost.FontReplace || m.kind === ToHost.FontLoad) {
+      const out = m.kind === ToHost.FontReplace ? await edits.replaceFont(m.from!, m.to!, m.google!) : await edits.loadFont(m.family!);
+      await reply(out.ok ? { kind: ToView.Edited, ok: true, written: out.written, note: out.note } : { kind: ToView.Edited, ok: false, reason: out.reason });
     }
     if (m.kind === ToHost.Structure) {
       const out = await edits.structure(m);

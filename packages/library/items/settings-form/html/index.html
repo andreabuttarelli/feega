@@ -1,0 +1,35 @@
+<section class="fl-settings-form">
+  <form method="post" action="#">
+    <header class="head">
+      <h1>Profile</h1>
+      <p>How other people see you across the workspace.</p>
+    </header>
+    <div class="row">
+      <div class="label"><b>Photo</b><span>Square, at least 256 px.</span></div>
+      <div class="control photo"><span class="fl-avatar" aria-hidden="true">NS</span><button class="fl-btn fl-btn--sm" type="button">Upload</button><button class="fl-btn fl-btn--sm fl-btn--ghost" type="button">Remove</button></div>
+    </div>
+    <div class="row">
+      <label class="label" for="fl-settings-name"><b>Name</b><span>Your full name.</span></label>
+      <div class="control"><input class="fl-input" id="fl-settings-name" name="name" value="Name Surname" autocomplete="name" /></div>
+    </div>
+    <div class="row">
+      <label class="label" for="fl-settings-email"><b>Email</b><span>Used to log in.</span></label>
+      <div class="control"><input class="fl-input" id="fl-settings-email" type="email" name="email" value="name@example.com" autocomplete="email" /><span class="fl-badge fl-badge--success">Verified</span></div>
+    </div>
+    <div class="row">
+      <label class="label" for="fl-settings-bio"><b>Bio</b><span>A line or two. Shown on your profile.</span></label>
+      <div class="control"><textarea class="fl-input" id="fl-settings-bio" name="bio" rows="3" maxlength="160" placeholder="What you work on"></textarea></div>
+    </div>
+    <div class="row">
+      <div class="label"><b>Email me</b><span>You can change this anytime.</span></div>
+      <div class="control toggles">
+        <label><input class="fl-switch" type="checkbox" role="switch" name="updates" checked />Product updates</label>
+        <label><input class="fl-switch" type="checkbox" role="switch" name="digest" />Weekly digest</label>
+      </div>
+    </div>
+    <footer class="actions">
+      <button class="fl-btn fl-btn--sm fl-btn--ghost" type="reset">Cancel</button>
+      <button class="fl-btn fl-btn--sm fl-btn--ink" type="submit">Save changes</button>
+    </footer>
+  </form>
+</section>

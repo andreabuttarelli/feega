@@ -1,0 +1,30 @@
+{
+  "id": "progress-skeleton",
+  "name": "Progress and skeleton",
+  "description": "Labelled progress bars, a spinner and a shimmering skeleton card for loading states.",
+  "category": "component",
+  "tags": [
+    "progress",
+    "loading",
+    "skeleton"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    }
+  ],
+  "tier": "free"
+}
