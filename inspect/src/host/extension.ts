@@ -16,6 +16,7 @@ import { appOf, inspectSession, type Session } from './session';
 import { signInFromUri } from './sign-in';
 import { DEV_PLUGINS_SETTING, approveInModal, beforeProvider, vsCodePlatform, type VsCodeHost } from './vscode-platform';
 import { CLOUD_SETTING, cloudEnabled } from '../cloud-flag';
+import { accountToken } from './account';
 import { cloudApi } from './cloud-api';
 import { editorServer } from './editor-server';
 import type { Platform } from './platform';
@@ -64,10 +65,7 @@ function cloudPlatform(context: vscode.ExtensionContext, base: Platform): { plat
   }
 
   const remote = withRemoteEditor(base, () => editorServer(vscode.Uri.joinPath(mediaOf(context)).fsPath, ANY_PORT));
-  const token = async () => {
-    const account = await base.account.read();
-    return account && account.expires_at > Math.floor(Date.now() / 1000) ? account.access_token : null;
-  };
+  const token = () => accountToken(base.account);
   const { share, cloud } = cloudShare({ api: cloudApi({ base: process.env[WEB_URL_VAR], token }), relayUrl: process.env[RELAY_URL_VAR] ?? RELAY_URL, send: fetch, editorUrl: remote.editorUrl });
   return { platform: { ...base, ...remote.transport, share, cloud }, stopRemote: remote.stop };
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Catalog, CatalogItem } from '../../../packages/library/src/catalog';
-import { INCLUDED_IN_CLOUD, entriesOf, insertAskOf } from './library';
+import { entriesOf, insertAskOf } from './library';
 
 const item = (id: string, tier: 'free' | 'pro'): CatalogItem => ({
   id,
@@ -34,8 +34,14 @@ describe('insertAskOf', () => {
     expect(out).toMatchObject({ ok: true, tokens: ':root{}', item: { id: 'pricing', component: 'Pricing', fonts: [{ family: 'Inter Tight', weights: [400] }] } });
   });
 
-  it('keeps pro items locked without asking any server', () => {
-    expect(insertAskOf(catalog, 'studio')).toEqual({ ok: false, reason: INCLUDED_IN_CLOUD });
+  it('hands a free item as it is, with its files', () => {
+    expect(insertAskOf(catalog, 'pricing')).toMatchObject({ ok: true, pro: false, item: { files: { svelte: [{ name: 'A.svelte', text: 's' }] } } });
+  });
+
+  it('marks a pro item as one whose files come from the server, with none of its own', () => {
+    const out = insertAskOf({ ...catalog, items: [{ ...item('studio', 'pro'), files: { svelte: [{ name: 'Leak.svelte', text: 'x' }], react: [], vue: [], astro: [] } }] }, 'studio');
+
+    expect(out).toMatchObject({ ok: true, pro: true, tokens: ':root{}', item: { id: 'studio', component: 'Studio', files: { svelte: [], react: [], vue: [], astro: [] } } });
   });
 
   it('refuses an id the catalog does not hold', () => {

@@ -4,7 +4,8 @@ import * as vscode from 'vscode';
 import type { HostMessage, Source } from '../messages';
 import { SettingKey, settingsWith } from '../settings';
 import { Column, openTarget, revealColumn } from './open-source';
-import type { Account, AccountStore } from './account';
+import { accountToken, type Account, type AccountStore } from './account';
+import { cloudApi } from './cloud-api';
 import { IMAGE_EXTENSIONS } from './image-copy';
 import { catalogFile } from './library';
 import { pluginsRoot } from '@feega/plugin-store/registry';
@@ -17,6 +18,7 @@ const BEFORE_SCHEME = 'feega-before';
 
 const COLUMNS: Record<Column, vscode.ViewColumn> = { [Column.First]: vscode.ViewColumn.One, [Column.Beside]: vscode.ViewColumn.Beside };
 
+const WEB_URL_VAR = 'FEEGA_WEB_URL';
 const SECRET_KEY = 'feegaInspect.account';
 const SKILL_HINT_NEVER = 'feegaInspect.skillHintNever';
 
@@ -97,6 +99,8 @@ export function vsCodePlatform(host: VsCodeHost, panel: PanelLike, befores: Map<
     return uri ? { name: basename(uri.fsPath), bytes: await vscode.workspace.fs.readFile(uri) } : null;
   }
 
+  const account = secretAccountStore(context.secrets);
+
   return {
     version: String(context.extension.packageJSON.version),
     launcher: host.launcher,
@@ -124,7 +128,8 @@ export function vsCodePlatform(host: VsCodeHost, panel: PanelLike, befores: Map<
     warn: async (text, action) => (await vscode.window.showWarningMessage(`Feega: ${text}`, ...(action ? [action] : []))) === action,
     pickImage,
     library: catalogFile(join(dirname(host.launcher), 'library.json')),
-    account: secretAccountStore(context.secrets),
+    proFiles: (id, framework) => cloudApi({ base: process.env[WEB_URL_VAR], token: () => accountToken(account) }).libraryPro(id, framework),
+    account,
     onboarding: deviceOnboardingStore(globalStateOnboardingStore(context.globalState)),
     usage: vsCodeUsage(context),
     skillHint: { fs: nodeHintFs, home: homedir(), surface: HintSurface.Panel, never: () => context.globalState.get(SKILL_HINT_NEVER) === true, setNever: async () => context.globalState.update(SKILL_HINT_NEVER, true) },

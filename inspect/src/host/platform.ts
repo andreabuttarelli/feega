@@ -1,5 +1,6 @@
 import type { HostMessage, Source, ViewMessage } from '../messages';
 import type { Catalog } from '../../../packages/library/src/catalog';
+import type { ProFetch } from './pro-insert';
 import type { AccountStore } from './account';
 import type { CommentsCloud } from './comments';
 import type { SharePort } from './share/share-port-factory';
@@ -47,6 +48,7 @@ export type Platform = Transport & {
   warn: (text: string, action?: string) => Promise<boolean>;
   pickImage?: () => Promise<ChosenImage | null>;
   library?: () => Promise<Catalog | null>;
+  proFiles?: ProFetch;
   usage?: UsageHost;
   account: AccountStore;
   cloud?: CommentsCloud;
