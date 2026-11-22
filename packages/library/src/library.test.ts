@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { compile } from 'svelte/compiler';
 import ts from 'typescript';
 import {
@@ -87,6 +88,12 @@ describe('library items', () => {
 		expect(freeItems.every((item) => item.tier === 'free')).toBe(true);
 		expect(proItems.length).toBeGreaterThan(0);
 		expect(proItems.every((item) => item.tier === 'pro')).toBe(true);
+	});
+
+	it('keeps nothing but the manifest and the preview of a pro item in the public repo', () => {
+		for (const item of proItems) {
+			expect(readdirSync(join(PRO_DIR, item.id)).sort(), item.id).toEqual(['manifest.json', 'preview.webp']);
+		}
 	});
 
 	it('requires a valid manifest', () => {
