@@ -1,0 +1,19 @@
+{
+  "id": "feature-image",
+  "name": "Feature with image",
+  "description": "Text with a short checklist next to an image placeholder.",
+  "category": "section",
+  "tags": [
+    "features",
+    "image"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "tier": "free"
+}

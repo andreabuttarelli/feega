@@ -1,0 +1,22 @@
+<div class="fl-toast" role="region" aria-label="Notifications">
+  <div class="toast" role="status">
+    <p>Changes saved.</p>
+    <button type="button" aria-label="Dismiss" data-dismiss>&times;</button>
+  </div>
+  <div class="toast toast--error" role="alert">
+    <p>Could not save. Try again.</p>
+    <button type="button" aria-label="Dismiss" data-dismiss>&times;</button>
+  </div>
+</div>
+
+<script>
+document.querySelectorAll('.fl-toast:not([data-ready])').forEach((root) => {
+  root.setAttribute('data-ready', '');
+  root.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-dismiss]');
+    if (button) {
+      button.parentElement.remove();
+    }
+  });
+});
+</script>

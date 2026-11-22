@@ -1,0 +1,36 @@
+<template>
+  <section class="fl-hero-split">
+    <div class="fl-container inner">
+      <div class="copy">
+        <h1>Headline that says what you do</h1>
+        <p class="lead">One or two sentences that explain the product and who it is for.</p>
+        <div class="actions">
+          <a class="fl-btn fl-btn--primary" href="#">Get started</a>
+          <a class="fl-btn" href="#">Learn more</a>
+        </div>
+      </div>
+      <div class="fl-media" role="img" aria-label="Placeholder image"></div>
+    </div>
+  </section>
+</template>
+
+<style scoped>
+.fl-container{width:min(var(--feega-max-width),100% - 2 * var(--feega-gutter));margin-inline:auto}
+.fl-btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--feega-space-2);min-height:40px;padding:0 var(--feega-space-4);border:1px solid var(--feega-line);border-radius:var(--feega-radius-sm);background:var(--feega-raised);color:var(--feega-fg);font:inherit;font-weight:500;text-decoration:none;cursor:pointer}
+.fl-btn:hover{background:var(--feega-surface)}
+.fl-btn--primary{background:var(--feega-accent);border-color:var(--feega-accent);color:var(--feega-accent-fg)}
+.fl-btn--primary:hover{background:var(--feega-accent);opacity:0.9}
+.fl-btn[disabled]{opacity:0.5;cursor:not-allowed}
+.fl-media{aspect-ratio:4 / 3;border:1px solid var(--feega-line);border-radius:var(--feega-radius-lg);background:linear-gradient(135deg,var(--feega-accent-soft),var(--feega-surface))}
+.fl-hero-split{font-family:var(--feega-font);line-height:1.5;color:var(--feega-fg);background:var(--feega-bg)}
+.fl-hero-split *,.fl-hero-split *::before,.fl-hero-split *::after{box-sizing:border-box}
+.fl-hero-split a{color:inherit}
+.fl-hero-split :focus-visible{outline:2px solid var(--feega-focus);outline-offset:2px}
+.fl-hero-split{padding-block:var(--feega-space-section)}
+.fl-hero-split .inner{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,20rem),1fr));align-items:center;gap:var(--feega-space-12)}
+.fl-hero-split .copy{display:grid;gap:var(--feega-space-6);justify-items:start}
+.fl-hero-split p{margin:0}
+.fl-hero-split h1{margin:0;font-size:clamp(2.25rem,6vw,3.75rem);font-weight:600;letter-spacing:-0.05em;line-height:1.04;text-wrap:balance}
+.fl-hero-split .lead{max-width:44ch;color:var(--feega-fg-muted);font-size:1.125rem}
+.fl-hero-split .actions{display:flex;flex-wrap:wrap;gap:var(--feega-space-3)}
+</style>

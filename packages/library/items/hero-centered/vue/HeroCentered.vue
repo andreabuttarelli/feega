@@ -1,0 +1,33 @@
+<template>
+  <section class="fl-hero-centered">
+    <div class="fl-container inner">
+      <p class="fl-badge">New</p>
+      <h1>Headline that says what you do</h1>
+      <p class="lead">One or two sentences that explain the product and who it is for.</p>
+      <div class="actions">
+        <a class="fl-btn fl-btn--primary" href="#">Get started</a>
+        <a class="fl-btn" href="#">Learn more</a>
+      </div>
+    </div>
+  </section>
+</template>
+
+<style scoped>
+.fl-container{width:min(var(--feega-max-width),100% - 2 * var(--feega-gutter));margin-inline:auto}
+.fl-btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--feega-space-2);min-height:40px;padding:0 var(--feega-space-4);border:1px solid var(--feega-line);border-radius:var(--feega-radius-sm);background:var(--feega-raised);color:var(--feega-fg);font:inherit;font-weight:500;text-decoration:none;cursor:pointer}
+.fl-btn:hover{background:var(--feega-surface)}
+.fl-btn--primary{background:var(--feega-accent);border-color:var(--feega-accent);color:var(--feega-accent-fg)}
+.fl-btn--primary:hover{background:var(--feega-accent);opacity:0.9}
+.fl-btn[disabled]{opacity:0.5;cursor:not-allowed}
+.fl-badge{display:inline-flex;align-items:center;padding:0 var(--feega-space-2);border-radius:var(--feega-radius-full);background:var(--feega-accent-soft);color:var(--feega-accent);font-size:0.75rem;font-weight:600;line-height:1.5rem}
+.fl-hero-centered{font-family:var(--feega-font);line-height:1.5;color:var(--feega-fg);background:var(--feega-bg)}
+.fl-hero-centered *,.fl-hero-centered *::before,.fl-hero-centered *::after{box-sizing:border-box}
+.fl-hero-centered a{color:inherit}
+.fl-hero-centered :focus-visible{outline:2px solid var(--feega-focus);outline-offset:2px}
+.fl-hero-centered{padding-block:var(--feega-space-section)}
+.fl-hero-centered .inner{display:grid;justify-items:center;gap:var(--feega-space-6);text-align:center}
+.fl-hero-centered p{margin:0}
+.fl-hero-centered h1{margin:0;max-width:16ch;font-size:clamp(2.25rem,8vw,4.5rem);font-weight:600;letter-spacing:-0.05em;line-height:1.02;text-wrap:balance}
+.fl-hero-centered .lead{max-width:48ch;color:var(--feega-fg-muted);font-size:1.125rem;text-wrap:pretty}
+.fl-hero-centered .actions{display:flex;flex-wrap:wrap;justify-content:center;gap:var(--feega-space-3)}
+</style>

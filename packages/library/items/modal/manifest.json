@@ -1,0 +1,19 @@
+{
+  "id": "modal",
+  "name": "Modal",
+  "description": "Native dialog opened by a button; closes with Escape or either action.",
+  "category": "component",
+  "tags": [
+    "dialog",
+    "overlay"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "tier": "free"
+}

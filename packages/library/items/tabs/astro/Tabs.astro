@@ -1,0 +1,54 @@
+---
+---
+
+<div class="fl-tabs">
+  <div class="list" role="tablist" aria-label="Sections">
+    <button class="tab" role="tab" type="button" id="fl-tab-1" aria-controls="fl-panel-1" aria-selected="true">Overview</button>
+    <button class="tab" role="tab" type="button" id="fl-tab-2" aria-controls="fl-panel-2" aria-selected="false" tabindex="-1">Activity</button>
+    <button class="tab" role="tab" type="button" id="fl-tab-3" aria-controls="fl-panel-3" aria-selected="false" tabindex="-1">Settings</button>
+  </div>
+  <div class="panel" role="tabpanel" id="fl-panel-1" aria-labelledby="fl-tab-1" tabindex="0"><p>Overview content.</p></div>
+  <div class="panel" role="tabpanel" id="fl-panel-2" aria-labelledby="fl-tab-2" tabindex="0" hidden><p>Activity content.</p></div>
+  <div class="panel" role="tabpanel" id="fl-panel-3" aria-labelledby="fl-tab-3" tabindex="0" hidden><p>Settings content.</p></div>
+</div>
+
+<script>
+document.querySelectorAll<HTMLElement>('.fl-tabs:not([data-ready])').forEach((root) => {
+  root.setAttribute('data-ready', '');
+  const tabs = Array.from(root.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+  const panels = Array.from(root.querySelectorAll<HTMLElement>('[role="tabpanel"]'));
+
+  function select(index: number) {
+    tabs.forEach((tab, i) => {
+      tab.setAttribute('aria-selected', String(i === index));
+      tab.tabIndex = i === index ? 0 : -1;
+      panels[i].hidden = i !== index;
+    });
+    tabs[index].focus();
+  }
+
+  tabs.forEach((tab, i) => tab.addEventListener('click', () => select(i)));
+  root.querySelector('[role="tablist"]')?.addEventListener('keydown', (event) => {
+    const key = (event as KeyboardEvent).key;
+    const step = key === 'ArrowRight' ? 1 : key === 'ArrowLeft' ? -1 : 0;
+    if (step === 0) {
+      return;
+    }
+    select((tabs.indexOf(document.activeElement as HTMLButtonElement) + step + tabs.length) % tabs.length);
+  });
+});
+</script>
+
+<style>
+.fl-tabs{font-family:var(--feega-font);line-height:1.5;color:var(--feega-fg);background:var(--feega-bg)}
+.fl-tabs *,.fl-tabs *::before,.fl-tabs *::after{box-sizing:border-box}
+.fl-tabs a{color:inherit}
+.fl-tabs :focus-visible{outline:2px solid var(--feega-focus);outline-offset:2px}
+.fl-tabs{padding:var(--feega-space-4)}
+.fl-tabs .list{display:flex;gap:var(--feega-space-1);overflow-x:auto;border-bottom:1px solid var(--feega-line)}
+.fl-tabs .tab{padding:var(--feega-space-3) var(--feega-space-4);border:0;border-bottom:2px solid transparent;background:transparent;color:var(--feega-fg-muted);font:inherit;font-weight:500;white-space:nowrap;cursor:pointer}
+.fl-tabs .tab:hover{color:var(--feega-fg)}
+.fl-tabs .tab[aria-selected="true"]{border-bottom-color:var(--feega-accent);color:var(--feega-fg)}
+.fl-tabs .panel{padding:var(--feega-space-4) 0;color:var(--feega-fg-muted)}
+.fl-tabs .panel p{margin:0}
+</style>

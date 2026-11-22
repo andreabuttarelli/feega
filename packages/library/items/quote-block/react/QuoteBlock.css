@@ -1,0 +1,16 @@
+.fl-container{width:min(var(--feega-max-width),100% - 2 * var(--feega-gutter));margin-inline:auto}
+.fl-badge{display:inline-flex;align-items:center;padding:0 var(--feega-space-2);border-radius:var(--feega-radius-full);background:var(--feega-accent-soft);color:var(--feega-accent);font-size:0.75rem;font-weight:600;line-height:1.5rem}
+.fl-title{margin:0;font-size:clamp(1.75rem,4.5vw,2.5rem);font-weight:600;letter-spacing:-0.04em;line-height:1.1;text-wrap:balance}
+.fl-lead{margin:0;color:var(--feega-fg-muted);font-size:1.125rem;text-wrap:pretty}
+.fl-quote-block{font-family:var(--feega-font);line-height:1.5;color:var(--feega-fg);background:var(--feega-bg)}
+.fl-quote-block *,.fl-quote-block *::before,.fl-quote-block *::after{box-sizing:border-box}
+.fl-quote-block a{color:inherit}
+.fl-quote-block :focus-visible{outline:2px solid var(--feega-focus);outline-offset:2px}
+.fl-quote-block{padding-block:var(--feega-space-section)}
+.fl-quote-block .notice{display:flex;flex-wrap:wrap;align-items:center;gap:var(--feega-space-2);margin:var(--feega-space-3) 0 var(--feega-space-8);color:var(--feega-fg-muted)}
+.fl-quote-block .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,16rem),1fr));gap:var(--feega-space-4)}
+.fl-quote-block figure{display:grid;gap:var(--feega-space-4);margin:0;padding:var(--feega-space-6);border:1px solid var(--feega-line);border-radius:var(--feega-radius-md);background:var(--feega-surface)}
+.fl-quote-block blockquote{margin:0;font-size:1.0625rem}
+.fl-quote-block blockquote p{margin:0}
+.fl-quote-block figcaption{display:grid;font-weight:600}
+.fl-quote-block figcaption span{color:var(--feega-fg-muted);font-weight:400;font-size:0.875rem}

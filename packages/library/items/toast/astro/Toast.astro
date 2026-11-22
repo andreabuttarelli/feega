@@ -1,0 +1,38 @@
+---
+---
+
+<div class="fl-toast" role="region" aria-label="Notifications">
+  <div class="toast" role="status">
+    <p>Changes saved.</p>
+    <button type="button" aria-label="Dismiss" data-dismiss>&times;</button>
+  </div>
+  <div class="toast toast--error" role="alert">
+    <p>Could not save. Try again.</p>
+    <button type="button" aria-label="Dismiss" data-dismiss>&times;</button>
+  </div>
+</div>
+
+<script>
+document.querySelectorAll<HTMLElement>('.fl-toast:not([data-ready])').forEach((root) => {
+  root.setAttribute('data-ready', '');
+  root.addEventListener('click', (event) => {
+    const button = (event.target as HTMLElement).closest('[data-dismiss]');
+    if (button) {
+      button.parentElement?.remove();
+    }
+  });
+});
+</script>
+
+<style>
+.fl-toast{font-family:var(--feega-font);line-height:1.5;color:var(--feega-fg);background:var(--feega-bg)}
+.fl-toast *,.fl-toast *::before,.fl-toast *::after{box-sizing:border-box}
+.fl-toast a{color:inherit}
+.fl-toast :focus-visible{outline:2px solid var(--feega-focus);outline-offset:2px}
+.fl-toast{display:grid;gap:var(--feega-space-2);width:min(100%,22rem);padding:var(--feega-space-4)}
+.fl-toast .toast{display:flex;align-items:center;justify-content:space-between;gap:var(--feega-space-3);padding:var(--feega-space-3) var(--feega-space-4);border:1px solid var(--feega-line);border-left:3px solid var(--feega-success);border-radius:var(--feega-radius-md);background:var(--feega-raised);box-shadow:var(--feega-shadow)}
+.fl-toast .toast--error{border-left-color:var(--feega-danger)}
+.fl-toast p{margin:0;font-size:0.9375rem}
+.fl-toast button{display:inline-grid;place-items:center;width:2rem;height:2rem;border:0;border-radius:var(--feega-radius-sm);background:transparent;color:var(--feega-fg-muted);font:inherit;font-size:1.25rem;cursor:pointer}
+.fl-toast button:hover{background:var(--feega-surface);color:var(--feega-fg)}
+</style>

@@ -1,0 +1,19 @@
+{
+  "id": "features-grid",
+  "name": "Features grid",
+  "description": "Section title and six features in a responsive grid.",
+  "category": "section",
+  "tags": [
+    "features",
+    "grid"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "tier": "free"
+}

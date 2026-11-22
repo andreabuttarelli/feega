@@ -1,0 +1,19 @@
+{
+  "id": "hero-centered",
+  "name": "Hero, centered",
+  "description": "Centered headline, supporting line and two actions.",
+  "category": "section",
+  "tags": [
+    "hero",
+    "landing"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "tier": "free"
+}

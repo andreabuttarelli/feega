@@ -1,0 +1,27 @@
+<template>
+  <section class="fl-logo-strip" aria-label="Trusted by">
+    <div class="fl-container inner">
+      <p class="caption">Trusted by teams everywhere (placeholder logos)</p>
+      <ul class="logos">
+        <li><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10" /></svg><span>Logo one</span></li>
+        <li><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="18" height="18" rx="3" /></svg><span>Logo two</span></li>
+        <li><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l10 18H2z" /></svg><span>Logo three</span></li>
+        <li><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l9 10-9 10-9-10z" /></svg><span>Logo four</span></li>
+        <li><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="9" width="18" height="6" rx="3" /></svg><span>Logo five</span></li>
+      </ul>
+    </div>
+  </section>
+</template>
+
+<style scoped>
+.fl-container{width:min(var(--feega-max-width),100% - 2 * var(--feega-gutter));margin-inline:auto}
+.fl-logo-strip{font-family:var(--feega-font);line-height:1.5;color:var(--feega-fg);background:var(--feega-bg)}
+.fl-logo-strip *,.fl-logo-strip *::before,.fl-logo-strip *::after{box-sizing:border-box}
+.fl-logo-strip a{color:inherit}
+.fl-logo-strip :focus-visible{outline:2px solid var(--feega-focus);outline-offset:2px}
+.fl-logo-strip{padding-block:var(--feega-space-12);border-block:1px solid var(--feega-line);background:var(--feega-surface)}
+.fl-logo-strip .inner{display:grid;gap:var(--feega-space-6);justify-items:center}
+.fl-logo-strip .caption{margin:0;color:var(--feega-fg-muted);font-size:0.875rem;text-align:center}
+.fl-logo-strip .logos{display:flex;flex-wrap:wrap;justify-content:center;gap:var(--feega-space-4) var(--feega-space-8);margin:0;padding:0;list-style:none}
+.fl-logo-strip .logos li{display:flex;align-items:center;gap:var(--feega-space-2);color:var(--feega-fg-muted);font-weight:600}
+</style>

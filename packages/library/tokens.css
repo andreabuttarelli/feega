@@ -1,0 +1,72 @@
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+  --feega-bg: #ffffff;
+  --feega-surface: #f6f6f6;
+  --feega-raised: #ffffff;
+  --feega-fg: #111111;
+  --feega-fg-muted: #595959;
+  --feega-line: #e2e2e2;
+  --feega-accent: #0b6bcb;
+  --feega-accent-fg: #ffffff;
+  --feega-accent-soft: #e6f1fc;
+  --feega-danger: #c62828;
+  --feega-success: #1b7f3b;
+  --feega-focus: #0099ff;
+  --feega-overlay: rgb(0 0 0 / 0.45);
+  --feega-shadow: 0 8px 24px rgb(0 0 0 / 0.12);
+  --feega-radius-sm: 4px;
+  --feega-radius-md: 6px;
+  --feega-radius-lg: 10px;
+  --feega-radius-full: 999px;
+  --feega-font: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --feega-font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --feega-space-1: 0.25rem;
+  --feega-space-2: 0.5rem;
+  --feega-space-3: 0.75rem;
+  --feega-space-4: 1rem;
+  --feega-space-6: 1.5rem;
+  --feega-space-8: 2rem;
+  --feega-space-12: 3rem;
+  --feega-space-section: clamp(3rem, 8vw, 6rem);
+  --feega-gutter: 1rem;
+  --feega-max-width: 72rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --feega-bg: #121212;
+    --feega-surface: #1a1a1a;
+    --feega-raised: #222222;
+    --feega-fg: #f2f2f2;
+    --feega-fg-muted: #a6a6a6;
+    --feega-line: #333333;
+    --feega-accent: #4da3ff;
+    --feega-accent-fg: #0a0a0a;
+    --feega-accent-soft: #14283d;
+    --feega-danger: #ff7a7a;
+    --feega-success: #4cc16f;
+    --feega-focus: #4da3ff;
+    --feega-overlay: rgb(0 0 0 / 0.6);
+    --feega-shadow: 0 8px 24px rgb(0 0 0 / 0.5);
+  }
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --feega-bg: #121212;
+  --feega-surface: #1a1a1a;
+  --feega-raised: #222222;
+  --feega-fg: #f2f2f2;
+  --feega-fg-muted: #a6a6a6;
+  --feega-line: #333333;
+  --feega-accent: #4da3ff;
+  --feega-accent-fg: #0a0a0a;
+  --feega-accent-soft: #14283d;
+  --feega-danger: #ff7a7a;
+  --feega-success: #4cc16f;
+  --feega-focus: #4da3ff;
+  --feega-overlay: rgb(0 0 0 / 0.6);
+  --feega-shadow: 0 8px 24px rgb(0 0 0 / 0.5);
+}

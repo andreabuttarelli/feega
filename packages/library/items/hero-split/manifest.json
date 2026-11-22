@@ -1,0 +1,20 @@
+{
+  "id": "hero-split",
+  "name": "Hero, split",
+  "description": "Headline and actions on the left, image placeholder on the right; stacks on small screens.",
+  "category": "section",
+  "tags": [
+    "hero",
+    "landing",
+    "image"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "tier": "free"
+}

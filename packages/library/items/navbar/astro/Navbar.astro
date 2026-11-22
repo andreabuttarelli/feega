@@ -1,0 +1,41 @@
+---
+---
+
+<header class="fl-navbar">
+  <div class="fl-container bar">
+    <a class="brand" href="#">Brand</a>
+    <nav aria-label="Primary">
+      <ul class="links">
+        <li><a href="#">Product</a></li>
+        <li><a href="#">Pricing</a></li>
+        <li><a href="#">Docs</a></li>
+        <li><a href="#">Blog</a></li>
+      </ul>
+    </nav>
+    <div class="actions">
+      <a class="fl-btn" href="#">Log in</a>
+      <a class="fl-btn fl-btn--primary" href="#">Get started</a>
+    </div>
+  </div>
+</header>
+
+<style>
+.fl-container{width:min(var(--feega-max-width),100% - 2 * var(--feega-gutter));margin-inline:auto}
+.fl-btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--feega-space-2);min-height:40px;padding:0 var(--feega-space-4);border:1px solid var(--feega-line);border-radius:var(--feega-radius-sm);background:var(--feega-raised);color:var(--feega-fg);font:inherit;font-weight:500;text-decoration:none;cursor:pointer}
+.fl-btn:hover{background:var(--feega-surface)}
+.fl-btn--primary{background:var(--feega-accent);border-color:var(--feega-accent);color:var(--feega-accent-fg)}
+.fl-btn--primary:hover{background:var(--feega-accent);opacity:0.9}
+.fl-btn[disabled]{opacity:0.5;cursor:not-allowed}
+.fl-navbar{font-family:var(--feega-font);line-height:1.5;color:var(--feega-fg);background:var(--feega-bg)}
+.fl-navbar *,.fl-navbar *::before,.fl-navbar *::after{box-sizing:border-box}
+.fl-navbar a{color:inherit}
+.fl-navbar :focus-visible{outline:2px solid var(--feega-focus);outline-offset:2px}
+.fl-navbar{border-bottom:1px solid var(--feega-line)}
+.fl-navbar .bar{display:flex;flex-wrap:wrap;align-items:center;gap:var(--feega-space-3) var(--feega-space-6);padding-block:var(--feega-space-3)}
+.fl-navbar .brand{font-weight:700;font-size:1.125rem;letter-spacing:-0.03em;text-decoration:none}
+.fl-navbar .links{display:flex;gap:var(--feega-space-6);margin:0;padding:0;list-style:none}
+.fl-navbar .links a{color:var(--feega-fg-muted);text-decoration:none;font-size:0.9375rem}
+.fl-navbar .links a:hover{color:var(--feega-fg)}
+.fl-navbar .actions{display:flex;gap:var(--feega-space-2);margin-left:auto}
+@media (max-width:640px){.fl-navbar nav{order:3;width:100%}.fl-navbar .links{gap:var(--feega-space-4);flex-wrap:wrap}}
+</style>

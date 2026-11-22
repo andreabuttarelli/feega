@@ -1,0 +1,19 @@
+{
+  "id": "faq",
+  "name": "FAQ",
+  "description": "Accordion built on native details and summary; no JavaScript.",
+  "category": "section",
+  "tags": [
+    "faq",
+    "accordion"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "tier": "free"
+}

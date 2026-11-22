@@ -1,0 +1,19 @@
+{
+  "id": "tabs",
+  "name": "Tabs",
+  "description": "Accessible tablist with arrow-key navigation.",
+  "category": "component",
+  "tags": [
+    "tabs",
+    "navigation"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "tier": "free"
+}

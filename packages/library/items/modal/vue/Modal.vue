@@ -1,0 +1,39 @@
+<script setup lang="ts">
+import { ref } from 'vue';
+
+const dialog = ref<HTMLDialogElement | null>(null);
+</script>
+
+<template>
+  <div class="fl-modal">
+    <button class="fl-btn" type="button" @click="dialog?.showModal()">Open modal</button>
+    <dialog ref="dialog" aria-label="Confirm action">
+      <form method="dialog">
+        <h2>Confirm action</h2>
+        <p>Explain what will happen when the user confirms.</p>
+        <div class="actions">
+          <button class="fl-btn" value="cancel">Cancel</button>
+          <button class="fl-btn fl-btn--primary" value="confirm">Confirm</button>
+        </div>
+      </form>
+    </dialog>
+  </div>
+</template>
+
+<style scoped>
+.fl-btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--feega-space-2);min-height:40px;padding:0 var(--feega-space-4);border:1px solid var(--feega-line);border-radius:var(--feega-radius-sm);background:var(--feega-raised);color:var(--feega-fg);font:inherit;font-weight:500;text-decoration:none;cursor:pointer}
+.fl-btn:hover{background:var(--feega-surface)}
+.fl-btn--primary{background:var(--feega-accent);border-color:var(--feega-accent);color:var(--feega-accent-fg)}
+.fl-btn--primary:hover{background:var(--feega-accent);opacity:0.9}
+.fl-btn[disabled]{opacity:0.5;cursor:not-allowed}
+.fl-modal{font-family:var(--feega-font);line-height:1.5;color:var(--feega-fg);background:var(--feega-bg)}
+.fl-modal *,.fl-modal *::before,.fl-modal *::after{box-sizing:border-box}
+.fl-modal a{color:inherit}
+.fl-modal :focus-visible{outline:2px solid var(--feega-focus);outline-offset:2px}
+.fl-modal{padding:var(--feega-space-4)}
+.fl-modal dialog{width:min(calc(100% - 2 * var(--feega-gutter)),26rem);padding:var(--feega-space-6);border:1px solid var(--feega-line);border-radius:var(--feega-radius-lg);background:var(--feega-raised);color:var(--feega-fg);box-shadow:var(--feega-shadow)}
+.fl-modal dialog::backdrop{background:var(--feega-overlay)}
+.fl-modal h2{margin:0 0 var(--feega-space-2);font-size:1.125rem;font-weight:600}
+.fl-modal dialog p{margin:0 0 var(--feega-space-6);color:var(--feega-fg-muted)}
+.fl-modal .actions{display:flex;justify-content:flex-end;gap:var(--feega-space-2)}
+</style>

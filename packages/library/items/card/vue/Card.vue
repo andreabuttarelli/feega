@@ -1,0 +1,24 @@
+<template>
+  <article class="fl-card">
+    <div class="fl-media" role="img" aria-label="Placeholder image"></div>
+    <div class="body">
+      <h3>Card title</h3>
+      <p>A short description of what this card links to.</p>
+      <a href="#">Read more</a>
+    </div>
+  </article>
+</template>
+
+<style scoped>
+.fl-media{aspect-ratio:4 / 3;border:1px solid var(--feega-line);border-radius:var(--feega-radius-lg);background:linear-gradient(135deg,var(--feega-accent-soft),var(--feega-surface))}
+.fl-card{font-family:var(--feega-font);line-height:1.5;color:var(--feega-fg);background:var(--feega-bg)}
+.fl-card *,.fl-card *::before,.fl-card *::after{box-sizing:border-box}
+.fl-card a{color:inherit}
+.fl-card :focus-visible{outline:2px solid var(--feega-focus);outline-offset:2px}
+.fl-card{max-width:22rem;overflow:hidden;border:1px solid var(--feega-line);border-radius:var(--feega-radius-md);background:var(--feega-raised)}
+.fl-card .fl-media{aspect-ratio:16 / 9;border:0;border-radius:0;border-bottom:1px solid var(--feega-line)}
+.fl-card .body{display:grid;gap:var(--feega-space-2);padding:var(--feega-space-4)}
+.fl-card h3{margin:0;font-size:1.0625rem;font-weight:600}
+.fl-card p{margin:0;color:var(--feega-fg-muted)}
+.fl-card a{color:var(--feega-accent);font-weight:500}
+</style>

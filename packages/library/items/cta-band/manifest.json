@@ -1,0 +1,19 @@
+{
+  "id": "cta-band",
+  "name": "CTA band",
+  "description": "Full-width accent band with one message and one action.",
+  "category": "section",
+  "tags": [
+    "cta",
+    "conversion"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "tier": "free"
+}

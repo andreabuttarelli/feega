@@ -1,0 +1,26 @@
+<template>
+  <section class="fl-cta-band">
+    <div class="fl-container inner">
+      <div>
+        <h2>Ready to start?</h2>
+        <p>One sentence that makes the next step obvious.</p>
+      </div>
+      <a class="cta" href="#">Get started</a>
+    </div>
+  </section>
+</template>
+
+<style scoped>
+.fl-container{width:min(var(--feega-max-width),100% - 2 * var(--feega-gutter));margin-inline:auto}
+.fl-cta-band{font-family:var(--feega-font);line-height:1.5;color:var(--feega-fg);background:var(--feega-bg)}
+.fl-cta-band *,.fl-cta-band *::before,.fl-cta-band *::after{box-sizing:border-box}
+.fl-cta-band a{color:inherit}
+.fl-cta-band :focus-visible{outline:2px solid var(--feega-focus);outline-offset:2px}
+.fl-cta-band{padding-block:var(--feega-space-12);background:var(--feega-accent);color:var(--feega-accent-fg)}
+.fl-cta-band .inner{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:var(--feega-space-6)}
+.fl-cta-band h2{margin:0;font-size:clamp(1.5rem,4vw,2rem);font-weight:600;letter-spacing:-0.04em}
+.fl-cta-band p{margin:var(--feega-space-1) 0 0;opacity:0.85}
+.fl-cta-band .cta{display:inline-flex;align-items:center;min-height:40px;padding:0 var(--feega-space-6);border-radius:var(--feega-radius-sm);background:var(--feega-accent-fg);color:var(--feega-accent);font-weight:600;text-decoration:none}
+.fl-cta-band .cta:hover{opacity:0.9}
+.fl-cta-band :focus-visible{outline-color:var(--feega-accent-fg)}
+</style>

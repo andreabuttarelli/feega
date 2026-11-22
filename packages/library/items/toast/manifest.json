@@ -1,0 +1,19 @@
+{
+  "id": "toast",
+  "name": "Toast",
+  "description": "Dismissible status and error messages; position the wrapper where you want it.",
+  "category": "component",
+  "tags": [
+    "feedback",
+    "notification"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "tier": "free"
+}

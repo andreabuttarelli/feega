@@ -1,0 +1,55 @@
+<template>
+  <section class="fl-pricing">
+    <div class="fl-container">
+      <div class="head">
+        <h2 class="fl-title">Simple pricing</h2>
+        <p class="fl-lead">Start free. Upgrade when you need more.</p>
+      </div>
+      <div class="tiers">
+        <article>
+          <h3>Free</h3>
+          <p class="price"><strong>$0</strong> <span>/ month</span></p>
+          <ul><li>Feature one</li><li>Feature two</li><li>Feature three</li></ul>
+          <a class="fl-btn" href="#">Get started</a>
+        </article>
+        <article class="featured">
+          <h3>Pro <span class="fl-badge">Popular</span></h3>
+          <p class="price"><strong>$12</strong> <span>/ month</span></p>
+          <ul><li>Everything in Free</li><li>Feature four</li><li>Feature five</li></ul>
+          <a class="fl-btn fl-btn--primary" href="#">Start Pro</a>
+        </article>
+        <article>
+          <h3>Team</h3>
+          <p class="price"><strong>$49</strong> <span>/ month</span></p>
+          <ul><li>Everything in Pro</li><li>Feature six</li><li>Feature seven</li></ul>
+          <a class="fl-btn" href="#">Contact us</a>
+        </article>
+      </div>
+    </div>
+  </section>
+</template>
+
+<style scoped>
+.fl-container{width:min(var(--feega-max-width),100% - 2 * var(--feega-gutter));margin-inline:auto}
+.fl-btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--feega-space-2);min-height:40px;padding:0 var(--feega-space-4);border:1px solid var(--feega-line);border-radius:var(--feega-radius-sm);background:var(--feega-raised);color:var(--feega-fg);font:inherit;font-weight:500;text-decoration:none;cursor:pointer}
+.fl-btn:hover{background:var(--feega-surface)}
+.fl-btn--primary{background:var(--feega-accent);border-color:var(--feega-accent);color:var(--feega-accent-fg)}
+.fl-btn--primary:hover{background:var(--feega-accent);opacity:0.9}
+.fl-btn[disabled]{opacity:0.5;cursor:not-allowed}
+.fl-badge{display:inline-flex;align-items:center;padding:0 var(--feega-space-2);border-radius:var(--feega-radius-full);background:var(--feega-accent-soft);color:var(--feega-accent);font-size:0.75rem;font-weight:600;line-height:1.5rem}
+.fl-title{margin:0;font-size:clamp(1.75rem,4.5vw,2.5rem);font-weight:600;letter-spacing:-0.04em;line-height:1.1;text-wrap:balance}
+.fl-lead{margin:0;color:var(--feega-fg-muted);font-size:1.125rem;text-wrap:pretty}
+.fl-pricing{font-family:var(--feega-font);line-height:1.5;color:var(--feega-fg);background:var(--feega-bg)}
+.fl-pricing *,.fl-pricing *::before,.fl-pricing *::after{box-sizing:border-box}
+.fl-pricing a{color:inherit}
+.fl-pricing :focus-visible{outline:2px solid var(--feega-focus);outline-offset:2px}
+.fl-pricing{padding-block:var(--feega-space-section)}
+.fl-pricing .head{display:grid;gap:var(--feega-space-3);max-width:40rem;margin-bottom:var(--feega-space-12)}
+.fl-pricing .tiers{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,16rem),1fr));gap:var(--feega-space-4);align-items:start}
+.fl-pricing article{display:grid;gap:var(--feega-space-4);padding:var(--feega-space-6);border:1px solid var(--feega-line);border-radius:var(--feega-radius-md);background:var(--feega-raised)}
+.fl-pricing .featured{border-color:var(--feega-accent);box-shadow:var(--feega-shadow)}
+.fl-pricing h3{display:flex;align-items:center;gap:var(--feega-space-2);margin:0;font-size:1.0625rem}
+.fl-pricing .price{margin:0;color:var(--feega-fg-muted)}
+.fl-pricing .price strong{color:var(--feega-fg);font-size:2.25rem;letter-spacing:-0.04em}
+.fl-pricing ul{display:grid;gap:var(--feega-space-2);margin:0;padding:0;list-style:none;color:var(--feega-fg-muted)}
+</style>

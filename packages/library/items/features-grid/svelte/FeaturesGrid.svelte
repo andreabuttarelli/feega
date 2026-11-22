@@ -1,0 +1,32 @@
+<section class="fl-features-grid">
+  <div class="fl-container">
+    <div class="head">
+      <h2 class="fl-title">Everything you need</h2>
+      <p class="fl-lead">A short line that frames the features below.</p>
+    </div>
+    <ul class="grid">
+      <li><span class="icon"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5z" /></svg></span><h3>Feature one</h3><p>Describe the benefit in one or two sentences.</p></li>
+      <li><span class="icon"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3L5 14h6l-1 7 8-11h-6z" /></svg></span><h3>Feature two</h3><p>Describe the benefit in one or two sentences.</p></li>
+      <li><span class="icon"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 018 0v3" /></svg></span><h3>Feature three</h3><p>Describe the benefit in one or two sentences.</p></li>
+      <li><span class="icon"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="1" /><rect x="13" y="4" width="7" height="7" rx="1" /><rect x="4" y="13" width="7" height="7" rx="1" /><rect x="13" y="13" width="7" height="7" rx="1" /></svg></span><h3>Feature four</h3><p>Describe the benefit in one or two sentences.</p></li>
+      <li><span class="icon"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9 5-9 5-9-5z" /><path d="M3 13l9 5 9-5" /></svg></span><h3>Feature five</h3><p>Describe the benefit in one or two sentences.</p></li>
+      <li><span class="icon"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 8l-4 4 4 4M16 8l4 4-4 4" /></svg></span><h3>Feature six</h3><p>Describe the benefit in one or two sentences.</p></li>
+    </ul>
+  </div>
+</section>
+
+<style>
+.fl-container{width:min(var(--feega-max-width),100% - 2 * var(--feega-gutter));margin-inline:auto}
+.fl-title{margin:0;font-size:clamp(1.75rem,4.5vw,2.5rem);font-weight:600;letter-spacing:-0.04em;line-height:1.1;text-wrap:balance}
+.fl-lead{margin:0;color:var(--feega-fg-muted);font-size:1.125rem;text-wrap:pretty}
+.fl-features-grid{font-family:var(--feega-font);line-height:1.5;color:var(--feega-fg);background:var(--feega-bg)}
+.fl-features-grid *,.fl-features-grid *::before,.fl-features-grid *::after{box-sizing:border-box}
+.fl-features-grid a{color:inherit}
+.fl-features-grid :focus-visible{outline:2px solid var(--feega-focus);outline-offset:2px}
+.fl-features-grid{padding-block:var(--feega-space-section)}
+.fl-features-grid .head{display:grid;gap:var(--feega-space-3);max-width:40rem;margin-bottom:var(--feega-space-12)}
+.fl-features-grid .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,16rem),1fr));gap:var(--feega-space-8);margin:0;padding:0;list-style:none}
+.fl-features-grid .icon{display:inline-grid;place-items:center;width:2.5rem;height:2.5rem;border-radius:var(--feega-radius-md);background:var(--feega-accent-soft);color:var(--feega-accent)}
+.fl-features-grid h3{margin:var(--feega-space-4) 0 var(--feega-space-2);font-size:1.0625rem;font-weight:600}
+.fl-features-grid li p{margin:0;color:var(--feega-fg-muted)}
+</style>

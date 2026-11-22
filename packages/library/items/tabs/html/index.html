@@ -1,0 +1,36 @@
+<div class="fl-tabs">
+  <div class="list" role="tablist" aria-label="Sections">
+    <button class="tab" role="tab" type="button" id="fl-tab-1" aria-controls="fl-panel-1" aria-selected="true">Overview</button>
+    <button class="tab" role="tab" type="button" id="fl-tab-2" aria-controls="fl-panel-2" aria-selected="false" tabindex="-1">Activity</button>
+    <button class="tab" role="tab" type="button" id="fl-tab-3" aria-controls="fl-panel-3" aria-selected="false" tabindex="-1">Settings</button>
+  </div>
+  <div class="panel" role="tabpanel" id="fl-panel-1" aria-labelledby="fl-tab-1" tabindex="0"><p>Overview content.</p></div>
+  <div class="panel" role="tabpanel" id="fl-panel-2" aria-labelledby="fl-tab-2" tabindex="0" hidden><p>Activity content.</p></div>
+  <div class="panel" role="tabpanel" id="fl-panel-3" aria-labelledby="fl-tab-3" tabindex="0" hidden><p>Settings content.</p></div>
+</div>
+
+<script>
+document.querySelectorAll('.fl-tabs:not([data-ready])').forEach((root) => {
+  root.setAttribute('data-ready', '');
+  const tabs = [...root.querySelectorAll('[role="tab"]')];
+  const panels = [...root.querySelectorAll('[role="tabpanel"]')];
+
+  function select(index) {
+    tabs.forEach((tab, i) => {
+      tab.setAttribute('aria-selected', String(i === index));
+      tab.tabIndex = i === index ? 0 : -1;
+      panels[i].hidden = i !== index;
+    });
+    tabs[index].focus();
+  }
+
+  tabs.forEach((tab, i) => tab.addEventListener('click', () => select(i)));
+  root.querySelector('[role="tablist"]').addEventListener('keydown', (event) => {
+    const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+    if (step === 0) {
+      return;
+    }
+    select((tabs.indexOf(document.activeElement) + step + tabs.length) % tabs.length);
+  });
+});
+</script>

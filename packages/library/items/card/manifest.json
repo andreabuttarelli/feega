@@ -1,0 +1,19 @@
+{
+  "id": "card",
+  "name": "Card",
+  "description": "Image placeholder, title, text and a link.",
+  "category": "component",
+  "tags": [
+    "card",
+    "content"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "tier": "free"
+}

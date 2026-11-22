@@ -1,0 +1,20 @@
+{
+  "id": "top-bar",
+  "name": "Top bar",
+  "description": "App header with title, search and an account button.",
+  "category": "app",
+  "tags": [
+    "navigation",
+    "header",
+    "search"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "tier": "free"
+}

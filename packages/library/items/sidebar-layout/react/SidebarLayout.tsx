@@ -1,0 +1,23 @@
+import './SidebarLayout.css';
+
+export function SidebarLayout() {
+  return (
+    <div className="fl-sidebar-layout">
+      <aside>
+        <a className="brand" href="#">App</a>
+        <nav aria-label="App">
+          <ul>
+            <li><a href="#" aria-current="page">Overview</a></li>
+            <li><a href="#">Projects</a></li>
+            <li><a href="#">Members</a></li>
+            <li><a href="#">Settings</a></li>
+          </ul>
+        </nav>
+      </aside>
+      <main>
+        <h1>Overview</h1>
+        <p>Page content goes here.</p>
+      </main>
+    </div>
+  );
+}

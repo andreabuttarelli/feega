@@ -1,0 +1,21 @@
+<div class="fl-modal">
+  <button class="fl-btn" type="button" data-open>Open modal</button>
+  <dialog aria-label="Confirm action">
+    <form method="dialog">
+      <h2>Confirm action</h2>
+      <p>Explain what will happen when the user confirms.</p>
+      <div class="actions">
+        <button class="fl-btn" value="cancel">Cancel</button>
+        <button class="fl-btn fl-btn--primary" value="confirm">Confirm</button>
+      </div>
+    </form>
+  </dialog>
+</div>
+
+<script>
+document.querySelectorAll('.fl-modal:not([data-ready])').forEach((root) => {
+  root.setAttribute('data-ready', '');
+  const dialog = root.querySelector('dialog');
+  root.querySelector('[data-open]').addEventListener('click', () => dialog.showModal());
+});
+</script>
