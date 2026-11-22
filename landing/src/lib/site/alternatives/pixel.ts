@@ -4,6 +4,7 @@ export enum PixelIcon {
   Stack = 'stack',
   Help = 'help',
   Plugin = 'plugin',
+  Templates = 'templates',
   MeshGradient = 'mesh-gradient',
   Object3d = 'object-3d'
 }
@@ -23,6 +24,7 @@ export const PIXEL_ROWS: Readonly<Record<PixelIcon, readonly string[]>> = {
   [PixelIcon.Stack]: ['..bbbb..', '.b....b.', 'b..oo..b', 'b.oooo.b', 'b..oo..b', '.b....b.', '..bbbb..'],
   [PixelIcon.Help]: ['..####..', '.##..##.', '.....##.', '....##..', '...##...', '........', '...##...'],
   [PixelIcon.Plugin]: ['..b..b..', '..b..b..', '.######.', '.#oooo#.', '.#oooo#.', '..####..', '...##...'],
+  [PixelIcon.Templates]: ['########', '#oooooo#', '########', '#.#bbb#.', '#.#bbb#.', '#.#####.', '........'],
   [PixelIcon.MeshGradient]: ['bbbooo##', 'bbboooo#', 'nbbbooo#', 'nnbbooo#', 'nnnbboo#', 'nnnnbboo', 'nnnnnbbo'],
   [PixelIcon.Object3d]: ['...bb...', '..bbbb..', '.bbbnnb.', 'bbbnnnnb', 'bbnnnnn.', '.bnnnn..', '..nnn...']
 };
