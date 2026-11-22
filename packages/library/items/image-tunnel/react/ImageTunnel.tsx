@@ -1,32 +1,12 @@
 import { useEffect, useRef } from 'react';
 import './ImageTunnel.css';
 
-type Image = { src?: string; alt: string };
-
-const IMAGES: Image[] = [
-  { alt: 'Placeholder image 1' },
-  { alt: 'Placeholder image 2' },
-  { alt: 'Placeholder image 3' },
-  { alt: 'Placeholder image 4' },
-  { alt: 'Placeholder image 5' },
-  { alt: 'Placeholder image 6' },
-  { alt: 'Placeholder image 7' },
-  { alt: 'Placeholder image 8' }
-];
-const HEADING = 'welcome to the tunnel';
-const TEXT = 'click to pause, press and hold to speed up';
-const CARDS = 16;
-
-function slots(images: Image[]) {
-  return Array.from({ length: CARDS }, (_, i) => ({ ...images[i % images.length], i, tone: i % 4 }));
-}
-
+const DEFAULT_SPEED = 0.9;
+const DEFAULT_BOOST = 5;
 const WALLS = ['left', 'right', 'floor', 'ceiling'];
 const LANES = [-0.4, 0.35, -0.1, 0.4];
 const DEPTH = 10;
 const RINGS = 20;
-const SPEED = 0.9;
-const BOOST = 5;
 const EASE = 4;
 const MAX_STEP = 0.1;
 const HOLD_MS = 250;
@@ -39,6 +19,8 @@ function tunnel(root: HTMLElement): () => void {
   const walls = [...root.querySelectorAll<HTMLElement>('.wall')];
   const cards = [...root.querySelectorAll<HTMLElement>('.card')];
   const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const pace = Number(root.dataset.speed) || DEFAULT_SPEED;
+  const boost = Number(root.dataset.boost) || DEFAULT_BOOST;
 
   let hw = 0;
   let hh = 0;
@@ -109,9 +91,9 @@ function tunnel(root: HTMLElement): () => void {
   function tick(now: number) {
     const step = Math.min(MAX_STEP, (now - last) / 1000);
     last = now;
-    const goal = held ? BOOST : paused ? 0 : 1;
+    const goal = held ? boost : paused ? 0 : 1;
     speed += (goal - speed) * Math.min(1, step * EASE);
-    offset += speed * SPEED * hh * step;
+    offset += speed * pace * hh * step;
     place();
     frame = 0;
     if (goal === 0 && speed < SETTLED) {
@@ -213,27 +195,39 @@ function tunnel(root: HTMLElement): () => void {
   };
 }
 
-export function ImageTunnel({ images = IMAGES, heading = HEADING, text = TEXT }: { images?: Image[]; heading?: string; text?: string }) {
+export function ImageTunnel() {
   const root = useRef<HTMLElement>(null);
-  const cards = slots(images);
 
   useEffect(() => (root.current ? tunnel(root.current) : undefined), []);
 
   return (
-    <section className="fl-image-tunnel" data-theme="dark" tabIndex={0} aria-label="Image tunnel, press to pause" ref={root}>
+    <section className="fl-image-tunnel" data-theme="dark" tabIndex={0} aria-label="Image tunnel, press to pause" data-speed="0.9" data-boost="5" ref={root}>
       <div className="stage">
         <div className="world" aria-hidden="true">
           <div className="wall left" data-wall="left" />
           <div className="wall right" data-wall="right" />
           <div className="wall floor" data-wall="floor" />
           <div className="wall ceiling" data-wall="ceiling" />
-          {cards.map((card) => (
-            <figure key={card.i} className="card" data-tone={card.tone}>{card.src ? <img src={card.src} alt={card.alt} loading="lazy" decoding="async" /> : null}</figure>
-          ))}
+          <figure className="card" data-tone="0"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 1" loading="lazy" decoding="async" /></figure>
+          <figure className="card" data-tone="1"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 2" loading="lazy" decoding="async" /></figure>
+          <figure className="card" data-tone="2"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 3" loading="lazy" decoding="async" /></figure>
+          <figure className="card" data-tone="3"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 4" loading="lazy" decoding="async" /></figure>
+          <figure className="card" data-tone="0"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 5" loading="lazy" decoding="async" /></figure>
+          <figure className="card" data-tone="1"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 6" loading="lazy" decoding="async" /></figure>
+          <figure className="card" data-tone="2"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 7" loading="lazy" decoding="async" /></figure>
+          <figure className="card" data-tone="3"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 8" loading="lazy" decoding="async" /></figure>
+          <figure className="card" data-tone="0"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 1" loading="lazy" decoding="async" /></figure>
+          <figure className="card" data-tone="1"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 2" loading="lazy" decoding="async" /></figure>
+          <figure className="card" data-tone="2"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 3" loading="lazy" decoding="async" /></figure>
+          <figure className="card" data-tone="3"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 4" loading="lazy" decoding="async" /></figure>
+          <figure className="card" data-tone="0"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 5" loading="lazy" decoding="async" /></figure>
+          <figure className="card" data-tone="1"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 6" loading="lazy" decoding="async" /></figure>
+          <figure className="card" data-tone="2"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 7" loading="lazy" decoding="async" /></figure>
+          <figure className="card" data-tone="3"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 8" loading="lazy" decoding="async" /></figure>
         </div>
         <div className="overlay">
-          <h2>{heading}</h2>
-          <p>{text}</p>
+          <h2>welcome to the tunnel</h2>
+          <p>click to pause, press and hold to speed up</p>
         </div>
       </div>
     </section>
