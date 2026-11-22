@@ -16,7 +16,8 @@ npx skills add andreabuttarelli/feega
 In Claude Code, install it as a plugin:
 
 ```
-/plugin install feega --marketplace andreabuttarelli/feega
+/plugin marketplace add andreabuttarelli/feega
+/plugin install feega@feega
 ```
 
 The skill teaches your agent to:
