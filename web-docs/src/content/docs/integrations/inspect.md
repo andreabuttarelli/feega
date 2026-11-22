@@ -64,10 +64,10 @@ code --install-extension feega-inspect-0.1.0.vsix
 
 ## Limits
 
-- Element picking needs the [source map](/integrations/source-map/). Vite, SvelteKit and React
-  Router apps get it automatically; Next.js, Nuxt, Astro and others need `feega-source-map`
-  added to their config.
-- Element picking: Vite-based apps (SvelteKit, Vite, React Router) only, for now.
+- Element picking needs the [source map](/integrations/source-map/). Vite, SvelteKit, React Router,
+  Astro and Nuxt apps get it when Feega starts their dev server.
+- Select, text, style and structure edits are tested on Vite (React, Vue, plain HTML), SvelteKit,
+  React Router, Astro, Nuxt and Next.js. Angular, Gatsby and Create React App are not supported.
 - `hover:`/`dark:` variants, class expressions and non-literal text are not written.
 
 ## Use with your agent

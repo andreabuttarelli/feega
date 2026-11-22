@@ -62,6 +62,7 @@ const INLINE: CssWriter = {
 const CSS_WRITERS: Record<string, CssWriter> = {
   svelte: SCOPED,
   vue: SCOPED,
+  astro: SCOPED,
   jsx: MODULE,
   tsx: MODULE
 };
