@@ -11,6 +11,7 @@ import { fileOnboardingStore, type OnboardingStore } from './onboarding';
 import { openTarget } from './open-source';
 import type { Platform, Stored, Transport } from './platform';
 import type { PluginsHost } from './plugins-session';
+import { HintSurface, nodeSkillHint } from './skill-hint';
 import { Device, Editor, fileInstallStore, installIdOf, nodeUsageEnabled, type InstallStore } from './usage';
 
 const FEEGA_DIR = '.feega';
@@ -113,6 +114,7 @@ export function nodePlatform({ root, launcher, version, transport, print, launch
     share,
     plugins,
     onboarding,
+    skillHint: nodeSkillHint(HintSurface.Terminal),
     usage: {
       identity: () => ({ installId: installIdOf(install), version, editor: Editor.Npx, os: process.platform, arch: process.arch, device: Device.Cli }),
       enabled: () => nodeUsageEnabled(env, settingsWith((row) => settings[row.key]))

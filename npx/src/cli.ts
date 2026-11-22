@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { chosenApp, type AppChoice, type Tree } from '../../inspect/src/host/app-root';
 import { nodePlatform } from '../../inspect/src/host/node-platform';
+import { terminalTip } from '../../inspect/src/host/skill-hint';
 import { killOrphans } from '../../inspect/src/host/orphans';
 import { inspectSession, memoOf } from '../../inspect/src/host/session';
 import { Browser, Run, argsOf, usageOf } from './args';
@@ -107,6 +108,10 @@ async function main(): Promise<number> {
     say(started.attached ? `feega: attached to a dev server Feega did not start (${started.command}); app on ${started.url}` : `feega: started the dev server (${started.command}); app on ${started.url}`);
   }
   say(`feega: editor ready on ${editor.url}  (Ctrl+C to stop)`);
+  const tip = await terminalTip({ platform, roots: [root, args.dir], interactive: Boolean(process.stdout.isTTY) && !process.env.CI });
+  if (tip) {
+    say(tip);
+  }
   if (args.browser === Browser.Open) {
     await platform.openExternal(editor.url);
   }

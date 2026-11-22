@@ -128,3 +128,7 @@ code --install-extension feega-inspect-0.1.0.vsix
 - **Copy for agent.** Right-click the selected element and choose **Copy for agent**, or use the
   link next to the file name in the bar. The clipboard gets `file:line`, selector, component, page,
   preview width, and the breakpoint, theme and state when set. Paste it into your agent.
+- **Skill tip.** In a project with agent files (`CLAUDE.md`, `AGENTS.md`, `.claude/`, `.cursor/`,
+  `.codex/` or `.agents/`) and no Feega skill, Feega shows a one-time tip with
+  `npx skills add andreabuttarelli/feega`. In the editor it has **Copy command** and **Don't show
+  again**; `npx feega` prints one dim line, once per project. Nothing is sent anywhere.

@@ -1,3 +1,4 @@
+import { homedir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import * as vscode from 'vscode';
 import type { HostMessage, Source } from '../messages';
@@ -9,6 +10,7 @@ import { catalogFile } from './library';
 import { pluginsRoot } from '@feega/plugin-store/registry';
 import { deviceOnboardingStore, globalStateOnboardingStore } from './onboarding';
 import type { Platform } from './platform';
+import { HintSurface, nodeHintFs } from './skill-hint';
 import { Device, editorOf, globalStateInstallStore, installIdOf, type UsageHost } from './usage';
 
 const BEFORE_SCHEME = 'feega-before';
@@ -16,6 +18,7 @@ const BEFORE_SCHEME = 'feega-before';
 const COLUMNS: Record<Column, vscode.ViewColumn> = { [Column.First]: vscode.ViewColumn.One, [Column.Beside]: vscode.ViewColumn.Beside };
 
 const SECRET_KEY = 'feegaInspect.account';
+const SKILL_HINT_NEVER = 'feegaInspect.skillHintNever';
 
 export const DEV_PLUGINS_SETTING = 'feegaInspect.plugins.dev';
 
@@ -124,6 +127,7 @@ export function vsCodePlatform(host: VsCodeHost, panel: PanelLike, befores: Map<
     account: secretAccountStore(context.secrets),
     onboarding: deviceOnboardingStore(globalStateOnboardingStore(context.globalState)),
     usage: vsCodeUsage(context),
+    skillHint: { fs: nodeHintFs, home: homedir(), surface: HintSurface.Panel, never: () => context.globalState.get(SKILL_HINT_NEVER) === true, setNever: async () => context.globalState.update(SKILL_HINT_NEVER, true) },
     plugins: { root: pluginsRoot(), dev: () => config().get<string[]>(DEV_PLUGINS_SETTING, []), approve: approveInModal }
   };
 }
