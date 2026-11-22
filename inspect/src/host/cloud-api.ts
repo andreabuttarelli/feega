@@ -2,6 +2,7 @@ export const CLOUD_BASE = 'https://oh.feega.app';
 
 const HTTP_PAYMENT_REQUIRED = 402;
 const PLAN_REQUIRED = 'plan_required';
+const SEATS_EXHAUSTED = 'seats_exhausted';
 
 export enum VisitorRole {
   Viewer = 'viewer',
@@ -11,6 +12,7 @@ export enum VisitorRole {
 export enum CloudFailure {
   NotSignedIn = 'not-signed-in',
   PlanRequired = 'plan-required',
+  SeatsExhausted = 'seats-exhausted',
   Http = 'http'
 }
 
@@ -68,6 +70,9 @@ export function cloudApi({ base = CLOUD_BASE, token, fetch: send = fetch }: Clou
       body: body === undefined ? undefined : JSON.stringify(body)
     });
     const payload = (await response.json().catch(() => ({}))) as { error?: string };
+    if (payload.error === SEATS_EXHAUSTED) {
+      throw new CloudError(CloudFailure.SeatsExhausted, 'No editor seats left', response.status);
+    }
     if (response.status === HTTP_PAYMENT_REQUIRED || payload.error === PLAN_REQUIRED) {
       throw new CloudError(CloudFailure.PlanRequired, 'Feega Cloud needs a paid plan', response.status);
     }

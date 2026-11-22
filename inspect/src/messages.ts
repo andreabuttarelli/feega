@@ -15,6 +15,7 @@ import type { OffsetSide } from '@feega/live-edit/authored-offsets';
 import type { Breakpoints } from '@feega/live-edit/breakpoints';
 import type { Theme } from '@feega/live-edit/themes';
 import type { CloudComment, CommentDraft } from './host/cloud-api';
+import type { Present, VisitorRole } from '../../packages/share-protocol/src/frame';
 import type { ReportFacts, SettingKey, SettingValue, Settings } from './settings';
 
 export enum IconSource {
@@ -145,7 +146,11 @@ export enum ToHost {
   Copy = 'copy',
   Comments = 'comments',
   CommentAdd = 'comment-add',
-  CommentResolve = 'comment-resolve'
+  CommentResolve = 'comment-resolve',
+  ShareStart = 'share-start',
+  ShareStop = 'share-stop',
+  ShareKick = 'share-kick',
+  ShareRole = 'share-role'
 }
 
 export type ChangeRow = { id: number; at: string; prop: string; value: string; scope: string; files: string[]; time: number };
@@ -167,7 +172,14 @@ export enum ToView {
   Onboarding = 'onboarding',
   ImageSaved = 'image-saved',
   Wiring = 'wiring',
-  Comments = 'comments'
+  Comments = 'comments',
+  Share = 'share'
+}
+
+export enum ShareState {
+  Idle = 'idle',
+  Starting = 'starting',
+  Live = 'live'
 }
 
 export enum Onboarding {
@@ -222,7 +234,11 @@ export type HostMessage =
   | { kind: ToHost.Copy; text: string }
   | { kind: ToHost.Comments }
   | { kind: ToHost.CommentAdd; draft: CommentDraft }
-  | { kind: ToHost.CommentResolve; id: string };
+  | { kind: ToHost.CommentResolve; id: string }
+  | { kind: ToHost.ShareStart; name: string; canEdit: boolean }
+  | { kind: ToHost.ShareStop }
+  | { kind: ToHost.ShareKick; userId: string }
+  | { kind: ToHost.ShareRole; userId: string; role: VisitorRole };
 
 export type ViewMessage =
   | { kind: ToView.App; url: string; styling: Styling; prefs: Prefs | null; route?: string; breakpoints: Breakpoints; themes: Theme[] }
@@ -239,7 +255,8 @@ export type ViewMessage =
   | { kind: ToView.Onboarding; state: Onboarding }
   | { kind: ToView.ImageSaved; url: string }
   | { kind: ToView.Wiring; at: string; instance?: number; wiring: Wiring }
-  | { kind: ToView.Comments; enabled: boolean; comments: CloudComment[]; error?: string };
+  | { kind: ToView.Comments; enabled: boolean; comments: CloudComment[]; error?: string }
+  | { kind: ToView.Share; state: ShareState; available: boolean; name: string; canEdit: boolean; url?: string; expiresAt?: string; visitors: Present[]; notice: boolean; error?: string };
 
 export const INSPECT = 'feega:inspect';
 export const INSPECT_RESULT = 'feega:inspect:result';

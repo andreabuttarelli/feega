@@ -1,4 +1,4 @@
-export type ShareRequest = { dir: string; editorUrl: string; visitorsCanEdit: boolean };
+export type ShareRequest = { dir: string; projectName?: string; editorUrl: string; appUrl?: string; visitorsCanEdit: boolean };
 
 export type ShareInfo = { id: string; url: string; expiresAt: string };
 

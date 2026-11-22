@@ -10,6 +10,8 @@ on:
       - 'packages/dev-run/**'
       - 'packages/source-map/**'
       - 'packages/live-edit/**'
+      - 'packages/share-protocol/**'
+      - 'relay/**'
       - '.github/workflows/inspect-os.yml'
   workflow_dispatch:
 
@@ -48,3 +50,22 @@ jobs:
       - run: node npx/test/editing.e2e.mjs
       - run: node npx/test/attach.e2e.mjs
         if: matrix.fixture == 'react-css'
+
+  relay:
+    name: relay tunnel end to end
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npx svelte-kit sync
+      - run: npm ci --no-audit --no-fund
+        working-directory: relay
+      - run: npm test
+        working-directory: relay
+      - run: npm run test:e2e
+        working-directory: relay

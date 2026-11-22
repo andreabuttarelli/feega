@@ -30,7 +30,7 @@ export function pageBridge(frame: () => HTMLIFrameElement | null, on: PageEvents
   let next = 0;
 
   window.addEventListener('message', (event) => {
-    if (!LOCAL_ORIGIN.test(event.origin)) {
+    if (!LOCAL_ORIGIN.test(event.origin) && event.origin !== location.origin) {
       return;
     }
     const data = event.data;

@@ -3,7 +3,7 @@ import { CLOUD_BASE, CloudError, CloudFailure, type CloudApi, type CloudComment 
 import type { ShareHost } from '../../../inspect/src/host/share-port';
 import type { Editors } from './editors';
 
-export const BILLING_URL = `${CLOUD_BASE}/app/settings/profile`;
+export const BILLING_URL = `${CLOUD_BASE}/app/settings/billing`;
 
 export type CloudDeps = { api: CloudApi; share: ShareHost; editors: Editors; cwd: string };
 

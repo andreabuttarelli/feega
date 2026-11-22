@@ -1,0 +1,15 @@
+name = "feega-relay"
+main = "src/index.ts"
+compatibility_date = "2026-04-07"
+
+[vars]
+VISITOR_BASE = "localhost:8787"
+WEB_ORIGIN = "http://localhost:5173"
+
+[[durable_objects.bindings]]
+name = "SESSION"
+class_name = "Session"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Session"]

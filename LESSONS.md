@@ -4050,3 +4050,11 @@ property reads on ~2,000 items (`src/lib/canvas/counted-list.testkit.ts`), not w
 ## "Working…" forever on a local agent is its startup, not a dead request
 
 **Signal:** the local ACP chat shows no event for 30-50 s after a prompt. **Move:** read the agent's own logs before the network tab: `~/.claude/projects/<cwd>/<session>.jsonl` (when the model was first called) and `~/Library/Caches/claude-cli-nodejs/<cwd>/mcp-logs-feega/` (an MCP server timing out at 30 s). Codex writes `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` with the `model` and `effort` of every turn: the place to prove a model or effort switch took effect.
+
+## `wrangler dev` answers 404 on every `<sid>.localhost` request
+
+**Signal:** the relay returns its own `not found` for `http://<sid>.localhost:8799/` while `env.VISITOR_BASE` is set. With `routes` in `wrangler.toml`, local mode rewrites `request.url` and `Host` to the first route's host, so the sid never reaches the Worker. **Move:** `wrangler dev --local --infer-origin-from-routes false`.
+
+## A Workers test WebSocket delivers binary frames as Blob
+
+**Signal:** a test peer gets `event.data` as an object with no `byteLength` and every decoded frame is `null`. **Move:** set `socket.binaryType = 'arraybuffer'` before `accept()` in the test harness.
