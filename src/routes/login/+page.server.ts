@@ -5,7 +5,6 @@ import { sendEmail, passwordResetEmailSubject, passwordResetEmailHtml, passwordR
 import { emailLocale } from '$lib/server/email-i18n';
 import { sanitizeWebsiteParam } from '$lib/website-param';
 import { appOrigin } from '$lib/server/app-url';
-import { takeOAuthReturn } from '$lib/server/oauth';
 import { INVITE_ERROR_PARAM, INVITE_PARAM, inviteTokenIn, landingPath } from '$lib/server/tenancy/landing';
 import { signInErrorIn } from './sign-in-error';
 import { START_URL_PARAM, startUrlOf } from '$lib/start-url';
@@ -63,8 +62,6 @@ export const load: PageServerLoad = async ({ url, request, cookies, locals: { sa
     return { ...page, homeHref: await landingPath(client, user, cookies, null) };
   }
 
-  const oauthReturn = takeOAuthReturn(cookies);
-  if (oauthReturn) throw redirect(303, oauthReturn);
   if (cliPort) throw redirect(303, `/cli/callback?cli_port=${cliPort}&cli_state=${cliState}`);
   throw redirect(303, await landingPath(client, user, cookies, inviteToken));
 };
@@ -84,10 +81,6 @@ async function routeAfterAuth(
   cookies: Cookies,
   locals: RequestEvent['locals']
 ): Promise<never> {
-  // An interrupted /oauth/authorize resumes here (MCP client connect → login → consent).
-  const oauthReturn = takeOAuthReturn(cookies);
-  if (oauthReturn) throw redirect(303, oauthReturn);
-
   if (cliPort) {
     throw redirect(303, `/cli/callback?cli_port=${encodeURIComponent(cliPort)}&cli_state=${encodeURIComponent(cliState)}`);
   }

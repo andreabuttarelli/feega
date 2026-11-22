@@ -5,7 +5,6 @@ const exchangeCodeForSession = vi.fn();
 const landingPath = vi.fn(async () => '/p/proj1/c/canvas1');
 
 vi.mock('$lib/server/feature-flags', () => ({ isPlanGoEnabled: () => true }));
-vi.mock('$lib/server/oauth', () => ({ takeOAuthReturn: () => null }));
 vi.mock('$lib/server/tenancy/landing', async (orig) => ({ ...(await orig<object>()), landingPath }));
 
 const { GET } = await import('./+server');

@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { isRedirect } from '@sveltejs/kit';
 
-vi.mock('$lib/server/oauth', () => ({ takeOAuthReturn: () => null }));
 
 const login = await import('./+page.server');
 

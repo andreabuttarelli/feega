@@ -1,5 +1,4 @@
 import { redirect } from '@sveltejs/kit';
-import { takeOAuthReturn } from '$lib/server/oauth';
 import { inviteTokenIn, landingPath } from '$lib/server/tenancy/landing';
 import { SIGN_IN_ERROR_PARAM, SignInError } from '../../login/sign-in-error';
 import type { RequestHandler } from './$types';
@@ -22,11 +21,6 @@ export const GET: RequestHandler = async ({ url, cookies, locals: { supabase, db
     throw redirect(303, '/login?error=link');
   }
   const user = data?.user;
-
-  const oauthReturn = takeOAuthReturn(cookies);
-  if (oauthReturn) {
-    throw redirect(303, oauthReturn);
-  }
 
   const cliPort = url.searchParams.get('cli_port') ?? '';
   const cliState = url.searchParams.get('cli_state') ?? '';
