@@ -572,6 +572,9 @@
         if (created) {
           select(created);
         }
+        if (m.fromHistory) {
+          bridge.clearAll();
+        }
         if (picked) {
           bridge.settle(picked.source, writtenState);
         }

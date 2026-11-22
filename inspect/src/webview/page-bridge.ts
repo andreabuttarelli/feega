@@ -1,6 +1,6 @@
 import type { ElementState } from '@feega/live-edit/element-state';
 import type { Apply } from '@feega/live-edit/themes';
-import { BRIDGE_READY, INSPECT, INSPECT_RESULT, LOCAL_ORIGIN, LOCATION, MODE, PREVIEW, PREVIEW_CLEAR, PREVIEW_SETTLE, PREVIEW_SETTLED, SCROLL, SCROLLED, REVEAL, HIDE, PALETTE, PALETTE_RESULT, type Palette, TREE, TREE_RESULT, type LayerNode, TEXT_DONE, TEXT_EDIT, TEXT_RESTORE, TRACK, TRACKED, LEAVE, FORCE, THEME, type Slot, type Mode, type Move, type Pick, type Source } from '../messages';
+import { BRIDGE_READY, INSPECT, INSPECT_RESULT, LOCAL_ORIGIN, LOCATION, MODE, PREVIEW, PREVIEW_CLEAR, PREVIEW_CLEAR_ALL, PREVIEW_SETTLE, PREVIEW_SETTLED, SCROLL, SCROLLED, REVEAL, HIDE, PALETTE, PALETTE_RESULT, type Palette, TREE, TREE_RESULT, type LayerNode, TEXT_DONE, TEXT_EDIT, TEXT_RESTORE, TRACK, TRACKED, LEAVE, FORCE, THEME, type Slot, type Mode, type Move, type Pick, type Source } from '../messages';
 
 type Inspected = { source: Source; component: Source | null; html: string; rect: Pick['rect']; styles: Record<string, string>; inherited?: Record<string, string>; classes: string; rem: number; viewport: number; ownText: boolean; inlineText: boolean; elements: number; name: string; parentWidth: number; instances: number; instanceIndex: number; classCount: number; ancestors: Pick['ancestors']; inner?: string; page?: Pick['page']; attributes?: Pick['attributes']; states?: string[] };
 
@@ -97,6 +97,7 @@ export function pageBridge(frame: () => HTMLIFrameElement | null, on: PageEvents
     again: (source: Source, index?: number) => inspect({ selector: selectorOf(source), index }),
     preview: (source: Source, style: Record<string, string>, inner?: string, state?: ElementState) => send({ type: PREVIEW, source: sourceText(source), inner, style, state }),
     clear: (source: Source, state?: ElementState) => send({ type: PREVIEW_CLEAR, source: sourceText(source), state }),
+    clearAll: () => send({ type: PREVIEW_CLEAR_ALL }),
     settle: (source: Source, state?: ElementState) => send({ type: PREVIEW_SETTLE, source: sourceText(source), state }),
     force: (source: Source | null, state: ElementState) => send({ type: FORCE, source: source ? sourceText(source) : '', state }),
     theme: (themes: Apply[], active: Apply | null) => send({ type: THEME, themes, active }),

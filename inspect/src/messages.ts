@@ -291,7 +291,7 @@ export type ViewMessage =
   | { kind: ToView.Settings; values: Settings; facts: ReportFacts }
   | { kind: ToView.History; changes: ChangeRow[]; canUndo: boolean; canRedo: boolean }
   | { kind: ToView.Status; text: string }
-  | { kind: ToView.Edited; ok: boolean; reason?: string; written?: string; at?: Source; saved?: Source; note?: string; select?: Source }
+  | { kind: ToView.Edited; ok: boolean; fromHistory?: boolean; reason?: string; written?: string; at?: Source; saved?: Source; note?: string; select?: Source }
   | { kind: ToView.Change; row: string; value: string }
   | { kind: ToView.Pick; id: number; x: number; y: number }
   | { kind: ToView.IconResults; id: number; library: string | null; hits: IconHit[]; error?: string }
@@ -312,6 +312,7 @@ export const INSPECT = 'feega:inspect';
 export const INSPECT_RESULT = 'feega:inspect:result';
 export const PREVIEW = 'feega:preview';
 export const PREVIEW_CLEAR = 'feega:preview:clear';
+export const PREVIEW_CLEAR_ALL = 'feega:preview:clear-all';
 export const PREVIEW_SETTLE = 'feega:preview:settle';
 export const PREVIEW_SETTLED = 'feega:preview:settled';
 export const LOCATION = 'feega:location';
