@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { ref, watchEffect } from 'vue';
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 
-type RevealImage = { src: string; srcset?: string };
-
+const DEFAULT_RADIUS = 200;
 const EASE = 9;
 const TRAIL = 0.8;
 const IDLE = 2;
@@ -11,7 +10,8 @@ const MAX_DPR = 2;
 const MAX_STEP = 0.05;
 const DRIFT = { x: 0.32, y: 0.26, fx: 0.37, fy: 0.53 };
 
-function reveal(root: HTMLElement, radius: number): () => void {
+function reveal(root: HTMLElement): () => void {
+  const radius = Number(root.dataset.radius) || DEFAULT_RADIUS;
   const lit = root.querySelector<HTMLImageElement>('img.lit')!;
   const canvas = root.querySelector<HTMLCanvasElement>('canvas')!;
   const ctx = canvas.getContext('2d');
@@ -167,26 +167,21 @@ function reveal(root: HTMLElement, radius: number): () => void {
   };
 }
 
-const props = withDefaults(defineProps<{ lit?: RevealImage; dark?: RevealImage; alt?: string; heading?: string; radius?: number }>(), { lit: () => ({"src":"https://www.feega.app/templates-assets/hover-reveal/lit-1670.webp","srcset":"https://www.feega.app/templates-assets/hover-reveal/lit-960.webp 960w, https://www.feega.app/templates-assets/hover-reveal/lit-1670.webp 1670w"}), dark: () => ({"src":"https://www.feega.app/templates-assets/hover-reveal/dark-1670.webp","srcset":"https://www.feega.app/templates-assets/hover-reveal/dark-960.webp 960w, https://www.feega.app/templates-assets/hover-reveal/dark-1670.webp 1670w"}), alt: 'A moonlit jungle with floating islands', heading: 'Bring the night to life', radius: 200 });
-
 const root = ref<HTMLElement | null>(null);
+let stop = () => {};
 
-watchEffect(
-  (onCleanup) => {
-    if (root.value) {
-      onCleanup(reveal(root.value, props.radius));
-    }
-  },
-  { flush: 'post' }
-);
+onMounted(() => {
+  stop = reveal(root.value as HTMLElement);
+});
+onBeforeUnmount(() => stop());
 </script>
 
 <template>
-  <section ref="root" class="fl-hover-reveal" :aria-label="props.heading" data-theme="dark">
-    <img class="dark" :src="props.dark.src" :srcset="props.dark.srcset" sizes="100vw" :alt="props.alt" />
-    <img class="lit" :src="props.lit.src" :srcset="props.lit.srcset" sizes="100vw" alt="" aria-hidden="true" />
+  <section class="fl-hover-reveal" data-theme="dark" data-radius="200" ref="root">
+    <img class="dark" src="https://www.feega.app/templates-assets/hover-reveal/dark-1670.webp" srcset="https://www.feega.app/templates-assets/hover-reveal/dark-960.webp 960w, https://www.feega.app/templates-assets/hover-reveal/dark-1670.webp 1670w" sizes="100vw" alt="A moonlit jungle with floating islands" />
+    <img class="lit" src="https://www.feega.app/templates-assets/hover-reveal/lit-1670.webp" srcset="https://www.feega.app/templates-assets/hover-reveal/lit-960.webp 960w, https://www.feega.app/templates-assets/hover-reveal/lit-1670.webp 1670w" sizes="100vw" alt="" aria-hidden="true" />
     <canvas aria-hidden="true"></canvas>
-    <div v-if="props.heading" class="overlay"><h2>{{ props.heading }}</h2></div>
+    <div class="overlay"><h2>Bring the night to life</h2></div>
   </section>
 </template>
 

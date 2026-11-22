@@ -2,7 +2,10 @@ const HEADING = 'welcome to the tunnel';
 const TEXT = 'click to pause, press and hold to speed up';
 const CARDS = 16;
 const TONES = 4;
-const IMAGES = Array.from({ length: 8 }, (_, i) => `Placeholder image ${i + 1}`);
+const BLANK = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
+const SPEED = 0.9;
+const BOOST = 5;
+const ALTS = Array.from({ length: CARDS }, (_, i) => `Placeholder image ${(i % 8) + 1}`);
 
 const css = [
   '.fl-image-tunnel{position:relative;background:var(--feega-bg);color:var(--feega-fg);user-select:none;-webkit-user-select:none;touch-action:manipulation;cursor:pointer}',
@@ -29,12 +32,12 @@ const css = [
 
 const t = (typed, s) => (typed ? s : '');
 
-const engine = (typed) => `const WALLS = ['left', 'right', 'floor', 'ceiling'];
+const engine = (typed) => `const DEFAULT_SPEED = ${SPEED};
+const DEFAULT_BOOST = ${BOOST};
+const WALLS = ['left', 'right', 'floor', 'ceiling'];
 const LANES = [-0.4, 0.35, -0.1, 0.4];
 const DEPTH = 10;
 const RINGS = 20;
-const SPEED = 0.9;
-const BOOST = 5;
 const EASE = 4;
 const MAX_STEP = 0.1;
 const HOLD_MS = 250;
@@ -47,6 +50,8 @@ function tunnel(root${t(typed, ': HTMLElement')})${t(typed, ': () => void')} {
   const walls = [...root.querySelectorAll${t(typed, '<HTMLElement>')}('.wall')];
   const cards = [...root.querySelectorAll${t(typed, '<HTMLElement>')}('.card')];
   const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const pace = Number(root.dataset.speed) || DEFAULT_SPEED;
+  const boost = Number(root.dataset.boost) || DEFAULT_BOOST;
 
   let hw = 0;
   let hh = 0;
@@ -117,9 +122,9 @@ function tunnel(root${t(typed, ': HTMLElement')})${t(typed, ': () => void')} {
   function tick(now${t(typed, ': number')}) {
     const step = Math.min(MAX_STEP, (now - last) / 1000);
     last = now;
-    const goal = held ? BOOST : paused ? 0 : 1;
+    const goal = held ? boost : paused ? 0 : 1;
     speed += (goal - speed) * Math.min(1, step * EASE);
-    offset += speed * SPEED * hh * step;
+    offset += speed * pace * hh * step;
     place();
     frame = 0;
     if (goal === 0 && speed < SETTLED) {
@@ -221,34 +226,25 @@ function tunnel(root${t(typed, ': HTMLElement')})${t(typed, ': () => void')} {
   };
 }`;
 
-const imageData = (typed) => `${typed ? 'type Image = { src?: string; alt: string };\n\n' : ''}const IMAGES${t(typed, ': Image[]')} = [
-${IMAGES.map((alt) => `  { alt: '${alt}' }`).join(',\n')}
-];
-const HEADING = '${HEADING}';
-const TEXT = '${TEXT}';
-const CARDS = ${CARDS};`;
-
-const slots = `function slots(images: Image[]) {
-  return Array.from({ length: CARDS }, (_, i) => ({ ...images[i % images.length], i, tone: i % ${TONES} }));
-}`;
 
 const WALL_NAMES = ['left', 'right', 'floor', 'ceiling'];
 const walls = (pad) => WALL_NAMES.map((w) => `${pad}<div class="wall ${w}" data-wall="${w}"></div>`).join('\n');
 
-const shell = (o) => `<section class="fl-image-tunnel" data-theme="dark" tabindex="0" aria-label="Image tunnel, press to pause" ${o.root}>
+const img = (alt) => `<img src="${BLANK}" alt="${alt}" loading="lazy" decoding="async" />`;
+const cards = ALTS.map((alt, i) => `      <figure class="card" data-tone="${i % TONES}">${img(alt)}</figure>`).join('\n');
+
+const shell = (root) => `<section class="fl-image-tunnel" data-theme="dark" tabindex="0" aria-label="Image tunnel, press to pause" data-speed="${SPEED}" data-boost="${BOOST}"${root}>
   <div class="stage">
     <div class="world" aria-hidden="true">
 ${walls('      ')}
-${o.cards}
+${cards}
     </div>
     <div class="overlay">
-      <h2>${o.heading}</h2>
-      <p>${o.text}</p>
+      <h2>${HEADING}</h2>
+      <p>${TEXT}</p>
     </div>
   </div>
 </section>`;
-
-const staticCards = Array.from({ length: CARDS }, (_, i) => `      <figure class="card" data-tone="${i % TONES}"></figure>`).join('\n');
 
 const pad = (text, n) =>
   text
@@ -263,7 +259,11 @@ document.querySelectorAll${t(typed, '<HTMLElement>')}('.fl-image-tunnel:not([dat
   tunnel(root);
 });`;
 
-const img = (attrs) => `<img ${attrs} loading="lazy" decoding="async" />`;
+const jsx = (markup) =>
+  markup
+    .replace(/class="/g, 'className="')
+    .replace('tabindex="0"', 'tabIndex={0}')
+    .replace(/<div className="wall ([a-z]+)" data-wall="([a-z]+)"><\/div>/g, '<div className="wall $1" data-wall="$2" />');
 
 export const imageTunnel = {
   id: 'image-tunnel',
@@ -274,22 +274,11 @@ export const imageTunnel = {
   mods: [],
   css,
   files: (C) => ({
-    html: `${shell({ root: '', cards: staticCards, heading: HEADING, text: TEXT }).replace(' >', '>')}\n\n<script>\n(() => {\n${pad(domBoot(false), 2)}\n})();\n</script>\n`,
+    html: `${shell('')}\n\n<script>\n(() => {\n${pad(domBoot(false), 2)}\n})();\n</script>\n`,
     astro: `---
-${imageData(true)}
-
-const { images = IMAGES, heading = HEADING, text = TEXT } = Astro.props as { images?: Image[]; heading?: string; text?: string };
-const cards = Array.from({ length: CARDS }, (_, i) => ({ ...images[i % images.length], tone: i % ${TONES} }));
 ---
 
-${shell({
-  root: '',
-  cards: `      {cards.map((card) => (
-        <figure class="card" data-tone={card.tone}>{card.src && ${img('src={card.src} alt={card.alt}')}}</figure>
-      ))}`,
-  heading: '{heading}',
-  text: '{text}'
-}).replace(' >', '>')}
+${shell('')}
 
 <script>
 ${domBoot(true)}
@@ -299,28 +288,14 @@ ${domBoot(true)}
 ${C}</style>
 `,
     svelte: `<script lang="ts">
-${pad(imageData(true), 2)}
-
-${pad(slots, 2)}
-
 ${pad(engine(true), 2)}
 
-  let { images = IMAGES, heading = HEADING, text = TEXT }: { images?: Image[]; heading?: string; text?: string } = $props();
-
-  const cards = $derived(slots(images));
   let root: HTMLElement;
 
   $effect(() => tunnel(root));
 </script>
 
-${shell({
-  root: 'bind:this={root}',
-  cards: `      {#each cards as card (card.i)}
-        <figure class="card" data-tone={card.tone}>{#if card.src}${img('src={card.src} alt={card.alt}')}{/if}</figure>
-      {/each}`,
-  heading: '{heading}',
-  text: '{text}'
-})}
+${shell(' bind:this={root}')}
 
 <style>
 ${C}</style>
@@ -328,54 +303,24 @@ ${C}</style>
     react: `import { useEffect, useRef } from 'react';
 import './ImageTunnel.css';
 
-${imageData(true)}
-
-${slots}
-
 ${engine(true)}
 
-export function ImageTunnel({ images = IMAGES, heading = HEADING, text = TEXT }: { images?: Image[]; heading?: string; text?: string }) {
+export function ImageTunnel() {
   const root = useRef<HTMLElement>(null);
-  const cards = slots(images);
 
   useEffect(() => (root.current ? tunnel(root.current) : undefined), []);
 
   return (
-${pad(
-  shell({
-    root: 'ref={root}',
-    cards: `      {cards.map((card) => (
-        <figure key={card.i} className="card" data-tone={card.tone}>{card.src ? ${img('src={card.src} alt={card.alt}')} : null}</figure>
-      ))}`,
-    heading: '{heading}',
-    text: '{text}'
-  })
-    .replace('class="fl-image-tunnel"', 'className="fl-image-tunnel"')
-    .replace('tabindex="0"', 'tabIndex={0}')
-    .replace(/class="/g, 'className="')
-    .replace(/<div className="wall ([a-z]+)" data-wall="([a-z]+)"><\/div>/g, '<div className="wall $1" data-wall="$2" />'),
-  4
-)}
+${pad(jsx(shell(' ref={root}')), 4)}
   );
 }
 `,
     vue: `<script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-
-${imageData(true)}
-
-${slots}
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 
 ${engine(true)}
 
-const props = withDefaults(defineProps<{ images?: Image[]; heading?: string; text?: string }>(), {
-  images: () => IMAGES,
-  heading: HEADING,
-  text: TEXT
-});
-
 const root = ref<HTMLElement | null>(null);
-const cards = computed(() => slots(props.images));
 let stop = () => {};
 
 onMounted(() => {
@@ -385,15 +330,7 @@ onBeforeUnmount(() => stop());
 </script>
 
 <template>
-${pad(
-  shell({
-    root: 'ref="root"',
-    cards: `      <figure v-for="card in cards" :key="card.i" class="card" :data-tone="card.tone">${img(':src="card.src" :alt="card.alt"').replace('<img', '<img v-if="card.src"')}</figure>`,
-    heading: '{{ heading }}',
-    text: '{{ text }}'
-  }),
-  2
-)}
+${pad(shell(' ref="root"'), 2)}
 </template>
 
 <style scoped>

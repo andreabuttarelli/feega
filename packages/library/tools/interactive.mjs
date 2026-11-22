@@ -51,11 +51,7 @@ const toastCss = [
   '.fl-toast .close .fl-px{width:9px}'
 ];
 
-const tabsData = `const tabs = [
-${TABS.map(([label, title, body]) => `  { label: '${label}', title: '${title}', body: '${body}' }`).join(',\n')}
-];`;
-
-const tabsStatic = (attrs) => `<div class="fl-tabs">
+const tabsStatic = (attrs = '') => `<div class="fl-tabs"${attrs}>
   <div class="list" role="tablist" aria-label="Sections">
 ${TABS.map(([label], i) => `    <button class="tab" role="tab" type="button" id="fl-tab-${i + 1}" aria-controls="fl-panel-${i + 1}" aria-selected="${i === 0}"${i ? ' tabindex="-1"' : ''}>${label}</button>`).join('\n')}
   </div>
@@ -87,6 +83,46 @@ const tabsScript = (typed) => `document.querySelectorAll${typed ? '<HTMLElement>
   });
 });`;
 
+const tabsMount = `function mount(root: HTMLElement): () => void {
+  const stop = new AbortController();
+  const { signal } = stop;
+  const tabs = Array.from(root.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+  const panels = Array.from(root.querySelectorAll<HTMLElement>('[role="tabpanel"]'));
+
+  function select(index: number) {
+    tabs.forEach((tab, i) => {
+      tab.setAttribute('aria-selected', String(i === index));
+      tab.tabIndex = i === index ? 0 : -1;
+      panels[i].hidden = i !== index;
+    });
+    tabs[index].focus();
+  }
+
+  tabs.forEach((tab, i) => tab.addEventListener('click', () => select(i), { signal }));
+  root.querySelector('[role="tablist"]')?.addEventListener(
+    'keydown',
+    (event) => {
+      const key = (event as KeyboardEvent).key;
+      const step = key === 'ArrowRight' ? 1 : key === 'ArrowLeft' ? -1 : 0;
+      if (step === 0) {
+        return;
+      }
+      select((tabs.indexOf(document.activeElement as HTMLButtonElement) + step + tabs.length) % tabs.length);
+    },
+    { signal }
+  );
+
+  return () => stop.abort();
+}`;
+
+const jsx = (markup) => markup.replace(/class="/g, 'className="');
+
+const pad = (text, n) =>
+  text
+    .split('\n')
+    .map((l) => (l ? ' '.repeat(n) + l : l))
+    .join('\n');
+
 const modalBody = (on) => `  <dialog ${on.ref} aria-labelledby="fl-modal-title">
     <form method="dialog">
       <span ${on.cls}="icon">${px('warn')}</span>
@@ -99,11 +135,6 @@ const modalBody = (on) => `  <dialog ${on.ref} aria-labelledby="fl-modal-title">
     </form>
   </dialog>`;
 
-const TOASTS = `[
-  { id: 1, title: 'Changes saved', body: 'Your profile is up to date.', error: false },
-  { id: 2, title: 'Could not publish', body: 'Check your connection and try again.', error: true }
-]`;
-
 export const interactive = [
   {
     id: 'tabs',
@@ -113,95 +144,49 @@ export const interactive = [
       html: tabsStatic() + `\n\n<script>\n${tabsScript(false)}\n</script>\n`,
       astro: `---\n---\n\n${tabsStatic()}\n\n<script>\n${tabsScript(true)}\n</script>\n\n<style>\n${C}</style>\n`,
       svelte: `<script lang="ts">
-  ${tabsData.split('\n').join('\n  ')}
+${pad(tabsMount, 2)}
 
-  let active = $state(0);
-  let buttons: HTMLButtonElement[] = [];
+  let root: HTMLElement;
 
-  function onkeydown(event: KeyboardEvent) {
-    const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
-    if (step === 0) {
-      return;
-    }
-    active = (active + step + tabs.length) % tabs.length;
-    buttons[active].focus();
-  }
+  $effect(() => mount(root));
 </script>
 
-<div class="fl-tabs">
-  <div class="list" role="tablist" aria-label="Sections" tabindex="-1" {onkeydown}>
-    {#each tabs as tab, i}
-      <button class="tab" role="tab" type="button" id="fl-tab-{i}" aria-controls="fl-panel-{i}" aria-selected={active === i} tabindex={active === i ? 0 : -1} bind:this={buttons[i]} onclick={() => (active = i)}>{tab.label}</button>
-    {/each}
-  </div>
-  {#each tabs as tab, i}
-    <div class="panel" role="tabpanel" id="fl-panel-{i}" aria-labelledby="fl-tab-{i}" tabindex="0" hidden={active !== i}><h3>{tab.title}</h3><p>{tab.body}</p></div>
-  {/each}
-</div>
+${tabsStatic(' bind:this={root}')}
 
 <style>
 ${C}</style>
 `,
-      react: `import { useId, useRef, useState } from 'react';
-import type { KeyboardEvent } from 'react';
+      react: `import { useEffect, useRef } from 'react';
 import './Tabs.css';
 
-${tabsData}
+${tabsMount}
 
 export function Tabs() {
-  const uid = useId();
-  const [active, setActive] = useState(0);
-  const buttons = useRef<(HTMLButtonElement | null)[]>([]);
+  const root = useRef<HTMLDivElement>(null);
 
-  function onKeyDown(event: KeyboardEvent) {
-    const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
-    if (step === 0) {
-      return;
-    }
-    const next = (active + step + tabs.length) % tabs.length;
-    setActive(next);
-    buttons.current[next]?.focus();
-  }
+  useEffect(() => (root.current ? mount(root.current) : undefined), []);
 
   return (
-    <div className="fl-tabs">
-      <div className="list" role="tablist" aria-label="Sections" onKeyDown={onKeyDown}>
-        {tabs.map((tab, i) => (
-          <button key={tab.label} ref={(el) => { buttons.current[i] = el; }} className="tab" role="tab" type="button" id={\`\${uid}-tab-\${i}\`} aria-controls={\`\${uid}-panel-\${i}\`} aria-selected={active === i} tabIndex={active === i ? 0 : -1} onClick={() => setActive(i)}>{tab.label}</button>
-        ))}
-      </div>
-      {tabs.map((tab, i) => (
-        <div key={tab.label} className="panel" role="tabpanel" id={\`\${uid}-panel-\${i}\`} aria-labelledby={\`\${uid}-tab-\${i}\`} tabIndex={0} hidden={active !== i}><h3>{tab.title}</h3><p>{tab.body}</p></div>
-      ))}
-    </div>
+${pad(tabsStatic(' ref={root}').replace(/class="/g, 'className="').replace(/tabindex="/g, 'tabIndex="').replace(/(tabIndex)="(-?\d)"/g, '$1={$2}').replace(/ hidden>/g, ' hidden>'), 4)}
   );
 }
 `,
       vue: `<script setup lang="ts">
-import { ref } from 'vue';
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 
-${tabsData}
+${tabsMount}
 
-const active = ref(0);
-const buttons = ref<HTMLButtonElement[]>([]);
+const root = ref<HTMLElement | null>(null);
+let stop = () => {};
 
-function onKeydown(event: KeyboardEvent) {
-  const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
-  if (step === 0) {
-    return;
-  }
-  active.value = (active.value + step + tabs.length) % tabs.length;
-  buttons.value[active.value]?.focus();
-}
+onMounted(() => {
+  stop = mount(root.value as HTMLElement);
+});
+onBeforeUnmount(() => stop());
 </script>
 
 <template>
-  <div class="fl-tabs">
-    <div class="list" role="tablist" aria-label="Sections" @keydown="onKeydown">
-      <button v-for="(tab, i) in tabs" :key="tab.label" ref="buttons" class="tab" role="tab" type="button" :id="\`fl-tab-\${i}\`" :aria-controls="\`fl-panel-\${i}\`" :aria-selected="active === i" :tabindex="active === i ? 0 : -1" @click="active = i">{{ tab.label }}</button>
-    </div>
-    <div v-for="(tab, i) in tabs" :key="tab.label" class="panel" role="tabpanel" :id="\`fl-panel-\${i}\`" :aria-labelledby="\`fl-tab-\${i}\`" tabindex="0" :hidden="active !== i"><h3>{{ tab.title }}</h3><p>{{ tab.body }}</p></div>
-  </div>
+${pad(tabsStatic(' ref="root"'), 2)}
 </template>
 
 <style scoped>
@@ -284,78 +269,70 @@ ${C}</style>
     <p class="text"><b>${title}</b><span>${body}</span></p>
     <button class="close" type="button" aria-label="Dismiss">${close}</button>
   </div>`;
-      const plain = `<div class="fl-toast" role="region" aria-label="Notifications">
+      const plainWith = (attrs = '') => `<div class="fl-toast" role="region" aria-label="Notifications"${attrs}>
 ${one('', 'status', 'Changes saved', 'Your profile is up to date.', check)}
 ${one(' toast--error', 'alert', 'Could not publish', 'Check your connection and try again.', warn)}
 </div>`;
+      const plain = plainWith();
       const script = (typed) => `document.querySelectorAll${typed ? '<HTMLElement>' : ''}('.fl-toast .close').forEach((button) => {
   button.addEventListener('click', () => button.closest('.toast')${typed ? '?' : ''}.remove());
 });`;
+      const toastMount = `function mount(root: HTMLElement): () => void {
+  const stop = new AbortController();
+  root.addEventListener(
+    'click',
+    (event) => (event.target as Element).closest('.close')?.closest('.toast')?.remove(),
+    { signal: stop.signal }
+  );
+  return () => stop.abort();
+}`;
       return {
         html: `${plain}\n\n<script>\n${script(false)}\n</script>\n`,
         astro: `---\n---\n\n${plain}\n\n<script>\n${script(true)}\n</script>\n\n<style>\n${C}</style>\n`,
         svelte: `<script lang="ts">
-  const initial = ${TOASTS.split('\n').join('\n  ')};
+${pad(toastMount, 2)}
 
-  let toasts = $state(initial);
+  let root: HTMLElement;
 
-  function dismiss(id: number) {
-    toasts = toasts.filter((toast) => toast.id !== id);
-  }
+  $effect(() => mount(root));
 </script>
 
-<div class="fl-toast" role="region" aria-label="Notifications">
-  {#each toasts as toast (toast.id)}
-    <div class="toast" class:toast--error={toast.error} role={toast.error ? 'alert' : 'status'}>
-      <span class="mark">{#if toast.error}${warn}{:else}${check}{/if}</span>
-      <p class="text"><b>{toast.title}</b><span>{toast.body}</span></p>
-      <button class="close" type="button" aria-label="Dismiss" onclick={() => dismiss(toast.id)}>${close}</button>
-    </div>
-  {/each}
-</div>
+${plainWith(' bind:this={root}')}
 
 <style>
 ${C}</style>
 `,
-        react: `import { useState } from 'react';
+    react: `import { useEffect, useRef } from 'react';
 import './Toast.css';
 
-const initial = ${TOASTS};
+${toastMount}
 
 export function Toast() {
-  const [toasts, setToasts] = useState(initial);
+  const root = useRef<HTMLDivElement>(null);
+
+  useEffect(() => (root.current ? mount(root.current) : undefined), []);
 
   return (
-    <div className="fl-toast" role="region" aria-label="Notifications">
-      {toasts.map((toast) => (
-        <div key={toast.id} className={toast.error ? 'toast toast--error' : 'toast'} role={toast.error ? 'alert' : 'status'}>
-          <span className="mark">{toast.error ? ${warn.replace('class=', 'className=')} : ${check.replace('class=', 'className=')}}</span>
-          <p className="text"><b>{toast.title}</b><span>{toast.body}</span></p>
-          <button className="close" type="button" aria-label="Dismiss" onClick={() => setToasts(toasts.filter((t) => t.id !== toast.id))}>${close.replace('class=', 'className=')}</button>
-        </div>
-      ))}
-    </div>
+${pad(jsx(plainWith(' ref={root}')), 4)}
   );
 }
 `,
-        vue: `<script setup lang="ts">
-import { ref } from 'vue';
+    vue: `<script setup lang="ts">
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 
-const toasts = ref(${TOASTS.split('\n').join('\n')});
+${toastMount}
 
-function dismiss(id: number) {
-  toasts.value = toasts.value.filter((toast) => toast.id !== id);
-}
+const root = ref<HTMLElement | null>(null);
+let stop = () => {};
+
+onMounted(() => {
+  stop = mount(root.value as HTMLElement);
+});
+onBeforeUnmount(() => stop());
 </script>
 
 <template>
-  <div class="fl-toast" role="region" aria-label="Notifications">
-    <div v-for="toast in toasts" :key="toast.id" :class="['toast', { 'toast--error': toast.error }]" :role="toast.error ? 'alert' : 'status'">
-      <span class="mark">${warn.replace('<svg', '<svg v-if="toast.error"')}${check.replace('<svg', '<svg v-else')}</span>
-      <p class="text"><b>{{ toast.title }}</b><span>{{ toast.body }}</span></p>
-      <button class="close" type="button" aria-label="Dismiss" @click="dismiss(toast.id)">${close}</button>
-    </div>
-  </div>
+${pad(plainWith(' ref="root"'), 2)}
 </template>
 
 <style scoped>

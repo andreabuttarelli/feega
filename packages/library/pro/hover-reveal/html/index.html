@@ -1,4 +1,4 @@
-<section class="fl-hover-reveal" aria-label="Bring the night to life" data-theme="dark" data-radius="200">
+<section class="fl-hover-reveal" data-theme="dark" data-radius="200">
   <img class="dark" src="https://www.feega.app/templates-assets/hover-reveal/dark-1670.webp" srcset="https://www.feega.app/templates-assets/hover-reveal/dark-960.webp 960w, https://www.feega.app/templates-assets/hover-reveal/dark-1670.webp 1670w" sizes="100vw" alt="A moonlit jungle with floating islands">
   <img class="lit" src="https://www.feega.app/templates-assets/hover-reveal/lit-1670.webp" srcset="https://www.feega.app/templates-assets/hover-reveal/lit-960.webp 960w, https://www.feega.app/templates-assets/hover-reveal/lit-1670.webp 1670w" sizes="100vw" alt="" aria-hidden="true">
   <canvas aria-hidden="true"></canvas>
@@ -7,6 +7,7 @@
 
 <script>
 (() => {
+  const DEFAULT_RADIUS = 200;
   const EASE = 9;
   const TRAIL = 0.8;
   const IDLE = 2;
@@ -15,7 +16,8 @@
   const MAX_STEP = 0.05;
   const DRIFT = { x: 0.32, y: 0.26, fx: 0.37, fy: 0.53 };
 
-  function reveal(root, radius) {
+  function reveal(root) {
+    const radius = Number(root.dataset.radius) || DEFAULT_RADIUS;
     const lit = root.querySelector('img.lit');
     const canvas = root.querySelector('canvas');
     const ctx = canvas.getContext('2d');
@@ -173,7 +175,7 @@
 
   document.querySelectorAll('.fl-hover-reveal:not([data-ready])').forEach((root) => {
     root.setAttribute('data-ready', '');
-    reveal(root, Number(root.dataset.radius));
+    reveal(root);
   });
 })();
 </script>
