@@ -1,0 +1,9 @@
+{
+  "id": "example.hello",
+  "name": "Hello",
+  "version": "1.0.0",
+  "permissions": ["selection"],
+  "contributions": {
+    "command": [{ "id": "hello", "title": "Say hello" }]
+  }
+}

@@ -1,12 +1,17 @@
+import type { Catalog } from '@feega/plugin-api/external';
 import { createPluginHost } from '@feega/plugin-api/host';
-import { parseManifest, Point } from '@feega/plugin-api/manifest';
+import { parseManifest, Point, type Manifest } from '@feega/plugin-api/manifest';
 import type { Source } from '@feega/plugin-api/protocol';
 import type { HostMessage, Pick } from '../messages';
 import { BUILT_IN } from './builtin-plugins';
 import { pickFile } from './file-pick';
 import { holds } from '@feega/plugin-api/when';
 import { editorPort, hostCalls, selectionOf } from './plugin-editor';
+import { rowsOf } from './plugin-manager';
+import { reconcile, wantedOf } from './plugin-sync';
 import { workerSandbox } from './worker-sandbox';
+
+const NO_EXTERNAL: Catalog = { plugins: [], disabled: [], problems: [] };
 
 export type PluginDeps = {
   pick: () => Pick | null;
@@ -22,13 +27,32 @@ export function createPlugins(deps: PluginDeps) {
   const host = createPluginHost({ sandbox: workerSandbox(workers), editor: editorPort({ pick: deps.pick, calls, preview: deps.preview, notify: deps.notify, pickFile }) });
   host.subscribe(() => version++);
 
-  for (const { manifest } of BUILT_IN) {
+  const builtIn = BUILT_IN.flatMap(({ manifest }) => {
     const parsed = parseManifest(manifest);
-    const loaded = parsed.ok ? host.load(parsed.manifest, '') : parsed;
-    if (!loaded.ok) {
-      deps.notify(`Plugin not loaded: ${loaded.reason}`);
+    return parsed.ok ? [parsed.manifest] : [];
+  });
+  const loaded = new Map<string, string>();
+  let catalog = $state<Catalog>(NO_EXTERNAL);
+  let canInstall = $state(false);
+
+  function sync(next: Catalog) {
+    catalog = next;
+    const { unload, load } = reconcile(loaded, wantedOf(builtIn, next));
+    for (const id of unload) {
+      host.unload(id);
+      loaded.delete(id);
+    }
+    for (const one of load) {
+      const out = host.load(one.manifest as Manifest, one.code);
+      if (out.ok) {
+        loaded.set(one.id, one.stamp);
+        continue;
+      }
+      deps.notify(`Plugin not loaded: ${out.reason}`);
     }
   }
+
+  sync(NO_EXTERNAL);
 
   const at = (point: Point) => {
     const pick = deps.pick();
@@ -39,6 +63,16 @@ export function createPlugins(deps: PluginDeps) {
   return {
     host,
     answer: calls.answer,
+    sync: (next: Catalog, installable: boolean) => ((canInstall = installable), sync(next)),
+    get rows() {
+      return rowsOf(builtIn, catalog);
+    },
+    get problems() {
+      return catalog.problems;
+    },
+    get canInstall() {
+      return canInstall;
+    },
     get rightBar() {
       return at(Point.RightBar);
     },

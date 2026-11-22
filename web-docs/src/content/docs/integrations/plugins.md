@@ -6,7 +6,9 @@ sidebar:
 ---
 
 Plugins add controls to Feega Inspect. Two are built in and on by default: **Mesh gradient** and
-**3D object**. Third-party plugins are not loadable yet.
+**3D object**. You can also install third-party plugins or load one from a folder while you build
+it: see [Write a plugin](/integrations/write-a-plugin/). **Plugins** in the Feega menu lists them
+all and switches any of them on or off.
 
 Every plugin change goes through the same edit engine as a manual edit. It shows in **Changes**,
 opens in the diff, and **Undo** reverts it in one step.
@@ -59,6 +61,9 @@ access of their own. A plugin can only:
   `edit.asset`). A proposal with one operation the manifest does not allow is refused whole;
 - ask for a file with the system dialog (`file.pick`);
 - fetch from hosts it lists as `network:<host>` (neither built-in plugin does).
+
+Third-party plugins run in the same sandbox, are marked **Not reviewed**, and are installed only
+after you approve the permissions they ask for.
 
 ## Where plugins appear
 
