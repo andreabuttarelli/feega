@@ -1,5 +1,5 @@
 import { useCurrentFrame } from "remotion";
-import { glide, lift, mix, tween } from "../../ease";
+import { lift, tween } from "../../ease";
 import { Sound, type Cue } from "../../components/Sfx";
 import { FPS } from "../../timing";
 import { MUSIC } from "../beat";
@@ -8,18 +8,15 @@ import { Landscape } from "../Landscape";
 import { noise } from "../motion";
 import { IconRow, Pixel, type Sprite } from "../pixel";
 import { PixelWord, wordBlocks } from "../PixelWord";
-import { Pointer, pointerAt, type Click, type Waypoint } from "../Pointer";
-import { EditorFrame } from "../editor/EditorFrame";
-import { EDITOR_REST, FeegaEditor, pressAmount } from "../editor/FeegaEditor";
-import { MESH_BOX, WIN, center, inside, type Rect } from "../editor/layout";
-import { ICON_PICK, OBJECT_PICK, Plugin, PluginInsert, PluginPanel, gridCell, pluginTab } from "../editor/PluginPanel";
+import { pointerAt, type Click, type Waypoint } from "../Pointer";
+import { center, inside, type Rect } from "../editor/layout";
 import { Place, Section } from "../Section";
-import { BLUE, DISPLAY, INK, ORANGE, PAPER, Tone, UI, WHITE } from "../style";
+import { BLUE, DISPLAY, INK, PAPER, Tone, UI, WHITE } from "../style";
 
 const BEAT = (FPS * 60) / MUSIC.bpm;
 const beats = (n: number) => Math.round(n * BEAT);
 
-export const PLUGINS_FRAMES = beats(15);
+export const PLUGINS_FRAMES = beats(12);
 export const PLUGINS_TONE = Tone.Ink;
 
 const WORD = "plugins";
@@ -30,57 +27,13 @@ const TILE = 120;
 const TILE_COLS = 16;
 const TILE_ROWS = 9;
 const TILE_SPAN = 10;
-const EDITOR_IN = beats(2);
-const WORD_OUT = EDITOR_IN + 2;
-const EDITOR_AT = { x: (1920 - WIN.w) / 2, y: (1080 - WIN.h) / 2 + 10, scale: 1 };
-
-export const DRAG_FROM = beats(3);
-const DRAG_END = beats(4);
-const PANEL_AT = DRAG_END + 2;
-const ICONS_TAB = beats(4.5);
-const ICON_CLICK = beats(5);
-const OBJECT_TAB = beats(5.5);
-const OBJECT_CLICK = beats(6);
-const TYPE_TAB = beats(6.5);
-const ARRIVE = 3;
-
-const CARD_AT = beats(7.5);
+const WORD_OUT = beats(2);
+const CARD_AT = beats(3);
 const HEAD_AT = CARD_AT + 16;
-const SCROLL_STEPS = [9.5, 10.5, 11.5].map(beats);
+const SCROLL_STEPS = [5, 6, 7].map(beats);
 const SCROLL_ROWS = 2;
 const SCROLL_SPAN = 8;
-const PICK_CLICK = beats(12.5);
-
-const POINTS = [
-  { x: 120, y: 100, c: ORANGE },
-  { x: 500, y: 90, c: "#ffb36b" },
-  { x: 140, y: 330, c: BLUE },
-  { x: 470, y: 320, c: "#c026d3" },
-];
-
-const GRAB = { x: MESH_BOX.x + POINTS[0].x, y: MESH_BOX.y + POINTS[0].y };
-const DROP = { x: MESH_BOX.x + 330, y: MESH_BOX.y + 230 };
-const HANDLE: Rect = { x: GRAB.x - 10, y: GRAB.y - 10, w: 20, h: 20 };
-
-const TARGETS: { at: number; rect: Rect; label: string }[] = [
-  { at: ICONS_TAB, rect: pluginTab(Plugin.Icons), label: "icons tab" },
-  { at: ICON_CLICK, rect: gridCell(ICON_PICK), label: "pick icon" },
-  { at: OBJECT_TAB, rect: pluginTab(Plugin.Object), label: "3d object tab" },
-  { at: OBJECT_CLICK, rect: gridCell(OBJECT_PICK), label: "pick object" },
-  { at: TYPE_TAB, rect: pluginTab(Plugin.Type), label: "3d text tab" },
-];
-
-const EDITOR_PATH: Waypoint[] = [
-  { at: EDITOR_IN + 8, x: 700, y: 700 },
-  { at: DRAG_FROM - ARRIVE, ...GRAB },
-  { at: DRAG_FROM, ...GRAB },
-  { at: DRAG_END, ...DROP },
-  { at: PANEL_AT, ...DROP },
-  ...TARGETS.flatMap((t) => [
-    { at: t.at - ARRIVE, ...center(t.rect) },
-    { at: t.at + 1, ...center(t.rect) },
-  ]),
-];
+const PICK_CLICK = beats(9);
 
 type Listing = { name: string; about: string; sprite: Sprite; unread?: true };
 
@@ -128,42 +81,21 @@ const CARD_PATH: Waypoint[] = [
 ];
 
 export const PLUGINS_CLICKS: Click[] = [
-  { label: "grab mesh point", at: DRAG_FROM, path: EDITOR_PATH, rect: HANDLE },
-  ...TARGETS.map((t) => ({ label: t.label, at: t.at, path: EDITOR_PATH, rect: t.rect })),
   { label: "install plugin", at: PICK_CLICK, path: CARD_PATH, rect: PICK_RECT },
 ];
-
-const EDITOR_CLICKS = PLUGINS_CLICKS.filter((c) => c.path === EDITOR_PATH);
 
 const WORD_TICKS = [0, 4, 8];
 
 export const PLUGINS_CUES: Cue[] = [
   ...WORD_TICKS.map((at) => ({ at, sound: Sound.Tap, volume: 0.3 })),
   { at: WORD_IN, sound: Sound.Pop, volume: 0.55 },
-  { at: EDITOR_IN, sound: Sound.Whoosh, volume: 0.35 },
   ...PLUGINS_CLICKS.map((c) => ({ at: c.at, sound: Sound.ClickB, volume: 0.6 })),
-  ...[ICON_CLICK, OBJECT_CLICK, TYPE_TAB].map((at) => ({ at: at + 2, sound: Sound.Pop, volume: 0.45 })),
   { at: CARD_AT, sound: Sound.Whoosh, volume: 0.4 },
   ...assembleTicks(HEAD_AT).map((at) => ({ at, sound: Sound.Tap, volume: 0.12 })),
   { at: boxPopAt(HEAD_AT), sound: Sound.Pop, volume: 0.55, beat: true },
   ...SCROLL_STEPS.map((at) => ({ at, sound: Sound.Tap, volume: 0.25 })),
   { at: PICK_CLICK + 2, sound: Sound.Pop, volume: 0.5 },
 ];
-
-const PANELS: { at: number; plugin: Plugin }[] = [
-  { at: PANEL_AT, plugin: Plugin.Mesh },
-  { at: ICONS_TAB, plugin: Plugin.Icons },
-  { at: OBJECT_TAB, plugin: Plugin.Object },
-  { at: TYPE_TAB, plugin: Plugin.Type },
-];
-
-const INSERTS: { at: number; plugin: Plugin }[] = [
-  { at: ICON_CLICK, plugin: Plugin.Icons },
-  { at: OBJECT_CLICK, plugin: Plugin.Object },
-  { at: TYPE_TAB + 2, plugin: Plugin.Type },
-];
-
-const latest = <T extends { at: number }>(events: T[], frame: number) => events.filter((e) => frame >= e.at).pop();
 
 const tileAt = (x: number, y: number) => CARD_AT + ((x + y) / (TILE_COLS + TILE_ROWS)) * TILE_SPAN + noise(x * 31 + y) * 4;
 
@@ -286,18 +218,6 @@ const Catalogue = () => {
 
 export const Plugins = () => {
   const frame = useCurrentFrame();
-  const enter = tween(frame, EDITOR_IN, 14);
-  const leave = glide(frame, CARD_AT, 12);
-  const drag = tween(frame, DRAG_FROM, DRAG_END - DRAG_FROM);
-  const points = POINTS.map((p, i) => (i === 0 ? { ...p, x: mix(p.x, DROP.x - MESH_BOX.x, drag), y: mix(p.y, DROP.y - MESH_BOX.y, drag) } : p));
-  const dragging = frame >= DRAG_FROM && frame <= DRAG_END;
-  const pointer = dragging ? { x: MESH_BOX.x + points[0].x, y: MESH_BOX.y + points[0].y } : pointerAt(frame, EDITOR_PATH);
-  const pressed = dragging || EDITOR_CLICKS.some((c) => Math.abs(frame - c.at) < 3);
-  const zoom = 1 + 0.08 * tween(frame, EDITOR_IN + 10, 40);
-  const panel = latest(PANELS, frame);
-  const insert = latest(INSERTS, frame);
-  const angle = frame * 4;
-  const picked = panel?.plugin === Plugin.Icons && frame >= ICON_CLICK ? ICON_PICK : panel?.plugin === Plugin.Object && frame >= OBJECT_CLICK ? OBJECT_PICK : -1;
   const landscapeOn = frame < CARD_AT + TILE_SPAN + 12;
 
   return (
@@ -309,14 +229,6 @@ export const Plugins = () => {
       ) : null}
       <Word />
       <InkTiles />
-      {frame >= EDITOR_IN && leave < 1 ? (
-        <EditorFrame x={EDITOR_AT.x} y={EDITOR_AT.y + (1 - enter) * 900 + leave * 1100} scale={EDITOR_AT.scale} enter={1} zoom={zoom} focus={center(MESH_BOX)}>
-          <FeegaEditor state={{ ...EDITOR_REST, selected: 1, mesh: points, presses: [{ rect: HANDLE, amount: pressAmount(frame, DRAG_FROM) }] }} />
-          {panel ? <PluginPanel plugin={panel.plugin} angle={angle} picked={picked} /> : null}
-          {insert ? <PluginInsert plugin={insert.plugin} amount={lift(frame, insert.at, 8)} angle={angle} /> : null}
-          <Pointer x={pointer.x} y={pointer.y} pressed={pressed} scale={EDITOR_AT.scale * zoom} />
-        </EditorFrame>
-      ) : null}
       <Catalogue />
     </Section>
   );

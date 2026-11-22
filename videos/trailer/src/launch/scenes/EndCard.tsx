@@ -7,7 +7,7 @@ import { Heading, Pixel, Tumble, type Sprite } from "../pixel";
 import { Ending, Place, Section } from "../Section";
 import { DISPLAY, INK, MONO, ORANGE, PAPER, Tone } from "../style";
 
-export const END_FRAMES = 111;
+export const END_FRAMES = 152;
 export const END_TONE = Tone.Ink;
 
 const RUN_IN = 18;
