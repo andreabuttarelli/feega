@@ -32,4 +32,13 @@ export const previewPath = (id: string) => `${PREVIEW_DIR}/${id}.html`;
 
 export const TOKENS_PATH = `${TEMPLATES_PATH}/tokens.css`;
 
+export enum VideoFormat {
+  Webm = 'webm',
+  Mp4 = 'mp4'
+}
+
+export const proVideoPath = (id: string, format: VideoFormat) => `/templates-shots/${id}.${format}`;
+
+export const proPosterPath = (id: string) => `/templates-shots/${id}.webp`;
+
 export const shotPath = (id: string, theme: Theme) => `/templates-shots/${id}-${theme}.webp`;

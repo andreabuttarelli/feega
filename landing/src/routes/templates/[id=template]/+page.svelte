@@ -8,6 +8,7 @@
   import { DOCS_URL, DOWNLOAD_PATH } from '$lib/site/links';
   import CodeTabs from '$lib/site/templates/CodeTabs.svelte';
   import PreviewFrame from '$lib/site/templates/PreviewFrame.svelte';
+  import ProPreview from '$lib/site/templates/ProPreview.svelte';
   import TemplateCard from '$lib/site/templates/TemplateCard.svelte';
   import TemplatesLayout from '$lib/site/templates/TemplatesLayout.svelte';
   import { CATEGORY_COPY } from '$lib/site/templates/copy';
@@ -53,13 +54,17 @@
     {#each template.tags as tag (tag)}<span class="tag">{tag}</span>{/each}
   </p>
 
-  <PreviewFrame {template} />
+  {#if isPro}
+    <ProPreview {template} />
+  {:else}
+    <PreviewFrame {template} />
+  {/if}
 
   <section>
     <h2>{lower('Code')}</h2>
     {#if isPro}
       <div class="pro-note">
-        <Callout item={{ tone: CalloutTone.Note, title: 'Included in Feega Cloud', text: 'This template is part of the Pro library in Feega Cloud. The preview above is the real thing; the code is available to Cloud teams.' }} />
+        <Callout item={{ tone: CalloutTone.Note, title: 'Included in Feega Cloud', text: 'This template is part of the Pro library in Feega Cloud. The video above shows it running; the code is available to Cloud teams.' }} />
       </div>
     {:else}
       <CodeTabs code={data.code} initial={Framework.Svelte} />
