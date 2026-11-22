@@ -16,6 +16,7 @@ import { wrapperCss, type WrapTag } from '@feega/live-edit/wrap-node';
 import type { LoopMove } from '@feega/live-edit/move-loop-item';
 import type { Usage } from '@feega/live-edit/move-usage';
 import { StructureOp, structure } from '@feega/live-edit/structure';
+import { structureMany, type Skipped, type Target } from '@feega/live-edit/structure-many';
 import { pageRule } from '@feega/live-edit/page-rule';
 import { ElementState } from '@feega/live-edit/element-state';
 import { scopedRule, type Scope } from '@feega/live-edit/scoped-rule';
@@ -35,6 +36,8 @@ import { themesOf } from './themes';
 import { scanProject } from './project-scan';
 
 export type StructureAsk = { op: StructureOp; at: string; to?: string; usage?: Usage; loop?: LoopMove; instance?: number; add?: { kind: AddKind; src?: string; place?: AddPlace }; wrap?: WrapTag };
+
+export type ManyAsk = { op: StructureOp; targets: { at: string; instance?: number }[]; wrap?: WrapTag };
 
 export type Written = { ok: true; path: string; written: string; note?: string; selected?: LiveAt } | { ok: false; reason: string; at?: LiveAt };
 
@@ -340,6 +343,37 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     return out.ok && written.ok ? { ...written, selected: out.selected } : written;
   }
 
+  const skippedNote = (total: number, skipped: Skipped[]): string | undefined => {
+    const reasons = [...new Set(skipped.map((s) => s.reason))].join('; ');
+    return skipped.length ? `${total - skipped.length} of ${total} changed · skipped: ${reasons}` : undefined;
+  };
+
+  async function restructuredMany(ask: ManyAsk): Promise<Written> {
+    const { op, wrap } = ask;
+    const tailwind = (await stylingOf(root, choice())) === Styling.Tailwind;
+    const style = tailwind ? AddStyle.Tailwind : AddStyle.Plain;
+    meta = { at: ask.targets[0]?.at ?? '', prop: op, value: `${ask.targets.length} elements`, scope: '' };
+    const outside: Skipped[] = [];
+    const targets: Target[] = [];
+    for (const target of ask.targets) {
+      const at = placed(target.at);
+      if (at) {
+        targets.push({ at, instance: target.instance });
+        continue;
+      }
+      outside.push({ at: { file: target.at, line: 0, col: 0 }, reason: `${target.at} is not a file:line:col inside the workspace` });
+    }
+    const made = await structureMany(reader(root), { op, targets, style, wrap });
+    if (!made.ok) {
+      return made;
+    }
+    const css = tailwind ? {} : op === StructureOp.Wrap ? wrapperCss(wrap) : {};
+    const out = await ruled(reader(root), { ok: true, changes: made.changes, selected: made.selected }, css);
+    const note = skippedNote(ask.targets.length, [...outside, ...made.skipped]);
+    const written = out.ok ? await writtenAll(out.changes, '', note ?? out.note) : out;
+    return out.ok && written.ok ? { ...written, selected: out.selected } : written;
+  }
+
   async function variableSaved(ask: EditAsk, name: string): Promise<Written> {
     const sheet = await globalSheetOf(reader(root));
     if (!sheet) {
@@ -357,6 +391,7 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
   return {
     saveVariable: (ask: EditAsk, name: string) => inTurn(() => variableSaved(ask, name)),
     structure: (ask: StructureAsk) => inTurn(() => restructured(ask)),
+    structureMany: (ask: ManyAsk) => inTurn(() => restructuredMany(ask)),
     move: (from: string, to: string, place: Place) => inTurn(() => moved(from, to, place)),
     edit: (ask: EditAsk) => inTurn(() => edited(ask)),
     icon: (at: string, name: string) => inTurn(() => iconSwapped(at, name)),

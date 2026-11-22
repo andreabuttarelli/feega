@@ -120,6 +120,7 @@ export enum ToHost {
   Setting = 'setting',
   Move = 'move',
   Structure = 'structure',
+  StructureMany = 'structure-many',
   AddImage = 'add-image',
   Server = 'server',
   Redo = 'redo',
@@ -210,6 +211,7 @@ export type HostMessage =
   | { kind: ToHost.Setting; key: SettingKey; value: SettingValue }
   | { kind: ToHost.Move; from: string; to: string; place: Place }
   | { kind: ToHost.Structure; op: StructureOp; at: string; to?: string; usage?: Usage; loop?: LoopMove; instance?: number; add?: { kind: AddKind; src?: string; place?: AddPlace }; wrap?: WrapTag }
+  | { kind: ToHost.StructureMany; op: StructureOp; targets: { at: string; instance?: number }[]; wrap?: WrapTag }
   | { kind: ToHost.AddImage; at: string; place?: AddPlace }
   | { kind: ToHost.Server; action: ServerAction }
   | { kind: ToHost.Redo }

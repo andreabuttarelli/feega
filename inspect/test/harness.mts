@@ -3,7 +3,7 @@ import { createServer } from 'node:http';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium, type Page } from '@playwright/test';
-import { fileEdits } from '../src/host/file-edits.ts';
+import { fileEdits, type ManyAsk } from '../src/host/file-edits.ts';
 import { stylingOf } from '../src/host/styling.ts';
 import { Attach, startDev } from '../src/host/dev-server.ts';
 import { ServerState, ToHost, ToView, type EditAsk, type Pick } from '../src/messages.ts';
@@ -54,10 +54,11 @@ export async function openPanel(appRoot: string, theme = DARK, cloud?: CommentsC
   const reply = (m: unknown) => page.evaluate((msg) => window.postMessage(msg, '*'), m);
   const picks = new Map<number, (p: Pick | null) => void>();
   const saves: unknown[] = [];
+  const copied: string[] = [];
   const comments = commentsHost(cloud, reply);
   const previewIcons = previewQueue(fetch, (name, svg) => reply({ kind: ToView.IconPreview, name, svg }));
 
-  await page.exposeFunction('toHost', async (m: { kind: ToHost; from?: string; to?: string; google?: boolean; family?: string; ask?: EditAsk; id?: number | string; pick?: Pick | null; query?: string; names?: string[]; draft?: CommentDraft }) => {
+  await page.exposeFunction('toHost', async (m: { kind: ToHost; from?: string; to?: string; google?: boolean; family?: string; ask?: EditAsk; id?: number | string; pick?: Pick | null; query?: string; names?: string[]; text?: string; draft?: CommentDraft }) => {
     if (m.kind === ToHost.Ready) {
       await reply({ kind: ToView.App, url: running.url, styling, prefs: null, breakpoints: await breakpointsOf(appRoot), themes: await themesOf(appRoot) });
       await reply({ kind: ToView.Server, state: ServerState.Running });
@@ -79,6 +80,13 @@ export async function openPanel(appRoot: string, theme = DARK, cloud?: CommentsC
     if (m.kind === ToHost.Structure) {
       const out = await edits.structure(m);
       await reply(out.ok ? { kind: ToView.Edited, ok: true, written: out.written, select: out.selected } : { kind: ToView.Edited, ok: false, reason: out.reason, at: out.at });
+    }
+    if (m.kind === ToHost.StructureMany) {
+      const out = await edits.structureMany(m as unknown as ManyAsk);
+      await reply(out.ok ? { kind: ToView.Edited, ok: true, written: out.written, note: out.note, select: out.selected } : { kind: ToView.Edited, ok: false, reason: out.reason, at: out.at });
+    }
+    if (m.kind === ToHost.Copy) {
+      copied.push(m.text!);
     }
     if (m.kind === ToHost.IconSearch) {
       const found = await searchIcons(appRoot, fetch, m.query!, null);
@@ -121,7 +129,7 @@ export async function openPanel(appRoot: string, theme = DARK, cloud?: CommentsC
     running.stop();
   };
 
-  return { page, frame, reply, edits, pickAt, saves, close, styling, url: running.url };
+  return { page, frame, reply, edits, pickAt, saves, copied, close, styling, url: running.url };
 }
 
 export type Panel = Awaited<ReturnType<typeof openPanel>>;

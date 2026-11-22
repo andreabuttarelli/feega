@@ -56,6 +56,31 @@ Feega Inspect is a small editor extension, separate from the Feega canvas. No ac
    with `node scripts/google-fonts.mjs`.
 10. Cmd/Ctrl+Z restores the file. It never overwrites a change made after the edit.
 
+## Layers, structure and shortcuts
+
+Right-click an element in the preview or a row in Layers for **Duplicate**, **Add as child**,
+**Wrap with** (Div, Section, Article, Nav, Header, Footer, Link, Button), **Unwrap** and
+**Delete**. Each is a single undo.
+
+Select several elements: Shift-click a Layers row for the range of visible rows, Cmd-click
+(Ctrl-click on Windows and Linux) to add or remove one, Shift-click in the preview to add or
+remove an element. Delete, Duplicate, Wrap and Unwrap then run on all of them as one edit, undone
+with one undo. Wrapping several elements needs adjacent siblings of the same parent; otherwise it
+is refused with the reason. Elements that cannot be edited are skipped and listed, the rest
+proceed. Styles stay single-element: the Properties controls apply to one element.
+
+| Key | Action |
+|---|---|
+| Delete / Backspace | Delete |
+| Cmd/Ctrl+D | Duplicate |
+| Cmd/Ctrl+G | Wrap in a div |
+| Shift+Cmd/Ctrl+G | Unwrap |
+| Cmd/Ctrl+A | Select the siblings |
+| Cmd/Ctrl+C | Copy for agent |
+| Enter / Shift+Enter | Select the child / the parent |
+| Tab / Shift+Tab | Select the next / the previous sibling |
+| Esc | Clear the selection |
+
 ## In the browser: `npx feega`
 
 The same editor runs without VS Code:
