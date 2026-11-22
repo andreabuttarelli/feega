@@ -14,6 +14,11 @@ describe('lower', () => {
     expect(lower('Feega Cloud for GitHub and Hunyuan3D')).toBe('Feega Cloud for GitHub and Hunyuan3D');
   });
 
+  it('keeps the competitor and agent names capitalized in headings', () => {
+    expect(lower('Where Lovable Is Still The Better Choice')).toBe('where Lovable is still the better choice');
+    expect(lower('Framer, Grok Build, OpenAI Codex and Cursor on GitHub with Tailwind')).toBe('Framer, Grok Build, OpenAI Codex and Cursor on GitHub with Tailwind');
+  });
+
   it('leaves markup attributes alone', () => {
     expect(lower('See <a href="/AI-Transparency">AI Transparency</a>')).toBe('see <a href="/AI-Transparency">AI transparency</a>');
   });

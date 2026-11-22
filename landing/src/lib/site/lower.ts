@@ -3,10 +3,11 @@ const PROPER_WORDS = new Set([
   'Discord', 'Instagram', 'Mac', 'Apple', 'Lottie', 'Nano', 'Banana', 'GPT', 'OpenAI', 'Seedream', 'Qwen', 'Seedance',
   'Kling', 'Grok', 'Trellis', 'Microsoft', 'Tencent', 'Kie', 'Higgsfield', 'Wiro', 'Apache', 'Svelte', 'Vue', 'Nuxt',
   'Astro', 'Gatsby', 'Angular', 'Vite', 'Solid', 'Remix', 'Roma', 'Topaz', 'Canva', 'CapCut', 'Spotify', 'Blender',
-  'Italian', 'Cloud', 'Next', 'Windows', 'Linux', 'Notion', 'Slack', 'Supabase', 'Windsurf', 'Tailwind', 'GitHub'
+  'Italian', 'Cloud', 'Next', 'Windows', 'Linux', 'Notion', 'Slack', 'Supabase', 'Windsurf', 'Tailwind', 'GitHub',
+  'Lovable', 'Framer', 'Onlook', 'Stitch', 'Vercel', 'Firebase', 'Gemini', 'Copilot', 'Cline', 'Anthropic', 'SvelteKit'
 ]);
 
-const PROTECTED_PHRASES = ['Feega Cloud', 'Claude Code', 'VS Code', 'Grok Imagine', 'GPT Image', 'Create React App', 'React Router'];
+const PROTECTED_PHRASES = ['Feega Cloud', 'Claude Code', 'VS Code', 'Grok Build', 'Grok Imagine', 'GPT Image', 'Create React App', 'React Router'];
 
 const MARKUP = /(<[^>]*>)/;
 const WORD = /\b[A-Z][a-z]+\b/g;
