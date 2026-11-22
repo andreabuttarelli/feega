@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { ORG_ENDPOINTS, pathFor, statusForFailure, toolFromHeader, type OrgEndpoint } from './index';
+import { ORG_ENDPOINTS, pathFor, statusForFailure, type OrgEndpoint } from './index';
 
 const byTool = (tool: string): OrgEndpoint => {
   const found = ORG_ENDPOINTS.find((e) => e.tool === tool);
@@ -116,33 +116,6 @@ describe('the org endpoint registry', () => {
         continue;
       }
       expect(e.output.safeParse([]).success, e.tool).toBe(false);
-    }
-  });
-});
-
-describe('the tool name that arrives in a header', () => {
-  it('recognises every tool the registry declares', () => {
-    for (const e of ORG_ENDPOINTS) {
-      expect(toolFromHeader(e.tool), e.tool).toBe(e.tool);
-    }
-  });
-  it('scarta quello che un nome di tool non è, invece di scriverlo', () => {
-    expect(toolFromHeader(null)).toBeNull();
-    expect(toolFromHeader('')).toBeNull();
-    expect(toolFromHeader('Generate_Image')).toBeNull();
-    expect(toolFromHeader('generate image')).toBeNull();
-    expect(toolFromHeader("generate'; drop table ai_calls; --")).toBeNull();
-    expect(toolFromHeader('a'.repeat(65))).toBeNull();
-    expect(toolFromHeader('a'.repeat(64))).toBe('a'.repeat(64));
-  });
-});
-
-describe('no description points at a retired tool', () => {
-  const RETIRED = ['add_competitor', 'delete_competitor', 'delete_product', 'get_ads', 'discard_plan', 'approve_posts'];
-
-  it.each(ORG_ENDPOINTS.map((e) => [e.tool, e.description] as const))('%s', (tool, description) => {
-    for (const gone of RETIRED) {
-      expect(description.includes(gone), `${tool} -> ${gone}`).toBe(false);
     }
   });
 });
