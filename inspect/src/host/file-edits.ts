@@ -1,4 +1,5 @@
-import { readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
 import { stylePatch, type LiveAt } from '@feega/live-edit/class-patch';
 import { cssModuleRule } from '@feega/live-edit/css-module';
 import type { FileChange, ReadFile } from '@feega/live-edit/files';
@@ -25,11 +26,13 @@ import { swapIcon } from '@feega/live-edit/icon-swap';
 import { svgMarkup } from '@feega/live-edit/svg-markup';
 import { addGo, type GoAsk } from '@feega/live-edit/go-action';
 import { linkWrite, type LinkEdit } from '@feega/live-edit/link-edit';
+import type { Proposal } from '@feega/plugin-api/protocol';
 import { Styling, type EditAsk } from '../messages';
 import { StylingChoice } from '../settings';
 import { stylingOf } from './styling';
 import { breakpointsOf } from './breakpoints';
 import { themesOf } from './themes';
+import { proposalChanges } from './proposal';
 
 export type StructureAsk = { op: StructureOp; at: string; to?: string; usage?: Usage; loop?: LoopMove; instance?: number; add?: { kind: AddKind; src?: string; place?: AddPlace }; wrap?: WrapTag };
 
@@ -82,7 +85,7 @@ async function ruled(read: ReadFile, out: Extract<Structured, { ok: true }>, css
   return rule.ok ? { ...out, changes: mergedChanges(out.changes, rule.changes) } : rule;
 }
 
-type Step = { full: string; before: string; after: string }[];
+type Step = { full: string; before: string; after: string; encoding?: 'base64' }[];
 
 export type Change = { id: number; at: string; prop: string; value: string; scope: string; files: string[]; time: number };
 
@@ -119,9 +122,10 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
       if (!full) {
         return { ok: false, reason: `${change.path} is outside the workspace` };
       }
-      step.push({ full, before: change.before, after: change.after });
+      step.push({ full, before: change.before, after: change.after, encoding: change.encoding });
     }
-    await Promise.all(step.map((s) => writeFile(s.full, s.after)));
+    await Promise.all(step.map((s) => mkdir(dirname(s.full), { recursive: true })));
+    await Promise.all(step.map((s) => writeFile(s.full, s.after, s.encoding)));
     steps.push(step);
     undone.length = 0;
     const change = { ...meta, id: ++nextId, files: moving.map((c) => c.path), time: Date.now() };
@@ -238,19 +242,19 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     return out.ok ? writtenAll(out.changes, '') : out;
   }
 
-  const put = (full: string, text: string) => (text === '' ? rm(full, { force: true }) : writeFile(full, text));
+  const put = (full: string, text: string, encoding?: 'base64') => (text === '' ? rm(full, { force: true }) : writeFile(full, text, encoding));
 
   async function replay(from: Step[], to: Step[], expect: 'before' | 'after', write: 'before' | 'after', empty: string): Promise<Written> {
     const step = from.at(-1);
     if (!step) {
       return { ok: false, reason: empty };
     }
-    const now = await Promise.all(step.map((s) => readFile(s.full, 'utf8').catch(() => '')));
+    const now = await Promise.all(step.map((s) => readFile(s.full, s.encoding ?? 'utf8').catch(() => '')));
     if (now.some((text, i) => text !== step[i][expect])) {
       return { ok: false, reason: CHANGED_SINCE };
     }
     from.pop();
-    await Promise.all(step.map((s) => put(s.full, s[write])));
+    await Promise.all(step.map((s) => put(s.full, s[write], s.encoding)));
     to.push(step);
     return { ok: true, path: step[0]?.full ?? '', written: '' };
   }
@@ -302,6 +306,13 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     return out.ok && written.ok ? { ...written, selected: out.selected } : written;
   }
 
+  async function proposed(proposal: Proposal, appDir: string): Promise<Written> {
+    const first = proposal.ops.find((op) => 'at' in op);
+    meta = { at: first && 'at' in first ? first.at : '', prop: 'plugin', value: proposal.label, scope: '' };
+    const out = await proposalChanges(proposal.ops, { root, read: reader(root), appDir, style: (read, at, css) => cssWriterOf(at.file).write(read, at, css) });
+    return out.ok ? writtenAll(out.changes, '') : out;
+  }
+
   async function variableSaved(ask: EditAsk, name: string): Promise<Written> {
     const sheet = await globalSheetOf(reader(root));
     if (!sheet) {
@@ -317,6 +328,7 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
   }
 
   return {
+    proposal: (proposal: Proposal, appDir: string) => inTurn(() => proposed(proposal, appDir)),
     saveVariable: (ask: EditAsk, name: string) => inTurn(() => variableSaved(ask, name)),
     structure: (ask: StructureAsk) => inTurn(() => restructured(ask)),
     move: (from: string, to: string, place: Place) => inTurn(() => moved(from, to, place)),

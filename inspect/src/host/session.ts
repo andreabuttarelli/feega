@@ -26,6 +26,7 @@ import { themesOf } from './themes';
 import { usageSession } from './usage';
 import { selectionSync } from './selection-sync';
 import { wiringOf } from './wiring';
+import { pluginCalls } from './plugin-calls';
 
 const PICK_TIMEOUT_MS = 3000;
 const SYNC_SELECTION_DELAY_MS = 200;
@@ -122,6 +123,15 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     }
     await edits.structure({ op: StructureOp.Add, at, add: { kind: AddKind.Image, src: copied.url, place } }).then((out) => edited(out, null));
   }
+
+  const pluginRun = pluginCalls({
+    get root() {
+      return root;
+    },
+    appDir: () => running?.plan.appDir ?? '',
+    propose: (proposal, appDir) => edits.proposal(proposal, appDir).then((out) => edited(out, null)),
+    fetch
+  });
 
   const comments = commentsHost(platform.cloud, post);
   const sharing = shareSession({ platform, workspace, appUrl: () => running?.url ?? null, post });
@@ -425,7 +435,8 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.ShareStart]: (m) => sharing.start(m.name, m.canEdit),
     [ToHost.ShareStop]: sharing.stop,
     [ToHost.ShareKick]: (m) => sharing.kick(m.userId),
-    [ToHost.ShareRole]: (m) => sharing.setRole(m.userId, m.role)
+    [ToHost.ShareRole]: (m) => sharing.setRole(m.userId, m.role),
+    [ToHost.Plugin]: async (m) => post({ kind: ToView.Plugin, id: m.id, result: await pluginRun(m.ask) })
   };
 
   platform.receive((message) => (handlers[message.kind] as (m: HostMessage) => unknown)(message));
