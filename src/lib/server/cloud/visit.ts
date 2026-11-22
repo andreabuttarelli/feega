@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { visitorAuthUrl } from './hosts';
 import { listComments, type Comment } from './comments';
 import { isSid } from './sid';
-import { joinSession, roleIn, sessionById, SESSION_MAX_MS, type SessionRow } from './sessions';
+import { joinSession, namesOf, roleIn, sessionById, SESSION_MAX_MS, type SessionRow } from './sessions';
 import { signToken } from './token';
 
 export enum VisitKind {
@@ -72,7 +72,8 @@ export async function visit(
 
   const visitorRole = role === 'host' ? 'editor' : role;
   const expiry = Math.min(input.now.getTime() + SESSION_MAX_MS, new Date(session.expires_at).getTime());
-  const token = await signToken({ sid: session.id, role: visitorRole, sub: input.userId, org: session.org_id, exp: Math.floor(expiry / MS_PER_SECOND) }, input.secret);
+  const name = (await namesOf(db, [input.userId])).get(input.userId);
+  const token = await signToken({ sid: session.id, role: visitorRole, sub: input.userId, org: session.org_id, exp: Math.floor(expiry / MS_PER_SECOND), name }, input.secret);
 
   return { kind: VisitKind.Enter, url: visitorAuthUrl(session.id, token, safeVisitorPath(input.next)) };
 }

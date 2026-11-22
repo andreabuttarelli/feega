@@ -56,6 +56,15 @@ describe('visit', () => {
     delete env.SESSION_ORIGIN_TEMPLATE;
   });
 
+  it('puts the visitor name in the token so the host sees who is there', async () => {
+    const db = fakeDb({ share_sessions: [session()], profiles: [{ id: 'ada', name: 'Ada Lovelace', email: 'ada@example.test' }] });
+
+    const result = await run(db, 'ada');
+
+    const verdict = await verifyToken(new URL((result as { url: string }).url).searchParams.get('token')!, SECRET, NOW.getTime());
+    expect(verdict).toMatchObject({ check: TokenCheck.Valid, claims: { name: 'Ada Lovelace' } });
+  });
+
   it('records the visitor as a member with the session role', async () => {
     const db = fakeDb({ share_sessions: [session({ visitor_role: 'editor' })] });
 
