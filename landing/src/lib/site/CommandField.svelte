@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { eventAttrs } from './analytics/attrs';
+
   let { command, onCopy }: { command: string; onCopy?: () => void } = $props();
 
   const FEEDBACK_MS = 1600;
@@ -15,7 +17,7 @@
 <div class="field">
   <span class="prompt" aria-hidden="true">$</span>
   <code>{command}</code>
-  <button type="button" aria-label={copied ? 'copied' : 'copy command'} onclick={copy}>
+  <button type="button" aria-label={copied ? 'copied' : 'copy command'} onclick={copy} {...eventAttrs('install_copy', { command })}>
     {#if copied}
       <span class="done">copied</span>
     {/if}

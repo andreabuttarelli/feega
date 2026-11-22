@@ -3,6 +3,7 @@
   import '$lib/site/landing/landing.css';
   import '$lib/site/alternatives/alternatives.css';
   import { primaryCta } from '$lib/site/install';
+  import { eventAttrs } from '$lib/site/analytics/attrs';
   import { ALTERNATIVES, ALTERNATIVES_PATH, AUTHOR, DISCLAIMER, TRY_STEPS, alternativePath } from '$lib/site/alternatives';
   import { articleJsonLd, faqJsonLd } from '$lib/site/structured-data';
   import CatalogLayout from '$lib/site/catalog/CatalogLayout.svelte';
@@ -123,7 +124,7 @@
 
   <section class="closing">
     <p>{page.rich?.closing ?? page.hook}</p>
-    <a class="landing-cta" href={cta.href}>{cta.label} →</a>
+    <a class="landing-cta" href={cta.href} {...eventAttrs('download_click', { target: 'download_page', place: 'alternative' })}>{cta.label} →</a>
   </section>
 
   <section>

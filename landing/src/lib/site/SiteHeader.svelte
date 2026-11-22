@@ -5,6 +5,8 @@
   import { GITHUB_ICON } from './social-icons';
   import LibraryMenu from './LibraryMenu.svelte';
   import { desktopNav } from './library-menu';
+  import { eventAttrs } from './analytics/attrs';
+  import { navAttrs } from './analytics/nav';
 
   const isCurrent = (href: string) => {
     if (href === DOCS_URL || href === STORY_URL) {
@@ -23,18 +25,18 @@
       {#if 'library' in entry}
         <LibraryMenu freeTemplates={page.data.freeTemplates ?? 0} />
       {:else}
-        <a class="sx-pill" href={entry.href} aria-current={isCurrent(entry.href) ? 'page' : undefined}>{entry.label.toLowerCase()}</a>
+        <a class="sx-pill" href={entry.href} {...navAttrs(entry.href, 'header')} aria-current={isCurrent(entry.href) ? 'page' : undefined}>{entry.label.toLowerCase()}</a>
       {/if}
     {/each}
   </nav>
 
   <div class="sx-actions">
-    <a class="sx-pill sx-star" href={GITHUB_URL}>star on github</a>
-    <a class="sx-pill sx-cta" href={DOWNLOAD_PATH}>download</a>
+    <a class="sx-pill sx-star" href={GITHUB_URL} {...eventAttrs('github_click', { place: 'header' })}>star on github</a>
+    <a class="sx-pill sx-cta" href={DOWNLOAD_PATH} {...eventAttrs('download_click', { target: 'download_page', place: 'header' })}>download</a>
   </div>
 
   <div class="sx-mobile">
-    <a class="sx-round" href={GITHUB_URL} aria-label="Feega on GitHub">{@html GITHUB_ICON}</a>
+    <a class="sx-round" href={GITHUB_URL} aria-label="Feega on GitHub" {...eventAttrs('github_click', { place: 'header_mobile' })}>{@html GITHUB_ICON}</a>
 
     <details class="sx-menu">
       <summary class="sx-round" aria-label="Menu">
@@ -45,9 +47,9 @@
       <nav class="sx-menu-panel" aria-label="Menu">
         <div class="sx-menu-links">
           {#each HEADER_LINKS as link (link.label)}
-            <a href={link.href}>{link.label.toLowerCase()}</a>
+            <a href={link.href} {...navAttrs(link.href, 'header_menu')}>{link.label.toLowerCase()}</a>
           {/each}
-          <a href={GITHUB_URL}>star on github</a>
+          <a href={GITHUB_URL} {...eventAttrs('github_click', { place: 'header_menu' })}>star on github</a>
         </div>
 
         <div class="sx-menu-icons">
@@ -56,7 +58,7 @@
           {/each}
         </div>
 
-        <a class="sx-menu-cta" href={DOWNLOAD_PATH}>download</a>
+        <a class="sx-menu-cta" href={DOWNLOAD_PATH} {...eventAttrs('download_click', { target: 'download_page', place: 'header_menu' })}>download</a>
       </nav>
     </details>
   </div>

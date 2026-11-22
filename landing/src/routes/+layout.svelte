@@ -9,6 +9,7 @@
   import { trailOf } from '$lib/site/llms';
   import { breadcrumbJsonLd } from '$lib/site/structured-data';
   import { OG } from '$lib/site/seo';
+  import { trackClick } from '$lib/site/analytics/attrs';
 
   import { onMount, type Component } from 'svelte';
 
@@ -52,6 +53,8 @@
   <meta name="twitter:image:alt" content={OG.image.alt} />
   <meta name="robots" content="max-image-preview:large" />
 </svelte:head>
+
+<svelte:window onclick={trackClick} />
 
 <div class="site" id="top">
   <SiteHeader />
