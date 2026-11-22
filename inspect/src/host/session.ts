@@ -27,6 +27,7 @@ import { usageSession } from './usage';
 import { selectionSync } from './selection-sync';
 import { wiringOf } from './wiring';
 
+const START_WITH_FEEGA = 'Start with Feega';
 const PICK_TIMEOUT_MS = 3000;
 const SYNC_SELECTION_DELAY_MS = 200;
 const LATER_EDITS = 'later edits depend on this change: undo them first';
@@ -264,6 +265,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
       log: logLine,
       installing: (dir: string) => current() && post({ kind: ToView.Server, state: ServerState.Installing, reason: `Installing dependencies for ${dir} (first run)…` }),
       spawned: (pid: number) => remember(pids, pid, root),
+      declined: (text: string) => void platform.warn(text),
       signal
     };
     const started = await startDev(workspace, platform.launcher, hooks, String(platform.settings()[SettingKey.DevCommand]), attach, app);
@@ -315,6 +317,10 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     const started = await attachDev(workspace, platform.launcher, url, app);
     if (starts !== mine) {
       return started;
+    }
+    if ('refused' in started && started.attachRefused) {
+      refuse(started.refused);
+      return (await platform.warn(started.refused, START_WITH_FEEGA)) ? startServer(Attach.Never) : started;
     }
     if ('refused' in started) {
       return refuse(started.refused);
