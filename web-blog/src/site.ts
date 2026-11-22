@@ -35,6 +35,14 @@ export async function useCasesNewestFirst(): Promise<UseCase[]> {
   return newestFirst(await getCollection('usecases'));
 }
 
+export async function allNewestFirst(): Promise<Entry[]> {
+  return newestFirst([...(await getCollection('posts')), ...(await getCollection('usecases'))]);
+}
+
+export function sectionOf(entry: Entry): Section {
+  return entry.collection === 'usecases' ? 'use-cases' : 'posts';
+}
+
 export function readingMinutes(entry: Entry): number {
   const words = (entry.body ?? '').split(/\s+/).filter(Boolean).length;
   return Math.max(1, Math.round(words / WORDS_PER_MINUTE));
