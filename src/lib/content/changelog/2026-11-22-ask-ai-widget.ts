@@ -1,9 +1,7 @@
 import type { ChangelogEntry } from './index';
 
-const entry: ChangelogEntry = {
+export default {
   date: '2026-11-22',
   title: 'Ask your AI about Feega',
-  items: ['Open ChatGPT, Claude, Perplexity, Grok or Mistral from the website with a prompt that explains Feega.']
-};
-
-export default entry;
+  items: ['Open ChatGPT, Claude, Perplexity, Grok or Mistral with a prompt that explains Feega.']
+} satisfies ChangelogEntry;
