@@ -12,6 +12,7 @@ import { palette } from './palette.mjs';
 import { scrollReveal } from './scroll-reveal.mjs';
 import { imageTunnel } from './image-tunnel.mjs';
 import { parallaxGallery } from './parallax-gallery.mjs';
+import { hoverReveal } from './hover-reveal.mjs';
 import { glassButton } from './glass-button.mjs';
 
 const PACKAGE = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -72,7 +73,7 @@ for (const item of [...sections, ...app, ...components, ...variants, ...blocks, 
   manifest(item, C);
 }
 
-for (const item of [...interactive, palette, scrollReveal, imageTunnel, parallaxGallery, glassButton]) {
+for (const item of [...interactive, palette, scrollReveal, imageTunnel, parallaxGallery, hoverReveal, glassButton]) {
   const C = css(`fl-${item.id}`, item.mods, item.css);
   emit(item, C, item.files(C));
   manifest(item, C);

@@ -1,35 +1,73 @@
+const ASSETS = 'https://www.feega.app/templates-assets/parallax-gallery';
+const DRIFT = 24;
+const INERTIA = 3.5;
+
+const IMAGES = {
+  '01': { w: 560, h: 440, alt: 'Glowing violet mushrooms in a night jungle' },
+  '02': { w: 560, h: 442, alt: 'A starry sky through jungle branches' },
+  '03': { w: 560, h: 527, alt: 'A waterfall in a moonlit jungle' },
+  '04': { w: 560, h: 784, alt: 'Luminous blue grass stems' },
+  '05': { w: 560, h: 805, alt: 'Glowing flower fronds at night' },
+  '06': { w: 560, h: 560, alt: 'A teal planet over floating islands' },
+  '07': { w: 560, h: 300, alt: 'A river under glowing plants' },
+  '08': { w: 560, h: 436, alt: 'Pink mushrooms in violet light' },
+  '09': { w: 560, h: 678, alt: 'An old tree at night' },
+  '10': { w: 560, h: 593, alt: 'Ferns lit in teal' },
+  '11': { w: 560, h: 420, alt: 'A red mushroom glowing at night' },
+  '12': { w: 560, h: 402, alt: 'Green floating islands' }
+};
+
+const LAYOUT = {
+  far: [
+    ['11', 980, 120, 130],
+    ['02', 360, 560, 110],
+    ['06', 1700, 520, 96],
+    ['03', 700, 1000, 120],
+    ['01', 180, 1120, 140],
+    ['10', 1180, 420, 100],
+    ['08', 1500, 1180, 118],
+    ['12', 560, 380, 120],
+    ['05', 860, 820, 90]
+  ],
+  mid: [
+    ['01', 560, 40, 210],
+    ['03', 760, 330, 200],
+    ['12', 1240, 20, 220],
+    ['04', 420, 720, 180],
+    ['10', 1560, 760, 200],
+    ['06', 40, 820, 190],
+    ['08', 1300, 1060, 210],
+    ['11', 40, 470, 170],
+    ['02', 620, 880, 190]
+  ],
+  near: [
+    ['09', 140, 120, 300],
+    ['05', 1020, 640, 270],
+    ['07', 1480, 160, 320]
+  ]
+};
+
 const css = [
   '.fl-parallax-gallery{position:relative;overflow:hidden;background:var(--feega-bg)}',
   '.fl-parallax-gallery .field{position:relative;height:clamp(30rem,80vh,54rem);overflow:hidden;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none;contain:layout paint}',
   '.fl-parallax-gallery .field[data-dragging]{cursor:grabbing}',
   '.fl-parallax-gallery .field:focus-visible{outline-offset:-4px}',
   '.fl-parallax-gallery .field::before,.fl-parallax-gallery .field::after{content:"";position:absolute;inset:0;z-index:4;pointer-events:none}',
-  '.fl-parallax-gallery .field::before{background:linear-gradient(90deg,var(--feega-bg),transparent 14%,transparent 86%,var(--feega-bg))}',
-  '.fl-parallax-gallery .field::after{background:linear-gradient(180deg,var(--feega-bg),transparent 7%,transparent 93%,var(--feega-bg))}',
-  '.fl-parallax-gallery .layer{position:absolute;inset:0}',
-  '.fl-parallax-gallery .card{position:absolute;top:0;left:0;overflow:hidden;border-radius:var(--feega-radius-md);background:var(--feega-surface)}',
-  '.fl-parallax-gallery .layer[data-depth="2"] .card{box-shadow:var(--feega-shadow)}',
-  '.fl-parallax-gallery .card img{display:block;width:100%;height:100%;object-fit:cover;pointer-events:none}',
-  '.fl-parallax-gallery .card[data-tone="0"]{background:linear-gradient(135deg,var(--feega-accent-soft),var(--feega-surface))}',
-  '.fl-parallax-gallery .card[data-tone="1"]{background:linear-gradient(160deg,var(--feega-success-soft),var(--feega-raised))}',
-  '.fl-parallax-gallery .card[data-tone="2"]{background:linear-gradient(200deg,var(--feega-surface),var(--feega-line-strong))}',
-  '.fl-parallax-gallery .card[data-tone="3"]{background:linear-gradient(120deg,var(--feega-danger-soft),var(--feega-accent-soft))}'
+  '.fl-parallax-gallery .field::before{background:linear-gradient(90deg,var(--feega-bg),transparent 18%,transparent 82%,var(--feega-bg))}',
+  '.fl-parallax-gallery .field::after{background:linear-gradient(180deg,var(--feega-bg),transparent 8%,transparent 92%,var(--feega-bg))}',
+  '.fl-parallax-gallery .layer{position:absolute;top:0;left:0;width:1800px;height:1300px;transform-origin:0 0}',
+  '.fl-parallax-gallery .card{position:absolute;margin:0;overflow:hidden;border-radius:var(--feega-radius-md);background:var(--feega-surface);will-change:transform}',
+  '.fl-parallax-gallery .layer[data-depth="near"] .card{box-shadow:var(--feega-shadow)}',
+  '.fl-parallax-gallery .card img{display:block;width:100%;height:auto;pointer-events:none}'
 ];
 
 const ENGINE = (typed) => {
   const t = (annotation) => (typed ? annotation : '');
-  return `${typed ? 'type GalleryImage = { src: string; alt: string };\n\n' : ''}const LAYERS = [
-  { depth: 0.55, width: 0.5, speed: 0.55 },
-  { depth: 0.78, width: 0.66, speed: 0.78 },
-  { depth: 1, width: 0.82, speed: 1 }
-];
-const VISIBLE_COLUMNS = 6;
-const MIN_PITCH = 120;
-const RATIOS = [1.25, 0.8, 1.5, 1, 0.75, 1.33];
-const TONES = 4;
-const GAP = 0.18;
-const DRIFT = 26;
-const FRICTION = 3.5;
+  return `const DEPTHS${t(': Record<string, number>')} = { far: 0.42, mid: 0.7, near: 1 };
+const TILE = { w: 1800, h: 1300 };
+const MARGIN = { x: 340, y: 420 };
+const DESIGN_WIDTH = 1280;
+const MIN_SCALE = 0.75;
 const STILL = 30;
 const RESUME = 1.4;
 const KEY_PUSH = 900;
@@ -38,10 +76,14 @@ const KEYS${t(': Record<string, [number, number]>')} = { ArrowLeft: [1, 0], Arro
 
 const wrap = (value${t(': number')}, size${t(': number')}) => ((value % size) + size) % size;
 
-function gallery(root${t(': HTMLElement')}, images${t(': GalleryImage[]')})${t(': () => void')} {
+function gallery(root${t(': HTMLElement')})${t(': () => void')} {
   const field = root.querySelector${t('<HTMLElement>')}('.field')${t('!')};
+  const layers = [...field.querySelectorAll${t('<HTMLElement>')}('.layer')];
+  const speed = Number(root.dataset.drift ?? 0);
+  const friction = Number(root.dataset.inertia ?? 1);
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let cards${t(': { el: HTMLElement; layer: number; x: number; y: number; h: number; wrap: number; span: number; margin: number; flow: number }[]')} = [];
+  let cards${t(': { el: HTMLElement; depth: number; x: number; y: number }[]')} = [];
+  let scale = 1;
   let pan = { x: 0, y: 0 };
   let velocity = { x: 0, y: 0 };
   let drift = 0;
@@ -52,62 +94,20 @@ function gallery(root${t(': HTMLElement')}, images${t(': GalleryImage[]')})${t('
   let frame = 0;
   let then = 0;
 
-  function card(index${t(': number')}, width${t(': number')}, height${t(': number')})${t(': HTMLElement')} {
-    const el = document.createElement('div');
-    el.className = 'card';
-    el.style.width = width + 'px';
-    el.style.height = height + 'px';
-    const image = images.length ? images[index % images.length] : null;
-    if (!image) {
-      el.dataset.tone = String(index % TONES);
-      return el;
-    }
-    const img = document.createElement('img');
-    img.src = image.src;
-    img.alt = image.alt;
-    img.draggable = false;
-    img.loading = 'lazy';
-    el.append(img);
-    return el;
-  }
-
-  function build() {
-    const width = field.clientWidth;
-    const height = field.clientHeight;
-    const pitch = Math.max(MIN_PITCH, width / VISIBLE_COLUMNS) * LAYERS.length / 2;
-    const columns = Math.ceil(width / pitch) + 2;
-    cards = [];
-    field.replaceChildren(
-      ...LAYERS.map((layer, l) => {
-        const el = document.createElement('div');
-        el.className = 'layer';
-        el.dataset.depth = String(l);
-        const w = (pitch * layer.width * 2) / LAYERS.length;
-        for (let c = 0; c < columns; c++) {
-          const column = [];
-          let y = 0;
-          for (let k = 0; y < height + w * 3; k++) {
-            const h = w * RATIOS[(c * 2 + k + l) % RATIOS.length];
-            column.push({ y, h, index: l * 17 + c * 5 + k });
-            y += h + w * GAP;
-          }
-          for (const entry of column) {
-            const node = card(entry.index, w, entry.h);
-            el.append(node);
-            cards.push({ el: node, layer: l, x: c * pitch + (l * pitch * 2) / LAYERS.length / 2 + ((l % 2) * pitch) / 2, y: entry.y - ((c + l) % 3) * w * 0.4, h: entry.h, wrap: y, span: columns * pitch, margin: pitch, flow: 1 + 0.12 * ((c % 3) - 1) });
-          }
-        }
-        return el;
-      })
-    );
+  function measure() {
+    scale = Math.max(MIN_SCALE, field.clientWidth / DESIGN_WIDTH);
+    cards = layers.flatMap((layer) => {
+      layer.style.transform = 'scale(' + scale + ')';
+      const depth = DEPTHS[layer.dataset.depth ?? 'near'] ?? 1;
+      return [...layer.querySelectorAll${t('<HTMLElement>')}('.card')].map((el) => ({ el, depth, x: el.offsetLeft, y: el.offsetTop }));
+    });
     place();
   }
 
   function place() {
     for (const c of cards) {
-      const layer = LAYERS[c.layer];
-      const x = wrap(c.x + pan.x * layer.depth + c.margin, c.span) - c.margin;
-      const y = wrap(c.y + (pan.y + drift * layer.speed * c.flow) * layer.depth + c.h, c.wrap) - c.h;
+      const x = wrap(c.x + (pan.x * c.depth) / scale + MARGIN.x, TILE.w) - MARGIN.x - c.x;
+      const y = wrap(c.y + ((pan.y + drift) * c.depth) / scale + MARGIN.y, TILE.h) - MARGIN.y - c.y;
       c.el.style.transform = 'translate3d(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px,0)';
     }
   }
@@ -121,13 +121,13 @@ function gallery(root${t(': HTMLElement')}, images${t(': GalleryImage[]')})${t('
     if (!dragging) {
       pan.x += velocity.x * dt;
       pan.y += velocity.y * dt;
-      const decay = Math.exp(-FRICTION * dt);
+      const decay = Math.exp(-friction * dt);
       velocity.x *= decay;
       velocity.y *= decay;
     }
     const target = reduced || dragging || Math.hypot(velocity.x, velocity.y) > STILL ? 0 : 1;
     flow += (target - flow) * Math.min(1, dt * RESUME);
-    drift -= DRIFT * flow * dt;
+    drift -= speed * flow * dt;
     place();
     if (!idle()) {
       wake();
@@ -170,6 +170,7 @@ function gallery(root${t(': HTMLElement')}, images${t(': GalleryImage[]')})${t('
     pan.y += dy;
     velocity = { x: velocity.x * 0.6 + (dx / dt) * 0.4, y: velocity.y * 0.6 + (dy / dt) * 0.4 };
     last = { x: event.clientX, y: event.clientY, time: event.timeStamp };
+    place();
   }
 
   function onUp() {
@@ -207,7 +208,7 @@ function gallery(root${t(': HTMLElement')}, images${t(': GalleryImage[]')})${t('
     }
     sleep();
   });
-  const resize = new ResizeObserver(() => build());
+  const resize = new ResizeObserver(() => measure());
 
   field.addEventListener('pointerdown', onDown);
   field.addEventListener('pointermove', onMove);
@@ -217,7 +218,7 @@ function gallery(root${t(': HTMLElement')}, images${t(': GalleryImage[]')})${t('
   document.addEventListener('visibilitychange', onVisibility);
   sight.observe(field);
   resize.observe(field);
-  build();
+  measure();
 
   return () => {
     sleep();
@@ -229,16 +230,28 @@ function gallery(root${t(': HTMLElement')}, images${t(': GalleryImage[]')})${t('
     field.removeEventListener('pointercancel', onUp);
     field.removeEventListener('keydown', onKey);
     document.removeEventListener('visibilitychange', onVisibility);
-    field.replaceChildren();
+    for (const c of cards) {
+      c.el.style.transform = '';
+    }
   };
 }`;
 };
 
-const FIELD = '<div class="field" role="application" tabindex="0" aria-label="Image gallery. Drag, swipe or use the arrow keys to move it."></div>';
+const LABEL = 'Image gallery. Drag, swipe or use the arrow keys to move it.';
 
-const shell = (attrs) => `<section class="fl-parallax-gallery" aria-label="Gallery"${attrs}>
-  ${FIELD}
-</section>`;
+const HTML_CARD = { cls: 'class', style: (l, t, w) => `style="left:${l}px;top:${t}px;width:${w}px"`, img: '>' };
+const JSX_CARD = { cls: 'className', style: (l, t, w) => `style={{ left: ${l}, top: ${t}, width: ${w} }}`, img: ' />' };
+
+const card = (dialect, [id, left, top, width]) => {
+  const image = IMAGES[id];
+  return `<figure ${dialect.cls}="card" ${dialect.style(left, top, width)}><img src="${ASSETS}/${id}.webp" width="${image.w}" height="${image.h}" alt="${image.alt}" draggable="false" decoding="async"${dialect.img}</figure>`;
+};
+
+const field = (dialect, tabindex) => `<div ${dialect.cls}="field" role="application" ${tabindex} aria-label="${LABEL}">
+${Object.entries(LAYOUT)
+  .map(([depth, cards]) => `  <div ${dialect.cls}="layer" data-depth="${depth}">\n${cards.map((c) => `    ${card(dialect, c)}`).join('\n')}\n  </div>`)
+  .join('\n')}
+</div>`;
 
 const pad = (text, n) =>
   text
@@ -246,17 +259,21 @@ const pad = (text, n) =>
     .map((l) => (l ? ' '.repeat(n) + l : l))
     .join('\n');
 
+const ROOT = `class="fl-parallax-gallery" aria-label="Gallery" data-drift="${DRIFT}" data-inertia="${INERTIA}"`;
+const FIELD = pad(field(HTML_CARD, 'tabindex="0"'), 2).trimStart();
+const shell = (extra = '') => `<section ${ROOT}${extra}>\n  ${FIELD}\n</section>`;
+
 const boot = (typed) => `${ENGINE(typed)}
 
 document.querySelectorAll${typed ? '<HTMLElement>' : ''}('.fl-parallax-gallery:not([data-ready])').forEach((root) => {
   root.setAttribute('data-ready', '');
-  gallery(root, JSON.parse(root.dataset.images || '[]'));
+  gallery(root);
 });`;
 
 export const parallaxGallery = {
   id: 'parallax-gallery',
   name: 'Parallax gallery',
-  description: 'An endless field of image cards in columns at three depths that drift on their own and pan with drag, touch or arrow keys.',
+  description: 'An endless, airy field of image cards at three depths that drift on their own and pan with drag, touch or arrow keys.',
   category: 'section',
   tags: ['gallery', 'parallax', 'drag', 'animation'],
   tier: 'pro',
@@ -264,21 +281,17 @@ export const parallaxGallery = {
   mods: [],
   css,
   files: (C) => ({
-    html: `${shell(` data-images='[]'`)}\n\n<script>\n(() => {\n${pad(boot(false), 2)}\n})();\n</script>\n`,
-    astro: `---\nconst { images = [] } = Astro.props;\n---\n\n${shell(' data-images={JSON.stringify(images)}')}\n\n<script>\n${boot(true)}\n</script>\n\n<style is:global>\n${C}</style>\n`,
+    html: `${shell()}\n\n<script>\n(() => {\n${pad(boot(false), 2)}\n})();\n</script>\n`,
+    astro: `---\n---\n\n${shell()}\n\n<script>\n${boot(true)}\n</script>\n\n<style is:global>\n${C}</style>\n`,
     svelte: `<script lang="ts">
 ${pad(ENGINE(true), 2)}
 
-  let { images = [] }: { images?: GalleryImage[] } = $props();
-
   let root: HTMLElement;
 
-  $effect(() => gallery(root, images));
+  $effect(() => gallery(root));
 </script>
 
-<section class="fl-parallax-gallery" aria-label="Gallery" bind:this={root}>
-  ${FIELD}
-</section>
+${shell(' bind:this={root}')}
 
 <style>
   :global {
@@ -290,41 +303,37 @@ import './ParallaxGallery.css';
 
 ${ENGINE(true)}
 
-export function ParallaxGallery({ images = [] }: { images?: GalleryImage[] }) {
+export function ParallaxGallery() {
   const root = useRef<HTMLElement>(null);
 
-  useEffect(() => (root.current ? gallery(root.current, images) : undefined), [images]);
+  useEffect(() => (root.current ? gallery(root.current) : undefined), []);
 
   return (
-    <section ref={root} className="fl-parallax-gallery" aria-label="Gallery">
-      <div className="field" role="application" tabIndex={0} aria-label="Image gallery. Drag, swipe or use the arrow keys to move it."></div>
+    <section ref={root} className="fl-parallax-gallery" aria-label="Gallery" data-drift="${DRIFT}" data-inertia="${INERTIA}">
+${pad(field(JSX_CARD, 'tabIndex={0}'), 6)}
     </section>
   );
 }
 `,
     vue: `<script setup lang="ts">
-import { ref, watchEffect } from 'vue';
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 
 ${ENGINE(true)}
 
-const props = withDefaults(defineProps<{ images?: GalleryImage[] }>(), { images: () => [] });
-
 const root = ref<HTMLElement | null>(null);
+let stop = () => {};
 
-watchEffect(
-  (onCleanup) => {
-    if (root.value) {
-      onCleanup(gallery(root.value, props.images));
-    }
-  },
-  { flush: 'post' }
-);
+onMounted(() => {
+  if (root.value) {
+    stop = gallery(root.value);
+  }
+});
+
+onBeforeUnmount(() => stop());
 </script>
 
 <template>
-  <section ref="root" class="fl-parallax-gallery" aria-label="Gallery">
-    ${FIELD}
-  </section>
+${pad(shell(' ref="root"'), 2)}
 </template>
 
 <style>

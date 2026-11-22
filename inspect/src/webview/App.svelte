@@ -27,6 +27,7 @@
   import { FOLLOW, badgeText, reachItems, writeTarget } from './responsive';
   import { badgeOf } from './states';
   import Interactions from './Interactions.svelte';
+  import Attributes from './Attributes.svelte';
   import { wiringState } from './wiring-state.svelte';
   import ModeSwitch from './ModeSwitch.svelte';
   import FeegaMenu from './FeegaMenu.svelte';
@@ -1279,6 +1280,7 @@
             <button type="button" class:on={scope === Scope.Class} disabled={!picked.classCount || styling === Styling.Tailwind} onclick={() => (scope = Scope.Class)} title={styling === Styling.Tailwind ? 'Class scope needs CSS rules, not Tailwind' : `Every element with this class: ${picked.classCount}`}>All .{picked.classes.split(' ')[0] || 'class'}{picked.classCount ? ` (${picked.classCount})` : ''}</button>
           </div>
           <Properties pick={picked} {breakpoints} {palette} {elementState} {baseline} onstate={chooseState} onpreview={preview} onchange={change} onsavevar={saveVar} onhint={(h) => (hint = h)} onfont={pickFont} onfontreplace={replaceFont} onfontload={loadFont} onnotice={showToast} />
+          <Attributes pick={picked} />
           <PluginSections {plugins} {palette} />
           <Interactions pick={picked} {changes} />
         {:else}

@@ -1,7 +1,7 @@
 {
   "id": "parallax-gallery",
   "name": "Parallax gallery",
-  "description": "An endless field of image cards in columns at three depths that drift on their own and pan with drag, touch or arrow keys.",
+  "description": "An endless, airy field of image cards at three depths that drift on their own and pan with drag, touch or arrow keys.",
   "category": "section",
   "tags": [
     "gallery",

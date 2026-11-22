@@ -164,6 +164,7 @@ export enum ToHost {
   ImageUpload = 'image-upload',
   Wiring = 'wiring',
   Link = 'link',
+  Attribute = 'attribute',
   Go = 'go',
   Selected = 'selected',
   Copy = 'copy',
@@ -268,6 +269,7 @@ export type HostMessage =
   | { kind: ToHost.ImageUpload; name: string; data: string }
   | { kind: ToHost.Wiring; at: string; instance?: number }
   | { kind: ToHost.Link; at: string; edit: LinkEdit; instance?: number }
+  | { kind: ToHost.Attribute; at: string; name: string; value: string }
   | { kind: ToHost.Go; at: string; ask: GoAsk }
   | { kind: ToHost.Selected; at: Source | null }
   | { kind: ToHost.Copy; text: string }
