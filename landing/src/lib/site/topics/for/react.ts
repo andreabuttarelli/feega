@@ -1,4 +1,5 @@
 import { figure, type Topic } from '../topic';
+import { EditorShotId } from '../../editor-shots';
 import { CHECKED, DOCS, FEEGA_SOURCE, MARKETPLACE, img } from '../shared';
 
 export const REACT: Topic = {
@@ -15,7 +16,8 @@ export const REACT: Topic = {
       html: `<p>When you open a React project, Feega looks at <code>package.json</code> and the config files to work out how the app starts. For a Vite project (a plain <code>npm create vite</code> app, or React Router in framework mode) it starts Vite itself, with your own <code>vite.config</code> loaded as it is and one extra plugin placed first.</p>
 <p>That plugin reads every <code>.jsx</code> and <code>.tsx</code> file with the Babel parser and adds one attribute to each HTML element in the markup: <code>data-feega-src="src/Pricing.tsx:14:7"</code>. File, line, column. When you click a <code>&lt;button&gt;</code> on the page, Feega reads that attribute and knows which line of which file to change.</p>
 <p>Only lowercase tags get the attribute: <code>div</code>, <code>section</code>, <code>button</code>, <code>h1</code>. A component like <code>&lt;Card&gt;</code> is not an element in the browser, so it has no line of its own. The elements inside <code>Card.tsx</code> carry Card's lines instead. Click the title inside a card and you land in <code>Card.tsx</code>, on the <code>&lt;h3&gt;</code> that renders it.</p>
-<p>The attribute exists only in the dev server Feega runs. Nothing is added to your source files to make this work, and a production build never sees it.</p>`
+<p>The attribute exists only in the dev server Feega runs. Nothing is added to your source files to make this work, and a production build never sees it.</p>`,
+      editor: EditorShotId.React
     },
     {
       heading: 'What it writes: Tailwind classes or a CSS module',
@@ -73,5 +75,5 @@ export const REACT: Topic = {
     { label: 'React: rendering lists', href: 'https://react.dev/learn/rendering-lists' },
     { label: 'CSS Modules specification', href: 'https://github.com/css-modules/css-modules' }
   ],
-  readNext: ['/for/nextjs', '/for/tailwind', '/integrations/vscode', '/integrations/cursor', '/alternatives/onlook', '/download']
+  readNext: ['/for/nextjs', '/for/tailwind', '/integrations/vscode', '/templates/react', '/alternatives/onlook', '/download']
 };

@@ -6,9 +6,7 @@
     },
     "start": {
       "title": "Welcome",
-      "titlePlan": "Welcome",
-      "sub": "Create your account with an email and password.",
-      "subPlan": "Create your account with an email and password. You start on {plan}."
+      "sub": "Create your account with an email and password."
     },
     "signin": {
       "title": "Sign in",
@@ -85,15 +83,9 @@
   },
   "app": {
     "nav": {
-      "settings": "Settings",
-      "workspace": "Workspace",
-      "sectionAccount": "Account",
-      "sectionProject": "Project"
+      "settings": "Settings"
     },
     "settings": {
-      "team": {
-        "title": "Team"
-      },
       "save": "Save",
       "profile": {
         "title": "Profile",
@@ -123,31 +115,81 @@
         "deleteReauth": "For safety, sign in again (within the last 15 minutes) and retry.",
         "deleteTransfer": "You are the only owner of a workspace with other members. Make someone else owner, or remove the members, first."
       },
-      "appearance": {
-        "title": "Appearance"
-      },
-      "models": {
-        "title": "Models"
-      },
-      "fonts": {
-        "title": "Fonts"
-      },
-      "spend": {
-        "title": "Billing limits"
-      },
-      "apiKeys": {
-        "title": "API Keys"
-      },
-      "project": {
-        "title": "Project"
-      },
-      "content": {
-        "title": "Content policy"
+      "billing": {
+        "title": "Billing",
+        "subtitle": "Your plan, seats and invoices.",
+        "current": "current",
+        "editorFor": "The local editor, on your machine.",
+        "editorUnit": "forever",
+        "editorCta": "free for everyone",
+        "editorLine1": "VS Code, npx feega or desktop",
+        "editorLine2": "Unlimited edits, written to your source",
+        "editorLine3": "No account needed to edit",
+        "planFree": "Free editor",
+        "planCloud": "Feega Cloud",
+        "freeLine": "The local editor is free, for everyone, forever.",
+        "cloudLine": "Billed per editor seat. Viewers are always free.",
+        "statusActive": "active",
+        "statusPastDue": "payment failed",
+        "statusEnding": "ending",
+        "seatsPaid": "editor seats paid",
+        "editors": "editors in your team",
+        "viewersFree": "viewers are free",
+        "renews": "renews",
+        "endsOn": "ends",
+        "noRenewal": "no renewal",
+        "pastDueNote": "Your last payment failed. Update your card in manage billing to keep Cloud.",
+        "endingNote": "Cloud is canceled and stays on until the end of the period.",
+        "monthly": "monthly",
+        "annual": "annual",
+        "save": "save {percent}%",
+        "intervalLabel": "billing interval",
+        "perEditorMonth": "per editor / month",
+        "billedMonthly": "billed monthly",
+        "billedYearly": "billed {amount} per editor, yearly",
+        "upgrade": "upgrade to Cloud",
+        "upgrading": "opening Stripe…",
+        "manage": "manage billing",
+        "managing": "opening Stripe…",
+        "manageHint": "Invoices, card and cancel, on Stripe.",
+        "currentPlan": "current plan",
+        "seatsOfEditors": "seats paid / editors",
+        "perEditorBilledYearly": "per editor / month, billed yearly",
+        "perEditorBilledMonthly": "per editor / month, billed monthly",
+        "askOwner": "ask the owner to manage billing",
+        "downgrade": "downgrade to free",
+        "downgradeHint": "Opens Stripe. Cancel there and Cloud stays on until the end of the period.",
+        "ownerOnly": "Only the workspace owner can change billing. You can see the plan here.",
+        "cloudTitle": "Feega Cloud",
+        "cloudFor": "For teams that design together.",
+        "include1": "Shared sessions, one link to review live",
+        "include2": "Comments on elements, from your phone",
+        "include3": "MCP for agents",
+        "include4": "Unlimited viewers, free",
+        "faqTitle": "questions",
+        "faq1q": "Who pays?",
+        "faq1a": "Editors. Every owner, admin and member takes a seat.",
+        "faq2q": "Are viewers free?",
+        "faq2a": "Yes. Invite as many viewers as you want, they never take a seat.",
+        "faq3q": "Is the local editor free?",
+        "faq3a": "Yes. The VS Code extension and npx feega stay free.",
+        "faq4q": "Can I cancel?",
+        "faq4a": "Anytime, in manage billing. Cloud stays on until the end of the period you paid.",
+        "paid": "Payment received. Cloud turns on in a moment.",
+        "canceled": "Checkout canceled. Nothing was charged.",
+        "error": {
+          "not_owner": "Only the workspace owner can do this.",
+          "not_configured": "Cloud checkout is not open yet.",
+          "already_subscribed": "This workspace is already on Cloud. Use manage billing.",
+          "no_customer": "There is nothing to manage yet.",
+          "unavailable": "Stripe is unavailable. Try again in a minute."
+        }
       }
     },
     "account": {
       "settings": "Account",
-      "signOut": "Sign out"
+      "signOut": "Sign out",
+      "billing": "Billing"
     },
     "dashboard": {
       "greeting": "hi, {name}!",

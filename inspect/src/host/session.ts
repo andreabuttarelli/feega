@@ -1,7 +1,7 @@
 import { rm } from 'node:fs/promises';
-import { join, relative } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 import { appsIn } from '@feega/dev-run/run-plan';
-import { AddKind } from '@feega/live-edit/add-node';
+import { AddKind, type AddPlace } from '@feega/live-edit/add-node';
 import { liveAtOf } from '@feega/live-edit/live-ask';
 import { StructureOp } from '@feega/live-edit/structure';
 import { AccountState, ServerAction, ServerState, ToHost, ToView, type EditAsk, type HostMessage, type Pick, type Prefs, type ViewMessage } from '../messages';
@@ -12,7 +12,12 @@ import { currentIcon } from './icon-current';
 import { mcpIcon, searchIcons } from './icon-search';
 import { previewQueue } from './icon-previews';
 import { appOfSource, firstStampedFile, urlOf } from './attach-url';
+import { serverInfo } from './server-info';
 import { Attach, attachDev, factsOf, startDev, type Refused, type Running } from './dev-server';
+import { RestartWatch, Signal, Step } from './restart-watch';
+import { shownFor, watchServer } from './server-watch';
+import { commentsHost } from './comments';
+import { shareSession } from './share/share-session';
 import { copyImage } from './image-copy';
 import { fileEdits, type Snapshot, type Written } from './file-edits';
 import type { KeptServers } from './kept-servers';
@@ -24,7 +29,13 @@ import { themesOf } from './themes';
 import { usageSession } from './usage';
 import { selectionSync } from './selection-sync';
 import { wiringOf } from './wiring';
+import { entriesOf, insertAskOf } from './library';
+import { pluginCalls } from './plugin-calls';
+import { pluginsSession } from './plugins-session';
+import { dependenciesOf, offerInstall } from './install-offer';
+import { install } from './dev-server';
 
+const START_WITH_FEEGA = 'Start with Feega';
 const PICK_TIMEOUT_MS = 3000;
 const SYNC_SELECTION_DELAY_MS = 200;
 const LATER_EDITS = 'later edits depend on this change: undo them first';
@@ -108,7 +119,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     }
   }
 
-  async function imageAdded(at: string) {
+  async function imageAdded(at: string, place?: AddPlace) {
     const image = await platform.pickImage?.();
     if (!image) {
       return;
@@ -118,8 +129,56 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
       await post({ kind: ToView.Edited, ok: false, reason: copied.reason });
       return;
     }
-    await edits.structure({ op: StructureOp.Add, at, add: { kind: AddKind.Image, src: copied.url } }).then((out) => edited(out, null));
+    await edits.structure({ op: StructureOp.Add, at, add: { kind: AddKind.Image, src: copied.url, place } }).then((out) => edited(out, null));
   }
+
+  async function libraryShown() {
+    const catalog = (await platform.library?.()) ?? null;
+    await post({ kind: ToView.Library, items: catalog ? entriesOf(catalog) : [] });
+  }
+
+  async function libraryInserted(m: Extract<HostMessage, { kind: ToHost.LibraryInsert }>) {
+    const ask = insertAskOf((await platform.library?.()) ?? null, m.id);
+    const out: Written = ask.ok ? await edits.library(m.at, m.place, ask.item, ask.tokens) : ask;
+    await edited(out, null);
+  }
+
+  function installOffered(now: Running, packages: string[]) {
+    const { plan } = now;
+    const hooks = { log: (line: string) => platform.log(line), installing: () => undefined, spawned: () => undefined, signal: new AbortController().signal };
+    return offerInstall(
+      {
+        command: plan.install.join(' '),
+        confirm: (question, yes) => platform.confirm(question, yes),
+        install: () => install(join(root, plan.installDir), plan.install, hooks),
+        say: (text) => post({ kind: ToView.Status, text })
+      },
+      packages
+    );
+  }
+
+  const pluginRun = pluginCalls({
+    get root() {
+      return root;
+    },
+    appDir: () => running?.plan.appDir ?? '',
+    propose: async (proposal, appDir) => {
+      const out = await edits.proposal(proposal, appDir).then((written) => edited(written, null));
+      const packages = dependenciesOf(proposal);
+      if (out.ok && packages.length && running) {
+        void installOffered(running, packages);
+      }
+      return out;
+    },
+    fetch
+  });
+
+  const pluginList = platform.plugins
+    ? pluginsSession({ host: { root: platform.plugins.root, dev: () => platform.plugins!.dev().map((folder) => resolve(root, folder)) }, post, notify: platform.notify })
+    : null;
+
+  const comments = commentsHost(platform.cloud, post);
+  const sharing = shareSession({ platform, workspace, appUrl: () => running?.url ?? null, post });
 
   const postAccount = (state: AccountState, email?: string) => post({ kind: ToView.Account, state, email });
 
@@ -193,7 +252,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   const keptMinutes = () => Number(platform.settings()[SettingKey.KeepServerAlive]) || 0;
 
   function infoOf(now: Running) {
-    return { keptMinutes: kept ? keptMinutes() : 0, url: now.url, framework: now.plan.framework, command: now.command, pid: now.pid, port: Number(new URL(now.url).port), attached: now.attached, startedAt, lastError };
+    return serverInfo({ url: now.url, framework: now.plan.framework, command: now.command, pid: now.pid, attached: now.attached }, { keptMinutes: kept ? keptMinutes() : 0, startedAt, lastError });
   }
 
   function logLine(line: string) {
@@ -228,6 +287,15 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     return picked;
   }
 
+  const restarts = new RestartWatch();
+
+  function carryOut(step: Step, started: Running) {
+    shownFor(step, infoOf(started), lastError).forEach(post);
+    if (step === Step.Respawn) {
+      void startServer();
+    }
+  }
+
   function adopt(started: Running, current: () => boolean) {
     running = started;
     started.exited(() => {
@@ -235,9 +303,10 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
         forget(pids, started.pid);
       }
       if (current() && running === started) {
-        post({ kind: ToView.Server, state: ServerState.Stopped, reason: lastError || 'the dev server exited', info: infoOf(started) });
+        carryOut(restarts.feed(Signal.Exited, Date.now()), started);
       }
     });
+    void watchServer({ started, restarts, current: () => current() && running === started, act: (step) => carryOut(step, started) });
   }
 
   async function startServer(attach = Attach.IfRunning): Promise<Running | Refused> {
@@ -259,6 +328,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
       log: logLine,
       installing: (dir: string) => current() && post({ kind: ToView.Server, state: ServerState.Installing, reason: `Installing dependencies for ${dir} (first run)…` }),
       spawned: (pid: number) => remember(pids, pid, root),
+      declined: (text: string) => void platform.warn(text),
       signal
     };
     const started = await startDev(workspace, platform.launcher, hooks, String(platform.settings()[SettingKey.DevCommand]), attach, app);
@@ -310,6 +380,10 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     const started = await attachDev(workspace, platform.launcher, url, app);
     if (starts !== mine) {
       return started;
+    }
+    if ('refused' in started && started.attachRefused) {
+      refuse(started.refused);
+      return (await platform.warn(started.refused, START_WITH_FEEGA)) ? startServer(Attach.Never) : started;
     }
     if ('refused' in started) {
       return refuse(started.refused);
@@ -377,7 +451,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   };
 
   const handlers: { [K in ToHost]: (m: Extract<HostMessage, { kind: K }>) => unknown } = {
-    [ToHost.Ready]: () => (showApp(), postSettings(), postHistory(), showAccount(), showOnboarding()),
+    [ToHost.Ready]: () => (showApp(), postSettings(), postHistory(), showAccount(), showOnboarding(), comments.show(), sharing.show(), pluginList?.show()),
     [ToHost.Edit]: (m) => edit(m.ask),
     [ToHost.Undo]: undo,
     [ToHost.Open]: (m) => platform.openSource(root, m.at),
@@ -388,12 +462,15 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.Server]: (m) => SERVER_ACTIONS[m.action](),
     [ToHost.SaveVariable]: (m) => edits.saveVariable(m.ask, m.name).then((out) => edited(out, m.ask)),
     [ToHost.Font]: (m) => edits.font(m.ask, m.google).then((out) => edited(out, m.ask)),
+    [ToHost.FontReplace]: (m) => edits.replaceFont(m.from, m.to, m.google).then((out) => edited(out, null)),
+    [ToHost.FontLoad]: (m) => edits.loadFont(m.family).then((out) => edited(out, null)),
     [ToHost.Redo]: () => edits.redo().then((out) => edited(out, null)),
     [ToHost.Revert]: (m) => revert(m.id),
     [ToHost.Diff]: (m) => showDiff(m.id),
     [ToHost.SourceControl]: () => platform.sourceControl(),
     [ToHost.Move]: (m) => edits.move(m.from, m.to, m.place).then((out) => edited(out, null)),
-    [ToHost.AddImage]: (m) => imageAdded(m.at),
+    [ToHost.StructureMany]: (m) => edits.structureMany(m).then((out) => edited(out, null)),
+    [ToHost.AddImage]: (m) => imageAdded(m.at, m.place),
     [ToHost.Structure]: (m) => edits.structure(m).then((out) => edited(out, null)),
     [ToHost.Setting]: (m) => platform.setSetting(m.key, m.value).then(postSettings),
     [ToHost.AttachUrl]: (m) => attachUrl(m.url),
@@ -413,7 +490,20 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.Link]: (m) => edits.link(m.at, m.edit, m.instance).then((out) => edited(out, null)),
     [ToHost.Go]: (m) => edits.go(m.at, m.ask).then((out) => edited(out, null)),
     [ToHost.Selected]: (m) => syncSelection(m.at),
-    [ToHost.Copy]: (m) => platform.copyText?.(m.text)
+    [ToHost.Copy]: (m) => platform.copyText?.(m.text),
+    [ToHost.Comments]: comments.show,
+    [ToHost.CommentAdd]: (m) => comments.add(m.draft),
+    [ToHost.CommentResolve]: (m) => comments.resolve(m.id),
+    [ToHost.ShareStart]: (m) => sharing.start(m.name, m.canEdit),
+    [ToHost.ShareStop]: sharing.stop,
+    [ToHost.ShareKick]: (m) => sharing.kick(m.userId),
+    [ToHost.ShareRole]: (m) => sharing.setRole(m.userId, m.role),
+    [ToHost.LibraryList]: libraryShown,
+    [ToHost.LibraryInsert]: libraryInserted,
+    [ToHost.Plugin]: async (m) => post({ kind: ToView.Plugin, id: m.id, result: await pluginRun(m.ask) }),
+    [ToHost.PluginEnable]: (m) => pluginList?.enable(m.id, m.enabled),
+    [ToHost.PluginRemove]: (m) => pluginList?.remove(m.id),
+    [ToHost.PluginInstall]: (m) => pluginList?.install(m.source)
   };
 
   platform.receive((message) => (handlers[message.kind] as (m: HostMessage) => unknown)(message));
@@ -440,15 +530,18 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     start: () => startServer(),
     attachUrl,
     addPlugin: installPlugin,
-    stop: () => {
+    stop: async () => {
       close();
-      return usage?.end() ?? Promise.resolve();
+      pluginList?.stop();
+      await sharing.stop();
+      await usage?.end();
     },
     usageChanged: () => usage?.recheck(),
     url: () => running?.url ?? null,
     showApp,
     showRoute,
     settingsChanged: postSettings,
+    pluginsChanged: () => pluginList?.restart(),
     pick,
     edit,
     undo,

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { agentContext, type AgentView } from './agent-context';
+import { agentContext, agentContexts, commentContext, type AgentView } from './agent-context';
+import type { CloudComment } from '../host/cloud-api';
 import type { Pick } from '../messages';
 
 const pick = { source: { file: 'src/Hero.tsx', line: 12, col: 5 }, component: { file: 'src/Page.tsx', line: 4, col: 3 }, tag: 'button', classes: 'btn  primary ', instanceIndex: 0, instances: 1, ownText: true } as Pick;
@@ -18,5 +19,36 @@ describe('agentContext', () => {
 
   it('con piu istanze dice quale', () => {
     expect(agentContext({ ...pick, instances: 3, instanceIndex: 1 } as Pick, { route: '/', width: 800 })).toContain('instance: 2 of 3');
+  });
+});
+
+describe('agentContexts', () => {
+  const other = { ...pick, source: { file: 'src/Hero.tsx', line: 20, col: 5 }, tag: 'a', classes: 'link' } as Pick;
+
+  it('is the plain block for one element', () => {
+    expect(agentContexts([pick], view)).toBe(agentContext(pick, view));
+  });
+
+  it('puts every selected element in one block, numbered, with the view said once', () => {
+    const text = agentContexts([pick, other], view);
+
+    expect(text.split('\n')[0]).toBe('Feega selection: 2 elements');
+    expect(text).toContain('1. source: src/Hero.tsx:12:5');
+    expect(text).toContain('2. source: src/Hero.tsx:20:5');
+    expect(text.match(/page: \/pricing/g)).toHaveLength(1);
+  });
+});
+
+describe('commentContext', () => {
+  const comment = { id: 'c1', authorName: 'Ada', body: 'Tighter padding', selector: 'div.card', sourceFile: 'src/Card.svelte', sourceLine: 4, sourceCol: 2 } as CloudComment;
+
+  it('dice chi, cosa, file:line:col e selettore', () => {
+    expect(commentContext(comment)).toBe(['Feega comment', 'author: Ada', 'comment: Tighter padding', 'source: src/Card.svelte:4:2', 'selector: div.card'].join('\n'));
+  });
+
+  it('porta le risposte dopo il commento', () => {
+    const reply = { authorName: 'Bob', body: 'Agreed' } as CloudComment;
+
+    expect(commentContext(comment, [reply])).toContain('comment: Tighter padding\nreply from Bob: Agreed\nsource:');
   });
 });

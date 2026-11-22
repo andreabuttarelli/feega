@@ -1,0 +1,12 @@
+{
+  "name": "@feega/plugin-api",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "build:sdk": "node build-sdk.mjs"
+  },
+  "exports": {
+    "./*": "./src/*.ts"
+  }
+}

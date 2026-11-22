@@ -1,5 +1,5 @@
 import { VisualKind, table, type Rich } from '../alternative';
-import { BUTTON_DIFF, EDITOR_VISUAL, OWN_STEPS } from './shared';
+import { BUTTON_DIFF, EDITOR_VISUAL, OWN_STEPS, PROPERTIES_VISUAL } from './shared';
 
 export const ONLOOK: Rich = {
   verdict:
@@ -24,8 +24,8 @@ export const ONLOOK: Rich = {
         'Onlook runs your dev server for you inside its own app. That is a clean experience, and it means your editor and your visual tool are two windows, possibly two views of the same folder.',
         'Feega sits inside the editor. The tool and the code are in one window, so the file you are changing is one tab away.'
       ],
-      visual: EDITOR_VISUAL,
-      caption: 'Feega as a panel inside VS Code.'
+      visual: PROPERTIES_VISUAL,
+      caption: 'Feega as a panel in your editor, with the Properties bar for the selected element.'
     },
     {
       heading: 'Pull requests are Onlook’s strength',
@@ -63,7 +63,7 @@ export const ONLOOK: Rich = {
   moreQuestions: [
     { q: 'Which one is more mature?', a: 'We make Feega, so we are not the right judge. Look at both repositories’ activity and try each on your project.' },
     { q: 'Can I use both on one project?', a: 'Both edit source files, so they can coexist. Commit between sessions to keep diffs easy to read.' },
-    { q: 'Does Feega support Storybook or shadcn/ui?', a: 'Onlook lists support for both. Feega works on your running app with SvelteKit, React, Next.js or Vue; we make no claim about Storybook.' },
+    { q: 'Does Feega support Storybook or shadcn/ui?', a: 'Onlook lists support for both. Feega works on your running app with SvelteKit, React, Next.js, Vue, Nuxt, React Router, Astro or Vite; we make no claim about Storybook.' },
     { q: 'Does Feega need an account?', a: 'No. It sends nothing and runs locally.' }
   ]
 };

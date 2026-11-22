@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CHANGELOG_PAGE_SIZE, changelogPage, changelogPageCount, changelogPagePath } from './changelog-pages';
+import { CHANGELOG_PAGE_SIZE, changelogByDate, changelogPage, changelogPageCount, changelogPagePath } from './changelog-pages';
 
 const entries = Array.from({ length: CHANGELOG_PAGE_SIZE * 2 + 5 }, (_, i) => ({ date: '2026-11-18', title: `entry ${i}`, items: [] }));
 
@@ -16,5 +16,17 @@ describe('changelog pages', () => {
 
   it('names each later page by its number', () => {
     expect(changelogPagePath(2)).toBe('/changelog/page/2.json');
+  });
+
+  it('groups the items of one date under one heading', () => {
+    const dated = [
+      { date: '2026-11-22', title: 'a', items: ['one'] },
+      { date: '2026-11-22', title: 'b', items: ['two'] },
+      { date: '2026-11-19', title: 'c', items: ['three'] }
+    ];
+    expect(changelogByDate(dated)).toEqual([
+      { date: '2026-11-22', items: ['one', 'two'] },
+      { date: '2026-11-19', items: ['three'] }
+    ]);
   });
 });

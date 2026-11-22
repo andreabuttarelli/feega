@@ -41,7 +41,7 @@ const FOUNDER = {
   worksFor: { '@type': 'Organization', name: 'Feega', url: SITE }
 };
 
-const script = (data: object) => `<script type="application/ld+json">${JSON.stringify(data)}</` + 'script>';
+export const script = (data: object) => `<script type="application/ld+json">${JSON.stringify(data)}</` + 'script>';
 
 export const faqJsonLd = (items: readonly { q: string; a: string }[]) =>
   script({
@@ -60,6 +60,19 @@ export const breadcrumbJsonLd = (trail: readonly Crumb[]) =>
   });
 
 export const HOME_JSON_LD = [ORGANIZATION, APPLICATION, FOUNDER].map(script).join('') + faqJsonLd(FAQ);
+
+export const altLandingJsonLd = (page: { name: string; description: string; path: string; faq: readonly { q: string; a: string }[] }) =>
+  script({
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    name: page.name,
+    description: page.description,
+    url: `${SITE}${page.path.slice(1)}`,
+    isPartOf: { '@type': 'WebSite', name: 'Feega', url: SITE },
+    about: { '@type': 'SoftwareApplication', name: 'Feega', url: SITE }
+  }) +
+  script(APPLICATION) +
+  faqJsonLd(page.faq);
 
 export const articleJsonLd = (article: { title: string; description: string; path: string; checked: string }) =>
   script({

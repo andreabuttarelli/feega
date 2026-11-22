@@ -1,8 +1,10 @@
 import { ArticleKind, type Article } from './alternative';
+import { FRAMER_ARTICLE, HUB_CHECKED, LOVABLE_SECTIONS } from './hubs';
 
 const CHECKED = '2026-11-18';
 
 export const SINGLES: Readonly<Record<string, Article>> = {
+  'framer': FRAMER_ARTICLE,
   'claude-design': {
     kind: ArticleKind.Single,
     title: 'Claude Design alternatives when the code already exists | Feega',
@@ -185,20 +187,25 @@ export const SINGLES: Readonly<Record<string, Article>> = {
       {
         heading: 'Lovable does not open your repo',
         html: '<p>Its GitHub sync always creates a new repository. To start from yours, you upload a ZIP. Its commits are authored by <code>lovable-dev[bot]</code>.</p>'
-      }
+      },
+      ...LOVABLE_SECTIONS
     ],
     mistakes: [
       { q: 'Uploading your app to edit a page.', a: 'You now have two copies to keep in step.' },
-      { q: 'Counting only the monthly price.', a: 'Credits run per build; check how many your edits take.' }
+      { q: 'Counting only the monthly price.', a: 'Credits run per build; check how many your edits take.' },
+      { q: 'Forgetting the branch.', a: 'Lovable syncs one branch at a time, so push to the branch it watches if you want a change back in Lovable.' }
     ],
     questions: [
       { q: 'What does Lovable cost?', a: 'Free has 5 build credits a day; Pro is $25 a month.' },
-      { q: 'Can Lovable push to my existing GitHub repo?', a: 'Not directly; sync creates a new repository.' }
+      { q: 'Can Lovable push to my existing GitHub repo?', a: 'Not directly; sync creates a new repository.' },
+      { q: 'Can I use Claude Code, Codex or Cursor on a Lovable project?', a: 'Lovable says you can clone the synced repository and work in your own IDE. Feega edits the same files by hand, so the agent and Feega share one repo.' },
+      { q: 'Does Feega replace Lovable?', a: 'Only for projects that already live in code. It has no prompt-to-app builder and no hosting.' }
     ],
     sources: [
       { label: 'Lovable GitHub integration', href: 'https://docs.lovable.dev/integrations/github' },
-      { label: 'Lovable plans', href: 'https://docs.lovable.dev/introduction/subscription-plans' }
+      { label: 'Lovable plans', href: 'https://docs.lovable.dev/introduction/subscription-plans' },
+      { label: 'Feega docs: use Feega with AI agents', href: 'https://docs.feega.app/more/ai-agents/' }
     ],
-    checked: CHECKED
+    checked: HUB_CHECKED
   }
 };

@@ -1,4 +1,5 @@
 import { figure, type Topic } from '../topic';
+import { EditorShotId } from '../../editor-shots';
 import { CHECKED, DOCS, FEEGA_SOURCE, OPEN_VSX, img } from '../shared';
 
 export const CURSOR: Topic = {
@@ -20,7 +21,7 @@ export const CURSOR: Topic = {
       html: `<p>Cursor's agent is good at work that needs reading: wiring a form, writing a hook, refactoring a component. It is a slow way to move a button eight pixels. You describe the change, wait for a plan and a diff, look at the page, and often go round again because "a bit more space" means different things to you and to the model. Each round costs tokens.</p>
 <p>Feega handles that last part by hand. You click the button in the running app, drag the padding until it looks right, and the class or CSS rule changes in the file. No prompt and no request to a model, so it costs nothing per edit. You keep the agent for the work it is good at and stop paying it to nudge spacing.</p>
 <p>A common pattern is to let the agent build a page from a description, then open Feega and do the design pass yourself: spacing, type sizes, colours, radius, alignment at phone width.</p>`,
-      figure: figure(img('integrations', 'cursor-window'), 'A stylised Cursor-like window: an agent chat column on the left, the running app in the middle with a card selected in orange, and the Feega properties bar on the right showing padding 24')
+      editor: EditorShotId.Overview
     },
     {
       heading: 'How Feega and the agent share files',
@@ -40,7 +41,7 @@ export const CURSOR: Topic = {
     {
       heading: 'Known limits',
       html: `<p>Cursor gets extensions from Open VSX, so a new Feega version shows up there when we publish it to Open VSX. Users have reported Cursor's copy of the registry lagging behind Open VSX for a while. If Cursor offers an older version than the <a href="/download">download page</a> lists, wait or install the <code>.vsix</code> from Open VSX.</p>
-<p>Click-to-source is verified on React and Vue with Vite, SvelteKit and Next.js. Class names built with <code>cn()</code> or <code>clsx()</code>, which AI-written code uses a lot, are not rewritten: Feega stops and shows the line. Remote and container setups are untested.</p>
+<p>Click-to-source is verified on React and Vue with Vite, SvelteKit, Next.js, Nuxt, React Router and Astro, and on Vite without a framework. Astro and Nuxt need Feega to start the dev server. Angular, plain HTML without Vite and Create React App are not supported. Class names built with <code>cn()</code> or <code>clsx()</code>, which AI-written code uses a lot, are not rewritten: Feega stops and shows the line. Remote and container setups are untested.</p>
 <p>Cursor also has visual features of its own. We compared them in <a href="/alternatives/cursor-design-mode">Cursor design mode alternatives</a>. This page covers running Feega inside Cursor.</p>`
     }
   ],

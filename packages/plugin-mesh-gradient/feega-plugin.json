@@ -1,0 +1,10 @@
+{
+  "id": "feega.mesh-gradient",
+  "name": "Mesh gradient",
+  "version": "1.0.0",
+  "permissions": ["selection", "edit.style"],
+  "contributions": {
+    "rightBar": [{ "id": "mesh", "title": "Mesh gradient", "when": ["!attribute:data-feega-scene"] }],
+    "overlay": [{ "id": "points", "when": ["!attribute:data-feega-scene"] }]
+  }
+}

@@ -1,4 +1,6 @@
 import { ArticleKind, type Article } from './alternative';
+import { AGENT_ARTICLES } from './agents';
+import { EXTRAS } from './extras';
 import { ROUNDUPS } from './roundups';
 import { RICH } from './rich';
 import { SINGLES } from './singles';
@@ -15,7 +17,8 @@ export const ALTERNATIVES_INDEX = {
 export const KIND_HEADINGS: Readonly<Record<ArticleKind, string>> = {
   [ArticleKind.Roundup]: 'Side by side',
   [ArticleKind.UseCase]: 'Situations',
-  [ArticleKind.Single]: 'Alternatives to one tool'
+  [ArticleKind.Single]: 'Alternatives to one tool',
+  [ArticleKind.Agent]: 'Alternatives for your coding agent'
 };
 
 export const TRY_STEPS: readonly string[] = [
@@ -26,12 +29,25 @@ export const TRY_STEPS: readonly string[] = [
 ];
 
 const withRich = ([slug, article]: [string, Article]): [string, Article] => {
-  const rich = RICH[slug];
+  const base = RICH[slug];
+  const extras = EXTRAS[slug];
+  const rich = base && extras ? { ...base, takeaways: extras.takeaways, tables: extras.tables, hero: extras.hero } : base;
+  const kept = article.sections.filter((s) => !rich?.highlights.some((h) => h.heading === s.heading));
+  const known = new Set(article.sources.map((s) => s.href));
 
-  return [slug, { ...article, rich, sections: article.sections.filter((s) => !rich?.highlights.some((h) => h.heading === s.heading)), questions: [...article.questions, ...(rich?.moreQuestions ?? [])] }];
+  return [
+    slug,
+    {
+      ...article,
+      rich,
+      sections: [...kept, ...(extras?.sections ?? [])],
+      questions: [...article.questions, ...(rich?.moreQuestions ?? [])],
+      sources: [...article.sources, ...(extras?.sources.filter((s) => !known.has(s.href)) ?? [])]
+    }
+  ];
 };
 
-export const ALTERNATIVES: Readonly<Record<string, Article>> = Object.fromEntries(Object.entries({ ...ROUNDUPS, ...SINGLES }).map(withRich));
+export const ALTERNATIVES: Readonly<Record<string, Article>> = Object.fromEntries(Object.entries({ ...ROUNDUPS, ...SINGLES, ...AGENT_ARTICLES }).map(withRich));
 
 export const alternativePath = (slug: string) => `${ALTERNATIVES_PATH}/${slug}`;
 

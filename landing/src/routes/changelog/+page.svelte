@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { changelogPagePath, type ChangelogEntry } from '$lib/site/changelog-pages';
+  import { changelogByDate, changelogPagePath, type ChangelogEntry } from '$lib/site/changelog-pages';
 
   const AHEAD_PX = 800;
 
@@ -11,7 +11,7 @@
   let failed = $state(false);
   let sentinel = $state<HTMLElement | null>(null);
 
-  const entries = $derived([...data.entries, ...shown]);
+  const days = $derived(changelogByDate([...data.entries, ...shown]));
   const more = $derived(page < data.pages);
 
   async function loadMore() {
@@ -57,17 +57,14 @@
     <h1>What changed in Feega</h1>
   </header>
 
-  {#each entries as entry}
+  {#each days as day}
     <article>
-      <time datetime={entry.date}>{entry.date}</time>
-      <div>
-        <h2>{entry.title}</h2>
-        <ul>
-          {#each entry.items as item}
-            <li>{item}</li>
-          {/each}
-        </ul>
-      </div>
+      <h2><time datetime={day.date}>{day.date}</time></h2>
+      <ul>
+        {#each day.items as item}
+          <li>{item}</li>
+        {/each}
+      </ul>
     </article>
   {/each}
 
@@ -108,13 +105,11 @@
     padding: 28px 0;
     border-top: 1px solid var(--site-line);
   }
-  time {
-    font-size: var(--site-text);
-    opacity: 0.6;
-  }
   h2 {
-    font-size: 20px;
-    margin: 0 0 12px;
+    font-size: var(--site-text);
+    font-weight: 500;
+    margin: 0;
+    opacity: 0.6;
   }
   ul {
     margin: 0;

@@ -1,0 +1,36 @@
+{
+  "id": "stats-band",
+  "name": "Stats band",
+  "description": "Four big numbers with labels in a single band; numbers are placeholders.",
+  "category": "section",
+  "tags": [
+    "stats",
+    "numbers",
+    "social-proof"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    },
+    {
+      "family": "Fragment Mono",
+      "weights": [
+        400
+      ]
+    }
+  ],
+  "tier": "free"
+}

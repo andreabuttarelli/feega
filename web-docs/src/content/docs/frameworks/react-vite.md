@@ -17,3 +17,7 @@ sidebar:
 - Class names built by an expression (`cn()`, `clsx()`, template strings) are not written.
 - Items rendered by `.map` share one source line and cannot be moved one by one.
 - Layers fills in after the first hot update.
+
+## Free templates
+
+Free sections and UI components to start from, in React: [Feega templates](https://www.feega.app/templates/react).

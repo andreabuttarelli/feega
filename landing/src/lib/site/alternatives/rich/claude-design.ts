@@ -1,5 +1,5 @@
 import { VisualKind, table, type Rich } from '../alternative';
-import { BUTTON_DIFF, EDITOR_VISUAL, OWN_STEPS } from './shared';
+import { BUTTON_DIFF, EDITOR_VISUAL, OWN_STEPS, PROPERTIES_VISUAL } from './shared';
 
 export const CLAUDE_DESIGN: Rich = {
   verdict:
@@ -46,8 +46,8 @@ export const CLAUDE_DESIGN: Rich = {
         'Feega has no model, so there are no tokens to spend and no output that varies from run to run. The same click on the same element writes the same line.',
         'That also means Feega has nothing to say about what a design should be. It will not propose a layout. If you want ideas, Claude Design is the better tool, and nothing stops you using both on the same project.'
       ],
-      visual: EDITOR_VISUAL,
-      caption: 'The Feega editor inside VS Code: layers, the live page and the Properties bar.'
+      visual: PROPERTIES_VISUAL,
+      caption: 'The Feega editor: layers, the live page and the Properties bar.'
     }
   ],
   cost: {
@@ -64,6 +64,6 @@ export const CLAUDE_DESIGN: Rich = {
     { q: 'Do I have to choose between them?', a: 'No. Claude Design makes new designs; Feega edits the app that exists. They touch different files at different moments, so they sit side by side.' },
     { q: 'What happens to the standalone Claude Design site?', a: 'According to Anthropic’s pages as we read them, claude.ai/design closes on 14 December 2026 and the product moves into Claude Code.' },
     { q: 'Does Feega need an internet connection or an account?', a: 'No account. It runs your dev server locally and edits local files.' },
-    { q: 'Which frameworks does Feega work with?', a: 'SvelteKit, React, Next.js and Vue, with plain CSS or Tailwind.' }
+    { q: 'Which frameworks does Feega work with?', a: 'SvelteKit, React, Next.js, Vue, Nuxt, React Router, Astro and Vite, with plain CSS or Tailwind.' }
   ]
 };

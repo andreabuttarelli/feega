@@ -334,8 +334,11 @@
   list-style: decimal;
 }
 
-.catalog .compare .vis.editor {
-  pointer-events: none;
+.catalog .compare .vis.editor img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--sx-radius-lg);
 }
 
 .catalog .compare .split {
@@ -461,4 +464,95 @@
 
 .catalog .compare code {
   overflow-wrap: anywhere;
+}
+
+.catalog .compare .table table {
+  min-width: 560px;
+}
+
+.catalog .compare .with-icon {
+  display: flex;
+  align-items: center;
+  gap: var(--sx-s3);
+}
+
+.catalog .compare .pixel {
+  flex: none;
+}
+
+.catalog .compare .takeaways {
+  margin-top: var(--sx-s7);
+  padding: var(--sx-s6);
+  border: 1px solid var(--sx-line);
+  border-radius: var(--sx-radius-lg);
+}
+
+.catalog .compare .takeaways ul {
+  margin-top: var(--sx-s4);
+  padding-left: var(--sx-s5);
+}
+
+.catalog .compare .callout {
+  display: flex;
+  gap: var(--sx-s4);
+  align-items: flex-start;
+  margin-top: var(--sx-s6);
+  padding: var(--sx-s5);
+  border-left: 3px solid var(--sx-accent);
+  border-radius: var(--sx-radius-lg);
+  background: var(--sx-tint-accent);
+}
+
+.catalog .compare .callout.warning {
+  border-left-color: #ff8a3d;
+}
+
+.catalog .compare .callout.note {
+  border-left-color: #004dff;
+}
+
+.catalog .compare .callout strong {
+  color: #fff;
+}
+
+.catalog .compare .callout p {
+  margin-top: var(--sx-s2);
+}
+
+.catalog .compare .cta-block {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sx-s4);
+  margin-top: var(--sx-s6);
+  padding: var(--sx-s5);
+  border: 1px solid var(--sx-line);
+  border-radius: var(--sx-radius-lg);
+}
+
+.catalog .compare .cta-block p {
+  flex: 1 1 240px;
+  margin: 0;
+  color: var(--sx-ink);
+}
+
+.catalog .compare .shot {
+  margin: var(--sx-s6) 0 0;
+}
+
+.catalog .compare .shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--sx-radius-lg);
+}
+
+.catalog .compare .shot figcaption {
+  margin-top: var(--sx-s3);
+  color: var(--sx-ink-3);
+  font-size: var(--sx-fs-small);
+}
+
+.catalog .compare .shot.tall {
+  max-width: 360px;
 }

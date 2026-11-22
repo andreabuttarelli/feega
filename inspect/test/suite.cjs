@@ -20,7 +20,7 @@ async function until(check) {
 
 exports.run = async () => {
   const root = process.env.INSPECT_TEST_DIR;
-  const ext = vscode.extensions.getExtension('AndreaButtarelli.feega-inspect');
+  const ext = vscode.extensions.getExtension('andreabuttarelli.feega');
   const api = await ext.activate();
   await vscode.commands.executeCommand('feegaInspect.open');
 

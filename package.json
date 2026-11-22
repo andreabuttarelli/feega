@@ -20,7 +20,6 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.16",
-    "@internationalized/date": "^3.12.0",
     "@lucide/svelte": "^1.21.0",
     "@playwright/test": "^1.65.1",
     "@sveltejs/adapter-vercel": "^5.5.0",
@@ -40,6 +39,7 @@
   },
   "dependencies": {
     "@microsoft/clarity": "^1.0.2",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@sentry/sveltekit": "^10",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.46.1",

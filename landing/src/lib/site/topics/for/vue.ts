@@ -1,4 +1,5 @@
 import { figure, type Topic } from '../topic';
+import { EditorShotId } from '../../editor-shots';
 import { CHECKED, DOCS, FEEGA_SOURCE, OPEN_VSX, img } from '../shared';
 
 export const VUE: Topic = {
@@ -14,7 +15,8 @@ export const VUE: Topic = {
       heading: 'How Feega maps a click to a .vue line',
       html: `<p>For a Vue project on Vite, the kind <code>npm create vue</code> gives you, Feega starts Vite itself with your <code>vite.config</code> loaded unchanged and its own source plugin placed first. The plugin reads the template of each single-file component with <code>@vue/compiler-sfc</code>, the same parser Vue uses, and adds <code>data-feega-src="src/components/PricingCard.vue:4:5"</code> to each plain HTML element.</p>
 <p>Components in the template, like <code>&lt;RouterLink&gt;</code> or <code>&lt;PricingCard&gt;</code>, are not tagged. The elements inside <code>PricingCard.vue</code> are, with that file's lines. A click on a card title goes to the <code>&lt;h3&gt;</code> in the card component, which is where its look is defined. Every card in the app shares that line, so they change together.</p>
-<p>The tags live only in the dev server Feega runs. Your files and your build don't get them.</p>`
+<p>The tags live only in the dev server Feega runs. Your files and your build don't get them.</p>`,
+      editor: EditorShotId.Vue
     },
     {
       heading: 'What it writes in a single-file component',
@@ -32,7 +34,8 @@ export const VUE: Topic = {
     },
     {
       heading: 'What about Nuxt?',
-      html: `<p>Feega recognises Nuxt and starts <code>nuxt dev</code> for you, so the preview opens. In version 0.2.2 it does not add the source plugin to Nuxt's build, which means clicks don't map to lines there yet. We won't claim Nuxt support until they do. If you want Feega on a Nuxt app today, it can show the page; editing needs a plain Vue and Vite project.</p>`
+      html: `<p>Nuxt 4 works. Feega starts <code>nuxt dev</code> itself and adds the source plugin to Nuxt's build, so a click on the page maps to the line in <code>app.vue</code> or the component that renders it. Attaching to a Nuxt server you started yourself does not map elements, so let Feega start it.</p>`,
+      editor: EditorShotId.Nuxt
     },
     {
       heading: 'Preprocessors, page styles and widths',
@@ -45,7 +48,7 @@ export const VUE: Topic = {
     }
   ],
   checked: CHECKED,
-  howChecked: `<p>We make Feega, so take this as the maker's account. On 19 November 2026 we read the Feega 0.2.2 code for Vue: the template tagger built on <code>@vue/compiler-sfc</code>, the style-block writer and the start-up rules that decide how each framework is launched, which is where the Nuxt gap shows. Every behaviour described comes from that code and its tests. We did not test Vue 2, Nuxt editing, or <code>&lt;style module&gt;</code>.</p>`,
+  howChecked: `<p>We make Feega, so take this as the maker's account. On 19 November 2026 we read the Feega 0.2.2 code for Vue: the template tagger built on <code>@vue/compiler-sfc</code>, the style-block writer and the start-up rules that decide how each framework is launched, Every behaviour described comes from that code and its tests. We did not test Vue 2 or <code>&lt;style module&gt;</code>.</p>`,
   tryIt: [
     'Install Feega from Open VSX or the Visual Studio Marketplace, or run npx feega in the Vue project.',
     'Run "Feega: Open from current workspace". Feega starts Vite and opens the app next to your code.',
@@ -55,12 +58,12 @@ export const VUE: Topic = {
   mistakes: [
     { q: 'Expecting a :class binding to be edited.', a: 'Bindings are code. Feega edits the static class attribute, which Vue merges with the binding.' },
     { q: 'Assuming the new <style> block is scoped.', a: 'A block Feega creates is plain <style>. Add scoped if you want it.' },
-    { q: 'Trying it on Nuxt and getting no edits.', a: 'Nuxt opens but is not mapped to source in 0.2.2. Use a Vue and Vite project.' },
+    { q: 'Trying it on Nuxt and getting no edits.', a: 'Let Feega start the Nuxt dev server. A server you started yourself is not mapped to source.' },
     { q: 'Editing one v-for item.', a: 'All items share the line. Add a condition in code for the one that differs.' }
   ],
   questions: [
     { q: 'Which Vue versions does Feega support?', a: 'Vue 3 on Vite. The tagger uses the Vue 3 SFC compiler. Vue 2 is untested.' },
-    { q: 'Does Feega support Nuxt?', a: 'It starts a Nuxt dev server, but 0.2.2 does not map clicks to source there, so editing Nuxt apps is not supported yet.' },
+    { q: 'Does Feega support Nuxt?', a: 'Yes, Nuxt 4, when Feega starts the dev server. Select, text, style and structure edits are tested.' },
     { q: 'Where do CSS edits go?', a: 'Into the first style block of the component, as a rule for a class Feega adds. Scoped blocks stay scoped.' },
     { q: 'Does it need an account or AI credits?', a: 'No. Feega is free, open source and makes no model calls.' }
   ],
@@ -72,5 +75,5 @@ export const VUE: Topic = {
     { label: 'Vue: class and style bindings', href: 'https://vuejs.org/guide/essentials/class-and-style.html' },
     { label: 'create-vue on GitHub', href: 'https://github.com/vuejs/create-vue' }
   ],
-  readNext: ['/for/sveltekit', '/for/tailwind', '/integrations/vscode', '/integrations/windsurf', '/alternatives/visual-editor-for-your-codebase', '/download']
+  readNext: ['/for/sveltekit', '/for/tailwind', '/integrations/vscode', '/templates/vue', '/alternatives/visual-editor-for-your-codebase', '/download']
 };

@@ -3,7 +3,7 @@
   import { GITHUB_URL } from '../links';
   import { primaryCta } from '../install';
   import PriceTag from './PriceTag.svelte';
-  import { CLOUD_SOON_FOR, CLOUD_SOON_LINES, EXTENSION_FOR, EXTENSION_LINES, EXTENSION_NOTE, CLOUD_SOON_NOTE, type CloudPlan } from './plan';
+  import { CLOUD_SOON_FOR, CLOUD_SOON_LINES, EXTENSION_FOR, EXTENSION_LINES, EXTENSION_NOTE, CLOUD_SOON_NOTE, annualLine, priceLabel, priceUnit, type CloudPlan } from './plan';
 
   let { plan, details = 'hide' }: { plan: CloudPlan; details?: 'show' | 'hide' } = $props();
 
@@ -26,11 +26,12 @@
     <div class="strip canvas" aria-hidden="true"></div>
     <h3>Feega {plan.name}</h3>
     <p class="for">{lower(CLOUD_SOON_FOR)}</p>
-    <PriceTag amount="coming later" unit="" cta="follow on github" href={GITHUB_URL} tone="outline" />
-    <p class="start">{lower(CLOUD_SOON_NOTE)}</p>
+    <PriceTag amount={priceLabel(plan)} unit={lower(priceUnit(plan))} cta="follow on github" href={GITHUB_URL} tone="outline" />
+    <p class="start">{lower(annualLine(plan))} {lower('Coming soon.')} {lower(CLOUD_SOON_NOTE)}</p>
     <ul>
       {#each CLOUD_SOON_LINES as line (line)}<li>{lower(line)}</li>{/each}
     </ul>
+    <p class="start">{lower('The free library is already open:')} <a href="/templates">{lower('free templates')}</a></p>
   </article>
 </div>
 

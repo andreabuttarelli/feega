@@ -1,0 +1,19 @@
+{
+  "name": "feega-relay",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --local --infer-origin-from-routes false --var VISITOR_BASE:localhost:8787 --var WEB_ORIGIN:http://localhost:5173",
+    "test": "vitest run",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "deploy": "node deploy.mjs"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "^1.9.0",
+    "@cloudflare/workers-types": "^5.20261121.1",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.12",
+    "wrangler": "^4.166.0"
+  }
+}

@@ -8,12 +8,18 @@
   import CatalogLayout from '$lib/site/catalog/CatalogLayout.svelte';
   import { articleOutline } from '$lib/site/catalog/outline';
   import { slugify } from '$lib/site/catalog/slug';
+  import Callout from '$lib/site/alternatives/Callout.svelte';
+  import CtaBlock from '$lib/site/alternatives/CtaBlock.svelte';
+  import Figure from '$lib/site/alternatives/Figure.svelte';
+  import Table from '$lib/site/alternatives/Table.svelte';
+  import Takeaways from '$lib/site/alternatives/Takeaways.svelte';
   import Faq from '$lib/site/alternatives/Faq.svelte';
   import HighlightBlock from '$lib/site/alternatives/HighlightBlock.svelte';
   import Split from '$lib/site/alternatives/Split.svelte';
   import Steps from '$lib/site/alternatives/Steps.svelte';
   import Verdict from '$lib/site/alternatives/Verdict.svelte';
   import { lower } from '$lib/site/lower';
+  import { SEE_IT_LABEL, altLandingPath, landingFor } from '$lib/site/alt-landings';
   import AsciiCover from '$lib/site/alternatives/AsciiCover.svelte';
   import { coverFor } from '$lib/site/alternatives/cover';
 
@@ -21,6 +27,7 @@
 
   const page = $derived(data.page);
   const outline = $derived(articleOutline(page));
+  const landing = $derived(landingFor(data.slug));
   const others = $derived(Object.entries(ALTERNATIVES).filter(([slug]) => slug !== data.slug).slice(0, 6));
 </script>
 
@@ -40,13 +47,18 @@
   <p class="fine">By {AUTHOR.name}, {AUTHOR.role} · checked {page.checked} · <a href="#how-we-checked">how we checked</a></p>
   <AsciiCover cover={coverFor(Object.keys(ALTERNATIVES).indexOf(data.slug))} label={page.heading} />
   <p class="intro"><strong>{page.lead}</strong></p>
+  {#if landing}<p class="fine"><a href={altLandingPath(landing.slug)}>{SEE_IT_LABEL} →</a> The short version of this comparison, for {landing.agent} users.</p>{/if}
+
+  {#if page.rich?.takeaways}<Takeaways items={page.rich.takeaways} />{/if}
 
   {#if page.rich}
     <Verdict text={page.rich.verdict} />
+    {#if page.rich.hero}<Figure shot={page.rich.hero} />{/if}
     <section>
       <h2 id={slugify(page.rich.snapshotHeading)}>{lower(page.rich.snapshotHeading)}</h2>
       <div class="body">{@html page.rich.snapshot}</div>
     </section>
+    {#each page.rich.tables ?? [] as block (block.heading)}<Table {block} />{/each}
     {#each page.rich.highlights as item, i (item.heading)}
       <HighlightBlock {item} flip={i % 2 === 1} />
     {/each}
@@ -68,6 +80,9 @@
     <section>
       <h2 id={slugify(section.heading)}>{lower(section.heading)}</h2>
       <div class="body">{@html section.html}</div>
+      {#if section.image}<Figure shot={section.image} />{/if}
+      {#if section.callout}<Callout item={section.callout} />{/if}
+      {#if section.cta}<CtaBlock item={section.cta} />{/if}
     </section>
   {/each}
 

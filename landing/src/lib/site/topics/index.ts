@@ -2,6 +2,7 @@ import { ALTERNATIVES, ALTERNATIVES_INDEX, ALTERNATIVES_PATH, alternativePath } 
 import { CODEBASE, CODEBASE_PATH } from '../codebase';
 import { DOWNLOAD_PATH } from '../links';
 import { topicPath, type Hub } from './topic';
+import { TEMPLATE_TITLES } from '../templates';
 import { REACT } from './for/react';
 import { NEXTJS } from './for/nextjs';
 import { SVELTEKIT } from './for/sveltekit';
@@ -14,7 +15,7 @@ import { VSCODIUM } from './integrations/vscodium';
 
 export const FOR_HUB: Hub = {
   path: '/for',
-  title: 'Visual editing for React, Next.js, SvelteKit and Vue | Feega',
+  title: 'Visual editing for React, Vue, Nuxt and more | Feega',
   description: 'How Feega maps a click to your source in each framework, what it writes back (Tailwind, CSS modules or <style>) and where it stops.',
   heading: 'Feega for your framework',
   menuLabel: 'frameworks',
@@ -45,6 +46,7 @@ const FIXED_LABELS: Readonly<Record<string, string>> = {
 
 const LABELS: Readonly<Record<string, string>> = {
   ...FIXED_LABELS,
+  ...TEMPLATE_TITLES,
   ...Object.fromEntries(HUBS.map((h) => [h.path, h.heading])),
   ...Object.fromEntries(HUBS.flatMap((h) => Object.entries(h.topics).map(([slug, t]) => [topicPath(h, slug), t.heading]))),
   ...Object.fromEntries(Object.entries(ALTERNATIVES).map(([slug, a]) => [alternativePath(slug), a.heading]))

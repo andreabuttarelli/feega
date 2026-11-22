@@ -1,0 +1,222 @@
+---
+title: SvelteKit load functions, server vs universal, tested
+description: When a +page.server.ts load runs, when a +page.ts load runs, what each can return, how they combine, and how invalidate and streaming behave. Checked in a SvelteKit 3 scratch project.
+date: 2026-11-22
+cover: /covers/sveltekit-load-functions-server-vs-universal.png
+coverAlt: "Cover: Server load or universal load? SvelteKit explained"
+tags: [sveltekit, svelte, data-loading, tutorial]
+---
+
+import Callout from '../../components/Callout.astro';
+import Cta from '../../components/Cta.astro';
+
+SvelteKit has two kinds of `load` function. One lives in `+page.server.ts` and runs only on the server. The other lives in `+page.ts` and runs on the server for the first request, then in the browser. People pick the wrong one often, because for a simple page both give the same result.
+
+This post shows where they differ, with a small app I ran on SvelteKit 3.4.0 and Svelte 5.59.1. Where I only read the docs, I say so.
+
+<Callout icon="check" title="The short version">
+Use a server load when the code needs a database, a secret, cookies or anything private. Use a universal load when you fetch from a public API, or need to return something that is not plain data, like a class instance or a component. If a route has both, the server one runs first and the universal one receives its result as `data`.
+</Callout>
+
+## How we checked
+
+On 22 November 2026 I read the SvelteKit [load docs](https://svelte.dev/docs/kit/load) and [routing docs](https://svelte.dev/docs/kit/routing), and the SvelteKit changelog. I created a project with `npx sv create`, then wrote a `lab` route with a server load, a universal load and a page. I ran it in the dev server, fetched it with `curl`, and drove it in a real Chromium with Playwright to see where each function ran.
+
+Limits: one small app, dev server only. The docs page for load is long and the tool I used to read it cut off the last part, which covers `depends` and `invalidate` in detail. I did test those two myself, below. I did not test layouts, `parent()` chains, or `setHeaders`.
+
+## What each one is
+
+A server load is exported from `+page.server.ts` or `+layout.server.ts`. A universal load is exported from `+page.ts` or `+layout.ts`. Both are named `load`, and both feed the page's `data` prop.
+
+```ts
+import type { PageServerLoad } from './$types';
+
+export const load: PageServerLoad = ({ depends, cookies }) => {
+  depends('app:lab');
+
+  return {
+    hits: nextHit(),
+    when: new Date('2026-11-22T10:00:00Z')
+  };
+};
+```
+
+```ts
+import type { PageLoad } from './$types';
+
+export const load: PageLoad = async ({ data }) => {
+  return {
+    ...data,
+    money: new Intl.NumberFormat('en', { style: 'currency', currency: 'EUR' })
+  };
+};
+```
+
+The page reads both through one object:
+
+```svelte
+<script lang="ts">
+  import type { PageProps } from './$types';
+
+  let { data }: PageProps = $props();
+</script>
+
+<p>{data.hits} hits, {data.money.format(12.5)}</p>
+```
+
+## Where each one runs
+
+The docs say a server load always runs on the server. A universal load runs on the server for the first visit, then again in the browser during hydration, reusing the `fetch` responses. After that, navigation inside the app runs it in the browser only. If SSR is switched off, it always runs in the browser. If the page is prerendered, both run at build time.
+
+I tested the universal part with a load that records where it ran:
+
+```ts
+export const load: PageLoad = async ({ fetch }) => {
+  const notes = await (await fetch('/api/notes')).json();
+  return { count: notes.length, ranIn: typeof window === 'undefined' ? 'server' : 'browser' };
+};
+```
+
+A `curl` of the page returned HTML saying "load ran in the server". In the browser, I then clicked a link to another page and went back. The page did not reload, I proved that with a `window` marker, and it now said "load ran in the browser". Same function, two places.
+
+That is the point to remember. A universal load must work in both places. Anything that exists only on the server, like a database client or `process.env`, will break it in the browser.
+
+## What each can return
+
+A server load has to return something SvelteKit can serialise to send to the browser. The docs say it uses a library called devalue, which handles JSON plus things like `BigInt`, `Date`, `Map`, `Set` and `RegExp`. My `Date` came through as a real `Date`: the page called `data.when.getFullYear()` and got 2026.
+
+A universal load can return anything, including class instances and component constructors. My `Intl.NumberFormat` worked there, and `data.money.format(12.5)` rendered `€12.50`.
+
+Then I moved that same `Intl.NumberFormat` into a server load. The page returned a 500 and the dev server logged this:
+
+```txt
+SvelteKit error: load_not_serializable
+Data returned from `load` while rendering `/lab/bad` is not serializable:
+Cannot stringify arbitrary non-POJOs (`data.money`).
+If you need to serialize/deserialize custom types, use transport hooks.
+```
+
+The message names the field and points at transport hooks, which is the way out if you really need a custom type to cross the boundary. I did not try them.
+
+## Using both in one route
+
+If a route has both, the server load runs first, and its return value is passed to the universal load as `data`. The universal function can then add to it. That is what the `...data` in my example does. The page sees the merged result.
+
+This is a useful pattern. The server load does the private work, like reading from the database. The universal load adds things that only make sense in the browser or need non-serialisable values.
+
+What does not happen is the server result reaching the page directly when a universal load exists. If you forget to return `data` from the universal load, the page loses it.
+
+## What only the server load can use
+
+Both functions get `params`, `route`, `url`, `fetch`, `setHeaders`, `parent`, `depends` and `untrack`. Only the server load gets `cookies`, `locals`, `getClientAddress`, `platform` and `request`. So reading a session cookie, or the user your `hooks.server.ts` put in `locals`, means a server load.
+
+The docs note that `setHeaders` has no effect when a load function runs in the browser.
+
+## Rerunning a load
+
+A load reruns when something it depends on changes. `depends('app:lab')` names a dependency, and `invalidate('app:lab')` from `$app/navigation` reruns every load that declared it.
+
+I tested it. The server load kept a counter. First view: 1. I clicked a button that called `invalidate('app:lab')`, and the page showed 2 without a navigation. The universal load ran again too, because it sits downstream of the server load.
+
+Version 3.0.0 changed one related behaviour. Its changelog says that clicking a link to the current URL now refreshes all load functions and queries. If you relied on that click doing nothing, check it after you upgrade.
+
+## Streaming
+
+A server load can return a promise without awaiting it. SvelteKit sends the page and fills the value in when it resolves.
+
+```ts
+return {
+  hits,
+  slow: sleep(1500).then(() => 'slow arrived')
+};
+```
+
+```svelte
+{#await data.slow}
+  <p>waiting</p>
+{:then value}
+  <p>{value}</p>
+{/await}
+```
+
+The raw HTML from `curl` contained `waiting` in the markup and `slow arrived` further down, in the data SvelteKit inlines when the promise settles. So the page shell arrives first.
+
+Two limits from the docs. Only server loads stream. Universal load promises are not streamed during SSR, they are recreated when the function runs again in the browser. And once streaming starts, you cannot set headers or throw a redirect. The docs add that some platforms, such as AWS Lambda, buffer the response, so the page renders only after every promise resolves. I did not test any host.
+
+<Callout icon="warn" title="Await what you need for the first paint">
+Stream the slow, secondary data. Await what the page cannot draw without. In the docs example, the post is awaited and the comments are streamed.
+</Callout>
+
+## Which one to pick
+
+| Need | Use |
+|---|---|
+| Database, API keys, private env | Server load |
+| Cookies, `locals`, request headers | Server load |
+| A public API with `fetch` | Either |
+| Return a class instance, a function or a component | Universal load |
+| Stream slow data | Server load |
+| Add browser-only values on top of server data | Both |
+| Page should run without a server (static) | Universal load, prerendered |
+
+## Mistakes I made
+
+**Returning a non-plain value from a server load.** The `Intl.NumberFormat` 500 above. The error is clear once you read it, but the page just says "Internal Error" until you look at the terminal.
+
+**Forgetting that universal load runs twice.** The first read of my `ran` field in the browser said `browser`, because hydration ran the function again. To see the server run, read the raw HTML, not the live DOM.
+
+**Reading the live DOM to check streaming.** By the time Playwright looked, the promise had resolved and the page showed `slow arrived` for the first read. The `curl` output is the honest test.
+## Where Feega fits
+
+Feega is a free, open-source VS Code extension that edits your running app and writes changes into your source. It does not care which kind of load your page uses. It cares about the markup the data ends up in.
+
+The Feega docs for SvelteKit say text that comes from a prop or a constant is refused with a message. A heading that comes from `data.title` can be restyled, but not retyped from the editor, because there is no single literal to change. And `{#each}` items share one source line and cannot be reordered one by one.
+
+So load data in `load`, and keep the words the designer changes in the markup.
+
+<Cta title="Tune the page the load builds">
+Run Feega on your SvelteKit app, click an element, change its spacing, colour or type, and read the edit as a diff in your `.svelte` file.
+</Cta>
+
+## Questions
+
+### What is the difference between +page.js and +page.server.js?
+
+`+page.server.js` runs only on the server and can use cookies, secrets and databases, but must return serialisable data. `+page.js` runs on the server for the first request and in the browser afterwards, and can return any value.
+
+### Can I use both in the same route?
+
+Yes. The server load runs first, and its result is passed to the universal load as `data`. The page receives what the universal load returns.
+
+### Why do I get "load_not_serializable"?
+
+A server load returned something devalue cannot serialise, such as a class instance. Return plain data, use transport hooks, or move the value to a universal load.
+
+### How do I rerun a load without navigating?
+
+Declare a dependency with `depends('your:key')` and call `invalidate('your:key')` from `$app/navigation`. In my test, the counter went from 1 to 2.
+
+### Can a universal load stream promises?
+
+Not during SSR. The docs say only server loads stream. Universal promises are recreated when the function reruns in the browser.
+
+### Does Feega need a particular load style?
+
+No. Feega edits markup. Keep the text and class names it should edit literal in the template.
+
+## Sources
+
+Opened on 22 November 2026.
+
+- [SvelteKit docs: Loading data](https://svelte.dev/docs/kit/load)
+- [SvelteKit docs: Routing](https://svelte.dev/docs/kit/routing)
+- [SvelteKit changelog](https://github.com/sveltejs/kit/blob/main/packages/kit/CHANGELOG.md), version 3.0.0.
+- npm registry: `@sveltejs/kit` 3.4.0 published 18 November 2026, `svelte` 5.59.1.
+- [Feega docs: SvelteKit](https://docs.feega.app/frameworks/sveltekit/)
+
+## Read next
+
+- [Form actions, without the magic](/posts/sveltekit-form-actions-explained/)
+- [SvelteKit vs Next.js, with the same app built twice](/posts/sveltekit-vs-nextjs/)
+- [Svelte 5 runes, in the order you need them](/posts/svelte-5-runes-in-practice/)
+- [Why Feega is now one thing](/posts/design-in-your-codebase/)

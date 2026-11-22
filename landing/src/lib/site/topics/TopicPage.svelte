@@ -11,6 +11,7 @@
   import { slugify } from '../catalog/slug';
   import { linkLabel } from '.';
   import { spokenDate, type Hub, type Topic } from './topic';
+  import EditorPicture from '../EditorPicture.svelte';
   import TopicFigure from './TopicFigure.svelte';
 
   let { topic, path, hub }: { topic: Topic; path: string; hub: Hub } = $props();
@@ -44,6 +45,7 @@
       <h2 id={slugify(section.heading)}>{lower(section.heading)}</h2>
       <div class="body">{@html section.html}</div>
       {#if section.figure}<TopicFigure figure={section.figure} />{/if}
+      {#if section.editor}<figure class="topic-figure"><EditorPicture id={section.editor} /></figure>{/if}
     </section>
   {/each}
 

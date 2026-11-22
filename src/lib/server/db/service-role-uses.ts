@@ -29,14 +29,14 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
     tables: ['usage_events']
   },
   {
+    path: 'src/lib/server/cloud-emails/send-once.ts — dbStore (sendOnce)',
+    why: "An email goes out from a webhook, a cron or another user's action (an invite, a share, a failed payment), so the recipient has no session, and user_emails grants nothing to anon/authenticated: only the server writes it. user_id is the recipient the caller resolved, never a value chosen by a request. It inserts one (user_id, kind, ref_id) row to claim the send, deletes that same row if the send fails, and reads nothing.",
+    tables: ['user_emails']
+  },
+  {
     path: 'src/lib/server/product-events/track.ts — track',
     why: "Il funnel nasce prima del login (un visitatore anonimo che arriva dalla landing) e la tabella non concede nulla ad anon/authenticated: solo il server scrive. Inserisce una riga con evento, id e props senza testo dei prompt; non legge nulla.",
     tables: ['product_events']
-  },
-  {
-    path: 'src/lib/server/canvas-debug/debug-log-repo.ts — writeDebugRows (rotta /api/v1/telemetry/canvas-debug)',
-    why: "Il registratore di volo `?debug` scrive righe diagnostiche che nessun utente deve poter leggere né riscrivere: la tabella non concede nulla ad anon/authenticated. L'utente c'è ed è verificato dalla rotta; user_id è il suo, org_id e canvas_id si LEGGONO dalla tela con il SUO client (RLS), mai presi da chi chiama. Solo insert di contatori e id, mai contenuto del documento; non legge nulla.",
-    tables: ['canvas_debug_logs']
   },
   {
     path: 'src/lib/server/core-usage.ts — profileIsInternal',
@@ -44,49 +44,19 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
     tables: ['profiles']
   },
   {
-    path: 'src/lib/server/canvas/canvas-share.ts — readSharedCanvas + signSharedMedia (rotta pubblica /s/[token])',
-    why: "Chi apre un link condiviso non ha sessione: il token È l'autorizzazione. La riga si trova solo per canvases.share_token; l'org_id si LEGGE da quella riga e limita ogni lettura successiva (nodi non cancellati, connessioni, asset di quei nodi, prodotti e post scaricati da quei nodi). Gli influencer non hanno sempre un org_id: si legge quello referenziato dal nodo e passa solo se è del catalogo (org_id null) o della stessa org — mai il volto di un'altra. Un progetto uncensored non si condivide mai: `projects.mode` si legge solo per rifiutarlo. Sola lettura, e fuori esce solo il contenuto dei nodi con i file firmati — mai org, progetto, prompt, parametri o utenti. I frame motion/element della tela (readSharedSource, /s/[token]/source/[node]) si leggono alla revisione corrente solo se il nodo sta su quella tela: doc, token del brand e i soli asset che il doc usa, firmati.",
-    tables: ['canvases', 'projects', 'nodes', 'nodes_connections', 'assets', 'products', 'social_posts', 'influencers', 'influencer_views']
-  },
-  {
-    path: 'src/lib/server/motion/render-link.ts — openRenderLink + linkPayload + uploadSlot + finishRenderLink (rotta pubblica /render/[token])',
-    why: "Chi apre un link di render può non avere una sessione su quel dispositivo (il telefono a cui un agente MCP ha mandato il link): il token È l'autorizzazione, monouso e a scadenza breve. La riga si trova per id del run e passa solo se l'impronta del segreto coincide, il run è un `browser-render:` ancora in corso e, dopo la prima apertura, il cookie del dispositivo che l'ha reclamato coincide. org, nodo e revisione si LEGGONO da quella riga: si legge solo quella revisione del doc, gli asset firmati di quel progetto; si scrive solo il file al percorso fisso del run (`exportPath`), l'asset che lo registra, `lastRenderAssetId` del nodo e lo stato del run.",
-    tables: ['node_runs', 'nodes', 'motion_revisions', 'projects', 'assets']
-  },
-  {
-    path: 'src/lib/server/motion/embed-rebuild-db.ts — rebuildPorts (rotta pubblica /e/[id], e il report di sola lettura scripts/embed-report.ts)',
-    why: "Chi apre un embed pubblicato non ha sessione: il file in `embeds/<nodeId>.html` È la pubblicazione. Quando quel file è nel formato vecchio (il motore congelato dentro la pagina), lo si ricostruisce una volta nel formato sorgente. Si parte solo dall'id di un file che esiste nel bucket: org e progetto si LEGGONO dalla riga di quel nodo, mai da chi chiama. Un nodo cancellato, un progetto uncensored o un file assente non si toccano. Del nodo si legge solo la revisione che era la testa all'ora di pubblicazione del file (mai il doc corrente, che può avere modifiche non pubblicate), e solo se ricompone la stessa impronta (clip, tempi, testo) della pagina pubblicata; se no si serve la pagina vecchia. Si scrive solo `embeds/<nodeId>.html` (lo stesso file, ancora pubblicato e non cambiato nel frattempo) e il marcatore `embeds/rebuild-locks/<nodeId>` che fa ricostruire una volta sola.",
-    tables: ['nodes', 'projects', 'motion_revisions', 'assets']
-  },
-  {
     path: 'src/lib/server/cli-auth.ts — authenticateApiKey',
     why: "La chiave API va risolta in un utente PRIMA di sapere chi è: non esiste ancora un JWT su cui far girare la RLS. La lettura è su key_hash e non accetta nulla da chi chiama oltre la chiave stessa; dopo la risoluzione il lavoro continua con il client dell'utente.",
     tables: ['api_keys']
   },
   {
-    path: 'src/routes/api/v1/canvas/runs/tick/+server.ts — expireStuckRuns + reconcileRenders + reconcileVideoNodeRuns + reconcileAudioNodeRuns + reconcileTaskNodeRuns + drainLoopQueue + drainStudio + pruneOldCanvasEvents + renewAccountSeats + sweepVoices',
-    why: "Un cron non ha una sessione: nessun utente ha cliccato. Prende le righe già scadute o in coda (run rimasti in corso, video da riconciliare, biglietti di loop da drenare, eventi canvas_events più vecchi di 356 giorni) attraverso tutte le org per costruzione, e l'org_id lo LEGGE dalla riga che ha preso — non lo riceve mai da fuori. `drainLoopQueue` gira `runGenNode` per un biglietto reclamato, con la stessa identità di servizio con cui il video già deposita il suo asset — `assets`/`ai_calls` sono scritture di quella funzione, non di questa rotta. La potatura di canvas_events è l'unica eccezione dichiarata: pota per età, su ogni org insieme, non per riga scoperta da un org_id letto — vedi retention.ts. `renewAccountSeats` (account-billing.ts) scorre ogni social_accounts attivo attraverso tutte le org per lo stesso motivo — un rinnovo mensile non ha un utente che lo clicca — e scrive solo credit_ledger/social_accounts della riga che sta processando. Un giro Wiro drenato da un loop legge il consenso dell'org e la provenienza dei riferimenti e registra la moderazione della stessa org letta dalla riga. `drainStudio` (studio/studio-drain.ts) reclama le righe `product_batch_items` in coda di ogni org e le gira con `runGenNode` sotto l'org e l'utente letti dalla riga del lotto, mai ricevuti da fuori. `reconcileRenders` (motion/render-run.ts) finalizza i render motion partiti da una richiesta e finiti nelle sandbox: org, progetto, nodo e utente li legge dai params della riga reclamata. `sweepVoices` (voices/custom-voices.ts) legge `custom_voices` di ogni org per cancellare da ElevenLabs i campioni dei cloni e le voci il cui org non esiste più: una voce va tolta dal fornitore anche quando l'org che la possedeva è sparita, e nessun utente resta a cliccare.",
-    tables: ['node_runs', 'nodes', 'canvas_events', 'assets', 'ai_calls', 'social_accounts', 'credit_ledger', 'orgs', 'org_uncensored_optins', 'influencers', 'moderation_checks', 'product_batches', 'product_batch_items']
-  },
-  {
-    path: 'src/lib/server/canvas/selection-feed.ts — channelFeed (op get_selection)',
-    why: "Un agente MCP con chiave API non ha un JWT con cui entrare nel canale privato `canvas:<id>`. L'op lo apre solo dopo aver provato che la tela è del progetto dell'org del chiamante, ascolta soltanto i broadcast `canvas-peer` per al più 3,5 s, tiene i segni del solo utente chiamante e non scrive nulla.",
-    tables: ['realtime.messages']
-  },
-  {
-    path: 'src/lib/server/canvas/agent-cursor.ts — broadcast (cursori degli agenti)',
-    why: "Un agente MCP con chiave API non ha un JWT con cui scrivere nel canale privato `canvas:<id>`, e un turno di chat non porta il JWT fino al livello degli strumenti. Il canvas_id e la posizione si LEGGONO con il client del chiamante (RLS accesa) dai nodi che l'agente ha appena toccato; la chiave serve solo a mandare un broadcast `canvas-peer` via REST su quel canale. Non legge né scrive tabelle.",
-    tables: ['realtime.messages']
-  },
-  {
-    path: 'le callback dei provider, src/routes/api/v1/webhooks/** (non ancora scritte: fase 3 e 5)',
-    why: 'Zernio e i provider di generazione chiamano senza una sessione utente. La riga da aggiornare si trova dal loro id esterno, che è già legato a una org; la firma della richiesta è ciò che autentica, non un JWT. Programmazione e stato di pubblicazione si leggono da Zernio, non da una tabella nostra (scheduled_posts è stata rimossa, 2026-09-22): un eventuale webhook scriverebbe solo posts.zernio_post_ids.',
-    tables: ['node_runs', 'ai_calls']
-  },
-  {
     path: 'src/lib/server/tenancy/bootstrap.ts — createFirstOrg (also every org made with "New organisation", team/orgs.ts createOrg)',
     why: "Alla creazione non esiste ancora una riga in orgs_members, quindi auth_org_ids() è vuoto e la policy rifiuterebbe l'insert della org e del suo primo membro. È l'unico punto in cui la RLS non può funzionare per costruzione: l'appartenenza sta nascendo. Non accetta un org_id da chi chiama — lo crea, e il membro è sempre l'utente della sessione. Legge/scrive anche credit_ledger (assertFreeOrgLimit): il limite di org gratuite è deciso qui, non altrove.",
     tables: ['orgs', 'orgs_members', 'credit_ledger']
+  },
+  {
+    path: 'src/lib/server/tenancy/rename-org.ts — renameOrg',
+    why: "The database refuses UPDATE on orgs to authenticated (20261114_orgs_read_only.sql), so a session cannot rename its own org. The onboarding action calls it only after listMemberships, with the user's own client (RLS), confirmed the caller is an owner of that org and its name is still the auto-created one; the org_id comes from that membership, never from the form. Writes only orgs.name and updated_at.",
+    tables: ['orgs']
   },
   {
     path: 'src/routes/api/v1/orgs/[orgId]/team/+server.ts — TeamCtx.writer (setRole, invite, resend, invite link)',
@@ -109,73 +79,8 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
     tables: ['orgs']
   },
   {
-    path: 'src/lib/server/org-data/auth.ts — resolveApiKey (MCP e CLI su /api/v1/org/**)',
-    why: "Una chiave API `feega_…` va risolta in un utente e un'org PRIMA di sapere chi è: non esiste un JWT su cui far girare auth_org_ids(). Dopo la risoluzione l'org_id NON arriva più da chi chiama: è quello della riga trovata per key_hash, imposto su ogni lettura e scrittura successiva da org-data/query-tool.ts e write-tool.ts — mai un filtro facoltativo.",
-    tables: ['api_keys']
-  },
-  {
-    path: 'src/lib/server/canvas/sign-media.ts — signAssetPaths, e ogni rotta che la chiama (assets/[id], p/[projectId]/assets, agent/assets, api/v1/org/media)',
-    why: "brand-knowledge tiene una cartella per utente (`<userId>/media/...`), e la sua unica policy di lettura confronta il primo segmento del path con auth.uid(): il client dell'utente firma solo i file che ha generato lui, non quelli generati da un altro membro della stessa org. La visibilità che conta è quella della riga `assets`, già provata da un SELECT con il client dell'utente (RLS su org_id) prima di chiamare questa funzione — la firma è un passo separato, e qui usa la service role solo dopo quella prova, mai su un path scelto da chi chiama.",
-    tables: ['assets']
-  },
-  {
-    path: 'scripts/import-anomalia-talents.ts',
-    why: "Uno script una tantum, senza sessione utente: scrive il catalogo globale (`influencers.org_id = null`), che la RLS vieta a qualunque JWT per costruzione — le policy di scrittura richiedono `org_id is not null`. Legge anche dal progetto Supabase VECCHIO (`OLD_FEEGA_*`), un database diverso su cui questa distinzione non si applica.",
-    tables: ['influencers', 'influencer_views']
-  },
-  {
-    path: 'scripts/seed-gallery.ts',
-    why: "Uno script una tantum, senza sessione utente: crea l'utente di sistema e l'org \"Feega\" (non esiste ancora un JWT di chi pubblica) e ne pubblica i video demo nella galleria. Scrive solo gallery_items di quell'org, ritrovata per slug, e i file sotto `media/gallery/<itemId>/`; legge auth.users solo per ritrovare l'utente di sistema per email. Non accetta un org_id da fuori: lo slug è fisso, o quello di un'org di prova passato a mano.",
-    tables: ['orgs', 'orgs_members', 'gallery_items']
-  },
-  {
-    path: 'scripts/import-showcase.ts',
-    why: "Uno script una tantum, lanciato a mano, senza sessione utente: importa i video showcase nel progetto \"Showcase\" di UNA org fissa (l'id è una costante, sovrascrivibile solo da chi lancia lo script). Legge orgs_members solo per trovare l'owner a cui intestare le azioni; crea progetto, tela, nodi motion, revisioni e asset di quell'org, carica i file sotto `canvas-assets/<orgId>/<projectId>/showcase/` e pubblica l'embed nel bucket `embeds`. Firma gli asset di quel progetto con questo stesso client (non con `signAssetPaths`, che pretende un client utente come prova di appartenenza): l'operatore che lancia lo script a mano ha già la chiave di servizio, e nessuna sessione utente esiste da provare.",
-    tables: ['orgs_members', 'projects', 'canvases', 'nodes', 'canvas_events', 'motion_revisions', 'assets']
-  },
-  {
-    path: 'scripts/seed-reference-images.ts',
-    why: "Uno script una tantum, senza sessione utente: semina il catalogo globale delle foto di riferimento (`reference_images.org_id = null`, bucket `reference-images` sotto `catalogue/`), che nessuna policy lascia scrivere a un JWT — il catalogo si legge da ogni org e non lo scrive nessuna.",
-    tables: ['reference_images']
-  },
-  {
     path: 'src/lib/server/account/account-server.ts — deleteAccount',
     why: "Cancellare il proprio account (GDPR art. 17) tocca righe che la RLS non lascia toccare a nessun JWT: auth.users, i riferimenti actor_id in org condivise, lo storage `${userId}/` e quello delle org di cui l'utente era l'unico membro. Lo user_id è sempre quello della sessione, verificata di recente e confermata a mano; nessun org_id arriva da chi chiama. La funzione SQL delete_account rifiuta se un'org resterebbe senza proprietario, cancella solo le org senza altri membri, e scrive in account_deletions un conteggio senza dati personali.",
     tables: ['orgs_members', 'orgs', 'account_deletions', 'profiles', 'chat_threads', 'nodes', 'chat_messages']
-  },
-  {
-    path: 'src/lib/server/uncensored-workspace/age-verification.ts — recordAdult',
-    why: "Un esito di verifica dell'età lo scrive il provider certificato, non l'utente: `user_age_verifications` non ha policy di scrittura, così nessuno può dichiararsi maggiorenne da solo. Lo user_id è quello della sessione che ha avviato la verifica, mai un valore scelto da chi chiama; si salva solo l'esito 18+, nessun documento.",
-    tables: ['user_age_verifications']
-  },
-  {
-    path: 'scripts/backfill-signed-url-nodes.ts',
-    why: 'Uno script una tantum, senza sessione utente: attraversa `nodes` di ogni org per trovare le righe con un url firmato scritto per errore in `data` (bug risolto in codice), cosa che nessun JWT di una singola org potrebbe fare.',
-    tables: ['nodes']
-  },
-  {
-    path: 'src/lib/server/reports/report-deps.ts — segnalazioni DSA/DMCA (rotte /report, /report/counter/[id], /admin/reports, tick)',
-    why: "Chi segnala da un link condiviso non ha sessione, e content_reports/account_strikes non hanno policy per nessun JWT: le legge e le scrive solo questo percorso. L'invio risolve org e autore dal token di condivisione o dall'id del nodo, senza restituire nulla a chi chiama. Le decisioni passano solo dopo isInternalEmail sulla sessione (/admin/reports) o dal cron (restauro dopo una contro-notifica); agiscono sulla riga del report, non su un org_id scelto da fuori. La sospensione usa auth.admin (ban) sull'utente letto dal report. La contro-notifica è autorizzata dall'impronta del token mandato all'autore. Una rimozione sposta i file del nodo (assets della sua org, letti da nodes.data e node_runs) nel bucket privato quarantine sotto <orgId>/<reportId>/, così gli URL già firmati muoiono subito; il ripristino li riporta indietro.",
-    tables: ['content_reports', 'account_strikes', 'canvases', 'nodes', 'node_runs', 'assets', 'orgs_members', 'profiles', 'auth.users', 'storage.objects']
-  },
-  {
-    path: 'src/lib/server/repos/node-runs.ts — writerFor (every run write made during a request)',
-    why: "A run carries what the server decides: status, cost, the provider job it points at and the price it is billed at. The database refuses every node_runs write to a session (20261114_runs_server_written.sql). A write made for a signed-in caller goes through here only after auth_editor_org_ids(), asked with the caller's own client, contains the org of the run; every write filters on that org_id and the run id. Values the server prices a run with are stripped from the params a caller sends.",
-    tables: ['node_runs']
-  },
-  {
-    path: 'src/lib/server/task-providers-config.ts — storeQuote (the quote of a provider task, on its run)',
-    why: "The price a task is billed at is a value only the server decides, and the database keeps it out of reach of a session (20261114_run_values_server_written.sql). It is written right after the server submitted the task and got its price, on the run the server just created or claimed: org and run come from that row, never from the caller. It writes only that run's params.",
-    tables: ['node_runs']
-  },
-  {
-    path: 'src/lib/server/task-providers-config.ts — loadOf (cap di concorrenza per account del fornitore)',
-    why: "Il limite di richieste simultanee di Higgsfield è per account feega, non per org: contarle richiede i giri di ogni org. Si legge solo `external_job_id` dei giri vivi con il prefisso del fornitore, un numero e nient'altro esce; nessun org_id arriva da chi chiama.",
-    tables: ['node_runs']
-  },
-  {
-    path: 'src/routes/api/v1/webhooks/revenuecat/+server.ts — applyStoreChange (acquisti in-app iOS/Android/Mac App Store)',
-    why: "Un acquisto in-app lo notifica RevenueCat, non l'utente: nessuna sessione. La chiamata passa solo con il segreto condiviso nell'header Authorization. L'org è l'app_user_id che l'app imposta dopo il login; una sola RPC (`apply_store_event`) registra l'evento per id (una riconsegna non scrive due volte), scrive grant o rimborso su credit_ledger e il piano store su orgs di quell'org.",
-    tables: ['store_events', 'credit_ledger', 'orgs']
   }
 ] as const;

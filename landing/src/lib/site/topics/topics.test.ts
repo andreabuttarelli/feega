@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { EDITOR_SHOTS } from '../editor-shots';
 import { SITE_PATHS } from '../paths';
 import { llmsFullTxt, llmsTxt } from '../llms';
 import { HUBS, linkLabel } from '.';
@@ -12,6 +13,7 @@ const STATIC_DIR = resolve(import.meta.dirname, '../../../../static');
 const FOOTER = readFileSync(resolve(import.meta.dirname, '../SiteFooter.svelte'), 'utf8');
 const KB = 1024;
 const MAX_IMAGE_KB = 80;
+const MAX_SHOT_KB = 160;
 const MAX_FIGURES = 5;
 const MIN_WORDS = 1000;
 const READ_NEXT = 6;
@@ -76,14 +78,15 @@ describe('topic pages', () => {
   });
 
   it.each(pages)('%s has two to five light images with alt text', (_, t) => {
-    const figures = [t.cover, ...t.sections.flatMap((s) => (s.figure ? [s.figure] : []))];
+    const shots = t.sections.flatMap((s) => (s.editor ? [EDITOR_SHOTS[s.editor]] : []));
+    const figures = [t.cover, ...t.sections.flatMap((s) => (s.figure ? [s.figure] : [])), ...shots];
     expect(figures.length).toBeGreaterThanOrEqual(2);
     expect(figures.length).toBeLessThanOrEqual(MAX_FIGURES);
     for (const f of figures) {
       const file = resolve(STATIC_DIR, f.src.slice(1));
       expect(existsSync(file), f.src).toBe(true);
       expect(f.src).toMatch(/\.webp$/);
-      expect(statSync(file).size).toBeLessThanOrEqual(MAX_IMAGE_KB * KB);
+      expect(statSync(file).size).toBeLessThanOrEqual((shots.some((x) => x.src === f.src) ? MAX_SHOT_KB : MAX_IMAGE_KB) * KB);
       expect(f.alt.length).toBeGreaterThan(30);
     }
   });

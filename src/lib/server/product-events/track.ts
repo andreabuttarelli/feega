@@ -4,22 +4,10 @@ import type { Json } from '$lib/database.types';
 import { capture } from '$lib/server/core-usage';
 
 export enum ProductEvent {
-  LandingPromptSent = 'landing_prompt_sent',
-  LoginStarted = 'login_started',
   SignupCompleted = 'signup_completed',
-  HandoffResumed = 'handoff_resumed',
-  CanvasCreated = 'canvas_created',
-  AgentStarted = 'agent_started',
-  AgentFirstOutput = 'agent_first_output',
-  AgentFailed = 'agent_failed',
-  CreditsExhausted = 'credits_exhausted',
-  ImportFailed = 'import_failed',
-  OnboardingTourCompleted = 'onboarding_tour_completed',
   AgentConnected = 'agent_connected',
   TeamInviteSent = 'team_invite_sent',
   TeamInviteAccepted = 'team_invite_accepted',
-  GenerationFailed = 'generation_failed',
-  ExportFailed = 'export_failed',
   PlanUpgraded = 'plan_upgraded',
   PlanDowngraded = 'plan_downgraded',
   PlanCancelled = 'plan_cancelled',
@@ -32,22 +20,10 @@ export type Money = { amount: number; currency: string; plan: string | null };
 type Nothing = Record<string, never>;
 
 export type ProductProps = {
-  [ProductEvent.LandingPromptSent]: { kind: string; source: string | null };
-  [ProductEvent.LoginStarted]: Nothing;
   [ProductEvent.SignupCompleted]: Nothing;
-  [ProductEvent.HandoffResumed]: { autostart: boolean; viaLogin: boolean };
-  [ProductEvent.CanvasCreated]: { kind: string; source: string | null };
-  [ProductEvent.AgentStarted]: { model: string };
-  [ProductEvent.AgentFirstOutput]: Nothing;
-  [ProductEvent.AgentFailed]: { code: string };
-  [ProductEvent.CreditsExhausted]: Nothing;
-  [ProductEvent.ImportFailed]: { source: string; error: string };
-  [ProductEvent.OnboardingTourCompleted]: Nothing;
   [ProductEvent.AgentConnected]: { key_id: string };
   [ProductEvent.TeamInviteSent]: { role: string; via: 'email' | 'link' };
   [ProductEvent.TeamInviteAccepted]: { role: string };
-  [ProductEvent.GenerationFailed]: { medium: string; error: string };
-  [ProductEvent.ExportFailed]: { format: string; error: string };
   [ProductEvent.PlanUpgraded]: Money & { seats: number };
   [ProductEvent.PlanDowngraded]: Money & { seats: number };
   [ProductEvent.PlanCancelled]: Money;

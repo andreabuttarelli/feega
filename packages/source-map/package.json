@@ -40,7 +40,8 @@
   },
   "dependencies": {
     "@babel/parser": "^7.26.0",
-    "magic-string": "^0.30.0"
+    "magic-string": "^0.30.0",
+    "parse5": "^7.3.0"
   },
   "peerDependencies": {
     "svelte": ">=5",
@@ -53,5 +54,8 @@
     "vite": {
       "optional": true
     }
+  },
+  "devDependencies": {
+    "@astrojs/compiler": "^2.13.1"
   }
 }

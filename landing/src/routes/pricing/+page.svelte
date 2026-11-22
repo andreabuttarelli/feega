@@ -20,7 +20,7 @@
 <div class="raised">
 <main class="page site-wide">
   <h1>pricing</h1>
-  <p class="lead">the Feega extension is free. Feega Cloud, with GitHub sync, collaboration, sections and templates, is coming later.</p>
+  <p class="lead">the Feega extension is free. Feega Cloud, with GitHub sync, collaboration, sections and templates, is coming soon.</p>
 
   <PriceGrid plan={PLAN} details="show" />
 

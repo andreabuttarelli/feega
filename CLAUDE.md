@@ -15,7 +15,7 @@ the change lands in the source. Sign-in and the account live in this web app (`o
 | `web-blog/` | the blog |
 | `supabase/` | all migrations (immutable) |
 | `cli/lib/init.ts` | project setup plan shared with the extension |
-| `docs/` | README media, runbooks, SEO notes |
+| `docs/` | README media, runbooks |
 
 The web app's routes: `/login`, `/auth/*`, `/cli/callback`, `/app` (dashboard),
 `/app/settings/profile`, `/account/export`, `/robots.txt`, and `/api` for the dashboard shell,
@@ -153,8 +153,10 @@ no stories.
 ## Changelog
 
 A user-visible change adds one English entry in `src/lib/content/changelog/YYYY-MM-DD-<slug>.ts`
-(`ChangelogEntry` as default export), read by the landing at build. Release-note style, one line,
-no file or function names. Skip it for refactors, tests and indexes.
+(`ChangelogEntry` as default export), read by the landing at build. One line, max 90 characters,
+no file or function names. Same-day entries about one feature merge into one. Never about removed
+products. Skip refactors, tests and indexes. In the same commit run `node scripts/changelog-prune.mjs`
+(keeps the 40 newest).
 
 ## Docs
 

@@ -1,0 +1,160 @@
+---
+title: "Feega for freelancers and agencies: fast design reviews with clients"
+description: Run a design review on a screen share, change the real running app while the client watches, and finish with a diff you can commit. What Feega does today, step by step, and what it does not.
+date: 2026-11-22
+cover: /covers/freelancers-and-agencies-design-reviews.png
+coverAlt: "Cover: Design reviews with the client live. Use case: freelancers and agencies"
+tags: [use-case, freelancers, agencies, design-review]
+---
+
+import Callout from '../../components/Callout.astro';
+import Cta from '../../components/Cta.astro';
+
+A design review with a client usually ends with a list. Make the button bigger. Try the green. Can the heading be two lines? You write it down, go away, change it, deploy a preview, and send a link. The client looks, and the list starts again.
+
+Feega shortens that loop for one specific case: you share your screen, the client says what they want, and you change the real running app while they watch. Each change is written to your source as a diff. When the call ends, the work is already in your files.
+
+<Callout icon="check" title="What this guide covers">
+Live tweaks on a screen-shared call, with every change recorded as a diff you can review, undo and commit. It does not cover hosted previews or share links. Feega does not have them today, and this guide does not pretend it does.
+</Callout>
+
+## Who this is for
+
+You build websites or web apps for clients, alone or in a small agency. The project is a real codebase in SvelteKit, Next.js, React with Vite or Vue, styled with Tailwind, CSS modules, scoped styles or plain CSS. The client gives feedback on how it looks, in words and in meetings.
+
+It is a poor fit if the design lives only in a design tool and the code does not exist yet. Feega edits a running app. It does not draw new pages from nothing.
+
+## What you need
+
+- A project that runs with `npm run dev` or similar.
+- VS Code 1.90 or newer, Cursor, Windsurf or VSCodium, or just Node 20+ for `npx feega`.
+- A video call tool that can share a window or a screen. Feega does not provide one.
+- Ten minutes before the call to open the project and check it loads.
+
+The [install page](https://docs.feega.app/getting-started/install/) has the extension links. Feega is free and open source under Apache-2.0, and works without an account.
+
+## How we checked
+
+I wrote this guide from the Feega docs and the skill file in the repository on 22 November 2026, and I list only features that appear there. I opened the Quick start, Selecting and navigating, Undo and changes, Responsive, Themes, SvelteKit and Next.js pages.
+
+What I did not do: I did not run a real client review with this method, so this guide contains no client stories and no numbers about time saved. The diff in the worked example below is illustrative. I wrote it to show the shape of a Feega edit and it did not come from a client project.
+
+## Before the call
+
+1. Open the project folder in your editor.
+2. Run **Feega: Open from current workspace** from the command palette, or `npx feega` in the app folder. Feega starts your dev server and opens the app beside your code.
+3. Click through the pages you plan to show. In **Navigate** mode (key `N`) clicks use your app, so you can reach the pages and states you need. Switch back to **Design** (key `D`) to edit.
+4. Pick the preview width in the device bar: full, desktop, tablet or phone.
+5. Commit your work in progress, so the call's edits are the only changes in `git diff`. Feega keeps its layout and history outside your project, so they do not appear in your commits.
+
+Then check that the text you expect the client to change is in the markup. Feega refuses text that comes from a prop, a constant or data, and shows a message. If the headline comes from a CMS, you can still change its style on the call, but not its words.
+
+## During the call
+
+Share the window with the app, or the whole editor if the client is comfortable with code on screen. Then work in short loops.
+
+**Spacing, size, colour, radius, type.** Click the element. Its properties open in the right bar. Change a padding, a fill, a font size, a radius or a shadow. The preview updates at once and the file changes.
+
+**Words.** Double-click text to edit it in place. The client says "Shop now, not Buy", you type it.
+
+**Different screens.** Switch the device bar to phone and edit there. In a Tailwind project, an edit at a smaller width goes to the class that applies at that width, such as `md:` or a base class. The [responsive page](https://docs.feega.app/integrations/inspect-responsive/) lists the exact rules.
+
+**Dark mode.** If your project supports a dark theme, Feega lists it in the toolbar and writes edits to that theme only. A project with no dark mode shows no theme control.
+
+**Undo.** Each edit is a step. Undo and redo walk the steps. When the client says "no, the first one was better", you undo and keep talking.
+
+<Callout icon="tip" title="Say what you are changing">
+Say the value out loud as you change it: "padding 24 to 32". Clients follow it, and your notes write themselves, because the Changes tab lists each edit with its file and line.
+</Callout>
+
+## After the call
+
+Open the **Changes** tab. It lists every edit with its file and line. For each one you can select it in the page, open the source, show the diff, or **Revert** it. **Revert all** returns the files to how they were before your edits.
+
+Review the diff the way you would review any change. Keep what the client approved, revert what was only a try. Then commit with git as usual. Feega writes files. It does not commit for you, and it does not deploy.
+
+An illustrative diff for a "make the call to action match the pricing button" request:
+
+```diff
+-<a class="px-4 py-2 rounded bg-neutral-900 text-white" href="#plans">Buy</a>
++<a class="px-6 py-3 rounded-full bg-orange-600 text-white" href="#plans">Shop now</a>
+```
+
+This is an illustration, not a real project. It shows what to expect: ordinary class and text changes in the file a developer would have edited, with nothing hidden.
+
+## What this saves, and what it does not
+
+It saves the round trip for small visual decisions. Spacing, colour, type size, copy, radius and breakpoints are the things clients ask about most, and these are decided on the call instead of in a list.
+
+It does not replace review for anything bigger. A new section, a new page or a changed flow is still a design and build job. Feega's structure edits cover duplicate, wrap, unwrap, delete, reorder and add for simple elements such as text, heading, button, link, image and container, which suits small layout changes and not redesigns.
+
+It does not save you from asking the client to decide. If anything, live edits make it easy to keep trying values for an hour. Agree on two options before you start.
+
+## Limits to tell yourself before you promise anything
+
+- **Text from data is refused.** Copy that comes from props, constants or a CMS cannot be retyped in the editor.
+- **Built class names are not written.** Class names made by `cn()`, `clsx()` or a template string are refused. Write literal classes on the elements people will tweak.
+- **Lists.** Items rendered by a loop share one source line and cannot be reordered one by one.
+- **No client access.** The client watches your screen. They do not get a link, a login or a comment thread from Feega.
+- **Your dev server, your machine.** The review runs on your laptop. A slow machine or a broken build breaks the call.
+
+<Callout icon="warn" title="No share links, no cloud preview">
+Feega has no hosted preview and no client-facing link today. If the client needs to look at it later, deploy a preview the way you already do, and send that.
+</Callout>
+
+## A simple routine
+
+1. Day before: open the project in Feega, click through the pages, fix anything that does not load.
+2. Start of call: agree on what is up for change today. Two things, not twenty.
+3. During: change, say the value, undo if it is wrong.
+4. End: read the Changes tab out loud, so the client hears the summary.
+5. After: review the diff, revert tries, commit, deploy your preview, send it.
+
+<Cta title="Try it on your next review">
+Install the extension, open a client project, and run one change from "can you make this bigger" to a diff in your file.
+</Cta>
+
+## Questions
+
+### Does the client need to install Feega?
+
+No. You drive. The client sees your shared screen.
+
+### Can I send the client a link to the changes?
+
+Not with Feega today. There are no share links. Deploy a preview with your usual host and send that.
+
+### Does Feega commit my changes?
+
+No. It writes files. You review the diff and commit with git.
+
+### Can I undo a change the client rejected?
+
+Yes. Each edit is a step you can undo, redo or revert. **Revert all** returns the files to how they were before your edits.
+
+### Will it work with my stack?
+
+Feega supports SvelteKit, React with Vite, Next.js and Vue, with Tailwind, CSS modules, scoped styles and plain CSS. See the framework pages in the docs for the limits.
+
+### Is there AI involved?
+
+No. Feega has no AI of its own. It edits the code the way you would. If you also use a coding agent, see [Using Feega with Claude Code](/use-cases/feega-with-claude-code/).
+
+## Sources
+
+Read on 22 November 2026.
+
+- [Feega docs: Quick start](https://docs.feega.app/getting-started/quick-start/)
+- [Feega docs: Selecting and navigating](https://docs.feega.app/editing/selecting-and-navigating/)
+- [Feega docs: Undo and changes](https://docs.feega.app/editing/undo-and-changes/)
+- [Feega docs: Responsive editing](https://docs.feega.app/integrations/inspect-responsive/)
+- [Feega docs: Themes](https://docs.feega.app/integrations/inspect-themes/)
+- [Feega docs: SvelteKit](https://docs.feega.app/frameworks/sveltekit/) and [Next.js](https://docs.feega.app/frameworks/nextjs/)
+- [Feega docs: Install](https://docs.feega.app/getting-started/install/)
+
+## Read next
+
+- [Using Feega with Claude Code](/use-cases/feega-with-claude-code/)
+- [Using Feega with Grok Build](/use-cases/feega-with-grok-build/)
+- [Why Feega is now one thing](/posts/design-in-your-codebase/)
+- [SvelteKit vs Next.js, with the same app built twice](/posts/sveltekit-vs-nextjs/)

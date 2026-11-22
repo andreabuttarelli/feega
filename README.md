@@ -49,21 +49,24 @@ It runs on macOS, Windows and Linux. Everything is local: no account, and nothin
 
 SvelteKit, React, Next.js and Vue, with Tailwind or plain CSS (CSS modules, scoped `<style>`).
 
-## Works with your agent
+## Use Feega with your AI agent
 
-Feega has no AI of its own, so it sits next to the agent you already use: you design, your agent codes, same files, every change a diff.
-
-Teach your agent Feega ([docs](https://docs.feega.app/more/ai-agents/)):
+Feega has no AI of its own: you design, your agent codes, same files, every change a diff. The Feega skill sets up the project, starts the editor and writes markup Feega can edit back.
 
 ```bash
 npx skills add andreabuttarelli/feega
 ```
 
-In Claude Code:
+Installs the skill for Claude Code, Cursor, Codex, OpenCode and the other agents the [skills CLI](https://github.com/vercel-labs/skills) supports.
+
+In Claude Code, as a plugin:
 
 ```
-/plugin install feega --marketplace andreabuttarelli/feega
+/plugin marketplace add andreabuttarelli/feega
+/plugin install feega@feega
 ```
+
+More in the [docs](https://docs.feega.app/more/ai-agents/).
 
 <p>
 <img src="docs/readme/logos/agent-chatgpt.svg" height="22" alt="ChatGPT"> ChatGPT &nbsp; <img src="docs/readme/logos/agent-claude.svg" height="22" alt="Claude"> Claude &nbsp; <img src="docs/readme/logos/agent-gemini.svg" height="22" alt="Gemini"> Gemini &nbsp; <img src="docs/readme/logos/agent-opencode.svg" height="22" alt="OpenCode"> OpenCode

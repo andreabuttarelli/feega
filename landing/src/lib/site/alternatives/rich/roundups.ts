@@ -1,5 +1,5 @@
 import { VisualKind, table, type Rich } from '../alternative';
-import { BUTTON_DIFF, EDITOR_VISUAL, OWN_STEPS, TAILWIND_DIFF } from './shared';
+import { BUTTON_DIFF, CHANGES_VISUAL, EDITOR_VISUAL, LAYERS_MENU_VISUAL, OWN_STEPS, PROPERTIES_VISUAL, RESPONSIVE_VISUAL, TAILWIND_DIFF } from './shared';
 
 const roundupCost = (what: string): Rich['cost'] => ({
   heading: 'What it costs',
@@ -42,10 +42,10 @@ export const VISUAL_EDITORS: Rich = {
       heading: 'A Properties bar in your editor',
       paragraphs: [
         'Feega is built for people who think in controls. Layers on the left, the running page in the middle, and a Properties bar for spacing, colour, type and layout.',
-        'It runs in VS Code, Cursor, Windsurf and VSCodium on any OS, or as npx feega in the browser, and works with SvelteKit, React, Next.js and Vue.'
+        'It runs in VS Code, Cursor, Windsurf and VSCodium on any OS, or as npx feega in the browser, and works with SvelteKit, React, Next.js, Vue, Nuxt, React Router, Astro and Vite.'
       ],
       visual: EDITOR_VISUAL,
-      caption: 'The Feega editor inside VS Code.'
+      caption: 'The Feega editor: layers, the live page and Properties.'
     },
     {
       heading: 'Every change is a diff',
@@ -64,7 +64,7 @@ export const VISUAL_EDITORS: Rich = {
   moreQuestions: [
     { q: 'What should I test on?', a: 'Your own repo, and the tenth edit, not the first. Tools differ most on messy real code.' },
     { q: 'Do these tools replace Figma?', a: 'No. They edit what exists. Figma is for designing what does not exist yet.' },
-    { q: 'Which frameworks does Feega support?', a: 'SvelteKit, React, Next.js and Vue, with CSS or Tailwind.' }
+    { q: 'Which frameworks does Feega support?', a: 'SvelteKit, React, Next.js, Vue, Nuxt, React Router, Astro and Vite, with CSS or Tailwind.' }
   ]
 };
 
@@ -111,8 +111,8 @@ export const AI_BUILDER_OR_REPO: Rich = {
         'Feega gives you layers, the live page and a Properties bar inside VS Code, Cursor, Windsurf or VSCodium, on any OS. Click, set a value, read the diff.',
         'There is no AI, so no messages to count and no tokens to buy.'
       ],
-      visual: EDITOR_VISUAL,
-      caption: 'The Feega editor.'
+      visual: PROPERTIES_VISUAL,
+      caption: 'The Properties bar for a selected element.'
     }
   ],
   cost: roundupCost('v0 is free for 7 messages a day; Lovable gives 5 credits a day; AI Studio’s first two apps are free; Framer’s Basic is $10 a month.'),
@@ -160,14 +160,14 @@ export const DESIGN_HANDOFF: Rich = {
         'Every design tool looks good on a new screen. Code-first tools show their worth on an old one, with its odd states and its accumulated CSS.',
         'Feega works on the running page with your own components, so what you see is what you ship.'
       ],
-      visual: EDITOR_VISUAL,
-      caption: 'The editor in VS Code.'
+      visual: CHANGES_VISUAL,
+      caption: 'The Changes tab lists each edit with a diff and a revert button.'
     },
     {
       heading: 'The change as code, not as a spec',
       paragraphs: [
         'Each Feega edit lands in your source as a diff you can read, keep or undo. A developer reviews a diff, not a redline.',
-        'It writes CSS or Tailwind and works with SvelteKit, React, Next.js and Vue.'
+        'It writes CSS or Tailwind and works with SvelteKit, React, Next.js, Vue, Nuxt, React Router, Astro and Vite.'
       ],
       visual: BUTTON_DIFF,
       caption: 'One edit, one diff.'
@@ -217,8 +217,8 @@ export const DESIGN_WITH_CLAUDE_CODE: Rich = {
         'An agent can change a page faster than anyone can review a diff of CSS. Feega shows the page itself, running, with layers and a Properties bar, so a designer can see and move what the agent did.',
         'It runs in VS Code, Cursor, Windsurf and VSCodium, so it sits next to wherever Claude Code is running.'
       ],
-      visual: EDITOR_VISUAL,
-      caption: 'The Feega editor.'
+      visual: LAYERS_MENU_VISUAL,
+      caption: 'The Layers menu: duplicate, wrap, unwrap and delete elements.'
     },
     {
       heading: 'Same files, no AI of its own',
@@ -279,11 +279,11 @@ export const FIREBASE_STUDIO: Rich = {
     {
       heading: 'Where Feega fits after the move',
       paragraphs: [
-        'If you move to your own repo, Feega lets you keep changing the interface by clicking, in VS Code, Cursor, Windsurf or VSCodium. It edits CSS or Tailwind in SvelteKit, React, Next.js and Vue projects.',
+        'If you move to your own repo, Feega lets you keep changing the interface by clicking, in VS Code, Cursor, Windsurf or VSCodium. It edits CSS or Tailwind in SvelteKit, React, Next.js, Vue, Nuxt, React Router, Astro and Vite projects.',
         'It is open source under Apache-2.0 and runs locally, so it adds no new lock-in.'
       ],
-      visual: EDITOR_VISUAL,
-      caption: 'The Feega editor.'
+      visual: RESPONSIVE_VISUAL,
+      caption: 'The preview at a tablet width, with the Layers tree and Properties beside it.'
     }
   ],
   cost: roundupCost('Pricing for Google’s routes depends on your usage; read Google’s pages for current terms.'),

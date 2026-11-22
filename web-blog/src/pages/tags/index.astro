@@ -1,8 +1,8 @@
 ---
 import Base from '../../layouts/Base.astro';
-import { postsNewestFirst, tagSlug } from '../../site';
+import { allNewestFirst, tagSlug } from '../../site';
 
-const posts = await postsNewestFirst();
+const posts = await allNewestFirst();
 const tags = [...new Set(posts.flatMap((post) => post.data.tags))].sort();
 ---
 

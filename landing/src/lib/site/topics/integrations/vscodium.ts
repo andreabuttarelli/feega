@@ -1,4 +1,5 @@
 import { figure, type Topic } from '../topic';
+import { EditorShotId } from '../../editor-shots';
 import { CHECKED, DOCS, FEEGA_SOURCE, OPEN_VSX, img } from '../shared';
 
 export const VSCODIUM: Topic = {
@@ -26,7 +27,7 @@ export const VSCODIUM: Topic = {
       heading: 'What you get after install',
       html: `<p>Run <strong>Feega: Open from current workspace</strong>, or right-click a folder or a page file and choose the Feega item. Feega works out the framework from <code>package.json</code>, installs missing dependencies if you let it, starts the dev server and opens the app beside your code.</p>
 <p>From there it is the same editor as in VS Code. Click an element to select it, use the breadcrumb and the layers tree to move around, and change size, spacing, layout, type, colour, borders, radius and shadows in the right bar. Switch the preview between desktop, tablet and phone widths. Each edit is written to the file and line that rendered the element, listed in Changes, and undoable as long as nobody changed the file since.</p>`,
-      figure: figure(img('integrations', 'vscodium-window'), 'A stylised editor window: a Vue component on the left, the running app in the middle with a selected button in orange, and the Feega Changes list on the right listing two edits')
+      editor: EditorShotId.Changes
     },
     {
       heading: 'What gets written',

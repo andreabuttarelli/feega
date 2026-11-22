@@ -6,8 +6,10 @@
   import { PRICING_PATH } from './paths';
   import { DOWNLOAD_PATH } from './links';
   import { ALTERNATIVES_PATH } from './alternatives';
+  import { ALT_LANDINGS, altLandingPath } from './alt-landings';
   import { CODEBASE_PATH } from './codebase';
   import { HUBS } from './topics';
+  import { TEMPLATES_PATH } from './templates/paths';
 
   const legal = Object.entries(LEGAL_DOCS).map(([slug, doc]) => ({ href: `/${slug}`, label: doc.label }));
   const year = new Date().getFullYear();
@@ -32,6 +34,7 @@
       <a href="/">home</a>
       <a href={DOWNLOAD_PATH}>download</a>
       <a href={PRICING_PATH}>pricing</a>
+      <a href={TEMPLATES_PATH}>templates</a>
       <a href={CODEBASE_PATH}>codebase</a>
       <a href="/changelog">changelog</a>
       <a href={GITHUB_URL}>star on github</a>
@@ -55,6 +58,13 @@
       {/each}
     </nav>
   </div>
+
+  <nav class="quick" aria-label="Alternatives">
+    <p class="head">alternatives</p>
+    {#each ALT_LANDINGS as v (v.slug)}
+      <a href={altLandingPath(v.slug)}>{lower(`${v.tool} alternative for ${v.agent}`)}</a>
+    {/each}
+  </nav>
 
   <div class="mark-box" aria-hidden="true"><p class="mark">feega</p></div>
 
@@ -179,6 +189,26 @@
     font-size: 13px;
     line-height: 16px;
     color: rgb(255 255 255 / 0.45);
+  }
+
+  .quick {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 24px;
+    margin-top: 48px;
+  }
+
+  .quick .head {
+    flex-basis: 100%;
+    margin: 0;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    line-height: 16px;
+    color: rgb(255 255 255 / 0.45);
+  }
+
+  .quick a {
+    padding-bottom: 2px;
   }
 
   .col a,

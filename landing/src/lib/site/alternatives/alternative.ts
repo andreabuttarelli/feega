@@ -1,7 +1,10 @@
+import type { EditorShotId } from '../editor-shots';
+
 export enum ArticleKind {
   Roundup = 'roundup',
   UseCase = 'use-case',
-  Single = 'single'
+  Single = 'single',
+  Agent = 'agent'
 }
 
 export type Question = { readonly q: string; readonly a: string };
@@ -25,7 +28,7 @@ export type DiffLine = { readonly sign: DiffSign; readonly text: string };
 export type FlowLane = { readonly title: string; readonly steps: readonly string[] };
 
 export type Visual =
-  | { readonly kind: VisualKind.Editor }
+  | { readonly kind: VisualKind.Editor; readonly shot: EditorShotId }
   | { readonly kind: VisualKind.Diff; readonly file: string; readonly lines: readonly DiffLine[] }
   | { readonly kind: VisualKind.Flow; readonly them: FlowLane; readonly us: FlowLane };
 
@@ -34,6 +37,25 @@ export type Highlight = {
   readonly paragraphs: readonly string[];
   readonly visual: Visual;
   readonly caption: string;
+};
+
+export enum CalloutTone {
+  Tip = 'tip',
+  Warning = 'warning',
+  Note = 'note'
+}
+
+export type Callout = { readonly tone: CalloutTone; readonly title: string; readonly text: string };
+
+export type Cta = { readonly text: string; readonly label: string; readonly href: string };
+
+export type Shot = { readonly src: string; readonly alt: string; readonly width: number; readonly height: number; readonly caption: string };
+
+export type TableBlock = {
+  readonly heading: string;
+  readonly head: readonly string[];
+  readonly rows: readonly (readonly string[])[];
+  readonly callout?: Callout;
 };
 
 export type Step = { readonly title: string; readonly text: string };
@@ -48,9 +70,26 @@ export type Rich = {
   readonly steps: readonly Step[];
   readonly closing: string;
   readonly moreQuestions: readonly Question[];
+  readonly takeaways?: readonly string[];
+  readonly tables?: readonly TableBlock[];
+  readonly hero?: Shot;
 };
 
-export type Section = { readonly heading: string; readonly html: string };
+export type Section = {
+  readonly heading: string;
+  readonly html: string;
+  readonly callout?: Callout;
+  readonly cta?: Cta;
+  readonly image?: Shot;
+};
+
+export type Extras = {
+  readonly takeaways: readonly string[];
+  readonly tables: readonly TableBlock[];
+  readonly hero: Shot;
+  readonly sections: readonly Section[];
+  readonly sources: readonly Source[];
+};
 
 export type Article = {
   readonly kind: ArticleKind;

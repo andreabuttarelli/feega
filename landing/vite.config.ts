@@ -2,10 +2,12 @@ import { readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { build } from 'esbuild';
-import { defineConfig, type Plugin } from 'vite';
+import type { Plugin } from 'vite';
+import { defineConfig } from 'vitest/config';
 
 const CHANGELOG_MODULE = 'virtual:changelog-entries';
 const CHANGELOG_DIR = resolve(import.meta.dirname, '../src/lib/content/changelog');
+const LIBRARY_DIR = resolve(import.meta.dirname, '../packages/library');
 const ENTRY_FILE = /^2.*\.ts$/;
 const TEST_FILE = /\.test\.ts$/;
 
@@ -28,7 +30,7 @@ function changelogEntries(): Plugin {
 
       const files = entryFiles();
       const imports = files.map((file, i) => `import e${i} from ${JSON.stringify(file)};`);
-      const contents = `${imports.join('\n')}\nimport legacy from './legacy';\nexport default [${files.map((_, i) => `e${i}`).join(',')}, ...legacy];`;
+      const contents = `${imports.join('\n')}\nexport default [${files.map((_, i) => `e${i}`).join(',')}];`;
       const out = await build({
         stdin: { contents, resolveDir: CHANGELOG_DIR, loader: 'ts' },
         tsconfigRaw: {},
@@ -57,6 +59,8 @@ async function latestVersion(): Promise<string> {
 
 export default defineConfig(async () => ({
   define: { __FEEGA_VERSION__: JSON.stringify(await latestVersion()) },
+  esbuild: { tsconfigRaw: '{}' },
   plugins: [sveltekit(), changelogEntries()],
-  server: { fs: { allow: [CHANGELOG_DIR] } }
+  server: { fs: { allow: [CHANGELOG_DIR, LIBRARY_DIR] } },
+  test: { css: { include: [/packages\/library\/.+\.css/] } }
 }));

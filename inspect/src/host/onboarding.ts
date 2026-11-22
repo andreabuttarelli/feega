@@ -36,3 +36,12 @@ export const fileOnboardingStore = (path: string = onboardingPath()): Onboarding
     writeFileSync(path, JSON.stringify({ seen: Onboarding.Seen }));
   }
 });
+
+export const deviceOnboardingStore = (profile: OnboardingStore, path: string = onboardingPath()): OnboardingStore => {
+  const device = fileOnboardingStore(path);
+
+  return {
+    read: async () => ((await device.read()) === Onboarding.Seen || (await profile.read()) === Onboarding.Seen ? Onboarding.Seen : Onboarding.Pending),
+    markSeen: () => Promise.all([device.markSeen(), profile.markSeen()])
+  };
+};

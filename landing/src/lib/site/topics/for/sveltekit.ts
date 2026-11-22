@@ -1,4 +1,5 @@
 import { figure, type Topic } from '../topic';
+import { EditorShotId } from '../../editor-shots';
 import { CHECKED, DOCS, FEEGA_SOURCE, MARKETPLACE, img } from '../shared';
 
 export const SVELTEKIT: Topic = {
@@ -14,7 +15,8 @@ export const SVELTEKIT: Topic = {
       heading: 'How a click finds the line in a .svelte file',
       html: `<p>When Feega sees <code>@sveltejs/kit</code> in your dependencies, it starts Vite itself. It loads your <code>vite.config</code> as it is, with the <code>sveltekit()</code> plugin and anything else you have there, and puts its own source plugin first in the list. Nothing is written to your config.</p>
 <p>The plugin parses each <code>.svelte</code> file with the Svelte compiler's parser, the modern AST from Svelte 5, and adds <code>data-feega-src="src/routes/+page.svelte:8:3"</code> to every regular HTML element. Components such as <code>&lt;PricingCard /&gt;</code> are not tagged themselves, and neither is <code>&lt;svelte:element&gt;</code>; the elements inside <code>PricingCard.svelte</code> carry PricingCard's lines.</p>
-<p>So when you click a card title, Feega goes to the <code>&lt;h3&gt;</code> in <code>PricingCard.svelte</code> and leaves the page that used the card alone. That is the right place to change how cards look, and it also means every card changes. The panel shows the file path, so you can see this before you edit.</p>`
+<p>So when you click a card title, Feega goes to the <code>&lt;h3&gt;</code> in <code>PricingCard.svelte</code> and leaves the page that used the card alone. That is the right place to change how cards look, and it also means every card changes. The panel shows the file path, so you can see this before you edit.</p>`,
+      editor: EditorShotId.SvelteKit
     },
     {
       heading: 'What it writes: a class, or a rule in <style>',
@@ -72,5 +74,5 @@ export const SVELTEKIT: Topic = {
     { label: 'Svelte: class attribute and directives', href: 'https://svelte.dev/docs/svelte/class' },
     { label: 'SvelteKit: loading data', href: 'https://svelte.dev/docs/kit/load' }
   ],
-  readNext: ['/for/vue', '/for/tailwind', '/integrations/vscode', '/integrations/vscodium', '/alternatives/visual-editor-for-your-codebase', '/download']
+  readNext: ['/for/vue', '/for/tailwind', '/integrations/vscode', '/templates/svelte', '/alternatives/visual-editor-for-your-codebase', '/download']
 };

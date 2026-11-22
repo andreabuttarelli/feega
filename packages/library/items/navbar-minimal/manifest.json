@@ -1,0 +1,29 @@
+{
+  "id": "navbar-minimal",
+  "name": "Navbar, minimal",
+  "description": "Just the logo and one call to action, for focused landing pages.",
+  "category": "section",
+  "tags": [
+    "navigation",
+    "header"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    }
+  ],
+  "tier": "free"
+}

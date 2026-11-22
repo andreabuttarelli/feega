@@ -6,7 +6,7 @@ import { addNode, type AddRequest, type AddStyle } from './add-node';
 import { ItemOp, loopItem } from './loop-items';
 import { loopsAt } from './loop-array';
 import { moveLoopItem, type LoopMove } from './move-loop-item';
-import { unwrapNode, wrapNode } from './wrap-node';
+import { WrapTag, unwrapNode, wrapNode } from './wrap-node';
 import { moveUsage, type Usage } from './move-usage';
 import { hiddenOut, lineSpan, parentOf, repeated, spanOf, type Span } from './move-node';
 
@@ -65,7 +65,7 @@ export enum StructureOp {
   Unwrap = 'unwrap'
 }
 
-export type StructureRequest = { op: StructureOp; at: LiveAt; to?: LiveAt; usage?: Usage; loop?: LoopMove; instance?: number; add?: AddRequest; style?: AddStyle };
+export type StructureRequest = { op: StructureOp; at: LiveAt; to?: LiveAt; usage?: Usage; loop?: LoopMove; instance?: number; add?: AddRequest; style?: AddStyle; wrap?: WrapTag };
 
 const single = (out: TextWritten): Structured => (out.ok ? { ok: true, changes: [out.change] } : out);
 
@@ -76,8 +76,8 @@ const OPS: Record<StructureOp, (read: ReadFile, req: StructureRequest) => Promis
   [StructureOp.MoveLoopItem]: async (read, req) => (req.loop ? moveLoopItem(read, req.at, req.loop) : { ok: false, reason: 'no item positions given' }),
   [StructureOp.AddItem]: (read, req) => loopItem(read, req.at, req.instance, ItemOp.Append),
   [StructureOp.Add]: async (read, req) => (req.add ? addNode(read, req.at, req.add) : { ok: false, reason: 'nothing to add' }),
-  [StructureOp.Wrap]: (read, req) => wrapNode(read, req.at, req.style),
-  [StructureOp.Unwrap]: (read, req) => unwrapNode(read, req.at, req.style),
+  [StructureOp.Wrap]: (read, req) => wrapNode(read, req.at, req.style, req.wrap),
+  [StructureOp.Unwrap]: (read, req) => unwrapNode(read, req.at, req.style, req.wrap),
   [StructureOp.MoveInto]: async (read, req) => (req.to ? moveInto(read, req.at, req.to) : { ok: false, reason: 'no target container' })
 };
 

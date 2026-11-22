@@ -37,10 +37,18 @@ const BAYER = [
 ];
 
 const covers = [
-  { file: 'public/covers/introducing-feega.png', scene: 'dusk', lines: ['One canvas for', 'design, motion and AI'], kicker: 'Introducing Feega' },
+  { file: 'public/covers/introducing-feega.png', scene: 'dusk', lines: ['Design in', 'your codebase.'], kicker: 'Introducing Feega' },
   { file: 'public/covers/rust-canvas-renderer.png', scene: 'forge', lines: ['Rust, WebGPU, WASM.', 'One engine.'], kicker: 'Why we wrote the renderer in Rust' },
   { file: 'public/covers/how-the-canvas-got-fast.png', scene: 'tiles', lines: ['Tiles, cheaper blur,', 'half the wasm.'], kicker: 'How the canvas got fast' },
-  { file: 'public/covers/design-in-your-codebase.png', scene: 'sunset', lines: ['One thing.', 'In your codebase.'], kicker: 'Why Feega is now one thing' }
+  { file: 'public/covers/design-in-your-codebase.png', scene: 'sunset', lines: ['One thing.', 'In your codebase.'], kicker: 'Why Feega is now one thing' },
+  { file: 'public/covers/sveltekit-vs-nextjs.png', scene: 'windows', lines: ['SvelteKit or', 'Next.js?'], kicker: 'The same app, side by side' },
+  { file: 'public/covers/sveltekit-form-actions-explained.png', scene: 'terminal', lines: ['Form actions,', 'without the magic'], kicker: 'SvelteKit explained' },
+  { file: 'public/covers/sveltekit-load-functions-server-vs-universal.png', scene: 'tiles', lines: ['Server load or', 'universal load?'], kicker: 'SvelteKit explained' },
+  { file: 'public/covers/svelte-5-runes-in-practice.png', scene: 'forge', lines: ['Runes, in the', 'order you need them'], kicker: 'Svelte 5 in practice' },
+  { file: 'public/covers/freelancers-and-agencies-design-reviews.png', scene: 'dusk', lines: ['Design reviews', 'with the client live'], kicker: 'Use case: freelancers and agencies' },
+  { file: 'public/covers/feega-with-claude-code.png', scene: 'sunset', lines: ['Claude Code writes.', 'You adjust.'], kicker: 'Use case: Claude Code' },
+  { file: 'public/covers/feega-with-grok-build.png', scene: 'terminal', lines: ['Grok Build writes.', 'You adjust.'], kicker: 'Use case: Grok Build' },
+  { file: 'public/covers/feega-with-ai-site-builders.png', scene: 'windows', lines: ['Generated site.', 'Hand-tuned code.'], kicker: 'Use case: AI site builders' }
 ];
 
 const CURSOR = [
@@ -147,7 +155,37 @@ function sunset(x, y) {
   return ramp([INK, DEEP, NAVY, EMBER, ORANGE], 1 - Math.min(distance / (ROWS * 0.9), 1), x, y);
 }
 
-const SCENES = { dusk, forge, tiles, sunset };
+function terminal(x, y) {
+  const line = Math.floor(y / 4);
+  const background = ramp([INK, DEEP], y / ROWS, x, y);
+  if (y % 4 > 1) {
+    return background;
+  }
+  const indent = Math.floor(hash(line, 1, 21) * 4) * 6 + 40;
+  const length = 10 + hash(line, 2, 21) * COLS * 0.35;
+  if (x < indent || x > indent + length) {
+    return background;
+  }
+  return line === 6 ? ORANGE : ramp([NAVY, BLUE], hash(x, line, 22), x, y);
+}
+
+function windows(x, y) {
+  const frames = [
+    { x0: COLS * 0.55, x1: COLS * 0.96, y0: ROWS * 0.28, y1: ROWS * 0.7, edge: ORANGE, fill: EMBER },
+    { x0: COLS * 0.42, x1: COLS * 0.88, y0: ROWS * 0.12, y1: ROWS * 0.55, edge: BLUE, fill: NAVY }
+  ];
+  for (const frame of frames) {
+    if (x < frame.x0 || x > frame.x1 || y < frame.y0 || y > frame.y1) {
+      continue;
+    }
+    const onEdge = x - frame.x0 < 1 || frame.x1 - x < 1 || y - frame.y0 < 1 || frame.y1 - y < 1;
+    const onBar = y - frame.y0 < 4;
+    return onEdge || onBar ? frame.edge : frame.fill;
+  }
+  return ramp([INK, DEEP], 1 - y / ROWS, x, y);
+}
+
+const SCENES = { dusk, forge, tiles, sunset, terminal, windows };
 
 const CURSOR_ANCHOR = { x: Math.round(COLS * 0.68) - 3, y: Math.round(ROWS * 0.7) - 28 };
 

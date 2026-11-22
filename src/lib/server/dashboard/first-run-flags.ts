@@ -1,12 +1,10 @@
 import type { User } from '@supabase/supabase-js';
 import type { Db } from '$lib/server/db/client';
-import { readTourSeen } from '$lib/server/repos/profiles';
-import { TourState, tourStateOf } from '$lib/onboarding/tour';
 import { outdatedTermsVersion } from '$lib/terms-notice';
 
-export type FirstRunFlags = { termsNoticeVersion: string | null; tour: TourState; name: string | null };
+export type FirstRunFlags = { termsNoticeVersion: string | null; name: string | null };
 
-const NOBODY: FirstRunFlags = { termsNoticeVersion: null, tour: TourState.Seen, name: null };
+const NOBODY: FirstRunFlags = { termsNoticeVersion: null, name: null };
 
 const NAME_KEYS = ['full_name', 'name'] as const;
 
@@ -21,14 +19,10 @@ export async function firstRunFlags(db: Db | null, user: User | null): Promise<F
     return NOBODY;
   }
 
-  const [terms, tourSeen] = await Promise.all([
-    db.from('profiles').select('terms_version, name').eq('id', user.id).maybeSingle(),
-    readTourSeen(db, user.id)
-  ]);
+  const terms = await db.from('profiles').select('terms_version, name').eq('id', user.id).maybeSingle();
 
   return {
     termsNoticeVersion: outdatedTermsVersion(terms.data?.terms_version ?? null),
-    tour: tourStateOf({ createdAt: user.created_at, seen: tourSeen }),
     name: terms.data?.name || metadataName(user)
   };
 }

@@ -72,5 +72,5 @@ export const NEXTJS: Topic = {
     { label: 'Next.js: CSS modules', href: 'https://nextjs.org/docs/app/getting-started/css' },
     { label: 'Next.js: server and client components', href: 'https://nextjs.org/docs/app/getting-started/server-and-client-components' }
   ],
-  readNext: ['/for/react', '/for/tailwind', '/integrations/cursor', '/integrations/vscode', '/alternatives/cursor-design-mode', '/download']
+  readNext: ['/for/react', '/for/tailwind', '/templates/react', '/integrations/vscode', '/alternatives/cursor-design-mode', '/download']
 };

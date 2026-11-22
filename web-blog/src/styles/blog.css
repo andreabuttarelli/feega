@@ -126,3 +126,22 @@ a:hover { color: var(--sx-accent); }
 
 .sx-pill.is-outline { border: 1px solid var(--sx-line-strong); }
 .sx-pill.is-outline:hover { color: #fff; }
+
+.prose table { display: block; overflow-x: auto; }
+.prose th, .prose td { min-width: 120px; }
+
+.pixel { flex: none; image-rendering: pixelated; }
+
+.callout { display: flex; gap: var(--sx-s4); margin: var(--sx-s6) 0; padding: var(--sx-s5); border: 1px solid var(--sx-line); border-radius: var(--sx-radius-lg); background: var(--sx-grey-1); }
+.callout > div { min-width: 0; }
+.callout .pixel { margin-top: 4px; }
+.callout p { margin: 0 0 var(--sx-s3); }
+.callout p:last-child { margin-bottom: 0; }
+.prose .callout-title { color: var(--sx-ink); font-weight: 600; }
+
+.cta-box { margin: var(--sx-s8) 0; padding: var(--sx-s6); border-radius: var(--sx-radius-xl); background: var(--sx-tint-accent); }
+.prose .cta-title { margin: 0 0 var(--sx-s3); color: var(--sx-ink); font-size: var(--sx-fs-h3); font-weight: 600; line-height: 1.15; }
+.cta-body p { margin: 0 0 var(--sx-s5); }
+.prose .cta-box .sx-pill { text-decoration: none; }
+.prose .cta-box .sx-pill:hover { color: #fff; }
+.archived-banner { margin: 0 0 var(--sx-s5); padding: var(--sx-s4) var(--sx-s5); border: 1px solid var(--sx-line); border-radius: var(--sx-radius-lg); background: var(--sx-grey-1); }

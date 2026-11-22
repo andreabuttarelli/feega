@@ -10,11 +10,22 @@ export const COFFEE_URL = 'https://buy.stripe.com/5kQ00k2A97C08sd94LeME07';
 
 export const EXTENSION_PUBLISHED = true;
 
+export const DESKTOP_PUBLISHED = false;
+
+export const DESKTOP_RELEASE_URL = `${GITHUB_URL}/releases/download/desktop-latest`;
+
+export const DESKTOP_INSTALL_COMMAND = `curl -fsSL ${SITE_URL}/install | sh`;
+
+export const DESKTOP_DMGS = [
+  { arch: 'Apple silicon', href: `${DESKTOP_RELEASE_URL}/Feega-mac-arm64.dmg` },
+  { arch: 'Intel', href: `${DESKTOP_RELEASE_URL}/Feega-mac-x64.dmg` }
+] as const;
+
 export const DOWNLOAD_PATH = '/download';
 
 export const FEEGA_VERSION = __FEEGA_VERSION__;
 
-export const NODE_REQUIREMENT = 'Node 18 or newer';
+export const NODE_REQUIREMENT = 'Node 20 or newer';
 
 export const VSCODE_REQUIREMENT = 'VS Code 1.90 or newer';
 
@@ -39,8 +50,10 @@ export const EDITORS: readonly Editor[] = [
 
 export const HEADER_LINKS = [
   { href: DOWNLOAD_PATH, label: 'Download' },
+  { href: '/templates', label: 'Templates' },
   { href: DOCS_URL, label: 'Docs' },
   { href: STORY_URL, label: 'Blog' },
+  { href: '/plugins', label: 'Plugins' },
   { href: '/pricing', label: 'Pricing' },
   { href: DISCORD_URL, label: 'Community' }
 ] as const;

@@ -1,0 +1,167 @@
+---
+title: Using Feega with Grok Build
+description: How to use Feega next to Grok Build, xAI's terminal coding agent. Add the Feega skill, give each tool its own job, and review both sets of changes as diffs.
+date: 2026-11-22
+cover: /covers/feega-with-grok-build.png
+coverAlt: "Cover: Grok Build writes. You adjust. Use case: Grok Build"
+tags: [use-case, grok-build, agents, how-to]
+---
+
+import Callout from '../../components/Callout.astro';
+import Cta from '../../components/Cta.astro';
+
+Grok Build is a coding agent from xAI that runs in your terminal. Feega is a visual editor that writes your design changes into your source. They do not know about each other, and they do not need to: both edit the files in your project, and you review both as diffs.
+
+This guide covers the practical bits: getting Feega's skill in front of Grok Build, splitting the work, and avoiding collisions. It is a how-to. It does not rate Grok Build and says nothing about its models or cost.
+
+<Callout icon="warn" title="Independent tools">
+Feega and Grok Build are separate products from separate makers. There is no official integration between them. This guide describes using the two side by side on one codebase.
+</Callout>
+
+## What you need
+
+- A web project that runs a dev server.
+- Grok Build, installed and signed in.
+- Feega: the VS Code extension (`andreabuttarelli.feega`), or `npx feega` with Node 20 or newer.
+
+Grok Build's docs give the install commands as `curl -fsSL https://x.ai/cli/install.sh | bash` on macOS or Linux, and `irm https://x.ai/cli/install.ps1 | iex` in Windows PowerShell. You start it with `grok` in your project folder. On first launch it opens your browser to sign in. Check the [Grok Build docs](https://docs.x.ai/build/overview) for the current steps.
+
+## How we checked
+
+On 22 November 2026 I opened the [Grok Build overview](https://docs.x.ai/build/overview), the page on [skills, plugins and marketplaces](https://docs.x.ai/build/features/skills-plugins-marketplaces), the page on [modes and commands](https://docs.x.ai/build/modes-and-commands), and xAI's [launch post](https://x.ai/news/grok-build-cli). I also read the Feega skill file and the Feega docs page on AI agents.
+
+The launch post is dated 25 May 2026 and calls Grok Build an early beta, so details may have changed since. xAI's product page at x.ai/cli returned an access error when I tried to open it, so I did not use it.
+
+What I did not do: I did not run Grok Build, so I have not tested the Feega skill inside it. The paths below come from the docs. This guide has no first-hand results and no screenshots of Grok Build.
+
+## Step 1: put the Feega skill where Grok Build looks
+
+A skill is a folder with a `SKILL.md` file. Grok Build's docs say it loads skills from:
+
+- `~/.grok/skills/` for you, in every project.
+- `./.grok/skills/` for the project, found by walking up to the repository root.
+- `~/.agents/skills/` for user-level skills in the shared agents layout.
+- Enabled plugins' `skills/` folders, and extra paths you list under `[skills] paths` in `~/.grok/config.toml`.
+
+The same page says Grok reads Claude Code skills, plugins, marketplaces and instruction files with no configuration. It does not name the exact Claude Code path, so I would not rely on that for a first setup.
+
+The plain approach is to copy the Feega skill into one of those folders. The skill lives in the Feega repository at `plugins/feega/skills/feega`.
+
+```bash
+mkdir -p .grok/skills
+cp -r path/to/feega/plugins/feega/skills/feega .grok/skills/feega
+```
+
+Commit `.grok/skills/feega` if you want the team to get it. Grok Build's `/skills` command opens a panel for skills, and the page lists `/plugins`, `/hooks` and `/mcps` the same way, so you can check the skill shows up.
+
+I did not verify whether the `npx skills add andreabuttarelli/feega` command from the Feega docs targets Grok Build's folders. Copying the folder does not depend on that.
+
+## Step 2: also tell it in AGENTS.md
+
+Grok Build reads the `AGENTS.md` family of files, walking from the current directory to the repository root. A few lines in `AGENTS.md` cost nothing and work even if the skill does not load:
+
+```md
+## Feega
+
+This project is edited visually with Feega. Write markup Feega can edit:
+literal Tailwind class strings (no cn() or clsx() on elements people tweak),
+visible text in the markup (not in props or constants), and loops over
+array literals. Do not reformat files you were not asked to touch.
+```
+
+These four points come from the Feega skill and docs. They are the ones that decide whether Feega can write to your code.
+
+## Step 3: set the project up
+
+Ask Grok Build in plain words: "set this project up for Feega". The skill's instructions, in short:
+
+- SvelteKit, Vite and React Router projects need no change. The source map is automatic.
+- Next.js needs `feega-source-map` in `devDependencies` and the config export wrapped with `withFeegaSource` from `feega-source-map/next`.
+- Other frameworks, Nuxt and Astro among them, need the Vite plugin `feegaSource()` first in `plugins`.
+
+Then start the editor yourself with **Feega: Open from current workspace** in VS Code, Cursor, Windsurf or VSCodium, or run `npx feega` in the app folder in a second terminal. `npx feega` runs until Ctrl+C, so do not leave it to the agent's shell if the agent waits for commands to finish.
+
+## Step 4: split the work
+
+| Task | Who |
+|---|---|
+| New component, route, data, logic, tests | Grok Build |
+| Spacing, colour, radius, type, shadow | Feega |
+| A word in a heading or button | Feega, double-click the text |
+| Phone or tablet width tweaks | Feega, with the device bar |
+| Dark mode value | Feega, with the theme menu |
+| Cross-file renames | Grok Build |
+
+Rule of thumb: a number or a colour you can see is a click. A behaviour is a request.
+
+## Step 5: use plan mode for bigger asks, and review both diffs
+
+Grok Build has a plan mode. The docs say you enter it with `/plan` and, until you approve, only the session plan file can be edited. The launch post says approved changes appear as diffs. For a large ask, such as a new section, that gives you a chance to correct the plan before any file changes.
+
+After each round:
+
+1. Look at what the agent changed in your usual git tool or `git diff`.
+2. Open Feega's **Changes** tab to see your own visual edits with file and line.
+3. Commit. Keep agent commits and visual commits apart if you can. It makes a revert simple.
+
+Feega keeps its history outside your project and respects hand edits in the same files, so an undo in Feega does not overwrite what the agent wrote. Still, do not tweak a file while the agent is writing it.
+
+## Headless runs
+
+Grok Build can run without the interface: `grok -p "Explain this codebase"`, with `--output-format streaming-json` for streamed output. The docs describe that for scripts and bots. Feega is an interactive editor, so it has no part in a headless run. The useful overlap is the markup rules in `AGENTS.md`: an agent running unattended will still write code Feega can edit later.
+
+## Limits
+
+- I did not run this combination. The skill paths are from the docs, and I have not seen the skill trigger in Grok Build.
+- Text from props or constants is refused by Feega, whoever wrote it. Copy lives in the markup or it is not editable visually.
+- Class names built with `cn()`, `clsx()` or a template string are not written.
+- Grok Build is an early beta according to its launch post. Behaviour and paths may change, so read its docs before you copy anything from here.
+- Feega never calls Grok Build and sends no code to it.
+
+<Cta title="Add visual editing to your terminal agent">
+Install Feega, copy the skill into `.grok/skills`, and change one value by hand after the agent writes a component.
+</Cta>
+
+## Questions
+
+### Is there an official Feega and Grok Build integration?
+
+No. They are independent. You use them on the same project, and each writes its own diffs.
+
+### Where does Grok Build look for skills?
+
+Per its docs: `~/.grok/skills/`, `./.grok/skills/` walking up to the repository root, `~/.agents/skills/`, plugin skill folders, and paths set in `~/.grok/config.toml`.
+
+### Does Feega work if I do not install the skill?
+
+Yes. The skill only helps the agent set a project up and write editable markup. You can add the plugin and run Feega yourself.
+
+### Which frameworks does Feega support?
+
+SvelteKit, Vite (React, Vue, Svelte), React Router, Next.js, Nuxt and Astro, with Tailwind, CSS modules, scoped styles or plain CSS.
+
+### Can Grok Build and Feega edit the same file?
+
+Yes, one after the other. Do not edit while the agent is writing, and commit between rounds.
+
+### Does Feega need an account or an API key for Grok?
+
+No. Feega works without an account and has no AI. It does not use your Grok credentials.
+
+## Sources
+
+Read on 22 November 2026.
+
+- [Grok Build overview](https://docs.x.ai/build/overview)
+- [Grok Build: plugins, skills and marketplaces](https://docs.x.ai/build/features/skills-plugins-marketplaces)
+- [Grok Build: modes and commands](https://docs.x.ai/build/modes-and-commands)
+- [xAI: Grok Build launch](https://x.ai/news/grok-build-cli), 25 May 2026.
+- [Feega docs: Use Feega with AI agents](https://docs.feega.app/more/ai-agents/)
+- The Feega skill, `plugins/feega/skills/feega/SKILL.md`, in the [Feega repository](https://github.com/andreabuttarelli/feega).
+
+## Read next
+
+- [Using Feega with Claude Code](/use-cases/feega-with-claude-code/)
+- [Using Feega alongside AI site builders and agents](/use-cases/feega-with-ai-site-builders/)
+- [Feega for freelancers and agencies](/use-cases/freelancers-and-agencies-design-reviews/)
+- [Why Feega is now one thing](/posts/design-in-your-codebase/)

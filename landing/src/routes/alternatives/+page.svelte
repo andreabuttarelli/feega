@@ -6,6 +6,7 @@
   import { ArticleKind } from '$lib/site/alternatives/alternative';
   import AsciiCover from '$lib/site/alternatives/AsciiCover.svelte';
   import { coverFor } from '$lib/site/alternatives/cover';
+  import { ALT_LANDINGS, altLandingPath } from '$lib/site/alt-landings';
 
   const slugs = Object.keys(ALTERNATIVES);
 
@@ -38,6 +39,14 @@
     </div>
   {/each}
 
+  <h2>Quick versions</h2>
+  <ul>
+    {#each ALT_LANDINGS as v (v.slug)}
+      <li><a href={altLandingPath(v.slug)}>{v.title}</a></li>
+    {/each}
+  </ul>
+
+  <p class="fine"><a href="/templates">Free sections and UI templates for Svelte, React, Vue and Astro</a></p>
   <p class="fine">{DISCLAIMER}</p>
 </article>
 </CatalogLayout>

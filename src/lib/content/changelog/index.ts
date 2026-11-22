@@ -9,7 +9,6 @@ export type ChangelogEntry = {
   items: string[];
 };
 
-import legacyEntries from './legacy';
 import fromFiles from 'virtual:changelog-entries';
 
-export const changelogEntries: ChangelogEntry[] = [...fromFiles, ...legacyEntries];
+export const changelogEntries: ChangelogEntry[] = fromFiles;

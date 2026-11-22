@@ -12,9 +12,10 @@ interface Props {
   cover?: { src: string; alt: string };
   type?: 'website' | 'article';
   jsonLd?: object;
+  noindex?: boolean;
 }
 
-const { title, description = SITE_DESCRIPTION, cover, type = 'website', jsonLd } = Astro.props;
+const { title, description = SITE_DESCRIPTION, cover, type = 'website', jsonLd, noindex = false } = Astro.props;
 const fullTitle = title ? `${title} · ${SITE_TITLE}` : SITE_TITLE;
 const canonical = new URL(Astro.url.pathname, Astro.site);
 const ogImage = cover ? new URL(cover.src, Astro.site).href : SOCIAL_PREVIEW.image;
@@ -29,6 +30,7 @@ const ogAlt = cover?.alt ?? SOCIAL_PREVIEW.alt;
     <title>{fullTitle}</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
+    {noindex && <meta name="robots" content="noindex, follow" />}
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
     <link rel="icon" href="/favicon.png" sizes="48x48" type="image/png" />

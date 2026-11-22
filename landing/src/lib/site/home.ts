@@ -1,4 +1,4 @@
-import { PLAN, freeAnswer } from './pricing/plan';
+import { freeAnswer } from './pricing/plan';
 import { GITHUB_URL } from './links';
 
 const VIDEO_BASE = 'https://klnswzhhgrqvbfjzioul.supabase.co/storage/v1/object/public/website';
@@ -39,15 +39,15 @@ export const TICKER_VIDEOS = [
 export const FAQ = [
   {
     q: "What is Feega?",
-    a: `A free VS Code extension. Click any element of your running app, edit it like in Figma, and the change is written to your code. No AI, no tokens, every edit shown as a diff. The code is on <a href="${GITHUB_URL}">GitHub</a>.`
+    a: `A free tool that runs as a VS Code extension, or in your browser with npx feega. Click any element of your running app, edit it like in Figma, and the change is written to your code. No AI, no tokens, every edit shown as a diff. The code is on <a href="${GITHUB_URL}">GitHub</a>.`
   },
   {
     q: "Can I use Feega for free?",
-    a: freeAnswer(PLAN)
+    a: freeAnswer()
   },
   {
     q: "Which editors and frameworks does it support?",
-    a: "VS Code, Cursor, Windsurf and VSCodium. React, Next.js, SvelteKit and Vue, styled with Tailwind or plain CSS."
+    a: "VS Code, Cursor, Windsurf and VSCodium, or any terminal with npx feega. React, Next.js, SvelteKit, Vue, Nuxt, React Router, Astro and Vite, styled with Tailwind or plain CSS."
   },
   {
     q: "Does it need an AI agent?",
@@ -55,7 +55,7 @@ export const FAQ = [
   },
   {
     q: "What is Feega Cloud?",
-    a: "Coming later: GitHub sync, collaboration, sections and templates. The extension stays free."
+    a: "Coming soon: GitHub sync, collaboration, sections and templates. The extension stays free."
   },
   {
     q: "Who owns my work, and is it used to train AI?",

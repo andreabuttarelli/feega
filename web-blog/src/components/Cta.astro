@@ -1,0 +1,14 @@
+---
+interface Props {
+  title: string;
+}
+
+const DOWNLOAD_URL = 'https://www.feega.app/download';
+const { title } = Astro.props;
+---
+
+<section class="cta-box">
+  <p class="cta-title">{title}</p>
+  <div class="cta-body"><slot /></div>
+  <a class="sx-pill sx-cta" href={DOWNLOAD_URL}>Download for free</a>
+</section>

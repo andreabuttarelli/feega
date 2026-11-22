@@ -3,6 +3,8 @@
   import Mark from './Mark.svelte';
   import { DOWNLOAD_PATH, GITHUB_URL, HEADER_LINKS, DOCS_URL, SOCIAL_LINKS, STORY_URL } from './links';
   import { GITHUB_ICON } from './social-icons';
+  import LibraryMenu from './LibraryMenu.svelte';
+  import { desktopNav } from './library-menu';
 
   const isCurrent = (href: string) => {
     if (href === DOCS_URL || href === STORY_URL) {
@@ -17,13 +19,17 @@
   <a class="sx-brand" href="/" aria-label="Feega home"><Mark size={22} /><span>feega</span></a>
 
   <nav class="sx-links" aria-label="Main">
-    {#each HEADER_LINKS as link (link.label)}
-      <a class="sx-pill" href={link.href} aria-current={isCurrent(link.href) ? 'page' : undefined}>{link.label.toLowerCase()}</a>
+    {#each desktopNav as entry ('library' in entry ? 'library' : entry.label)}
+      {#if 'library' in entry}
+        <LibraryMenu freeTemplates={page.data.freeTemplates ?? 0} />
+      {:else}
+        <a class="sx-pill" href={entry.href} aria-current={isCurrent(entry.href) ? 'page' : undefined}>{entry.label.toLowerCase()}</a>
+      {/if}
     {/each}
   </nav>
 
   <div class="sx-actions">
-    <a class="sx-pill" href={GITHUB_URL}>star on github</a>
+    <a class="sx-pill sx-star" href={GITHUB_URL}>star on github</a>
     <a class="sx-pill sx-cta" href={DOWNLOAD_PATH}>download</a>
   </div>
 

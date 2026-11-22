@@ -1,0 +1,149 @@
+---
+title: Using Feega alongside AI site builders and agents
+description: A generated site is a starting point. If you can get its code into a project that runs locally, Feega lets you tune it by hand. What works, what gets refused, and how to prepare generated code.
+date: 2026-11-22
+cover: /covers/feega-with-ai-site-builders.png
+coverAlt: "Cover: Generated site. Hand-tuned code. Use case: AI site builders"
+tags: [use-case, ai, site-builders, how-to]
+---
+
+import Callout from '../../components/Callout.astro';
+import Cta from '../../components/Cta.astro';
+
+Tools that generate a whole site from a prompt are common now, and so are coding agents that scaffold an app. The first draft arrives fast. The last ten percent is the hard part: the spacing that is slightly off, the heading that needs two lines, the colour the client actually wants.
+
+Feega is built for that last stretch. If the generated site exists as code in a project you can run locally, you can click an element in the running page and change it, and the edit lands in the source as a diff. This guide explains when that works, what to check first, and what Feega will refuse.
+
+<Callout icon="warn" title="No relationship implied">
+Feega is not part of any site builder, and no site builder uses Feega. This guide describes a workflow where you take generated code and edit it yourself. It names no specific product on purpose.
+</Callout>
+
+## The one condition
+
+You need the code. Feega edits a running app that lives in a folder on your machine, started with its own dev server. It reads the source behind the page and writes back to it.
+
+That means:
+
+- A builder that lets you export or sync the project as code (to a repository or a download) is a candidate.
+- A builder that only hosts the site and shows it in a browser is not. Feega has nothing to open.
+- An agent that writes files into a folder on your machine is a candidate right away.
+
+Feega supports SvelteKit, Vite (React, Vue, Svelte), React Router, Next.js, Nuxt and Astro. Styling can be Tailwind, CSS modules, Svelte or Vue scoped styles, or plain CSS. If the generated project uses something else, check the framework pages in the docs first.
+
+## How we checked
+
+On 22 November 2026 I read the Feega docs for SvelteKit, Next.js, Quick start and Troubleshooting, and the Feega skill file, to list what Feega edits and what it refuses. I wrote this guide from that.
+
+What I did not do: I did not test any site builder, and I did not run Feega on generated code for this post. I cannot tell you how any particular builder structures its output. The lists below describe the typical things generated code does, and each is something Feega's docs say it refuses or cannot trace. Check your own project.
+
+## Step 1: get the project running
+
+1. Export or clone the generated project.
+2. Install and start it the way its readme says, usually `npm install` then `npm run dev`.
+3. Confirm the site loads in your browser before you add Feega.
+
+If the dev server does not start, fix that first. Feega starts your dev server for you, so it has to start from a command. If the command is unusual, the `feegaInspect.devCommand` setting takes it, as in `npm run dev`.
+
+## Step 2: open it in Feega
+
+Open the folder in your editor and run **Feega: Open from current workspace**, or run `npx feega` in the app folder. In **Design** mode, click an element. Its properties open in the right bar. Change one value and open **Changes** to see the diff.
+
+For Next.js, and for frameworks other than SvelteKit, Vite and React Router, the project needs the `feega-source-map` plugin first. The skill describes the exact edit, and the extension offers an "Add the Feega plugin" link in its panel.
+
+## Step 3: know what generated code gets refused
+
+Generated code is written for speed. A few habits are common, and each runs into a Feega limit. The limits come from the docs.
+
+| What the code does | What Feega does |
+|---|---|
+| Text comes from a prop, a constant or a data array | The edit is refused, with a message pointing at the source line |
+| Class names built with `cn()`, `clsx()` or a template string | Class edits are not written |
+| Cards or rows rendered by `{#each}`, `v-for` or `.map` | The items share one source line and cannot be reordered one by one |
+| Layers wrapped by the framework | They may show up in Layers next to your own elements (Next.js) |
+| Icons from an unsupported library | Icon swap does not apply; they stay manual |
+
+Do not be discouraged by the first refused edit. The message says why, and the fix is usually small: move a string into the markup, turn a built class name into a literal one. Do it for the elements people will actually tweak, not for the whole project.
+
+## Step 4: prepare the parts you will tweak
+
+A short pass before you start:
+
+1. Find the five or six elements the client or designer will care about: hero heading, main button, cards, footer.
+2. Make their text literal in the markup.
+3. Make their classes literal strings.
+4. For a loop, render it over an array literal in the same file, so the order can be edited at the data.
+
+If you use a coding agent to do this pass, the [Claude Code guide](/use-cases/feega-with-claude-code/) and the [Grok Build guide](/use-cases/feega-with-grok-build/) show how to give it the Feega rules once, so it writes editable markup from then on.
+
+## Step 5: tune, review, commit
+
+Work in short loops. Change a size, a colour, a radius, a font. Switch the device bar to phone and fix the narrow layout. If the project supports dark mode, Feega lists the theme in the toolbar and writes the edit to that theme only.
+
+Open **Changes** when you stop. Each edit has a file and line. You can show the diff, open the source, or revert one change. **Revert all** returns the files to how they were before your edits.
+
+Then commit with git. Feega writes files and does not commit. Its layout and history live outside your project.
+
+An illustrative before and after, to show the kind of edit that happens. It is not from a real project:
+
+```diff
+-<h1 class="text-4xl font-bold">Build your site in minutes</h1>
++<h1 class="text-5xl font-semibold tracking-tight">Build your site in minutes</h1>
+```
+
+## When this is the wrong tool
+
+- **You do not have the code.** No folder, no Feega.
+- **You want a new page generated.** Feega changes what exists. It does not generate designs and has no AI.
+- **You need to change data or logic.** That is code work. Do it by hand or with an agent.
+- **The whole project is built from generated class names or data.** You may spend more time preparing than tuning. Edit the stylesheet by hand instead.
+
+## What stays the same
+
+Whoever wrote the code, you review it as code. A generated site can have accessibility gaps, odd markup, or dependencies you do not want. Feega does not check any of that. It makes visual edits quick, and it shows them as diffs, which keeps the review honest.
+
+<Cta title="Take a generated page the last ten percent">
+Run your exported project locally, open it in Feega, and change three values you would normally chase in the stylesheet.
+</Cta>
+
+## Questions
+
+### Can I use Feega on a site that is only hosted by a builder?
+
+No. Feega needs a project folder with a dev server. Export the code first, if the builder allows it.
+
+### Does Feega work with any generated code?
+
+It works with supported frameworks and styling. Generated code often has text in props and built class names, which Feega refuses until you make them literal.
+
+### Does Feega generate or rewrite my site?
+
+No. It has no AI. It changes what you click, one edit at a time, and shows each as a diff.
+
+### Is this affiliated with any site builder?
+
+No. Feega is independent, and this guide names no builder.
+
+### What do I do when an edit is refused?
+
+Read the message. It points at the source line. Usually you move text into the markup or write a class name as a literal string.
+
+### Can I undo edits?
+
+Yes. Undo and redo walk the steps, and **Revert all** returns the files to how they were before your edits.
+
+## Sources
+
+Read on 22 November 2026.
+
+- [Feega docs: Quick start](https://docs.feega.app/getting-started/quick-start/)
+- [Feega docs: SvelteKit](https://docs.feega.app/frameworks/sveltekit/) and [Next.js](https://docs.feega.app/frameworks/nextjs/)
+- [Feega docs: Troubleshooting](https://docs.feega.app/more/troubleshooting/)
+- [Feega docs: Undo and changes](https://docs.feega.app/editing/undo-and-changes/)
+- The Feega skill, `plugins/feega/skills/feega/SKILL.md`, in the [Feega repository](https://github.com/andreabuttarelli/feega).
+
+## Read next
+
+- [Using Feega with Claude Code](/use-cases/feega-with-claude-code/)
+- [Using Feega with Grok Build](/use-cases/feega-with-grok-build/)
+- [Feega for freelancers and agencies](/use-cases/freelancers-and-agencies-design-reviews/)
+- [Why Feega is now one thing](/posts/design-in-your-codebase/)

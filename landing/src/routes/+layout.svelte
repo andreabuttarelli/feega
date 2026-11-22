@@ -10,7 +10,15 @@
   import { breadcrumbJsonLd } from '$lib/site/structured-data';
   import { OG } from '$lib/site/seo';
 
+  import { onMount, type Component } from 'svelte';
+
   let { children } = $props();
+
+  let AskAi = $state<Component | null>(null);
+
+  onMount(async () => {
+    AskAi = (await import('$lib/site/ask-ai/AskAi.svelte')).default;
+  });
 
   const canonical = $derived(SITE_URL + page.url.pathname);
   const trail = $derived(page.url.pathname === '/' ? [] : trailOf(page.url.pathname));
@@ -52,3 +60,7 @@
   </main>
   <SiteFooter />
 </div>
+
+{#if AskAi}
+  <AskAi />
+{/if}

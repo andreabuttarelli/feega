@@ -1,7 +1,9 @@
 <script lang="ts">
   import { browserEnv, installOptions, Outcome, runOption, type InstallOption } from './install';
   import { EDITOR_ICONS } from './editor-icons';
-  import { DOWNLOAD_PATH } from './links';
+  import CommandField from './CommandField.svelte';
+  import { APPLE_ICON } from './social-icons';
+  import { DESKTOP_DMGS, DESKTOP_INSTALL_COMMAND, DESKTOP_PUBLISHED, DOWNLOAD_PATH } from './links';
 
   let { label }: { label: string } = $props();
 
@@ -46,6 +48,14 @@
           {#if option.command && copied}<span class="done">copied</span>{/if}
         </button>
       {/each}
+      {#if DESKTOP_PUBLISHED}
+        <p class="section"><img src="/img/feega-desktop.png" alt="" width="20" height="20" />desktop app (beta)</p>
+        <div class="field"><CommandField command={DESKTOP_INSTALL_COMMAND} /></div>
+        {#each DESKTOP_DMGS as dmg (dmg.arch)}
+          <a role="menuitem" href={dmg.href}><span class="logo">{@html APPLE_ICON}</span><span>dmg · {dmg.arch.toLowerCase()}</span></a>
+        {/each}
+        <p class="hint">macOS blocks the dmg. allow it in privacy & security, open anyway.</p>
+      {/if}
       <a role="menuitem" class="all" href={DOWNLOAD_PATH}>All download options →</a>
     </div>
   {/if}
@@ -100,6 +110,7 @@
     display: flex;
     flex-direction: column;
     min-width: 240px;
+    max-width: calc(100vw - 32px);
     padding: 6px;
     border: 1px solid rgb(255 255 255 / 0.15);
     border-radius: var(--ui-radius-lg, 10px);
@@ -142,6 +153,32 @@
     margin-left: auto;
     color: #ff5100;
     font-size: 13px;
+  }
+
+  .section {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 8px 10px 4px;
+    padding-top: 8px;
+    border-top: 1px solid rgb(255 255 255 / 0.1);
+    color: rgb(255 255 255 / 0.5);
+    font-size: 13px;
+  }
+
+  .hint {
+    margin: 4px 10px 6px;
+    color: rgb(255 255 255 / 0.5);
+    font-size: 12px;
+    line-height: 1.35;
+  }
+
+  .field {
+    margin: 2px 4px 6px;
+  }
+
+  .section img {
+    border-radius: 4px;
   }
 
   .all {

@@ -6,6 +6,8 @@
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
   import { signOutForm } from '$lib/auth/sign-out-form';
   import { DASHBOARD_SETTINGS_HOME } from '$lib/settings/paths';
+  import { dashboardSettingsHref } from '$lib/components/settings/platforms';
+  import { SettingsSection } from '$lib/settings/sections';
   import type { AppShell as Shell } from '$lib/server/dashboard/app-shell';
 
   let { profile, children }: { profile: Shell['profile']; children: Snippet } = $props();
@@ -26,6 +28,7 @@
         </DropdownMenu.Label>
         <DropdownMenu.Separator />
         <DropdownMenu.Item><a class="entry" href={DASHBOARD_SETTINGS_HOME}>{$_('app.account.settings')}</a></DropdownMenu.Item>
+        <DropdownMenu.Item><a class="entry" href={dashboardSettingsHref(SettingsSection.Billing)}>{$_('app.account.billing')}</a></DropdownMenu.Item>
         <DropdownMenu.Item>
           <form method="POST" action="/auth/signout" use:signOutForm>
             <button type="submit" class="entry">{$_('app.account.signOut')}</button>

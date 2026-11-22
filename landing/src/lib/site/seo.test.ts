@@ -76,6 +76,19 @@ describe('llms.txt', () => {
   });
 });
 
+describe('llms surfaces', () => {
+  it('states editors, terminal, desktop and Cloud as coming soon, without a download link', () => {
+    for (const text of [llmsTxt(), llmsFullTxt()]) {
+      expect(text).toContain('## Where it runs');
+      expect(text).toMatch(/Cursor, Windsurf and VSCodium/);
+      expect(text).toContain('`npx feega`');
+      expect(text).toMatch(/Desktop app: coming soon/);
+      expect(text).toMatch(/Feega Cloud: coming soon/);
+      expect(text).not.toMatch(/\.dmg|desktop-latest/);
+    }
+  });
+});
+
 describe('llms-full', () => {
   it('llms-full says the extension is not published yet, without fake install links', () => {
     expect(llmsFullTxt()).not.toContain('vscode:extension');
