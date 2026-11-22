@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "wrangler dev --local --infer-origin-from-routes false --var VISITOR_BASE:localhost:8787 --var WEB_ORIGIN:http://localhost:5173",
     "test": "vitest run",
-    "deploy": "wrangler deploy"
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "deploy": "node deploy.mjs"
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "^1.9.0",
