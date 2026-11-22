@@ -90,6 +90,17 @@ const pop = () => {
   });
 };
 
+const tap = () => {
+  const noise = seeded(89);
+
+  return render(0.05, (t) => {
+    const body = Math.sin(2 * Math.PI * 1800 * t) * Math.exp(-t / 0.006);
+    const grain = noise() * Math.exp(-t / 0.002);
+
+    return 0.22 * (body + 0.4 * grain) * Math.min(1, t / 0.0008);
+  });
+};
+
 mkdirSync(OUT, { recursive: true });
 
 const SOUNDS = {
@@ -101,6 +112,7 @@ const SOUNDS = {
   backspace: click(67, 1100),
   chime: chime(),
   pop: pop(),
+  tap: tap(),
 };
 
 for (const [name, samples] of Object.entries(SOUNDS)) {

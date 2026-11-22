@@ -11,6 +11,8 @@ export const settle = (p: number) => {
   return expoInOut(t) + SETTLE * Math.sin(Math.PI * tail);
 };
 
+const expoOut = Easing.out(Easing.exp);
+
 const glideInOut = Easing.bezier(0.7, 0, 0.3, 1);
 
 const progress = (frame: number, start: number, duration: number) =>
@@ -24,3 +26,5 @@ export const tween = (frame: number, start: number, duration: number) => settle(
 export const glide = (frame: number, start: number, duration: number) => glideInOut(progress(frame, start, duration));
 
 export const mix = (a: number, b: number, t: number) => a + (b - a) * t;
+
+export const lift = (frame: number, start: number, duration: number) => expoOut(progress(frame, start, duration));

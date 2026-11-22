@@ -5,7 +5,7 @@ import { CAMERA_MOVE, HEIGHT, WIDTH } from "../timing";
 
 export type Shot = { x: number; y: number; scale: number };
 
-type Key<F extends string> = { at: number; focus: F };
+type Key<F extends string> = { at: number; focus: F; move?: number };
 
 type Props<F extends string> = {
   keys: Key<F>[];
@@ -31,7 +31,7 @@ export const Camera = <F extends string>({ keys, shots, children }: Props<F>) =>
   const index = current(keys, frame);
   const to = shots[keys[index].focus];
   const from = shots[keys[Math.max(0, index - 1)].focus];
-  const t = glide(frame, keys[index].at, CAMERA_MOVE);
+  const t = glide(frame, keys[index].at, keys[index].move ?? CAMERA_MOVE);
 
   const x = mix(from.x, to.x, t);
   const y = mix(from.y, to.y, t);

@@ -1,10 +1,15 @@
-import { CAMERA_MOVE, ENTER_PAUSE } from "../timing";
+import { ENTER_PAUSE } from "../timing";
 
 export enum Focus {
   Prompt = "prompt",
   Page = "page",
-  Navbar = "navbar",
+  Stack = "stack",
   Limit = "limit",
+}
+
+export enum Front {
+  Terminal = "terminal",
+  Browser = "browser",
 }
 
 export enum Reply {
@@ -57,26 +62,37 @@ export type Beat = BeatSpec & {
   typeStart: number;
   submit: number;
   replyAt: number;
-  cameraAt: number;
+  frontAt: number;
   changeAt: number;
   end: number;
 };
 
-const OPENING = 22;
-const LEAD_IN = 8;
-const SIGH = 42;
-const REVEAL_LAG = 6;
-const CHANGE_DURATION = 30;
+const OPENING = 16;
+const LEAD_IN = 6;
+const SIGH = 20;
+const REVEAL_LAG = 4;
+const CHANGE_DURATION = 24;
+
+export const LIFT = 5;
+export const ZOOM = 20;
+export const BROWSER_LEAD = 8;
+
+const REVEAL: Record<Focus, number> = {
+  [Focus.Prompt]: 0,
+  [Focus.Page]: 2 * ZOOM,
+  [Focus.Stack]: LIFT + CHANGE_DURATION,
+  [Focus.Limit]: 0,
+};
 
 export const applyKeys = (keys: string) =>
   [...keys].reduce((text, key) => (key === BACKSPACE ? text.slice(0, -1) : text + key), "");
 
 const SPECS: BeatSpec[] = [
-  { keys: "build a perfect landing page. first try 😎", reply: "Done! Your website is ready ✨", kind: Reply.Done, work: 48, focus: Focus.Page, hold: 50, lead: LEAD_IN },
-  { keys: "move the nabv⌫⌫vbar to the left", reply: "Done! Navbar moved.", kind: Reply.Done, work: 18, focus: Focus.Navbar, hold: 34, lead: LEAD_IN },
-  { keys: "no no, I meant to the CENTRE⌫⌫ER", reply: "Done! Navbar centered.", kind: Reply.Done, work: 18, focus: Focus.Navbar, hold: 34, lead: LEAD_IN },
-  { keys: "fix the title, use the rigth⌫⌫ht color!", reply: "Done! Title color fixed.", kind: Reply.Done, work: 18, focus: Focus.Page, hold: 38, lead: LEAD_IN },
-  { keys: "NO!! blakc⌫⌫ck, like EVERY other title!!!", reply: "You've reached your usage limit.\nTry again in 5 hours.", kind: Reply.Limit, work: 24, focus: Focus.Limit, hold: 80, lead: SIGH },
+  { keys: "build a perfect landing page. first try 😎", reply: "Done! Your website is ready ✨", kind: Reply.Done, work: 40, focus: Focus.Page, hold: 14, lead: LEAD_IN },
+  { keys: "move the nabv⌫⌫vbar to the left", reply: "Done! Navbar moved.", kind: Reply.Done, work: 14, focus: Focus.Stack, hold: 16, lead: LEAD_IN },
+  { keys: "no no, I meant to the CENTRE⌫⌫ER", reply: "Done! Navbar centered.", kind: Reply.Done, work: 14, focus: Focus.Stack, hold: 16, lead: LEAD_IN },
+  { keys: "fix the title, use the rigth⌫⌫ht color!", reply: "Done! Title color fixed.", kind: Reply.Done, work: 14, focus: Focus.Stack, hold: 20, lead: LEAD_IN },
+  { keys: "NO!! blakc⌫⌫ck, like EVERY other title!!!", reply: "You've reached your usage limit.\nTry again in 5 hours.", kind: Reply.Limit, work: 20, focus: Focus.Limit, hold: 66, lead: SIGH },
 ];
 
 const build = (specs: BeatSpec[]): Beat[] => {
@@ -88,13 +104,13 @@ const build = (specs: BeatSpec[]): Beat[] => {
     const strokes = keystrokes(spec.keys, typeStart);
     const submit = strokes[strokes.length - 1].at + ENTER_PAUSE;
     const replyAt = submit + spec.work;
-    const cameraAt = replyAt + REVEAL_LAG;
-    const changeAt = cameraAt + CAMERA_MOVE;
-    const end = changeAt + CHANGE_DURATION + spec.hold;
+    const frontAt = replyAt + REVEAL_LAG;
+    const changeAt = frontAt + LIFT;
+    const end = frontAt + REVEAL[spec.focus] + spec.hold;
 
     cursor = end;
 
-    return { ...spec, prompt: applyKeys(spec.keys), strokes, start, typeStart, submit, replyAt, cameraAt, changeAt, end };
+    return { ...spec, prompt: applyKeys(spec.keys), strokes, start, typeStart, submit, replyAt, frontAt, changeAt, end };
   });
 };
 
@@ -106,7 +122,20 @@ export const NAV_CHANGE = CHANGE_DURATION;
 
 export const COLD_OPEN_FRAMES = LIMIT.end;
 
-export const CAMERA_KEYS = BEATS.flatMap((beat) => [
-  { at: beat.start - CAMERA_MOVE, focus: Focus.Prompt },
-  { at: beat.cameraAt, focus: beat.focus },
+export const BROWSER_OPENS = BUILD.replyAt - BROWSER_LEAD;
+
+export const CAMERA_KEYS = [
+  { at: 0, focus: Focus.Prompt },
+  { at: BUILD.frontAt, focus: Focus.Page, move: ZOOM },
+  { at: BUILD.frontAt + ZOOM + BUILD.hold, focus: Focus.Stack, move: ZOOM },
+  { at: LIMIT.start, focus: Focus.Limit, move: ZOOM },
+];
+
+const swaps = (beat: Beat) => (beat.kind === Reply.Limit ? [{ at: beat.start, front: Front.Terminal }] : [
+  { at: beat.start, front: Front.Terminal },
+  { at: beat.frontAt, front: Front.Browser },
 ]);
+
+export const SWAPS = BEATS.slice(1).flatMap(swaps);
+
+export const FRONT_KEYS = [{ at: -LIFT, front: Front.Terminal }, { at: BROWSER_OPENS, front: Front.Browser }, ...SWAPS];

@@ -9,6 +9,7 @@ export enum Sound {
   Backspace = "backspace",
   Chime = "chime",
   Pop = "pop",
+  Tap = "tap",
 }
 
 export type Cue = { at: number; sound: Sound; volume: number };
