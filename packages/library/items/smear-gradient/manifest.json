@@ -1,14 +1,14 @@
 {
-  "id": "topo-shader",
-  "name": "Topo shader",
-  "description": "A card of glowing topographic contour lines. The pointer raises a hill that wraps it in gold rings.",
-  "category": "component",
+  "id": "smear-gradient",
+  "name": "Smear gradient",
+  "description": "A warm WebGL gradient that smears into wavy vertical streaks wherever the cursor drags.",
+  "category": "section",
   "tags": [
     "shader",
-    "topographic",
+    "gradient",
     "webgl",
     "interactive",
-    "card"
+    "background"
   ],
   "frameworks": [
     "html",
@@ -25,12 +25,6 @@
         400,
         500,
         600
-      ]
-    },
-    {
-      "family": "Fragment Mono",
-      "weights": [
-        400
       ]
     }
   ],
