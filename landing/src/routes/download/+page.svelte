@@ -1,24 +1,21 @@
 <script lang="ts">
-  import { browserEnv, installOptions, Outcome, runOption, type InstallOption } from '$lib/site/install';
+  import { browserEnv, installOptions, runOption, type InstallOption } from '$lib/site/install';
   import { EDITOR_ICONS } from '$lib/site/editor-icons';
-  import { COFFEE_URL, GITHUB_URL } from '$lib/site/links';
+  import { COFFEE_URL, DESKTOP_DMGS, DESKTOP_PUBLISHED, GITHUB_URL } from '$lib/site/links';
   import { DOWNLOAD_META } from '$lib/site/seo';
   import { downloadJsonLd } from '$lib/site/structured-data';
   import { DOWNLOAD_PAGE } from '$lib/site/download';
+  import CommandField from '$lib/site/CommandField.svelte';
+  import { APPLE_ICON } from '$lib/site/social-icons';
 
   const editors = installOptions().filter((o) => !o.command);
   const terminal = DOWNLOAD_PAGE.terminal;
-  let copied = $state(false);
+  const desktop = DOWNLOAD_PAGE.desktop;
 
   const copy = (text: string) => navigator.clipboard?.writeText(text);
 
   function install(option: InstallOption) {
     runOption(option, browserEnv(), copy);
-  }
-
-  function copyCommand() {
-    const option = installOptions().find((o) => o.command)!;
-    copied = runOption(option, browserEnv(), copy) === Outcome.Copied;
   }
 </script>
 
@@ -51,11 +48,27 @@
     </ul>
 
     <h2>{terminal.heading}</h2>
-    <div class="terminal">
-      <code>{terminal.command}</code>
-      <button class="install" type="button" onclick={copyCommand}>{copied ? 'copied' : 'copy'}</button>
-    </div>
+    <CommandField command={terminal.command} />
     <p class="note">{terminal.line} {terminal.requirement}.</p>
+
+    {#if DESKTOP_PUBLISHED}
+      <h2 class="titled"><img src="/img/feega-desktop.png" alt="" width="36" height="36" />{desktop.heading}</h2>
+      <p class="lead small">{desktop.lead}</p>
+      <h3>{desktop.terminalLabel}</h3>
+      <CommandField command={desktop.command} />
+      <p class="note">{desktop.terminalNote}</p>
+      <h3>{desktop.dmgLabel}</h3>
+      <ul class="dmgs">
+        {#each DESKTOP_DMGS as dmg (dmg.arch)}
+          <li class="card dmg">
+            <span class="logo">{@html APPLE_ICON}</span>
+            <span class="name">{dmg.arch}</span>
+            <a class="install" href={dmg.href}>download</a>
+          </li>
+        {/each}
+      </ul>
+      <p class="note">{desktop.dmgNote}</p>
+    {/if}
 
     <h2>{DOWNLOAD_PAGE.requirements.heading}</h2>
     <ul class="reqs">
@@ -97,6 +110,19 @@
     letter-spacing: -0.04em;
   }
 
+  h3 {
+    margin: 28px 0 12px;
+    font-size: 18px;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    opacity: 0.7;
+  }
+
+  .lead.small {
+    margin: 0;
+    font-size: 18px;
+  }
+
   .lead {
     margin: 20px 0 8px;
     font-size: 20px;
@@ -114,6 +140,7 @@
   }
 
   .cards,
+  .dmgs,
   .reqs {
     display: grid;
     gap: 12px;
@@ -131,6 +158,29 @@
     border: 1px solid var(--site-line);
     border-radius: var(--ui-radius-md, 6px);
     background: #000;
+  }
+
+  .dmg {
+    grid-template-columns: 28px 1fr auto;
+  }
+
+  .titled {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .titled img {
+    border-radius: var(--ui-radius-md, 6px);
+  }
+
+  .logo :global(svg) {
+    width: 20px;
+    height: 20px;
+  }
+
+  .install {
+    text-decoration: none;
   }
 
   .logo {
@@ -164,22 +214,6 @@
     opacity: 0.85;
   }
 
-  .terminal {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 14px 16px;
-    border: 1px solid var(--site-line);
-    border-radius: var(--ui-radius-md, 6px);
-    background: #000;
-  }
-
-  code {
-    font-family: 'Fragment Mono', monospace;
-    font-size: 18px;
-  }
-
   .reqs li::before {
     content: '';
     display: inline-block;
@@ -211,7 +245,8 @@
       font-size: 26px;
     }
 
-    .cards {
+    .cards,
+    .dmgs {
       grid-template-columns: repeat(2, 1fr);
     }
   }

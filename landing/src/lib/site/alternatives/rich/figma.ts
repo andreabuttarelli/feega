@@ -73,6 +73,6 @@ export const FIGMA: Rich = {
     { q: 'Should we stop using Figma?', a: 'No. If you design new screens and share a library, keep doing it there. Feega covers the edits to what has already shipped.' },
     { q: 'Is Figma Make the same thing as Feega?', a: 'Not today. Make local, as of our check, is a closed beta on the Mac desktop app. Feega is available now and is not tied to a generative model.' },
     { q: 'Can a designer use Feega without learning git?', a: 'They click and set values, and see each change as a diff. A developer can review and commit.' },
-    { q: 'Which stacks does Feega support?', a: 'SvelteKit, React, Next.js and Vue, with CSS or Tailwind.' }
+    { q: 'Which stacks does Feega support?', a: 'SvelteKit, React, Next.js, Vue, Nuxt, React Router, Astro and Vite, with CSS or Tailwind.' }
   ]
 };

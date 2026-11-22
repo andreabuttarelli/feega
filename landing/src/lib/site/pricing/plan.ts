@@ -67,7 +67,7 @@ export const EXTENSION_NOTE = 'No account, no card, no AI.';
 
 export const EXTENSION_LINES = [
   'VS Code, Cursor, Windsurf and VSCodium',
-  'React, Next.js, SvelteKit and Vue',
+  'React, Next.js, SvelteKit, Vue, Nuxt, React Router, Astro and Vite',
   'Tailwind or plain CSS',
   'Every change written to your code, with a diff',
   'Open source, Apache-2.0'

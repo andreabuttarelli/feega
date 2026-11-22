@@ -36,5 +36,9 @@ export const TESTED: readonly Framework[] = [
   { name: 'Next.js', logo: 'Next' },
   { name: 'SvelteKit', logo: 'Svelte' },
   { name: 'React + Vite', logo: 'React' },
-  { name: 'Vue + Vite', logo: 'Vue' }
+  { name: 'Vue + Vite', logo: 'Vue' },
+  { name: 'Nuxt', logo: 'Nuxt' },
+  { name: 'React Router', logo: 'ReactRouter' },
+  { name: 'Astro', logo: 'Astro' },
+  { name: 'Vite', logo: 'Vite' }
 ];
