@@ -6,7 +6,7 @@ export const SITE_DESCRIPTION = 'Notes from building Feega, the free, open-sourc
 export const SOCIAL_PREVIEW = {
   image: 'https://feega.app/og.png',
   video: 'https://feega.app/og.mp4',
-  alt: 'Feega: Design inside your code with your agents and team. An isometric illustration of page layouts stacked above the code they come from.',
+  alt: 'Feega: Design in your codebase. A heading selected in a running app inside the Feega editor, next to a code diff where its size changes from 64px to 88px.',
   width: 1200,
   height: 630
 } as const;
