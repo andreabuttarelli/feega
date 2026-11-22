@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const billingPortalSessionsCreate = vi.fn();
 const subscriptionsRetrieve = vi.fn();
+const subscriptionsList = vi.fn();
 const subscriptionsUpdate = vi.fn();
 const subscriptionsCancel = vi.fn();
 const checkoutSessionsCreate = vi.fn();
@@ -23,6 +24,7 @@ vi.mock('stripe', () => ({
 		billingPortal = { sessions: { create: billingPortalSessionsCreate } };
 		subscriptions = {
 			retrieve: subscriptionsRetrieve,
+			list: subscriptionsList,
 			update: subscriptionsUpdate,
 			cancel: subscriptionsCancel
 		};
@@ -409,6 +411,20 @@ describe('setSeatQuantity', () => {
 		await setSeatQuantity('sub_1', 'si_1', 2, SeatProration.None);
 
 		expect(subscriptionsUpdate).toHaveBeenCalledWith('sub_1', { items: [{ id: 'si_1', quantity: 2 }], proration_behavior: 'none' });
+	});
+});
+
+describe('cloudSeatCount', () => {
+	const sub = (status: string, ...items: [string, number | null][]) => ({ status, items: { data: items.map(([id, quantity]) => ({ price: { id }, quantity })) } });
+
+	it('adds up the editors on live subscriptions to the Cloud prices only', async () => {
+		subscriptionsList.mockResolvedValue({
+			data: [sub('active', ['price_m', 3], ['price_other', 9]), sub('trialing', ['price_a', null]), sub('canceled', ['price_m', 5]), sub('past_due', ['price_m', 7])]
+		});
+		const { cloudSeatCount } = await import('./stripe');
+
+		expect(await cloudSeatCount('cus_1', ['price_m', 'price_a'])).toBe(4);
+		expect(subscriptionsList).toHaveBeenCalledWith(expect.objectContaining({ customer: 'cus_1' }));
 	});
 });
 

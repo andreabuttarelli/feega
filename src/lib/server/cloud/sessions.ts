@@ -188,6 +188,25 @@ export async function setMemberRole(db: SupabaseClient, session: SessionRow, hos
   return Outcome.Done;
 }
 
+export async function editorsInLive(db: SupabaseClient, orgId: string, now: Date): Promise<ReadonlySet<string>> {
+  const { data: sessions, error } = await db.from('share_sessions').select('id').eq('org_id', orgId).eq('status', 'live').gte('expires_at', now.toISOString());
+  if (error) {
+    throw failure(error);
+  }
+
+  const ids = ((sessions ?? []) as { id: string }[]).map((row) => row.id);
+  if (!ids.length) {
+    return new Set();
+  }
+
+  const { data: members, error: membersError } = await db.from('share_members').select('user_id').in('session_id', ids).eq('role', 'editor').is('removed_at', null);
+  if (membersError) {
+    throw failure(membersError);
+  }
+
+  return new Set(((members ?? []) as { user_id: string }[]).map((row) => row.user_id));
+}
+
 export function snapshotPathOf(session: Pick<SessionRow, 'org_id' | 'id'>): string {
   return `${session.org_id}/${session.id}.zip`;
 }

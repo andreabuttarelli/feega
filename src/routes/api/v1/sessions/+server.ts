@@ -32,7 +32,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
     return reject('invalid_visitor_role', Http.BadRequest);
   }
 
-  if (!cloudEntitled(orgId)) {
+  if (!(await cloudEntitled(supabase, orgId))) {
     return reject('plan_required', Http.PaymentRequired);
   }
   if (!(await mayEdit(supabase, orgId, user.id))) {

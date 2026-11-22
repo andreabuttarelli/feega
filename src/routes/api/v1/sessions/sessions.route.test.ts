@@ -4,10 +4,12 @@ import { json } from '@sveltejs/kit';
 const mocks = vi.hoisted(() => ({
   env: {} as Record<string, string | undefined>,
   call: null as unknown,
-  pushed: [] as string[]
+  pushed: [] as string[],
+  seatCount: vi.fn(async (_customerId: string, _priceIds: string[]) => 0)
 }));
 
 vi.mock('$env/dynamic/private', () => ({ env: mocks.env }));
+vi.mock('$lib/server/stripe', () => ({ cloudSeatCount: mocks.seatCount }));
 vi.mock('$lib/server/cli-auth', () => ({
   openOrg: async () => (mocks.call ? { call: mocks.call } : { error: json({ error: 'Missing or invalid Authorization header' }, { status: 401 }) })
 }));
@@ -82,6 +84,8 @@ const COMMENT = { body: 'Tighten', selector: 'h1', sourceFile: 'src/Hero.tsx', s
 beforeEach(() => {
   mocks.call = null;
   mocks.pushed.length = 0;
+  mocks.seatCount.mockReset();
+  mocks.seatCount.mockResolvedValue(0);
   for (const key of Object.keys(mocks.env)) {
     delete mocks.env[key];
   }
@@ -104,6 +108,18 @@ describe('POST /api/v1/sessions', () => {
 
     expect(response.status).toBe(402);
     expect(await response.json()).toEqual({ error: 'plan_required' });
+  });
+
+  it('lets an org with an active Cloud subscription start a session', async () => {
+    as('host-1', seedDb({ orgs: [{ id: ORG, stripe_customer_id: 'cus_1' }] }));
+    delete mocks.env.CLOUD_ORG_IDS;
+    mocks.env.STRIPE_PRICE_CLOUD_MONTHLY = 'price_m';
+    mocks.seatCount.mockResolvedValue(2);
+
+    const response = await post({ projectName: 'P', visitorRole: 'viewer' });
+
+    expect(response.status).toBe(201);
+    expect(mocks.seatCount).toHaveBeenCalledWith('cus_1', ['price_m']);
   });
 
   it('answers 403 to an org viewer, who has no editor seat', async () => {
@@ -273,6 +289,54 @@ describe('POST /api/v1/sessions/:id/members/:userId', () => {
     as('ada', seedDb());
 
     expect((await setRole({ role: 'editor' })).status).toBe(403);
+  });
+
+  describe('with a subscription of one editor seat', () => {
+    const editing = { session_id: SID, org_id: ORG, user_id: 'ada', role: 'editor', removed_at: null };
+
+    beforeEach(() => {
+      delete mocks.env.CLOUD_ORG_IDS;
+      mocks.env.STRIPE_PRICE_CLOUD_MONTHLY = 'price_m';
+      mocks.seatCount.mockResolvedValue(1);
+    });
+
+    const seeded = (...members: Record<string, unknown>[]) => seedDb({ orgs: [{ id: ORG, stripe_customer_id: 'cus_1' }], share_members: members });
+
+    it('refuses a promotion beyond the seats with 402 seats_exhausted', async () => {
+      const db = seeded(editing);
+      as('host-1', db);
+
+      const response = await setRole({ role: 'editor' });
+
+      expect(response.status).toBe(402);
+      expect(await response.json()).toEqual({ error: 'seats_exhausted' });
+      expect(db.tables.share_members).toEqual([editing]);
+    });
+
+    it('promotes while a seat is free', async () => {
+      as('host-1', seeded());
+
+      expect((await setRole({ role: 'editor' })).status).toBe(200);
+    });
+
+    it('does not charge a seat to someone who already edits', async () => {
+      as('host-1', seeded(editing));
+
+      expect((await setRole({ role: 'editor' }, 'ada')).status).toBe(200);
+    });
+
+    it('always allows a demotion', async () => {
+      as('host-1', seeded(editing, { ...editing, user_id: 'vera' }));
+
+      expect((await setRole({ role: 'viewer' }, 'vera')).status).toBe(200);
+    });
+
+    it('ignores editors of closed sessions', async () => {
+      const closed = { ...editing, session_id: 'zzzzzzzzzz' };
+      as('host-1', seedDb({ orgs: [{ id: ORG, stripe_customer_id: 'cus_1' }], share_members: [closed], share_sessions: [{ id: 'zzzzzzzzzz', org_id: ORG, host_user_id: 'host-1', status: 'closed', expires_at: FUTURE }, { id: SID, org_id: ORG, host_user_id: 'host-1', visitor_role: 'editor', status: 'live', expires_at: FUTURE }] }));
+
+      expect((await setRole({ role: 'editor' })).status).toBe(200);
+    });
   });
 
   it('refuses someone outside the org and an invalid role', async () => {
