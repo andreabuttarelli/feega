@@ -13,6 +13,7 @@ import { replaceEverywhere } from '@feega/live-edit/font-replace';
 import { VariableHome, saveVariable, variableName } from '@feega/live-edit/save-variable';
 import { addedCss, AddKind, AddPlace, AddStyle } from '@feega/live-edit/add-node';
 import { wrapperCss, type WrapTag } from '@feega/live-edit/wrap-node';
+import { libraryInsert, type InsertItem } from '@feega/live-edit/library-insert';
 import type { LoopMove } from '@feega/live-edit/move-loop-item';
 import type { Usage } from '@feega/live-edit/move-usage';
 import { StructureOp, structure } from '@feega/live-edit/structure';
@@ -347,6 +348,20 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     return out.ok && written.ok ? { ...written, selected: out.selected } : written;
   }
 
+  async function libraryWritten(rawAt: string, place: AddPlace, item: InsertItem, tokens: string): Promise<Written> {
+    meta = { at: rawAt, prop: 'library', value: item.id, scope: '' };
+    const at = placed(rawAt);
+    if (!at) {
+      return { ok: false, reason: `${rawAt} is not a file:line:col inside the workspace` };
+    }
+    const out = await libraryInsert(reader(root), at, place, item, tokens);
+    if (!out.ok) {
+      return out;
+    }
+    const written = await writtenAll(out.changes, '', out.note);
+    return written.ok ? { ...written, selected: out.selected } : written;
+  }
+
   async function proposed(proposal: Proposal, appDir: string): Promise<Written> {
     const first = proposal.ops.find((op) => 'at' in op);
     meta = { at: first && 'at' in first ? first.at : '', prop: 'plugin', value: proposal.label, scope: '' };
@@ -403,6 +418,7 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     proposal: (proposal: Proposal, appDir: string) => inTurn(() => proposed(proposal, appDir)),
     saveVariable: (ask: EditAsk, name: string) => inTurn(() => variableSaved(ask, name)),
     structure: (ask: StructureAsk) => inTurn(() => restructured(ask)),
+    library: (at: string, place: AddPlace, item: InsertItem, tokens: string) => inTurn(() => libraryWritten(at, place, item, tokens)),
     structureMany: (ask: ManyAsk) => inTurn(() => restructuredMany(ask)),
     move: (from: string, to: string, place: Place) => inTurn(() => moved(from, to, place)),
     edit: (ask: EditAsk) => inTurn(() => edited(ask)),

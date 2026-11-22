@@ -14,13 +14,19 @@ import { killOrphans } from './orphans';
 import type { Running } from './dev-server';
 import { appOf, inspectSession, type Session } from './session';
 import { signInFromUri } from './sign-in';
-import { beforeProvider, vsCodePlatform, type VsCodeHost } from './vscode-platform';
+import { DEV_PLUGINS_SETTING, approveInModal, beforeProvider, vsCodePlatform, type VsCodeHost } from './vscode-platform';
+import { CLOUD_SETTING, cloudEnabled } from '../cloud-flag';
 import { cloudApi } from './cloud-api';
 import { editorServer } from './editor-server';
 import type { Platform } from './platform';
 import { RELAY_URL } from './share/share-host';
 import { cloudShare } from './share/share-port-factory';
 import { withRemoteEditor } from './share/remote-editor';
+import { httpFetcher } from '@feega/plugin-store/fetcher';
+import { installPlugin } from '@feega/plugin-store/install';
+import { pluginsRoot } from '@feega/plugin-store/registry';
+import { questionOf } from '@feega/plugin-store/review';
+import { sourceOf } from '@feega/plugin-store/source';
 
 const VIEW_TYPE = 'feegaInspect.panel';
 const TITLE = 'Feega';
@@ -53,6 +59,10 @@ const RELAY_URL_VAR = 'FEEGA_RELAY_URL';
 const ANY_PORT = 0;
 
 function cloudPlatform(context: vscode.ExtensionContext, base: Platform): { platform: Platform; stopRemote: () => Promise<void> } {
+  if (!cloudEnabled({ setting: vscode.workspace.getConfiguration().get<boolean>(CLOUD_SETTING), env: process.env })) {
+    return { platform: base, stopRemote: async () => {} };
+  }
+
   const remote = withRemoteEditor(base, () => editorServer(vscode.Uri.joinPath(mediaOf(context)).fsPath, ANY_PORT));
   const token = async () => {
     const account = await base.account.read();
@@ -139,14 +149,31 @@ async function openFromUrl(context: vscode.ExtensionContext) {
   await session.attachUrl(url);
 }
 
+async function installPluginFromSource() {
+  const source = await vscode.window.showInputBox({ prompt: 'Plugin to install', placeHolder: 'github:owner/repo@v1.0.0 or an npm package name', validateInput: (text) => (sourceOf(text) ? null : 'Use github:owner/repo[@tag] or an npm package name[@version]') });
+  if (!source) {
+    return;
+  }
+  const out = await installPlugin({ root: pluginsRoot(), fetch: httpFetcher(), approve: (review) => approveInModal(questionOf(review), 'Install') }, source);
+  if (out.ok) {
+    vscode.window.showInformationMessage(`Feega: installed ${out.id} ${out.version}`);
+    return;
+  }
+  vscode.window.showErrorMessage(`Feega: ${out.reason}`);
+}
+
 const COMMANDS: Record<Command, (context: vscode.ExtensionContext, target?: vscode.Uri) => unknown> = {
   [Command.Open]: open,
   [Command.DesignFolder]: open,
   [Command.DesignPage]: open,
-  [Command.OpenFromUrl]: openFromUrl
+  [Command.OpenFromUrl]: openFromUrl,
+  [Command.InstallPlugin]: installPluginFromSource
 };
 
 function settingsChanged(e: vscode.ConfigurationChangeEvent) {
+  if (e.affectsConfiguration(DEV_PLUGINS_SETTING)) {
+    void opened?.session.pluginsChanged();
+  }
   if (!e.affectsConfiguration(SECTION)) {
     return;
   }

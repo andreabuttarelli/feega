@@ -13,7 +13,7 @@
   import { untrack } from 'svelte';
   import { MOVES, Shortcut, isMac, needsBareFocus, shortcutOf, typingIn } from './selection-keys';
   import { Click, NONE, Surface, clickOf, contains, extend, keyOf, only, primary, refOf, siblingsOf, toggle, visibleRows, type Selection } from './selection';
-  import { AccountState, Mode, Onboarding, Move, ServerAction, Slot, type ChangeRow, type FontChoice, type LayerNode, type Palette, ServerState, type ServerInfo, Styling, ToHost, ToView, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
+  import { AccountState, Mode, Onboarding, Move, ServerAction, Slot, type ChangeRow, type FontChoice, type LayerNode, type LibraryEntry, type Palette, ServerState, type ServerInfo, Styling, ToHost, ToView, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
   import { fromHost, inVscode, toHost } from './host';
   import { imageSaved } from './image-file.svelte';
   import { iconDrawn, iconsFound } from './icon-search.svelte';
@@ -54,6 +54,8 @@
   import { Place } from '@feega/live-edit/move-node';
   import { StructureOp } from '@feega/live-edit/structure';
   import StructureMenu from './StructureMenu.svelte';
+  import LibraryPanel from './LibraryPanel.svelte';
+  import { LIBRARY_DRAG_TYPE } from './library';
   import { agentContexts, commentContext } from './agent-context';
   import CommentsList from './CommentsList.svelte';
   import type { CloudComment, CommentDraft } from '../host/cloud-api';
@@ -61,7 +63,7 @@
   import { AddKind, AddPlace } from '@feega/live-edit/add-node';
   import { WrapTag } from '@feega/live-edit/wrap-node';
   import { ADD_DRAG_TYPE, insertSpot, type InsertSpot } from './insert-drop';
-  import { ADD_ITEMS, ADD_LOOP_ITEM, Command, menuFor, pickedOf } from './structure-menu';
+  import { ADD_ITEMS, ADD_LOOP_ITEM, Command, LIBRARY_ID, LIBRARY_ITEM, menuFor, pickedOf } from './structure-menu';
   import { modeOfKey } from './modes';
   import { browseHistory } from './history';
   import { DEFAULT_ANCHOR, anchorBox, isAnchor, nearestAnchor, nextAnchor, type Anchor } from './anchors';
@@ -184,6 +186,7 @@
   const PIN_STACK_PX = 22;
   const pins = $derived(pinsOf(threadsOf(cloud.comments, false)));
   const openComments = $derived(pins.length);
+  const cloudOn = $derived(Boolean(share?.available));
   let layers = $state<LayerNode[]>([]);
   let palette = $state<Palette>({ document: [], tokens: [], fonts: [], missing: [] });
   const dismissedFonts = new SvelteSet<string>();
@@ -574,8 +577,10 @@
       }, SETTLE_MS);
     },
     [ToView.Plugin]: (m) => plugins.answer(m.id, m.result),
+    [ToView.Plugins]: (m) => plugins.sync(m.catalog, m.canInstall),
     [ToView.Account]: (m) => (account = { state: m.state, email: m.email }),
     [ToView.Share]: (m) => (share = m),
+    [ToView.Library]: (m) => (libraryItems = m.items),
     [ToView.Comments]: (m) => (cloud = { enabled: m.enabled, comments: m.comments, error: m.error ?? '' }),
     [ToView.Onboarding]: (m) => (onboarding = m.state),
     [ToView.IconResults]: (m) => iconsFound({ id: m.id, library: m.library, hits: m.hits, error: m.error ?? '' }),
@@ -834,6 +839,33 @@
   }
 
   let addMenu = $state<{ x: number; y: number } | null>(null);
+  let libraryOpen = $state(false);
+  let libraryItems = $state<LibraryEntry[]>([]);
+
+  function openLibrary() {
+    libraryOpen = true;
+    leftClosed = false;
+    toHost({ kind: ToHost.LibraryList });
+  }
+
+  function insertLibrary(id: string, target: Source, place: AddPlace) {
+    toHost({ kind: ToHost.LibraryInsert, id, at: sourceText(target), place });
+  }
+
+  function pickAdd(id: string) {
+    if (runPluginItem(id, picked?.source ?? null)) {
+      return;
+    }
+    if (id === LIBRARY_ID) {
+      openLibrary();
+      return;
+    }
+    if (id === StructureOp.AddItem) {
+      restructure(StructureOp.AddItem);
+      return;
+    }
+    addElement(id as AddKind);
+  }
 
   function openAddMenu(x: number, y: number) {
     if (picked) {
@@ -855,7 +887,7 @@
   let addSpot = $state<InsertSpot | null>(null);
   let spotAsked = 0;
 
-  const addDrag = (e: DragEvent) => e.dataTransfer?.types.includes(ADD_DRAG_TYPE) ?? false;
+  const addDrag = (e: DragEvent) => (e.dataTransfer?.types.includes(ADD_DRAG_TYPE) || e.dataTransfer?.types.includes(LIBRARY_DRAG_TYPE)) ?? false;
 
   async function overAdd(e: DragEvent) {
     if (!addDrag(e)) {
@@ -879,9 +911,14 @@
     e.preventDefault();
     spotAsked++;
     const kind = e.dataTransfer?.getData(ADD_DRAG_TYPE) as AddKind;
+    const library = e.dataTransfer?.getData(LIBRARY_DRAG_TYPE);
     const spot = addSpot;
     addSpot = null;
     addMenu = null;
+    if (library && spot) {
+      insertLibrary(library, spot.target, spot.place);
+      return;
+    }
     const dropped = kind && spot ? pluginDrop(kind, spot) : null;
     if (dropped) {
       plugins.host.menu(dropped.plugin, dropped.item, dropped.target, dropped.place);
@@ -1050,7 +1087,7 @@
     if (cmd || typing(e)) {
       return;
     }
-    if (e.key.toLowerCase() === COMMENT_KEY && picked && mode === Mode.Design && !editing) {
+    if (cloudOn && e.key.toLowerCase() === COMMENT_KEY && picked && mode === Mode.Design && !editing) {
       e.preventDefault();
       startComment();
       return;
@@ -1076,15 +1113,19 @@
 
 <main bind:clientWidth={viewW} style={`grid-template-columns: ${leftPx}px minmax(0, 1fr) ${barPx}px; --bar: ${barPx}px; --left: ${leftPx}px`} class:sizing={sizing || leftSizing}>
   <aside class="left" class:closed={leftClosed}>
+    {#if libraryOpen}
+      <LibraryPanel items={libraryItems} canInsert={!!picked} oninsert={(id) => picked && insertLibrary(id, picked.source, AddPlace.After)} onclose={() => (libraryOpen = false)} />
+    {:else}
     <header class="left-head">Layers<button type="button" class="add" title="Add an element (/)" aria-label="Add" data-testid="add-button" disabled={!picked} onclick={(e) => openAddMenu(e.clientX, e.clientY)}>+ Add</button></header>
     <div class="layers" role="tree" aria-label="Layers" data-testid="layers">
       <LayersTree nodes={layers} {picked} selected={selectedKeys} badge={badgeOf(elementState)} open={layersOpen} onselect={selectRow} onhover={hoverLayer} onopen={(at) => toHost({ kind: ToHost.Open, at })} onmove={moveLayer} onusage={moveUsage} dragging={layerDrag} hidden={hiddenNow} locked={lockedNow} ontoggle={toggleFlag} oncontext={openLayerMenu} onadd={layerAdd} />
     </div>
+    {/if}
     {#if !leftClosed}<span class="edge-right" role="separator" aria-orientation="vertical" aria-label="Resize Layers" title="Drag to resize, double-click to reset" onpointerdown={(e) => ((e.currentTarget as HTMLElement).setPointerCapture(e.pointerId), (leftSizing = { x: e.clientX, width: leftPx }))} onpointermove={(e) => leftSizing && (leftWidth = leftSizing.width + (e.clientX - leftSizing.x))} onpointerup={() => leftSizing && ((leftSizing = null), (leftWidth = leftPx), savePrefs())} ondblclick={() => ((leftWidth = LEFT_DEFAULT_PX), savePrefs())}></span>{/if}
   </aside>
   <section class="view">
     <header class="toolbar" bind:clientHeight={toolbarH}>
-      <FeegaMenu commands={plugins.commands} oncommand={(plugin, command) => plugins.host.command(plugin, command)} values={settings} {facts} {account} onaccount={(kind) => toHost({ kind })} onsetting={(key, value) => toHost({ kind: ToHost.Setting, key, value })} onlink={(link) => toHost({ kind: ToHost.External, url: link })} />
+      <FeegaMenu commands={plugins.commands} oncommand={(plugin, command) => plugins.host.command(plugin, command)} rows={plugins.rows} problems={plugins.problems} canInstall={plugins.canInstall} onenable={(id, enabled) => toHost({ kind: ToHost.PluginEnable, id, enabled })} onremove={(id) => toHost({ kind: ToHost.PluginRemove, id })} oninstall={(source) => toHost({ kind: ToHost.PluginInstall, source })} values={settings} {facts} {account} onaccount={(kind) => toHost({ kind })} onsetting={(key, value) => toHost({ kind: ToHost.Setting, key, value })} onlink={(link) => toHost({ kind: ToHost.External, url: link })} />
       <button type="button" class="icon" class:on={!leftClosed} title="Layers (⇧⌘\)" aria-label="Toggle Layers" data-testid="left-toggle" onclick={() => ((leftClosed = !leftClosed), savePrefs())}><PanelLeft size={15} /></button>
       <button type="button" class="icon" title="Back (⌘[)" disabled={!canBack} onclick={() => go(history.back())}><ArrowLeft size={15} /></button>
       <button type="button" class="icon" title="Forward (⌘])" disabled={!canForward} onclick={() => go(history.forward())}><ArrowRight size={15} /></button>
@@ -1098,7 +1139,7 @@
       {#if themes.length > 1}<ThemeBar {themes} choice={themeName} onchoose={chooseTheme} />{/if}
       {#if fit.scale < 1}<span class="zoom" data-testid="zoom">{Math.round(fit.scale * 100)}%</span>{/if}
       <button type="button" class="icon" title="Open in browser" onclick={() => toHost({ kind: ToHost.External, url: new URL(route, url).toString() })}><ExternalLink size={14} /></button>
-      <SharePanel view={share} onstart={(name, canEdit) => toHost({ kind: ToHost.ShareStart, name, canEdit })} onstop={() => toHost({ kind: ToHost.ShareStop })} onkick={(userId) => toHost({ kind: ToHost.ShareKick, userId })} onrole={(userId, role) => toHost({ kind: ToHost.ShareRole, userId, role })} />
+      {#if share?.available}<SharePanel view={share} onstart={(name, canEdit) => toHost({ kind: ToHost.ShareStart, name, canEdit })} onstop={() => toHost({ kind: ToHost.ShareStop })} onkick={(userId) => toHost({ kind: ToHost.ShareKick, userId })} onrole={(userId, role) => toHost({ kind: ToHost.ShareRole, userId, role })} />{/if}
       <button type="button" class="icon" class:on={!barClosed} title="Properties (⌘\)" onclick={toggleBar} data-testid="bar-toggle"><PanelRight size={15} /></button>
     </header>
 
@@ -1156,7 +1197,7 @@
         </div>
       {/if}
       {#if menu}<StructureMenu x={menu.x} y={menu.y} items={contextMenuItems(menuFor(selection.refs.length), plugins.contextMenu, menu.where)} onpick={pickMenu} onclose={() => (menu = null)} />{/if}
-      {#if addMenu}<StructureMenu x={addMenu.x} y={addMenu.y} items={addMenuItems(picked && picked.instances > 1 ? [...ADD_ITEMS, ADD_LOOP_ITEM] : ADD_ITEMS, plugins.addMenu)} label="add" draggable={true} onpick={(id) => (runPluginItem(id, picked?.source ?? null) ? undefined : id === StructureOp.AddItem ? restructure(StructureOp.AddItem) : addElement(id as AddKind))} onclose={() => (addMenu = null)} />{/if}
+      {#if addMenu}<StructureMenu x={addMenu.x} y={addMenu.y} items={addMenuItems(picked && picked.instances > 1 ? [...ADD_ITEMS, ADD_LOOP_ITEM, LIBRARY_ITEM] : [...ADD_ITEMS, LIBRARY_ITEM], plugins.addMenu)} label="add" draggable={true} onpick={pickAdd} onclose={() => (addMenu = null)} />{/if}
       {#if fontNotice}
         <div class="notice missingfont" data-testid="font-notice">
           <MissingFont missing={fontNotice} project={palette.fonts.filter((name) => !palette.missing.some((m) => m.family === name))} onreplace={replaceFont} onload={loadFont} />
@@ -1197,7 +1238,7 @@
       <Tabs.List class="tab-list">
         <Tabs.Trigger value={Tab.Properties} class="tab">Properties</Tabs.Trigger>
         <Tabs.Trigger value={Tab.Changes} class="tab" data-testid="changes-tab">Changes{changes.length ? ` ${changes.length}` : ''}</Tabs.Trigger>
-        <Tabs.Trigger value={Tab.Comments} class="tab" data-testid="comments-tab">Comments{openComments ? ` ${openComments}` : ''}</Tabs.Trigger>
+        {#if cloudOn}<Tabs.Trigger value={Tab.Comments} class="tab" data-testid="comments-tab">Comments{openComments ? ` ${openComments}` : ''}</Tabs.Trigger>{/if}
         {#each plugins.sidePanel as panel (panel.plugin + panel.entry.id)}<Tabs.Trigger value={`plugin:${panel.plugin}/${panel.entry.id}`} class="tab" data-testid="plugin-tab">{panel.entry.title}</Tabs.Trigger>{/each}
       </Tabs.List>
       <Tabs.Content value={Tab.Properties}>
@@ -1216,7 +1257,7 @@
         {:else if picked}
           <div class="what" data-testid="selection">
             <Breadcrumb pick={picked} onselect={select} state={elementState} />
-            <span class="where">{#if picked.component}in {picked.component.file.split('/').pop()} · {/if}<button type="button" class="link" onclick={() => toHost({ kind: ToHost.Open, at: picked!.source })}>{picked.source.file.split('/').pop()}:{picked.source.line}</button> · <button type="button" class="link" data-testid="copy-for-agent" title="Copy file, selector and view for your coding agent" onclick={copyForAgent}>Copy for agent</button> · <button type="button" class="link" data-testid="comment-start" title="Comment on this element (C)" onclick={startComment}>Comment</button></span>
+            <span class="where">{#if picked.component}in {picked.component.file.split('/').pop()} · {/if}<button type="button" class="link" onclick={() => toHost({ kind: ToHost.Open, at: picked!.source })}>{picked.source.file.split('/').pop()}:{picked.source.line}</button> · <button type="button" class="link" data-testid="copy-for-agent" title="Copy file, selector and view for your coding agent" onclick={copyForAgent}>Copy for agent</button>{#if cloudOn} · <button type="button" class="link" data-testid="comment-start" title="Comment on this element (C)" onclick={startComment}>Comment</button>{/if}</span>
             {#if authored(picked.classes)}<code class="classes">{authored(picked.classes)}</code>{/if}
           </div>
           <BreakpointBar badge={reachBadge} theme={themeBadge(themeName)} items={reachItems(breakpoints)} choice={reach} onchoose={(id) => (reach = id)} />

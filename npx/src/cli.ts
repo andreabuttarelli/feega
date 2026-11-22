@@ -5,13 +5,16 @@ import { chosenApp, type AppChoice, type Tree } from '../../inspect/src/host/app
 import { nodePlatform } from '../../inspect/src/host/node-platform';
 import { killOrphans } from '../../inspect/src/host/orphans';
 import { inspectSession, memoOf } from '../../inspect/src/host/session';
-import { Browser, Run, USAGE, argsOf } from './args';
+import { Browser, Run, argsOf, usageOf } from './args';
+import { cloudEnabled, cloudPorts } from '../../inspect/src/cloud-flag';
 import { editorServer } from '../../inspect/src/host/editor-server';
 import { serveMcp } from './mcp/run';
 import { fileAccountStore } from '../../inspect/src/host/account';
 import { shareHost } from '../../inspect/src/host/share/share-host';
 import { cloudShare } from '../../inspect/src/host/share/share-port-factory';
 import { cloudApiOf, relayUrlOf } from './cloud';
+import { pluginsRoot } from '../../packages/plugin-store/src/registry';
+import { runPlugin, terminalIo } from './plugin-cli';
 
 declare const FEEGA_VERSION: string;
 
@@ -43,9 +46,10 @@ async function main(): Promise<number> {
     say(`feega: Node ${MIN_NODE_MAJOR}+ is required (found ${process.versions.node})`);
     return 1;
   }
-  const args = argsOf(process.argv.slice(2), process.cwd());
+  const cloud = cloudEnabled({ setting: undefined, env: process.env });
+  const args = argsOf(process.argv.slice(2), process.cwd(), cloud);
   if (args.run === Run.Help) {
-    say(USAGE);
+    say(usageOf(cloud));
     return 0;
   }
   if (args.run === Run.Version) {
@@ -56,8 +60,11 @@ async function main(): Promise<number> {
     await serveMcp({ cli: __filename, version: FEEGA_VERSION, cwd: process.cwd(), env: process.env, share: shareHost({ api: cloudApiOf(process.env, fileAccountStore()), relayUrl: relayUrlOf(process.env), send: fetch }) });
     return KEEP_RUNNING;
   }
+  if (args.run === Run.Plugin) {
+    return runPlugin(terminalIo(pluginsRoot(), say), args.action, args.value);
+  }
   if (args.run === Run.Error) {
-    say(`feega: ${args.reason}\n\n${USAGE}`);
+    say(`feega: ${args.reason}\n\n${usageOf(cloud)}`);
     return 1;
   }
 
@@ -69,8 +76,8 @@ async function main(): Promise<number> {
 
   const editor = await editorServer(join(__dirname, 'webview'), args.port);
   const account = fileAccountStore();
-  const { share, cloud } = cloudShare({ api: cloudApiOf(process.env, account), relayUrl: relayUrlOf(process.env), send: fetch, editorUrl: async () => editor.url });
-  const host = nodePlatform({ root, launcher: join(__dirname, 'launcher'), version: FEEGA_VERSION, transport: editor.transport, print: say, account, cloud, share });
+  const ports = cloudPorts(cloud, () => cloudShare({ api: cloudApiOf(process.env, account), relayUrl: relayUrlOf(process.env), send: fetch, editorUrl: async () => editor.url }));
+  const host = nodePlatform({ root, launcher: join(__dirname, 'launcher'), version: FEEGA_VERSION, transport: editor.transport, print: say, account, ...ports, plugins: { root: pluginsRoot(), dev: () => args.devPlugins ?? [] } });
   const platform = args.url ? { ...host, chooseApp: (apps: string[]) => askApp(apps.map((app) => ({ label: app || '.', app }))) } : host;
   await killOrphans(memoOf(platform));
   const session = inspectSession(platform, root);

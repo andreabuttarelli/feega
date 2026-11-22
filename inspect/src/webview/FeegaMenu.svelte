@@ -3,10 +3,12 @@
   import Coffee from '@lucide/svelte/icons/coffee';
   import { tick } from 'svelte';
   import type { Contributed } from '@feega/plugin-api/host';
+  import PluginManager from './PluginManager.svelte';
+  import type { Row } from './plugin-manager';
   import { AccountState, ToHost } from '../messages';
   import { LINKS, SETTINGS, issueUrl, type ReportFacts, type SettingKey, type SettingValue, type Settings } from '../settings';
 
-  let { commands = [], oncommand = () => undefined, values, facts, account, onaccount, onsetting, onlink }: { commands?: Contributed[]; oncommand?: (plugin: string, command: string) => void; values: Settings | null; facts: ReportFacts | null; account: { state: AccountState; email?: string }; onaccount: (kind: ToHost.SignIn | ToHost.CancelSignIn | ToHost.SignOut) => void; onsetting: (key: SettingKey, value: SettingValue) => void; onlink: (url: string) => void } = $props();
+  let { commands = [], oncommand = () => undefined, rows = [], problems = [], canInstall = false, onenable = () => undefined, onremove = () => undefined, oninstall = () => undefined, values, facts, account, onaccount, onsetting, onlink }: { commands?: Contributed[]; oncommand?: (plugin: string, command: string) => void; rows?: Row[]; problems?: string[]; canInstall?: boolean; onenable?: (id: string, enabled: boolean) => void; onremove?: (id: string) => void; oninstall?: (source: string) => void; values: Settings | null; facts: ReportFacts | null; account: { state: AccountState; email?: string }; onaccount: (kind: ToHost.SignIn | ToHost.CancelSignIn | ToHost.SignOut) => void; onsetting: (key: SettingKey, value: SettingValue) => void; onlink: (url: string) => void } = $props();
 
   let open = $state(false);
   let trigger = $state<HTMLButtonElement | null>(null);
@@ -93,14 +95,13 @@
         </button>
       </section>
 
-      {#if commands.length}
-        <section>
-          <h3>Plugins</h3>
-          {#each commands as command (command.plugin + command.entry.id)}
-            <button type="button" class="row" data-testid="plugin-command" onclick={() => (oncommand(command.plugin, command.entry.id), close())}>{command.entry.title}</button>
-          {/each}
-        </section>
-      {/if}
+      <section>
+        <h3>Plugins</h3>
+        {#each commands as command (command.plugin + command.entry.id)}
+          <button type="button" class="row" data-testid="plugin-command" onclick={() => (oncommand(command.plugin, command.entry.id), close())}>{command.entry.title}</button>
+        {/each}
+        <PluginManager {rows} {problems} {canInstall} {onenable} {onremove} {oninstall} />
+      </section>
 
       <section>
         <h3>Help</h3>

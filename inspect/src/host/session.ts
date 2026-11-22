@@ -1,5 +1,5 @@
 import { rm } from 'node:fs/promises';
-import { join, relative } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 import { appsIn } from '@feega/dev-run/run-plan';
 import { AddKind, type AddPlace } from '@feega/live-edit/add-node';
 import { liveAtOf } from '@feega/live-edit/live-ask';
@@ -29,7 +29,9 @@ import { themesOf } from './themes';
 import { usageSession } from './usage';
 import { selectionSync } from './selection-sync';
 import { wiringOf } from './wiring';
+import { entriesOf, insertAskOf } from './library';
 import { pluginCalls } from './plugin-calls';
+import { pluginsSession } from './plugins-session';
 import { dependenciesOf, offerInstall } from './install-offer';
 import { install } from './dev-server';
 
@@ -130,6 +132,17 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     await edits.structure({ op: StructureOp.Add, at, add: { kind: AddKind.Image, src: copied.url, place } }).then((out) => edited(out, null));
   }
 
+  async function libraryShown() {
+    const catalog = (await platform.library?.()) ?? null;
+    await post({ kind: ToView.Library, items: catalog ? entriesOf(catalog) : [] });
+  }
+
+  async function libraryInserted(m: Extract<HostMessage, { kind: ToHost.LibraryInsert }>) {
+    const ask = insertAskOf((await platform.library?.()) ?? null, m.id);
+    const out: Written = ask.ok ? await edits.library(m.at, m.place, ask.item, ask.tokens) : ask;
+    await edited(out, null);
+  }
+
   function installOffered(now: Running, packages: string[]) {
     const { plan } = now;
     const hooks = { log: (line: string) => platform.log(line), installing: () => undefined, spawned: () => undefined, signal: new AbortController().signal };
@@ -159,6 +172,10 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     },
     fetch
   });
+
+  const pluginList = platform.plugins
+    ? pluginsSession({ host: { root: platform.plugins.root, dev: () => platform.plugins!.dev().map((folder) => resolve(root, folder)) }, post, notify: platform.notify })
+    : null;
 
   const comments = commentsHost(platform.cloud, post);
   const sharing = shareSession({ platform, workspace, appUrl: () => running?.url ?? null, post });
@@ -434,7 +451,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   };
 
   const handlers: { [K in ToHost]: (m: Extract<HostMessage, { kind: K }>) => unknown } = {
-    [ToHost.Ready]: () => (showApp(), postSettings(), postHistory(), showAccount(), showOnboarding(), comments.show(), sharing.show()),
+    [ToHost.Ready]: () => (showApp(), postSettings(), postHistory(), showAccount(), showOnboarding(), comments.show(), sharing.show(), pluginList?.show()),
     [ToHost.Edit]: (m) => edit(m.ask),
     [ToHost.Undo]: undo,
     [ToHost.Open]: (m) => platform.openSource(root, m.at),
@@ -481,7 +498,12 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.ShareStop]: sharing.stop,
     [ToHost.ShareKick]: (m) => sharing.kick(m.userId),
     [ToHost.ShareRole]: (m) => sharing.setRole(m.userId, m.role),
-    [ToHost.Plugin]: async (m) => post({ kind: ToView.Plugin, id: m.id, result: await pluginRun(m.ask) })
+    [ToHost.LibraryList]: libraryShown,
+    [ToHost.LibraryInsert]: libraryInserted,
+    [ToHost.Plugin]: async (m) => post({ kind: ToView.Plugin, id: m.id, result: await pluginRun(m.ask) }),
+    [ToHost.PluginEnable]: (m) => pluginList?.enable(m.id, m.enabled),
+    [ToHost.PluginRemove]: (m) => pluginList?.remove(m.id),
+    [ToHost.PluginInstall]: (m) => pluginList?.install(m.source)
   };
 
   platform.receive((message) => (handlers[message.kind] as (m: HostMessage) => unknown)(message));
@@ -510,6 +532,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     addPlugin: installPlugin,
     stop: async () => {
       close();
+      pluginList?.stop();
       await sharing.stop();
       await usage?.end();
     },
@@ -518,6 +541,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     showApp,
     showRoute,
     settingsChanged: postSettings,
+    pluginsChanged: () => pluginList?.restart(),
     pick,
     edit,
     undo,

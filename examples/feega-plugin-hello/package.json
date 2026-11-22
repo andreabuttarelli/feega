@@ -1,0 +1,13 @@
+{
+  "name": "feega-plugin-hello",
+  "version": "1.0.0",
+  "description": "A Feega plugin that says hello about the selected element.",
+  "license": "Apache-2.0",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.12"
+  },
+  "files": ["feega-plugin.json", "plugin.js"]
+}

@@ -5,10 +5,12 @@ import { createHash } from 'node:crypto';
 import { homedir, tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { settingsWith, type SettingValue } from '../settings';
+import { pluginsRoot } from '@feega/plugin-store/registry';
 import { fileAccountStore, type AccountStore } from './account';
 import { fileOnboardingStore, type OnboardingStore } from './onboarding';
 import { openTarget } from './open-source';
 import type { Platform, Stored, Transport } from './platform';
+import type { PluginsHost } from './plugins-session';
 import { Device, Editor, fileInstallStore, installIdOf, nodeUsageEnabled, type InstallStore } from './usage';
 
 const FEEGA_DIR = '.feega';
@@ -21,7 +23,7 @@ const LINUX_OPENER = ['xdg-open'];
 
 export type Launch = (command: string, args: string[]) => Promise<boolean>;
 
-export type NodeHost = { root: string; launcher: string; version: string; transport: Transport; print: (line: string) => void; launch?: Launch; env?: NodeJS.ProcessEnv; account?: AccountStore; onboarding?: OnboardingStore; install?: InstallStore; cloud?: Platform['cloud']; share?: Platform['share'] };
+export type NodeHost = { root: string; launcher: string; version: string; transport: Transport; print: (line: string) => void; launch?: Launch; env?: NodeJS.ProcessEnv; account?: AccountStore; onboarding?: OnboardingStore; install?: InstallStore; cloud?: Platform['cloud']; share?: Platform['share']; plugins?: PluginsHost };
 
 export const launchDetached: Launch = (command, args) =>
   new Promise((resolve) => {
@@ -43,7 +45,7 @@ const stateDirFor = (root: string, env: NodeJS.ProcessEnv) => {
   return join(env.XDG_CACHE_HOME || join(homedir(), '.cache'), CACHE_DIR, key);
 };
 
-export function nodePlatform({ root, launcher, version, transport, print, launch = launchDetached, env = process.env, account = fileAccountStore(), onboarding = fileOnboardingStore(), install = fileInstallStore(), cloud, share }: NodeHost): Platform {
+export function nodePlatform({ root, launcher, version, transport, print, launch = launchDetached, env = process.env, account = fileAccountStore(), onboarding = fileOnboardingStore(), install = fileInstallStore(), cloud, share, plugins = { root: pluginsRoot(), dev: () => [] } }: NodeHost): Platform {
   const dir = join(root, FEEGA_DIR);
   const settingsPath = join(dir, SETTINGS_FILE);
   const stateDir = stateDirFor(root, env);
@@ -109,6 +111,7 @@ export function nodePlatform({ root, launcher, version, transport, print, launch
     account,
     cloud,
     share,
+    plugins,
     onboarding,
     usage: {
       identity: () => ({ installId: installIdOf(install), version, editor: Editor.Npx, os: process.platform, arch: process.arch, device: Device.Cli }),
