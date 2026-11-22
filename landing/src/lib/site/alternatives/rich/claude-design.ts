@@ -1,5 +1,5 @@
 import { VisualKind, table, type Rich } from '../alternative';
-import { BUTTON_DIFF, EDITOR_VISUAL, OWN_STEPS } from './shared';
+import { BUTTON_DIFF, EDITOR_VISUAL, OWN_STEPS, PROPERTIES_VISUAL } from './shared';
 
 export const CLAUDE_DESIGN: Rich = {
   verdict:
@@ -46,8 +46,8 @@ export const CLAUDE_DESIGN: Rich = {
         'Feega has no model, so there are no tokens to spend and no output that varies from run to run. The same click on the same element writes the same line.',
         'That also means Feega has nothing to say about what a design should be. It will not propose a layout. If you want ideas, Claude Design is the better tool, and nothing stops you using both on the same project.'
       ],
-      visual: EDITOR_VISUAL,
-      caption: 'The Feega editor inside VS Code: layers, the live page and the Properties bar.'
+      visual: PROPERTIES_VISUAL,
+      caption: 'The Feega editor: layers, the live page and the Properties bar.'
     }
   ],
   cost: {

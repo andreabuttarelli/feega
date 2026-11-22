@@ -1,4 +1,5 @@
 import { figure, type Topic } from '../topic';
+import { EditorShotId } from '../../editor-shots';
 import { CHECKED, DOCS, FEEGA_SOURCE, OPEN_VSX, img } from '../shared';
 
 export const WINDSURF: Topic = {
@@ -20,7 +21,7 @@ export const WINDSURF: Topic = {
       html: `<p>Cascade, Windsurf's agent, can build a settings page from a sentence. What it can't do well is read your mind about the gap between two cards, or the exact grey you had in mind for secondary text. Those edits take one look and one adjustment when you do them yourself, and several prompts when you describe them.</p>
 <p>Feega gives you the hands-on part. Click the card in the running app, drag the gap, pick the grey, change the font weight. The edit goes to the line of the component that rendered the card, as the Tailwind class or CSS rule you would have typed. Cascade's next change starts from the file as you left it.</p>
 <p>Nothing in that loop calls a model, so a visual tweak in Feega costs no credits and works offline.</p>`,
-      figure: figure(img('integrations', 'windsurf-window'), 'A stylised editor window: a Svelte component on the left, the running app with a selected heading outlined in orange in the middle, and the Feega panel with typography controls on the right')
+      editor: EditorShotId.Selected
     },
     {
       heading: 'Two writers, one file',

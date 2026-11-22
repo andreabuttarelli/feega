@@ -1,4 +1,5 @@
 import { figure, type Topic } from '../topic';
+import { EditorShotId } from '../../editor-shots';
 import { CHECKED, DOCS, FEEGA_SOURCE, OPEN_VSX, img } from '../shared';
 
 export const VUE: Topic = {
@@ -14,7 +15,8 @@ export const VUE: Topic = {
       heading: 'How Feega maps a click to a .vue line',
       html: `<p>For a Vue project on Vite, the kind <code>npm create vue</code> gives you, Feega starts Vite itself with your <code>vite.config</code> loaded unchanged and its own source plugin placed first. The plugin reads the template of each single-file component with <code>@vue/compiler-sfc</code>, the same parser Vue uses, and adds <code>data-feega-src="src/components/PricingCard.vue:4:5"</code> to each plain HTML element.</p>
 <p>Components in the template, like <code>&lt;RouterLink&gt;</code> or <code>&lt;PricingCard&gt;</code>, are not tagged. The elements inside <code>PricingCard.vue</code> are, with that file's lines. A click on a card title goes to the <code>&lt;h3&gt;</code> in the card component, which is where its look is defined. Every card in the app shares that line, so they change together.</p>
-<p>The tags live only in the dev server Feega runs. Your files and your build don't get them.</p>`
+<p>The tags live only in the dev server Feega runs. Your files and your build don't get them.</p>`,
+      editor: EditorShotId.Vue
     },
     {
       heading: 'What it writes in a single-file component',

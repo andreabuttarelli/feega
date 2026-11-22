@@ -334,8 +334,11 @@
   list-style: decimal;
 }
 
-.catalog .compare .vis.editor {
-  pointer-events: none;
+.catalog .compare .vis.editor img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--sx-radius-lg);
 }
 
 .catalog .compare .split {

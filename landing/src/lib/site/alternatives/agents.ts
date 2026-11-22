@@ -428,7 +428,7 @@ function build(s: Subject, a: Agent, otherSubject: Subject, siblings: readonly A
   const pair = PAIRS[`${s.slug}-${a.slug}`];
   const slug = `${s.slug}-alternative-for-${a.slug}`;
 
-  const handoff: Highlight = { heading: a.handoff.heading, paragraphs: a.handoff.paragraphs, visual: EDITOR_VISUAL, caption: 'The editor sits next to your code and your agent.' };
+  const handoff: Highlight = { heading: a.handoff.heading, paragraphs: a.handoff.paragraphs, visual: EDITOR_VISUAL, caption: 'The Feega editor: layers, the live page and the Properties bar.' };
   const example: Highlight = {
     heading: `A real edit, written to source`,
     paragraphs: [

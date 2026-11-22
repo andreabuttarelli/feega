@@ -1,5 +1,5 @@
 import { VisualKind, table, type Rich } from '../alternative';
-import { BUTTON_DIFF, EDITOR_VISUAL, OWN_STEPS } from './shared';
+import { BUTTON_DIFF, EDITOR_VISUAL, OWN_STEPS, PROPERTIES_VISUAL } from './shared';
 
 export const FIGMA: Rich = {
   verdict:
@@ -55,8 +55,8 @@ export const FIGMA: Rich = {
         'Make can open a local folder or a GitHub clone, but per Figma’s help page as we read it, only in a closed beta on the Mac desktop app. Dev Mode reads code through its MCP server and does not edit your repo.',
         'If that beta reaches your team and fits how you work, it is worth a look. Today, Feega is the one you can install in a minute on any operating system.'
       ],
-      visual: EDITOR_VISUAL,
-      caption: 'Feega runs on any OS, in VS Code, Cursor, Windsurf or VSCodium.'
+      visual: PROPERTIES_VISUAL,
+      caption: 'The Properties bar for a selected element. Feega runs on any OS, in VS Code, Cursor, Windsurf or VSCodium.'
     }
   ],
   cost: {
