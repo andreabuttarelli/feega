@@ -1,7 +1,7 @@
 {
   "id": "glass-button",
   "name": "Glass button",
-  "description": "A liquid glass pill button over a slowly rotating rainbow glow that the glass bends like a lens.",
+  "description": "A clear liquid glass pill button; a rainbow light follows the cursor and bends through the glass.",
   "category": "component",
   "tags": [
     "button",
