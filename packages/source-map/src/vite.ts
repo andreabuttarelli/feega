@@ -11,7 +11,12 @@ const BRIDGE_IMPORT = `import ${JSON.stringify(fsUrl(BRIDGE_PATH))};`;
 
 const isOwnSource = (id: string) => !id.includes('?') && !id.includes('/node_modules/') && !id.startsWith('\0') && MAPPED_EXTENSIONS.some((ext) => id.endsWith(ext));
 
-export function feegaSource(): Plugin {
+export enum Bridge {
+  ViteClient = 'vite-client',
+  Proxy = 'proxy'
+}
+
+export function feegaSource(bridge: Bridge = Bridge.ViteClient): Plugin {
   let root = process.cwd();
 
   return {
@@ -45,7 +50,7 @@ export function feegaSource(): Plugin {
     },
 
     transform(code, id, options) {
-      if (!VITE_CLIENT.test(id)) {
+      if (bridge === Bridge.Proxy || !VITE_CLIENT.test(id)) {
         return null;
       }
       return options?.ssr ? null : { code: `${code}\n${BRIDGE_IMPORT}\n`, map: null };

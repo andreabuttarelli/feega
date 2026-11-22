@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createServer, type Plugin } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
-import { feegaSource } from './vite.ts';
+import { Bridge, feegaSource } from './vite.ts';
 
 const FIXTURES_DIR = fileURLToPath(new URL('../fixtures/', import.meta.url));
 const VITE_CLIENT = '/app/node_modules/vite/dist/client/client.mjs';
@@ -24,6 +24,10 @@ describe('feegaSource', () => {
 
   it('keeps the bridge out of the server render', () => {
     expect(transformOf(feegaSource())('export const hot = 1;', VITE_CLIENT, { ssr: true })).toBeNull();
+  });
+
+  it('leaves the Vite client alone when the page gets the bridge from the proxy', () => {
+    expect(transformOf(feegaSource(Bridge.Proxy))('export const hot = 1;', VITE_CLIENT)).toBeNull();
   });
 
   it('leaves other dependencies untouched', () => {

@@ -10,6 +10,7 @@ import { failureOf, localUrlOf, type Failed } from './dev-output';
 import { killTree } from './process-tree';
 import { Launch } from './launch';
 import { Verdict, verdictOf } from './candidate';
+import { stampedDev } from './stamped-dev';
 
 export { Launch };
 
@@ -183,7 +184,7 @@ function started(plan: RunPlan, appRoot: string, launch: Launch, command: string
     return spawn('node', [join(appRoot, LAUNCHER_DIR, LAUNCHER), String(plan.port), HOST], { cwd: appRoot, env, detached: GROUPED });
   }
   const preload = launch === Launch.Next ? { NODE_OPTIONS: `${env.NODE_OPTIONS ?? ''} --require ${join(appRoot, LAUNCHER_DIR, NEXT_PRELOAD)}`.trim() } : {};
-  const [bin, ...args] = plan.dev;
+  const [bin, ...args] = stampedDev(plan.framework, plan, join(appRoot, LAUNCHER_DIR), HOST) ?? plan.dev;
   return spawn(bin, args, { cwd: appRoot, env: { ...env, ...preload }, shell: process.platform === 'win32', detached: GROUPED });
 }
 

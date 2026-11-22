@@ -42,6 +42,8 @@ await esbuild({
 await Promise.all(BRIDGE_FILES.map((f) => cp(`${SOURCE_MAP}${f}`, `${LAUNCHER}${f}`)));
 await cp(here('launcher/launch.mjs'), `${LAUNCHER}launch.mjs`);
 await cp(here('launcher/next-preload.cjs'), `${LAUNCHER}next-preload.cjs`);
+await cp(here('launcher/astro.mjs'), `${LAUNCHER}astro.mjs`);
+await cp(here('launcher/nuxt-layer'), `${LAUNCHER}nuxt-layer`, { recursive: true });
 await esbuild({
   entryPoints: [`${SOURCE_MAP}next-loader.ts`],
   outfile: `${LAUNCHER}next-loader.cjs`,
