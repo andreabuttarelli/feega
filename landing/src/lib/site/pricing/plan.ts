@@ -77,7 +77,7 @@ export const CLOUD_SOON_FOR = 'For teams that design in the same codebase.';
 
 export const CLOUD_SOON_NOTE = 'Star the repo to hear first.';
 
-export const CLOUD_SOON_LINES = ['GitHub sync', 'Collaboration', 'Sections and templates'] as const;
+export const CLOUD_SOON_LINES = ['GitHub sync', 'Collaboration', 'All Pro templates and plugins'] as const;
 
 export const freeStart = (plan: CloudPlan): string => `Start free: ${FREE_EDITORS} ${plan.per}, ${count(FREE_CREDITS)} credits, no card.`;
 
@@ -108,4 +108,4 @@ export const runOutAnswer = (plan: CloudPlan): string =>
   `AI pauses until next ${plan.period}'s credits arrive or you top up with ${topUpPrices(plan)}; everything else keeps working. Credits never expire.`;
 
 export const freeAnswer = (plan: CloudPlan): string =>
-  `Yes. The Feega extension is free, with no account and no AI. Feega Cloud, with GitHub sync, collaboration, sections and templates, is coming later.`;
+  `Yes. The Feega extension is free, with no account and no AI. Feega Cloud, with GitHub sync, collaboration, all Pro templates and plugins, is coming later.`;

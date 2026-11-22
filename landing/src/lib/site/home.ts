@@ -55,7 +55,7 @@ export const FAQ = [
   },
   {
     q: "What is Feega Cloud?",
-    a: "Coming later: GitHub sync, collaboration, sections and templates. The extension stays free."
+    a: "Coming later: GitHub sync, collaboration, all Pro templates and plugins. The extension stays free."
   },
   {
     q: "Who owns my work, and is it used to train AI?",
