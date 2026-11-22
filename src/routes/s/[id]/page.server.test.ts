@@ -77,7 +77,7 @@ describe('/s/[id] load', () => {
     const error = (await thrown(run(fakeDb({ share_sessions: [sessionRow()] }), '?next=/about'))) as { status: number; location: string };
 
     expect(error.status).toBe(303);
-    expect(error.location).toMatch(new RegExp(`^https://${SID}\\.s\\.feega\\.app/__feega/auth\\?token=[\\w.-]+&next=%2Fabout$`));
+    expect(error.location).toMatch(new RegExp(`^http://${SID}\\.localhost:8787/__feega/auth\\?token=[\\w.-]+&next=%2Fabout$`));
   });
 
   it('is a 404 when the session is not visible to the user', async () => {

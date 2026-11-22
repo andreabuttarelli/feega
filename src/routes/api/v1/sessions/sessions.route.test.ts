@@ -127,7 +127,7 @@ describe('POST /api/v1/sessions', () => {
     const body = await response.json();
 
     expect(response.status).toBe(201);
-    expect(body.url).toBe(`https://${body.id}.s.feega.app`);
+    expect(body.url).toBe(`http://${body.id}.localhost:8787`);
     expect(db.tables.share_sessions.some((row) => row.id === body.id)).toBe(true);
 
     const verdict = await verifyToken(body.hostToken, SECRET);
@@ -164,7 +164,7 @@ describe('GET /api/v1/sessions', () => {
     const response = await GET({ request: req('GET'), url: new URL('https://oh.feega.app/api/v1/sessions?status=live') } as never);
 
     expect(await response.json()).toEqual({
-      sessions: [{ id: SID, url: `https://${SID}.s.feega.app`, projectName: 'Landing', hostName: 'Grace', startedAt: expect.any(String), expiresAt: FUTURE, status: 'live' }]
+      sessions: [{ id: SID, url: `http://${SID}.localhost:8787`, projectName: 'Landing', hostName: 'Grace', startedAt: expect.any(String), expiresAt: FUTURE, status: 'live' }]
     });
   });
 });
