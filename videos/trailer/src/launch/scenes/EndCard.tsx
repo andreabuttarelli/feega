@@ -1,0 +1,53 @@
+import { useCurrentFrame } from "remotion";
+import { lift, tween } from "../../ease";
+import { FeegaMark } from "../../components/brandIcons";
+import { Pixel, hop, type Sprite } from "../pixel";
+import { Place, Section } from "../Section";
+import { DISPLAY, MONO, ORANGE, PAPER, Tone } from "../style";
+
+export const END_FRAMES = 180;
+export const LOGO_AT = 4;
+
+const AROUND: { x: number; y: number; s: Sprite }[] = [
+  { x: 260, y: 180, s: "blob" },
+  { x: 1560, y: 160, s: "ghost" },
+  { x: 180, y: 520, s: "brush" },
+  { x: 1680, y: 520, s: "layers" },
+  { x: 300, y: 830, s: "frame" },
+  { x: 1520, y: 840, s: "blob" },
+  { x: 900, y: 900, s: "pointer" },
+  { x: 640, y: 120, s: "star" },
+  { x: 1200, y: 110, s: "plug" },
+];
+
+export const EndCard = () => {
+  const frame = useCurrentFrame();
+  const logo = tween(frame, LOGO_AT, 16);
+  const tag = lift(frame, 18, 14);
+  const chip = tween(frame, 28, 12);
+
+  return (
+    <Section tone={Tone.Ink}>
+      {AROUND.map((a, i) => {
+        const p = lift(frame, 10 + i * 3, 10);
+
+        return (
+          <Place key={i} x={a.x} y={a.y} style={{ transform: `translateY(${hop(frame, i * 3) * p}px) scale(${p})` }}>
+            <Pixel sprite={a.s} size={11} />
+          </Place>
+        );
+      })}
+      <Place x={0} y={330} style={{ width: 1920, display: "flex", flexDirection: "column", alignItems: "center" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 30, transform: `scale(${0.7 + 0.3 * logo})`, opacity: logo }}>
+          <FeegaMark size={150} />
+          <span style={{ fontFamily: DISPLAY, fontSize: 190, fontWeight: 560, letterSpacing: "-0.05em", color: PAPER, lineHeight: 1 }}>feega</span>
+        </div>
+        <div style={{ marginTop: 40, fontFamily: DISPLAY, fontSize: 64, fontWeight: 500, letterSpacing: "-0.04em", color: PAPER, opacity: tag, transform: `translateY(${(1 - tag) * 30}px)` }}>design in your codebase.</div>
+        <div style={{ marginTop: 44, display: "flex", alignItems: "center", gap: 14, padding: "14px 26px", background: ORANGE, color: PAPER, fontFamily: MONO, fontSize: 30, transform: `scale(${chip})` }}>
+          <span style={{ width: 12, height: 12, background: PAPER }} />
+          feega.app
+        </div>
+      </Place>
+    </Section>
+  );
+};

@@ -2,6 +2,7 @@ import { Composition, Series } from "remotion";
 import { ColdOpen } from "./scenes/ColdOpen";
 import { COLD_OPEN_FRAMES } from "./scenes/coldOpenTimeline";
 import { Intro, INTRO_FRAMES } from "./scenes/Intro";
+import { LAUNCH_FRAMES, Launch } from "./launch/Launch";
 import { FPS, HEIGHT, WIDTH } from "./timing";
 
 const Trailer = () => (
@@ -20,5 +21,6 @@ export const Root = () => (
     <Composition id="Trailer" component={Trailer} durationInFrames={INTRO_FRAMES + COLD_OPEN_FRAMES} fps={FPS} width={WIDTH} height={HEIGHT} />
     <Composition id="Intro" component={Intro} durationInFrames={INTRO_FRAMES} fps={FPS} width={WIDTH} height={HEIGHT} />
     <Composition id="ColdOpen" component={ColdOpen} durationInFrames={COLD_OPEN_FRAMES} fps={FPS} width={WIDTH} height={HEIGHT} />
+    <Composition id="Launch" component={Launch} durationInFrames={LAUNCH_FRAMES} fps={FPS} width={WIDTH} height={HEIGHT} />
   </>
 );
