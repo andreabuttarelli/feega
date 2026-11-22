@@ -4058,3 +4058,7 @@ property reads on ~2,000 items (`src/lib/canvas/counted-list.testkit.ts`), not w
 ## A Workers test WebSocket delivers binary frames as Blob
 
 **Signal:** a test peer gets `event.data` as an object with no `byteLength` and every decoded frame is `null`. **Move:** set `socket.binaryType = 'arraybuffer'` before `accept()` in the test harness.
+
+## A fixture package.json changes by itself after the first run
+
+**Signal:** a framework e2e fails with `package.json` in the changed files. React Router adds `isbot` to the app when it is missing, and the test cleanup then reverts your uncommitted fixture edit. **Move:** declare the dependency the framework wants in the committed fixture, and commit fixture edits before running the e2e.

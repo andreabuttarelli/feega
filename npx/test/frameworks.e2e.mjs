@@ -1,13 +1,19 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
 import { readFileSync, rmSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
 
 const here = (path) => fileURLToPath(new URL(path, import.meta.url));
 const APP = resolve(process.env.FEEGA_E2E_APP);
-const SOURCE_FILE = new RegExp(process.env.FEEGA_E2E_SOURCE);
+const WRITTEN_FILE = {
+  'vite-vanilla': /(^|\/)index\.html$/,
+  'astro-css': /(^|\/)index\.astro$/,
+  'nuxt-css': /(^|\/)app\/app\.vue$/,
+  'react-router-css': /(^|\/)routes\/home\.tsx$/
+};
+const SOURCE_FILE = WRITTEN_FILE[basename(APP)] ?? /src\//;
 const CLI = here('../dist/cli.cjs');
 const PORT = Number(process.env.FEEGA_E2E_PORT ?? 4723);
 const READY_MS = 180_000;
