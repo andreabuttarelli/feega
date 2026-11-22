@@ -108,6 +108,7 @@ describe.each(ADAPTERS)('attaching to a URL on the %s platform', (_name, make) =
     expect(kinds.indexOf(ToView.App)).toBeGreaterThan(kinds.indexOf(ServerState.Starting));
     expect(kinds.indexOf(ToView.App)).toBeLessThan(kinds.indexOf(ServerState.Running));
     expect(app && 'url' in app && app.url).toBe(running && 'info' in running && running.info?.url);
+    expect(app && 'url' in app && new URL(app.url).port).toBe(String(running && 'info' in running && running.info?.port));
   });
 
   it.each([['astro'], ['nuxt']])('refuses to attach to a %s dev server and offers to start it', async (dependency) => {

@@ -11,7 +11,9 @@ import { failureOf, localUrlOf, type Failed } from './dev-output';
 import { killTree } from './process-tree';
 import { Launch } from './launch';
 import { Verdict, verdictOf } from './candidate';
+import { until, type Probes, type Watched } from './ready';
 import { stampedDev } from './stamped-dev';
+import { commandShown } from './server-info';
 
 export { Launch };
 
@@ -105,9 +107,7 @@ export async function listening(port: number): Promise<boolean> {
   return all.some(Boolean);
 }
 
-type Watched = { url: string | null; failed: Failed | null };
-
-function watchOutput(child: ChildProcess): Watched {
+export function watchOutput(child: ChildProcess): Watched {
   const seen: Watched = { url: null, failed: null };
   const read = (d: Buffer) => {
     const text = String(d);
@@ -117,23 +117,6 @@ function watchOutput(child: ChildProcess): Watched {
   child.stdout?.on('data', read);
   child.stderr?.on('data', read);
   return seen;
-}
-
-const portOf = (url: string) => Number(new URL(url).port) || 80;
-
-async function until(port: number, child: ChildProcess, seen: Watched): Promise<string | Failed | null> {
-  const end = Date.now() + READY_MS;
-  while (Date.now() < end && child.exitCode === null && !seen.failed) {
-    const printed = seen.url;
-    if (printed && (await listening(portOf(printed)))) {
-      return printed;
-    }
-    if (await listening(port)) {
-      return `http://${HOST}:${port}/`;
-    }
-    await new Promise((r) => setTimeout(r, READY_POLL_MS));
-  }
-  return seen.failed;
 }
 
 const KILL_AFTER_MS = 3000;
@@ -320,14 +303,15 @@ export async function startDev(root: string, launcherSource: string, hooks: Star
   child.stderr?.on('data', (d) => hooks.log(String(d)));
 
   const port = launch === Launch.Command ? planned.defaultPort : planned.port;
-  const ready = await until(port, child, seen);
+  const owned = launch === Launch.Command ? listening : (p: number) => servesWorkspace(p, appRoot);
+  const ready = await until(port, child, seen, { listening, ours: owned, wait: () => new Promise((r) => setTimeout(r, READY_POLL_MS)), now: Date.now, timeoutMs: READY_MS });
   time.mark('ready');
   if (typeof ready !== 'string') {
     stopGroup(child);
     return ready ? { refused: `${ready.message}: ${ready.line}`, failed: ready } : { refused: child.exitCode !== null ? `the dev server exited (${child.exitCode})` : `the dev server did not answer on port ${port}` };
   }
   hooks.log(`feega: started the dev server on ${ready}\n`);
-  const shown = launch === Launch.Command ? command : launch === Launch.Vite ? `vite (Feega launcher) on ${planned.port}` : planned.dev.join(' ');
+  const shown = launch === Launch.Command ? command : launch === Launch.Vite ? 'vite (Feega launcher)' : commandShown(planned.dev, planned.port);
   const proxy = row.proxied ? await devProxy(ready, bridgeDir) : null;
   const stop = () => (proxy?.close(), stopGroup(child));
   time.done('started');
