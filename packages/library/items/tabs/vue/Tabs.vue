@@ -1,31 +1,57 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 
-const tabs = [
-  { label: 'Overview', title: 'Traffic is up this week', body: 'Visits grew 12% against last week, led by the pricing page.' },
-  { label: 'Activity', title: 'Three changes today', body: 'Two pages published and one form edited, all by your team.' },
-  { label: 'Settings', title: 'Workspace defaults', body: 'Pick who can publish, the default theme and the time zone.' }
-];
+function mount(root: HTMLElement): () => void {
+  const stop = new AbortController();
+  const { signal } = stop;
+  const tabs = Array.from(root.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+  const panels = Array.from(root.querySelectorAll<HTMLElement>('[role="tabpanel"]'));
 
-const active = ref(0);
-const buttons = ref<HTMLButtonElement[]>([]);
-
-function onKeydown(event: KeyboardEvent) {
-  const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
-  if (step === 0) {
-    return;
+  function select(index: number) {
+    tabs.forEach((tab, i) => {
+      tab.setAttribute('aria-selected', String(i === index));
+      tab.tabIndex = i === index ? 0 : -1;
+      panels[i].hidden = i !== index;
+    });
+    tabs[index].focus();
   }
-  active.value = (active.value + step + tabs.length) % tabs.length;
-  buttons.value[active.value]?.focus();
+
+  tabs.forEach((tab, i) => tab.addEventListener('click', () => select(i), { signal }));
+  root.querySelector('[role="tablist"]')?.addEventListener(
+    'keydown',
+    (event) => {
+      const key = (event as KeyboardEvent).key;
+      const step = key === 'ArrowRight' ? 1 : key === 'ArrowLeft' ? -1 : 0;
+      if (step === 0) {
+        return;
+      }
+      select((tabs.indexOf(document.activeElement as HTMLButtonElement) + step + tabs.length) % tabs.length);
+    },
+    { signal }
+  );
+
+  return () => stop.abort();
 }
+
+const root = ref<HTMLElement | null>(null);
+let stop = () => {};
+
+onMounted(() => {
+  stop = mount(root.value as HTMLElement);
+});
+onBeforeUnmount(() => stop());
 </script>
 
 <template>
-  <div class="fl-tabs">
-    <div class="list" role="tablist" aria-label="Sections" @keydown="onKeydown">
-      <button v-for="(tab, i) in tabs" :key="tab.label" ref="buttons" class="tab" role="tab" type="button" :id="`fl-tab-${i}`" :aria-controls="`fl-panel-${i}`" :aria-selected="active === i" :tabindex="active === i ? 0 : -1" @click="active = i">{{ tab.label }}</button>
+  <div class="fl-tabs" ref="root">
+    <div class="list" role="tablist" aria-label="Sections">
+      <button class="tab" role="tab" type="button" id="fl-tab-1" aria-controls="fl-panel-1" aria-selected="true">Overview</button>
+      <button class="tab" role="tab" type="button" id="fl-tab-2" aria-controls="fl-panel-2" aria-selected="false" tabindex="-1">Activity</button>
+      <button class="tab" role="tab" type="button" id="fl-tab-3" aria-controls="fl-panel-3" aria-selected="false" tabindex="-1">Settings</button>
     </div>
-    <div v-for="(tab, i) in tabs" :key="tab.label" class="panel" role="tabpanel" :id="`fl-panel-${i}`" :aria-labelledby="`fl-tab-${i}`" tabindex="0" :hidden="active !== i"><h3>{{ tab.title }}</h3><p>{{ tab.body }}</p></div>
+    <div class="panel" role="tabpanel" id="fl-panel-1" aria-labelledby="fl-tab-1" tabindex="0"><h3>Traffic is up this week</h3><p>Visits grew 12% against last week, led by the pricing page.</p></div>
+    <div class="panel" role="tabpanel" id="fl-panel-2" aria-labelledby="fl-tab-2" tabindex="0" hidden><h3>Three changes today</h3><p>Two pages published and one form edited, all by your team.</p></div>
+    <div class="panel" role="tabpanel" id="fl-panel-3" aria-labelledby="fl-tab-3" tabindex="0" hidden><h3>Workspace defaults</h3><p>Pick who can publish, the default theme and the time zone.</p></div>
   </div>
 </template>
 

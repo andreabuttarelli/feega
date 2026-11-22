@@ -51,11 +51,7 @@ const toastCss = [
   '.fl-toast .close .fl-px{width:9px}'
 ];
 
-const tabsData = `const tabs = [
-${TABS.map(([label, title, body]) => `  { label: '${label}', title: '${title}', body: '${body}' }`).join(',\n')}
-];`;
-
-const tabsStatic = (attrs) => `<div class="fl-tabs">
+const tabsStatic = (attrs = '') => `<div class="fl-tabs"${attrs}>
   <div class="list" role="tablist" aria-label="Sections">
 ${TABS.map(([label], i) => `    <button class="tab" role="tab" type="button" id="fl-tab-${i + 1}" aria-controls="fl-panel-${i + 1}" aria-selected="${i === 0}"${i ? ' tabindex="-1"' : ''}>${label}</button>`).join('\n')}
   </div>
@@ -87,6 +83,44 @@ const tabsScript = (typed) => `document.querySelectorAll${typed ? '<HTMLElement>
   });
 });`;
 
+const tabsMount = `function mount(root: HTMLElement): () => void {
+  const stop = new AbortController();
+  const { signal } = stop;
+  const tabs = Array.from(root.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+  const panels = Array.from(root.querySelectorAll<HTMLElement>('[role="tabpanel"]'));
+
+  function select(index: number) {
+    tabs.forEach((tab, i) => {
+      tab.setAttribute('aria-selected', String(i === index));
+      tab.tabIndex = i === index ? 0 : -1;
+      panels[i].hidden = i !== index;
+    });
+    tabs[index].focus();
+  }
+
+  tabs.forEach((tab, i) => tab.addEventListener('click', () => select(i), { signal }));
+  root.querySelector('[role="tablist"]')?.addEventListener(
+    'keydown',
+    (event) => {
+      const key = (event as KeyboardEvent).key;
+      const step = key === 'ArrowRight' ? 1 : key === 'ArrowLeft' ? -1 : 0;
+      if (step === 0) {
+        return;
+      }
+      select((tabs.indexOf(document.activeElement as HTMLButtonElement) + step + tabs.length) % tabs.length);
+    },
+    { signal }
+  );
+
+  return () => stop.abort();
+}`;
+
+const pad = (text, n) =>
+  text
+    .split('\n')
+    .map((l) => (l ? ' '.repeat(n) + l : l))
+    .join('\n');
+
 const modalBody = (on) => `  <dialog ${on.ref} aria-labelledby="fl-modal-title">
     <form method="dialog">
       <span ${on.cls}="icon">${px('warn')}</span>
@@ -113,95 +147,49 @@ export const interactive = [
       html: tabsStatic() + `\n\n<script>\n${tabsScript(false)}\n</script>\n`,
       astro: `---\n---\n\n${tabsStatic()}\n\n<script>\n${tabsScript(true)}\n</script>\n\n<style>\n${C}</style>\n`,
       svelte: `<script lang="ts">
-  ${tabsData.split('\n').join('\n  ')}
+${pad(tabsMount, 2)}
 
-  let active = $state(0);
-  let buttons: HTMLButtonElement[] = [];
+  let root: HTMLElement;
 
-  function onkeydown(event: KeyboardEvent) {
-    const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
-    if (step === 0) {
-      return;
-    }
-    active = (active + step + tabs.length) % tabs.length;
-    buttons[active].focus();
-  }
+  $effect(() => mount(root));
 </script>
 
-<div class="fl-tabs">
-  <div class="list" role="tablist" aria-label="Sections" tabindex="-1" {onkeydown}>
-    {#each tabs as tab, i}
-      <button class="tab" role="tab" type="button" id="fl-tab-{i}" aria-controls="fl-panel-{i}" aria-selected={active === i} tabindex={active === i ? 0 : -1} bind:this={buttons[i]} onclick={() => (active = i)}>{tab.label}</button>
-    {/each}
-  </div>
-  {#each tabs as tab, i}
-    <div class="panel" role="tabpanel" id="fl-panel-{i}" aria-labelledby="fl-tab-{i}" tabindex="0" hidden={active !== i}><h3>{tab.title}</h3><p>{tab.body}</p></div>
-  {/each}
-</div>
+${tabsStatic(' bind:this={root}')}
 
 <style>
 ${C}</style>
 `,
-      react: `import { useId, useRef, useState } from 'react';
-import type { KeyboardEvent } from 'react';
+      react: `import { useEffect, useRef } from 'react';
 import './Tabs.css';
 
-${tabsData}
+${tabsMount}
 
 export function Tabs() {
-  const uid = useId();
-  const [active, setActive] = useState(0);
-  const buttons = useRef<(HTMLButtonElement | null)[]>([]);
+  const root = useRef<HTMLDivElement>(null);
 
-  function onKeyDown(event: KeyboardEvent) {
-    const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
-    if (step === 0) {
-      return;
-    }
-    const next = (active + step + tabs.length) % tabs.length;
-    setActive(next);
-    buttons.current[next]?.focus();
-  }
+  useEffect(() => (root.current ? mount(root.current) : undefined), []);
 
   return (
-    <div className="fl-tabs">
-      <div className="list" role="tablist" aria-label="Sections" onKeyDown={onKeyDown}>
-        {tabs.map((tab, i) => (
-          <button key={tab.label} ref={(el) => { buttons.current[i] = el; }} className="tab" role="tab" type="button" id={\`\${uid}-tab-\${i}\`} aria-controls={\`\${uid}-panel-\${i}\`} aria-selected={active === i} tabIndex={active === i ? 0 : -1} onClick={() => setActive(i)}>{tab.label}</button>
-        ))}
-      </div>
-      {tabs.map((tab, i) => (
-        <div key={tab.label} className="panel" role="tabpanel" id={\`\${uid}-panel-\${i}\`} aria-labelledby={\`\${uid}-tab-\${i}\`} tabIndex={0} hidden={active !== i}><h3>{tab.title}</h3><p>{tab.body}</p></div>
-      ))}
-    </div>
+${pad(tabsStatic(' ref={root}').replace(/class="/g, 'className="').replace(/tabindex="/g, 'tabIndex="').replace(/(tabIndex)="(-?\d)"/g, '$1={$2}').replace(/ hidden>/g, ' hidden>'), 4)}
   );
 }
 `,
       vue: `<script setup lang="ts">
-import { ref } from 'vue';
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 
-${tabsData}
+${tabsMount}
 
-const active = ref(0);
-const buttons = ref<HTMLButtonElement[]>([]);
+const root = ref<HTMLElement | null>(null);
+let stop = () => {};
 
-function onKeydown(event: KeyboardEvent) {
-  const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
-  if (step === 0) {
-    return;
-  }
-  active.value = (active.value + step + tabs.length) % tabs.length;
-  buttons.value[active.value]?.focus();
-}
+onMounted(() => {
+  stop = mount(root.value as HTMLElement);
+});
+onBeforeUnmount(() => stop());
 </script>
 
 <template>
-  <div class="fl-tabs">
-    <div class="list" role="tablist" aria-label="Sections" @keydown="onKeydown">
-      <button v-for="(tab, i) in tabs" :key="tab.label" ref="buttons" class="tab" role="tab" type="button" :id="\`fl-tab-\${i}\`" :aria-controls="\`fl-panel-\${i}\`" :aria-selected="active === i" :tabindex="active === i ? 0 : -1" @click="active = i">{{ tab.label }}</button>
-    </div>
-    <div v-for="(tab, i) in tabs" :key="tab.label" class="panel" role="tabpanel" :id="\`fl-panel-\${i}\`" :aria-labelledby="\`fl-tab-\${i}\`" tabindex="0" :hidden="active !== i"><h3>{{ tab.title }}</h3><p>{{ tab.body }}</p></div>
-  </div>
+${pad(tabsStatic(' ref="root"'), 2)}
 </template>
 
 <style scoped>
