@@ -7,13 +7,13 @@ description: Set up a web project for Feega visual editing, start the editor, an
 
 Feega edits a running web app visually: click an element, change it, and the edit is written to the source as a Tailwind class or a CSS rule. It has no AI of its own; you and the user share the same files and every edit is a diff.
 
-Supported: SvelteKit, Vite (React, Vue, Svelte), React Router, Next.js, Nuxt, Astro. Styling: Tailwind, CSS modules, scoped `<style>`, plain CSS. Needs Node 20+.
+Supported: React (Vite), Next.js, Vue (Vite), SvelteKit, Nuxt 4, React Router 7 (framework mode), Astro 5, plain Vite (edits land in `index.html`). Not supported: Angular, static HTML without Vite, Create React App. Styling: Tailwind, CSS modules, scoped `<style>`, plain CSS. Needs Node 20+.
 
 ## 1. Set up the project
 
 Done when the dev page carries the Feega source map and picking an element works.
 
-Vite, SvelteKit and React Router get the source map automatically: skip to step 2. Next.js needs `feega-source-map`; other frameworks (Nuxt, Astro) need it too, in their Vite config, with the Vite recipe.
+Vite, SvelteKit and React Router get the source map automatically: skip to step 2. Next.js needs `feega-source-map`. Nuxt and Astro need it too, in their Vite config, with the Vite recipe.
 
 1. Add the dev dependency: `feega-source-map` at `^0.1.0` in `devDependencies`, then install.
 2. Edit the config, once. If it already mentions `feega-source-map`, change nothing.
@@ -42,12 +42,12 @@ The VS Code extension does the same edit from its "Add the Feega plugin" link in
 
 Pick by what the user has open:
 
-- Browser, any editor: run `npx feega` in the app folder. Feega finds the app, starts its dev server and opens the editor. Options: `npx feega [dir] [--url <address>] [--port N] [--no-open]`. `--url` attaches to a dev server that already runs; `--no-open` prints the editor URL.
-- VS Code, Cursor, Windsurf, VSCodium: install the extension `andreabuttarelli.feega`, then run the command palette entry "Feega: Open from current workspace". Or right-click a folder in the Explorer: "Design this folder with Feega". Or a page file (`.svelte`, `.vue`, `.tsx`, `.jsx`, `.astro`, `.html`): "Design this page with Feega".
+- Browser, any editor: run `npx feega` in the app folder. Feega finds the app, starts its dev server and opens the editor. Options: `npx feega [dir] [--url <address>] [--port N] [--no-open]`. `--no-open` prints the editor URL. `--url` attaches to a dev server that already runs; never use it on Astro or Nuxt, which map elements to source only when Feega starts the server.
+- VS Code, Cursor, Windsurf, VSCodium: install the extension `andreabuttarelli.feega`, then run the command palette entry "Feega: Open from current workspace". Or right-click a folder in the Explorer: "Design this folder with Feega". Or a `.svelte`, `.vue`, `.tsx`, `.jsx`, `.astro` or `.html` file: "Design this page with Feega". "Feega: Open from URL…" attaches to a running app (same Astro/Nuxt limit).
 
 `npx feega` runs until Ctrl+C and stops the dev server it started. Run it in the background, or hand the user the command; do not block on it.
 
-Settings (VS Code, `feegaInspect.*`): `styling` (`auto`, `tailwind`, `css`), `devCommand` (empty: read from `package.json`), `defaultSize` (`full`, `desktop`, `tablet`, `phone`), `keepServerAlive` (minutes), `telemetry`. In `npx feega`, the same live in `.feega/settings.json`. Suggest `.feega/` in `.gitignore`: it holds editor layout and edit history.
+Settings (VS Code, `feegaInspect.*`): `styling` (`auto`, `tailwind`, `css`), `devCommand` (empty: read from `package.json`), `defaultSize` (`full`, `desktop`, `tablet`, `phone`), `keepServerAlive` (minutes), `telemetry`, `plugins.dev` (plugin folders). In `npx feega`, the same live in `.feega/settings.json`. Suggest `.feega/` in `.gitignore`: it holds editor layout and edit history.
 
 ## 3. Write code Feega can edit
 
@@ -71,5 +71,23 @@ Structure:
 - Duplicate, wrap, unwrap, delete, reorder and add (Text, Heading, Button, Link, Image, Container) are source edits; plain JSX/template elements give the cleanest ones.
 
 Selecting in the editor selects the same element in the code editor, and the reverse. "Copy for agent" copies the selected element with its source location, for you to read and edit.
+
+## 4. Library and plugins
+
+Library: in the editor, select an element, **+ Add** then **Library**, **Insert** (or drag onto the preview). It writes a component for the project's framework into `feega/` under the component folder (`src/lib/components/feega/` SvelteKit, `src/components/feega/` React, Vue, Astro, `components/feega/` Nuxt), plus `tokens.css` and the fonts it uses, and the import. One insert is one undo.
+
+Plugins add controls to the editor. Built in: Mesh gradient and 3D object (`3d` adds `three` to `package.json`; offer the install). Third-party plugins are not reviewed by Feega and run sandboxed, limited to the permissions in their `feega-plugin.json`.
+
+- `npx feega plugin add <github:owner/repo[@tag] | npm-name[@version]>`: shows the permissions and asks the user first. Never approve for them.
+- `npx feega plugin list`, `npx feega plugin remove <id>`.
+- `npx feega plugin dev <folder> [dir]`: opens the editor with a plugin folder you are building, reloaded on change. In VS Code: `feegaInspect.plugins.dev`.
+- To write one, follow https://docs.feega.app/integrations/write-a-plugin/: a folder with `feega-plugin.json` and a bundled script (no imports), using the plugin SDK.
+
+## 5. Editor behavior to expect
+
+- Multi-select: Shift+click or Cmd/Ctrl+click in Layers or the preview. Delete, duplicate, wrap and unwrap apply to all as one undo; styles are edited one element at a time.
+- Size has min and max width and height.
+- A font that is not installed or loaded shows a notice offering to load it from Google Fonts or replace it.
+- The preview reloads itself after the dev server restarts, for example after a dependency install.
 
 After editing, tell the user what changed and that Feega shows the same edits under Changes, where each is undoable.
