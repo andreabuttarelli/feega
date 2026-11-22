@@ -2,9 +2,8 @@ import { CAMERA_MOVE, ENTER_PAUSE, FRAMES_PER_CHAR } from "../timing";
 
 export enum Focus {
   Prompt = "prompt",
-  Wide = "wide",
+  Page = "page",
   Navbar = "navbar",
-  Title = "title",
   Limit = "limit",
 }
 
@@ -13,16 +12,20 @@ export enum Reply {
   Limit = "limit",
 }
 
+export const BACKSPACE = "⌫";
+
 type BeatSpec = {
-  prompt: string;
+  keys: string;
   reply: string;
   kind: Reply;
   work: number;
   focus: Focus;
   hold: number;
+  lead: number;
 };
 
 export type Beat = BeatSpec & {
+  prompt: string;
   start: number;
   typeStart: number;
   submit: number;
@@ -34,15 +37,19 @@ export type Beat = BeatSpec & {
 
 const OPENING = 22;
 const LEAD_IN = 8;
+const SIGH = 42;
 const REVEAL_LAG = 6;
 const CHANGE_DURATION = 30;
 
+export const applyKeys = (keys: string) =>
+  [...keys].reduce((text, key) => (key === BACKSPACE ? text.slice(0, -1) : text + key), "");
+
 const SPECS: BeatSpec[] = [
-  { prompt: "Build the best startup website ever", reply: "Done! Your website is ready.", kind: Reply.Done, work: 60, focus: Focus.Wide, hold: 60 },
-  { prompt: "move the navbar to the left", reply: "Done! Navbar moved.", kind: Reply.Done, work: 20, focus: Focus.Navbar, hold: 36 },
-  { prompt: "no no, I meant to the center", reply: "Done! Navbar centered.", kind: Reply.Done, work: 20, focus: Focus.Navbar, hold: 36 },
-  { prompt: "Fix the title, use the right color", reply: "Done! Title color fixed.", kind: Reply.Done, work: 20, focus: Focus.Title, hold: 36 },
-  { prompt: "no! black, like every other title!!!", reply: "You've reached your usage limit.\nTry again in 5 hours.", kind: Reply.Limit, work: 30, focus: Focus.Limit, hold: 90 },
+  { keys: "build a perfect landing page. first try 😎", reply: "Done! Your website is ready ✨", kind: Reply.Done, work: 48, focus: Focus.Page, hold: 50, lead: LEAD_IN },
+  { keys: "move the nabv⌫⌫vbar to the left", reply: "Done! Navbar moved.", kind: Reply.Done, work: 18, focus: Focus.Navbar, hold: 34, lead: LEAD_IN },
+  { keys: "no no, I meant to the CENTRE⌫⌫ER", reply: "Done! Navbar centered.", kind: Reply.Done, work: 18, focus: Focus.Navbar, hold: 34, lead: LEAD_IN },
+  { keys: "fix the title, use the rigth⌫⌫ht color!", reply: "Done! Title color fixed.", kind: Reply.Done, work: 18, focus: Focus.Page, hold: 38, lead: LEAD_IN },
+  { keys: "NO!! blakc⌫⌫ck, like EVERY other title!!!", reply: "You've reached your usage limit.\nTry again in 5 hours.", kind: Reply.Limit, work: 24, focus: Focus.Limit, hold: 80, lead: SIGH },
 ];
 
 const build = (specs: BeatSpec[]): Beat[] => {
@@ -50,8 +57,8 @@ const build = (specs: BeatSpec[]): Beat[] => {
 
   return specs.map((spec) => {
     const start = cursor;
-    const typeStart = start + LEAD_IN;
-    const submit = typeStart + Math.round(spec.prompt.length * FRAMES_PER_CHAR) + ENTER_PAUSE;
+    const typeStart = start + spec.lead;
+    const submit = typeStart + Math.round([...spec.keys].length * FRAMES_PER_CHAR) + ENTER_PAUSE;
     const replyAt = submit + spec.work;
     const cameraAt = replyAt + REVEAL_LAG;
     const changeAt = cameraAt + CAMERA_MOVE;
@@ -59,7 +66,7 @@ const build = (specs: BeatSpec[]): Beat[] => {
 
     cursor = end;
 
-    return { ...spec, start, typeStart, submit, replyAt, cameraAt, changeAt, end };
+    return { ...spec, prompt: applyKeys(spec.keys), start, typeStart, submit, replyAt, cameraAt, changeAt, end };
   });
 };
 
