@@ -1,0 +1,195 @@
+const LABEL = 'get started';
+
+const css = [
+  '.fl-glass-button{--glow-1:deeppink;--glow-2:orange;--glow-3:gold;--glow-4:springgreen;--glow-5:deepskyblue;--glow-6:blueviolet;--shine:white;--spin:9s;--radius:var(--feega-radius-full);--blur:18px;--glow:0.8;--bend:1;--mx:50%;--my:0%;position:relative;display:inline-grid;place-items:center;padding:var(--feega-space-12) var(--feega-space-16);max-width:100%}',
+  '.fl-glass-button .glow{position:absolute;inset:calc(var(--feega-space-12) - 6px) calc(var(--feega-space-16) - 6px);border-radius:var(--radius);overflow:hidden;filter:blur(var(--blur));opacity:var(--glow);pointer-events:none;transition:opacity var(--feega-dur) var(--feega-ease),transform var(--feega-dur) var(--feega-ease)}',
+  '.fl-glass-button .orbit,.fl-glass-button .hue{position:absolute;inset:50% auto auto 50%;width:max(260%,24rem);aspect-ratio:1;translate:-50% -50%}',
+  '.fl-glass-button .orbit{animation:fl-glass-spin calc(var(--spin) / 3) linear infinite;animation-play-state:paused}',
+  '.fl-glass-button .hue{width:100%;background:conic-gradient(var(--glow-1),var(--glow-2),var(--glow-3),var(--glow-4),var(--glow-5),var(--glow-6),var(--glow-1));animation:fl-glass-spin var(--spin) linear infinite}',
+  '@keyframes fl-glass-spin{to{transform:rotate(1turn)}}',
+  '.fl-glass-button .glass{position:relative;display:inline-flex;align-items:center;justify-content:center;min-height:56px;max-width:100%;padding:0 var(--feega-space-8);border:0;border-radius:var(--radius);background:linear-gradient(180deg,color-mix(in srgb,var(--feega-raised) 38%,transparent),color-mix(in srgb,var(--feega-raised) 10%,transparent));color:var(--feega-fg);font:inherit;font-size:1.0625rem;font-weight:500;letter-spacing:var(--feega-tracking);white-space:nowrap;cursor:pointer;-webkit-backdrop-filter:blur(10px) saturate(1.8);backdrop-filter:blur(10px) saturate(1.8);box-shadow:inset 0 1px 0 color-mix(in srgb,var(--shine) 85%,transparent),inset 0 -10px 18px -10px color-mix(in srgb,var(--feega-fg) 30%,transparent),inset 1.5px 0 0 color-mix(in srgb,var(--glow-5) 55%,transparent),inset -1.5px 0 0 color-mix(in srgb,var(--glow-1) 55%,transparent),0 10px 30px -12px color-mix(in srgb,var(--feega-fg) 35%,transparent);transition:transform var(--feega-dur-fast) var(--feega-ease)}',
+  '.fl-glass-button[data-lens] .glass{-webkit-backdrop-filter:var(--lens) blur(1.5px) saturate(1.8);backdrop-filter:var(--lens) blur(1.5px) saturate(1.8)}',
+  '.fl-glass-button .glass::before{content:"";position:absolute;inset:0;padding:1.5px;border-radius:inherit;background:radial-gradient(90% 130% at var(--mx) var(--my),var(--shine),transparent 70%);-webkit-mask:linear-gradient(black 0 0) content-box exclude,linear-gradient(black 0 0);mask:linear-gradient(black 0 0) content-box exclude,linear-gradient(black 0 0);pointer-events:none}',
+  '.fl-glass-button .glass::after{content:"";position:absolute;inset:0;border-radius:inherit;background:radial-gradient(60% 90% at var(--mx) var(--my),color-mix(in srgb,var(--shine) 45%,transparent),transparent 70%);opacity:0.35;pointer-events:none;transition:opacity var(--feega-dur) var(--feega-ease)}',
+  '.fl-glass-button .label{position:relative;z-index:1;text-shadow:0 1px 1px color-mix(in srgb,var(--feega-bg) 45%,transparent)}',
+  '.fl-glass-button .lens{position:absolute;width:0;height:0;overflow:hidden}',
+  '.fl-glass-button:is(:hover,:focus-within) .glow{opacity:calc(var(--glow) + 0.2);transform:scale(1.08)}',
+  '.fl-glass-button:is(:hover,:focus-within) .orbit{animation-play-state:running}',
+  '.fl-glass-button:hover .glass::after{opacity:0.8}',
+  '.fl-glass-button .glass:active{transform:scale(0.97,0.93)}'
+];
+
+const ENGINE = (typed) => {
+  const t = (annotation) => (typed ? annotation : '');
+  return `const RIM = 14;
+const BEND = 36;
+let lenses = 0;
+
+function lensMap(w${t(': number')}, h${t(': number')})${t(': string')} {
+  const r = h / 2;
+  const svg = \`<svg xmlns="http://www.w3.org/2000/svg" width="\${w}" height="\${h}" viewBox="0 0 \${w} \${h}"><defs><linearGradient id="x"><stop offset="0" stop-color="red"/><stop offset="1" stop-color="black"/></linearGradient><linearGradient id="y" x2="0" y2="1"><stop offset="0" stop-color="lime"/><stop offset="1" stop-color="black"/></linearGradient><filter id="s"><feGaussianBlur stdDeviation="\${RIM / 2}"/></filter></defs><rect width="\${w}" height="\${h}" fill="black"/><rect width="\${w}" height="\${h}" rx="\${r}" fill="url(#x)"/><rect width="\${w}" height="\${h}" rx="\${r}" fill="url(#y)" style="mix-blend-mode:screen"/><rect x="\${RIM}" y="\${RIM}" width="\${w - RIM * 2}" height="\${h - RIM * 2}" rx="\${r - RIM}" fill="gray" filter="url(#s)"/></svg>\`;
+  return 'data:image/svg+xml,' + encodeURIComponent(svg);
+}
+
+function refracts()${t(': boolean')} {
+  return CSS.supports('backdrop-filter', 'url(#a)') && 'userAgentData' in navigator;
+}
+
+function glass(root${t(': HTMLElement')})${t(': () => void')} {
+  const button = root.querySelector${t('<HTMLElement>')}('.glass')${t('!')};
+  const filter = root.querySelector${t('<SVGFilterElement>')}('filter')${t('!')};
+  const map = root.querySelector${t('<SVGFEImageElement>')}('feImage')${t('!')};
+  const bend = root.querySelector${t('<SVGFEDisplacementMapElement>')}('feDisplacementMap')${t('!')};
+  const speed = Number(root.dataset.speed) || 1;
+  const intensity = Number(root.dataset.intensity) || 1;
+  const id = 'fl-glass-lens-' + ++lenses;
+
+  filter.id = id;
+  root.style.setProperty('--spin', 9 / speed + 's');
+  root.style.setProperty('--glow', String(Math.min(1, 0.8 * intensity)));
+  bend.setAttribute('scale', String(BEND * intensity));
+
+  function resize() {
+    const w = Math.round(button.offsetWidth);
+    const h = Math.round(button.offsetHeight);
+    map.setAttribute('width', String(w));
+    map.setAttribute('height', String(h));
+    map.setAttribute('href', lensMap(w, h));
+  }
+
+  function onMove(event${t(': PointerEvent')}) {
+    const box = button.getBoundingClientRect();
+    root.style.setProperty('--mx', ((event.clientX - box.left) / box.width) * 100 + '%');
+    root.style.setProperty('--my', ((event.clientY - box.top) / box.height) * 100 + '%');
+  }
+
+  function onLeave() {
+    root.style.setProperty('--mx', '50%');
+    root.style.setProperty('--my', '0%');
+  }
+
+  const watch = new ResizeObserver(resize);
+
+  if (refracts()) {
+    root.style.setProperty('--lens', 'url(#' + id + ')');
+    root.setAttribute('data-lens', '');
+    watch.observe(button);
+  }
+  root.addEventListener('pointermove', onMove);
+  root.addEventListener('pointerleave', onLeave);
+
+  return () => {
+    watch.disconnect();
+    root.removeEventListener('pointermove', onMove);
+    root.removeEventListener('pointerleave', onLeave);
+    root.removeAttribute('data-lens');
+  };
+}`;
+};
+
+const pad = (text, n) =>
+  text
+    .split('\n')
+    .map((l) => (l ? ' '.repeat(n) + l : l))
+    .join('\n');
+
+const LENS = `<svg class="lens" aria-hidden="true" focusable="false">
+    <filter x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+      <feImage x="0" y="0" preserveAspectRatio="none" result="map" />
+      <feDisplacementMap in="SourceGraphic" in2="map" scale="36" xChannelSelector="R" yChannelSelector="G" />
+    </filter>
+  </svg>`;
+
+const GLOW = '<span class="glow" aria-hidden="true"><span class="orbit"><span class="hue"></span></span></span>';
+
+const shell = (rootAttrs, label) => `<div ${rootAttrs}>
+  ${GLOW}
+  <button class="glass" type="button"><span class="label">${label}</span></button>
+  ${LENS}
+</div>`;
+
+const ROOT = 'class="fl-glass-button" data-speed="1" data-intensity="1"';
+
+const boot = (typed) => `${ENGINE(typed)}
+
+document.querySelectorAll${typed ? '<HTMLElement>' : ''}('.fl-glass-button:not([data-ready])').forEach((root) => {
+  root.setAttribute('data-ready', '');
+  glass(root);
+});`;
+
+export const glassButton = {
+  id: 'glass-button',
+  name: 'Glass button',
+  description: 'A liquid glass pill button over a slowly rotating rainbow glow that the glass bends like a lens.',
+  category: 'component',
+  tags: ['button', 'glass', 'glow', 'animation'],
+  tier: 'free',
+  mods: [],
+  css,
+  files: (C) => ({
+    html: `${shell(ROOT, LABEL)}\n\n<script>\n(() => {\n${pad(boot(false), 2)}\n})();\n</script>\n`,
+    astro: `---
+---
+
+${shell(ROOT, LABEL)}
+
+<script>
+${boot(true)}
+</script>
+
+<style is:global>
+${C}</style>
+`,
+    svelte: `<script lang="ts">
+${pad(ENGINE(true), 2)}
+
+  let root: HTMLElement;
+
+  $effect(() => glass(root));
+</script>
+
+${shell(`bind:this={root} ${ROOT}`, LABEL)}
+
+<style>
+  :global {
+${pad(C, 4)}  }
+</style>
+`,
+    react: `import { useEffect, useRef } from 'react';
+import './GlassButton.css';
+
+${ENGINE(true)}
+
+export function GlassButton() {
+  const root = useRef<HTMLDivElement>(null);
+
+  useEffect(() => (root.current ? glass(root.current) : undefined), []);
+
+  return (
+${pad(shell(`ref={root} className="fl-glass-button" data-speed="1" data-intensity="1"`, LABEL).replace(/\bclass=/g, 'className=').replace(/color-interpolation-filters=/g, 'colorInterpolationFilters='), 4)}
+  );
+}
+`,
+    vue: `<script setup lang="ts">
+import { onBeforeUnmount, onMounted, ref } from 'vue';
+
+${ENGINE(true)}
+
+const root = ref<HTMLElement | null>(null);
+let stop = () => {};
+
+onMounted(() => {
+  stop = glass(root.value as HTMLElement);
+});
+onBeforeUnmount(() => stop());
+</script>
+
+<template>
+${pad(shell(`ref="root" ${ROOT}`, LABEL), 2)}
+</template>
+
+<style>
+${C}</style>
+`
+  })
+};
