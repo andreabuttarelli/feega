@@ -40,7 +40,7 @@ every framework file and manifest from one markup and one CSS list per item. Nev
 Every colour, radius and font comes from `--feega-*` tokens in `tokens.css`. Override them on
 `:root` (or any ancestor) to retheme. Dark follows `prefers-color-scheme`; `data-theme="light"` or
 `data-theme="dark"` on any element forces a theme for its subtree. The test fails on a colour
-literal in any item, and on text/fill token pairs under WCAG AA (4.5:1) in either theme.
+literal in any item (except a palette table declared in `PALETTE_TABLES`, such as the pride flag presets), and on text/fill token pairs under WCAG AA (4.5:1) in either theme.
 
 ## Preview
 
