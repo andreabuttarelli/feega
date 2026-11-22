@@ -15,6 +15,8 @@
   import Check from '@lucide/svelte/icons/check';
   import Icon from './Icon.svelte';
   import FontPicker from './FontPicker.svelte';
+  import MissingFont from './MissingFont.svelte';
+  import { missingIn } from './missing-font';
   import { UI_ICON_SVG, UiIcon } from './ui-icons';
   import ScanLine from '@lucide/svelte/icons/square-dashed';
   import { MIXED, type Shared } from '@feega/properties-panel/mixed';
@@ -37,9 +39,12 @@
   import { DEFAULT_BREAKPOINTS, type Breakpoints } from '@feega/live-edit/breakpoints';
   import { overrideTitle, rowOverrides } from './responsive';
 
-  type Props = { pick: Pick; onpreview: (row: Row, value: string) => void; onchange: (row: Row, value: string, token?: string) => void; onsavevar: (row: Row, name: string, css: string) => void; onhint: (hint: Hint | null) => void; onfont: (font: FontChoice) => void; onnotice: (text: string) => void; palette: Palette; elementState?: ElementState; baseline?: Record<string, string> | null; onstate?: (state: ElementState) => void; breakpoints?: Breakpoints };
+  type Props = { pick: Pick; onpreview: (row: Row, value: string) => void; onchange: (row: Row, value: string, token?: string) => void; onsavevar: (row: Row, name: string, css: string) => void; onhint: (hint: Hint | null) => void; onfont: (font: FontChoice) => void; onfontreplace: (from: string, to: FontChoice) => void; onfontload: (family: string) => void; onnotice: (text: string) => void; palette: Palette; elementState?: ElementState; baseline?: Record<string, string> | null; onstate?: (state: ElementState) => void; breakpoints?: Breakpoints };
 
-  let { pick, onpreview, onchange, onhint, onfont, onnotice, palette, onsavevar, elementState = ElementState.Default, baseline = null, onstate, breakpoints = DEFAULT_BREAKPOINTS }: Props = $props();
+  let { pick, onpreview, onchange, onhint, onfont, onfontreplace, onfontload, onnotice, palette, onsavevar, elementState = ElementState.Default, baseline = null, onstate, breakpoints = DEFAULT_BREAKPOINTS }: Props = $props();
+
+  const missingHere = $derived(missingIn(pick.styles['font-family'] ?? '', palette.missing));
+  const presentFonts = $derived(palette.fonts.filter((name) => !palette.missing.some((m) => m.family === name)));
 
   const differs = $derived(changedKeys(ROWS, pick.styles, baseline));
   const changed = (key: string) => isChanged(differs, key);
@@ -345,6 +350,7 @@
           </div>
         {/snippet}
         {@render row('Font', font, 'font')}
+        {#if missingHere}<div class="font-warning"><MissingFont missing={missingHere} project={presentFonts} onreplace={onfontreplace} onload={onfontload} /></div>{/if}
         {#snippet metrics()}<div class="triple">{@render field(num('font-size'), 'Aa', '', true)}{@render field(num('line-height'), '↕', '', true)}{@render field(num('letter-spacing'), '↔', '', true)}</div>{/snippet}
         {@render row('Size', metrics, 'type-size')}
         {#snippet ta()}{@render segmented(byName('text-align'), TEXT_ALIGN)}{/snippet}
@@ -682,6 +688,10 @@
 
   .triple {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .font-warning {
+    padding: 4px 12px 8px;
   }
 
   .sides {

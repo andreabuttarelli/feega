@@ -393,6 +393,8 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.Server]: (m) => SERVER_ACTIONS[m.action](),
     [ToHost.SaveVariable]: (m) => edits.saveVariable(m.ask, m.name).then((out) => edited(out, m.ask)),
     [ToHost.Font]: (m) => edits.font(m.ask, m.google).then((out) => edited(out, m.ask)),
+    [ToHost.FontReplace]: (m) => edits.replaceFont(m.from, m.to, m.google).then((out) => edited(out, null)),
+    [ToHost.FontLoad]: (m) => edits.loadFont(m.family).then((out) => edited(out, null)),
     [ToHost.Redo]: () => edits.redo().then((out) => edited(out, null)),
     [ToHost.Revert]: (m) => revert(m.id),
     [ToHost.Diff]: (m) => showDiff(m.id),

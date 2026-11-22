@@ -39,7 +39,7 @@ export function pageBridge(frame: () => HTMLIFrameElement | null, on: PageEvents
       return;
     }
     if (data?.type === PALETTE_RESULT) {
-      on.palette({ document: data.document, tokens: data.tokens, fonts: data.fonts });
+      on.palette({ document: data.document, tokens: data.tokens, fonts: data.fonts, missing: data.missing ?? [] });
       return;
     }
     if (data?.type === TREE_RESULT) {

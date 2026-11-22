@@ -4058,3 +4058,9 @@ property reads on ~2,000 items (`src/lib/canvas/counted-list.testkit.ts`), not w
 ## A Workers test WebSocket delivers binary frames as Blob
 
 **Signal:** a test peer gets `event.data` as an object with no `byteLength` and every decoded frame is `null`. **Move:** set `socket.binaryType = 'arraybuffer'` before `accept()` in the test harness.
+
+## Feega Inspect
+
+### Every file read in `fileEdits` answers null though the file exists
+
+**Signal:** an edit or a project-wide rewrite says "not named in any source file" / "not a file inside the workspace" in the panel harness, while the same code passes in unit tests. **Move:** `inside(root, path)` compares against `normalize(root) + sep`, so a root with a trailing slash never matches. Pass the app root without the trailing slash (`fileURLToPath(new URL('../fixtures/vite-react', import.meta.url))`).
