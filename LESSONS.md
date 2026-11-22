@@ -1373,3 +1373,7 @@ Signal: a test of code under `packages/` hangs or ignores your edit in a worktre
 ## Astro compiler offsets are UTF-8 bytes
 
 **Signal:** raw `data-feega-src="..."` shows as visible text in the middle of words on an Astro page, only after the first non-ASCII character (`·`, `€`, accents) in the file. **Move:** convert `position.start.offset` from bytes to string indices before inserting, and keep a non-ASCII case in the Astro stamping test and fixture.
+
+## A reversible toggle that writes into the shared rule is not reversible
+
+**Signal:** Hide then Show leaves a diff (`- display: flex;`): the toggle overwrote a declaration the user authored, and the inverse can only delete it. **Move:** a toggle writes its own override (inline style for Hide) that the inverse removes, never the property of the rule; test it as hide then show leaving the file byte-identical.

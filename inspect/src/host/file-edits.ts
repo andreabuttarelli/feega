@@ -5,7 +5,7 @@ import { cssModuleRule } from '@feega/live-edit/css-module';
 import type { FileChange, ReadFile } from '@feega/live-edit/files';
 import type { Structured } from '@feega/live-edit/move-into';
 import { inside, liveAtOf, reader, tokenOf } from '@feega/live-edit/live-ask';
-import { LiveProp } from '@feega/live-edit/live-fields';
+import { ClassFamily, LiveProp } from '@feega/live-edit/live-fields';
 import { literalText } from '@feega/live-edit/literal-text';
 import { moveNode, type Place } from '@feega/live-edit/move-node';
 import { globalSheetOf, googleFontImport, googleFontLink } from '@feega/live-edit/font-wiring';
@@ -57,6 +57,8 @@ const single = (write: typeof scopedRule): CssWriter['write'] => async (read, at
 const SCOPED: CssWriter = { write: single(scopedRule) };
 const MODULE: CssWriter = { write: cssModuleRule };
 const inlineStyle = single(styleAttr);
+
+const HIDING: CssWriter = { write: inlineStyle };
 
 const INLINE: CssWriter = {
   write: async (read, at, css, viewport, scope, inner, state = ElementState.Default, media, within) => {
@@ -174,7 +176,7 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     }
 
     if ((await stylingOf(root, choice())) === Styling.Css) {
-      const writer = cssWriterOf(at.file);
+      const writer = ask.family === ClassFamily.Hidden ? HIDING : cssWriterOf(at.file);
       const out = await writer.write(reader(root), at, ask.css ?? {}, ask.viewport, ask.scope, ask.inner, ask.state, media, within);
       return out.ok ? written(out.changes, '', writer.note) : out;
     }
