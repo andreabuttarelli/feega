@@ -10,7 +10,7 @@ export const COFFEE_URL = 'https://buy.stripe.com/5kQ00k2A97C08sd94LeME07';
 
 export const EXTENSION_PUBLISHED = true;
 
-export const DESKTOP_PUBLISHED = false;
+export const DESKTOP_PUBLISHED = true;
 
 export const DESKTOP_RELEASE_URL = `${GITHUB_URL}/releases/download/desktop-latest`;
 
