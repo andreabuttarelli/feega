@@ -5,9 +5,9 @@ export const SCENE_DIR = 'src/feega';
 export const RUNTIME_FILE = `${SCENE_DIR}/scene3d.ts`;
 export const SCENE_MARKER = 'data-feega-scene';
 
-export type Scene = { shape: string; material: string; lights: string; autorotate: string; follow: string; color: string; text: string; model: string; font: string };
+export type Scene = { shape: string; material: string; lights: string; autorotate: string; follow: string; color: string; text: string; model: string; font: string; height: string };
 
-export const DEFAULT_SCENE: Scene = { shape: 'cube', material: 'glass', lights: 'studio', autorotate: 'true', follow: 'true', color: '#ff5a1f', text: 'Feega', model: '', font: '' };
+export const DEFAULT_SCENE: Scene = { shape: 'cube', material: 'glass', lights: 'studio', autorotate: 'true', follow: 'true', color: '#ff5a1f', text: 'Feega', model: '', font: '', height: '' };
 
 const PROPS = Object.keys(DEFAULT_SCENE) as (keyof Scene)[];
 
@@ -20,7 +20,8 @@ const DATA_ATTRIBUTE: Record<keyof Scene, string> = {
   color: 'data-color',
   text: 'data-text',
   model: 'data-model',
-  font: 'data-font'
+  font: 'data-font',
+  height: 'data-height'
 };
 
 export const attributeText = (scene: Scene) =>
@@ -37,7 +38,8 @@ export function sceneOf(attributes: { name: string; value: string }[]): Scene | 
   return Object.fromEntries(PROPS.map((prop) => [prop, read(DATA_ATTRIBUTE[prop]) ?? DEFAULT_SCENE[prop]])) as Scene;
 }
 
-const BOX = 'width: 100%; height: 360px;';
+const FILL = 'width: 100%;';
+const RATIO = '16 / 9';
 
 const dataSvelte = PROPS.map((prop) => `${DATA_ATTRIBUTE[prop]}={${prop}}`).join(' ');
 const dataVue = PROPS.map((prop) => `:${DATA_ATTRIBUTE[prop]}="${prop}"`).join(' ');
@@ -49,13 +51,17 @@ const svelte = () => `<script>
   import { onMount } from 'svelte';
   import { mountScene } from './scene3d';
 
-${PROPS.map((prop) => `  export let ${prop} = '${DEFAULT_SCENE[prop]}';`).join('\n')}
+  let { ${PROPS.map((prop) => `${prop} = '${DEFAULT_SCENE[prop]}'`).join(', ')} } = $props();
 
-  let host;
+  let host = $state();
   let scene;
 
-  $: options = { ${PROPS.join(', ')} };
-  $: if (scene) scene.update(options);
+  const options = $derived({ ${PROPS.join(', ')} });
+  const box = $derived('${FILL}' + (height ? 'height:' + height + 'px' : 'aspect-ratio:${RATIO}'));
+
+  $effect(() => {
+    scene?.update(options);
+  });
 
   onMount(() => {
     scene = mountScene(host, options);
@@ -63,7 +69,7 @@ ${PROPS.map((prop) => `  export let ${prop} = '${DEFAULT_SCENE[prop]}';`).join('
   });
 </script>
 
-<div bind:this={host} class="feega-scene" ${dataSvelte} style="${BOX}"></div>
+<div bind:this={host} class="feega-scene" ${dataSvelte} style={box}></div>
 `;
 
 const vue = (typescript: boolean) => `<script setup${typescript ? ' lang="ts"' : ''}>
@@ -87,7 +93,7 @@ onBeforeUnmount(() => scene?.dispose());
 </script>
 
 <template>
-  <div ref="host" class="feega-scene" ${dataVue} style="${BOX}"></div>
+  <div ref="host" class="feega-scene" ${dataVue} :style="{ width: '100%', ...(height ? { height: height + 'px' } : { aspectRatio: '${RATIO}' }) }"></div>
 </template>
 `;
 
@@ -95,7 +101,7 @@ const astro = () => `---
 const { ${PROPS.map((prop) => `${prop} = '${DEFAULT_SCENE[prop]}'`).join(', ')} } = Astro.props;
 ---
 
-<div class="feega-scene" ${dataAstro} style="${BOX}"></div>
+<div class="feega-scene" ${dataAstro} style={'${FILL}' + (height ? 'height:' + height + 'px' : 'aspect-ratio:${RATIO}')}></div>
 
 <script>
   import { mountScene } from './scene3d';
@@ -136,7 +142,7 @@ export default function ${COMPONENT_NAME}(props${typescript ? ': Partial<SceneOp
     scene.current?.update(options);
   }, [JSON.stringify(options)]);
 
-  return <div ref={host} className="feega-scene" ${dataReact} style={{ width: '100%', height: 360 }} />;
+  return <div ref={host} className="feega-scene" ${dataReact} style={{ width: '100%', ...(options.height ? { height: Number(options.height) } : { aspectRatio: '${RATIO}' }) }} />;
 }
 `;
 

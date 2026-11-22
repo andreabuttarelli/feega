@@ -1,3 +1,5 @@
+import { isCondition } from './when';
+
 export enum Point {
   RightBar = 'rightBar',
   TopBar = 'topBar',
@@ -26,7 +28,7 @@ export enum Where {
   Both = 'both'
 }
 
-export type Contribution = { id: string; title?: string; category?: string; where?: Where; html?: string };
+export type Contribution = { id: string; title?: string; category?: string; where?: Where; html?: string; when?: string[] };
 
 type Field = 'title' | 'category' | 'where' | 'html';
 
@@ -95,6 +97,9 @@ function entryProblem(point: Point, entry: unknown, seen: Set<string>): string |
   }
   if ('where' in entry && !PLACES.has(String(entry.where))) {
     return `${point}/${entry.id}: where must be one of ${[...PLACES].join(', ')}`;
+  }
+  if ('when' in entry && !(Array.isArray(entry.when) && entry.when.every((c) => typeof c === 'string' && isCondition(c)))) {
+    return `${point}/${entry.id}: when holds unknown conditions`;
   }
   return null;
 }

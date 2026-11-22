@@ -39,7 +39,7 @@ export type ComponentFile = { name: string; file: string; source: string; attrib
 export type Op =
   | { kind: OpKind.Style; at: string; css: Css }
   | { kind: OpKind.Insert; at: string; place: Place; component: ComponentFile; support?: SupportFile[] }
-  | { kind: OpKind.Attributes; at: string; tag?: string; set: Record<string, string> }
+  | { kind: OpKind.Attributes; at?: string; tag?: string; set: Record<string, string> }
   | { kind: OpKind.Dependency; name: string; version: string; dev?: boolean }
   | { kind: OpKind.Asset; file: string; base64: string };
 

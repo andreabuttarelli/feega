@@ -4,7 +4,8 @@ import type { Source } from '@feega/plugin-api/protocol';
 import type { HostMessage, Pick } from '../messages';
 import { BUILT_IN } from './builtin-plugins';
 import { pickFile } from './file-pick';
-import { editorPort, hostCalls } from './plugin-editor';
+import { holds } from '@feega/plugin-api/when';
+import { editorPort, hostCalls, selectionOf } from './plugin-editor';
 import { workerSandbox } from './worker-sandbox';
 
 export type PluginDeps = {
@@ -29,7 +30,11 @@ export function createPlugins(deps: PluginDeps) {
     }
   }
 
-  const at = (point: Point) => (version, host.contributions(point));
+  const at = (point: Point) => {
+    const pick = deps.pick();
+    const selection = pick ? selectionOf(pick) : null;
+    return (version, host.contributions(point).filter((one) => holds(one.entry.when, selection)));
+  };
 
   return {
     host,

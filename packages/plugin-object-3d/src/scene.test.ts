@@ -72,4 +72,23 @@ describe('componentFor', () => {
   it('names the runtime file next to the component', () => {
     expect(RUNTIME_FILE).toBe(`${SCENE_DIR}/scene3d.ts`);
   });
+
+  it('uses runes in the svelte component, which also runs in runes-mode projects', () => {
+    const { source } = componentFor(Framework.Svelte, false);
+    expect(source).toContain('$props()');
+    expect(source).not.toContain('export let');
+    expect(source).not.toMatch(/^\s*\$:/m);
+  });
+
+  it.each(Object.values(Framework))('%s sizes by aspect ratio unless a height is given', (framework) => {
+    const { source } = componentFor(framework, true);
+    expect(source).toMatch(/aspect-?[rR]atio/);
+    expect(source).toContain('height');
+    expect(source).not.toContain('360');
+  });
+
+  it('reads the height back from the page', () => {
+    expect(sceneOf([{ name: 'data-feega-scene', value: 'cube' }, { name: 'data-height', value: '420' }])?.height).toBe('420');
+    expect(DEFAULT_SCENE.height).toBe('');
+  });
 });

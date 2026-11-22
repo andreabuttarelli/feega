@@ -109,7 +109,7 @@
 {#if sub && subSpot}
   <div class="menu" role="menu" tabindex="-1" data-testid={`${label}-submenu`} data-submenu={sub.item.id} bind:offsetWidth={subWidth} bind:offsetHeight={subHeight} style={`left:${subSpot.x}px;top:${subSpot.y}px`} onpointerdown={(e) => e.stopPropagation()}>
     {#each sub.item.items ?? [] as item (item.id)}
-      <button type="button" role="menuitem" data-op={item.id} onclick={() => (onpick(item.id), onclose())}>
+      <button type="button" role="menuitem" data-op={item.id} draggable={draggable} onclick={() => (onpick(item.id), onclose())} ondragstart={(e) => drag(e, item)} ondragend={onclose}>
         <span>{item.label}</span>
         {#if item.shortcut}<kbd>{item.shortcut}</kbd>{/if}
       </button>

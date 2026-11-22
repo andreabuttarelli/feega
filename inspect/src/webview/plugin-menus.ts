@@ -1,4 +1,6 @@
+import { AddPlace } from '@feega/live-edit/add-node';
 import { Where } from '@feega/plugin-api/manifest';
+import { Place, type Source } from '@feega/plugin-api/protocol';
 import type { Contributed } from '@feega/plugin-api/host';
 import type { MenuItem } from './structure-menu';
 
@@ -34,3 +36,10 @@ export const contextMenuItems = (base: MenuItem[], contributed: Contributed[], w
   ...base,
   ...contributed.filter(({ entry }) => entry.where === where || entry.where === Where.Both).map(itemOf)
 ];
+
+const PLACES: Record<AddPlace, Place> = { [AddPlace.Auto]: Place.Auto, [AddPlace.Child]: Place.Child, [AddPlace.Before]: Place.Before, [AddPlace.After]: Place.After };
+
+export function pluginDrop(id: string, spot: { target: Source; place: AddPlace }) {
+  const item = parseItemId(id);
+  return item ? { ...item, target: spot.target, place: PLACES[spot.place] } : null;
+}

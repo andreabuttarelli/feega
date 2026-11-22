@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { Where, type Contribution } from '@feega/plugin-api/manifest';
-import { addMenuItems, contextMenuItems, itemId, parseItemId } from './plugin-menus';
+import { AddPlace } from '@feega/live-edit/add-node';
+import { Place } from '@feega/plugin-api/protocol';
+import { addMenuItems, contextMenuItems, itemId, parseItemId, pluginDrop } from './plugin-menus';
 import type { MenuItem } from './structure-menu';
 
 const BASE: MenuItem[] = [{ id: 'text', label: 'Text' }];
@@ -52,5 +54,21 @@ describe('contextMenuItems', () => {
   it('offers each place only the items made for it', () => {
     expect(contextMenuItems(BASE, all, Where.Layers).map((i) => i.label)).toEqual(['Text', 'Only layers', 'Both']);
     expect(contextMenuItems(BASE, all, Where.Preview).map((i) => i.label)).toEqual(['Text', 'Only preview', 'Both']);
+  });
+});
+
+describe('pluginDrop', () => {
+  const target = { file: 'src/App.svelte', line: 4, col: 3 };
+
+  it('turns a dragged plugin item into a menu signal for the element under the pointer', () => {
+    expect(pluginDrop(itemId('feega.object-3d', 'shape:cube'), { target, place: AddPlace.After })).toEqual({ plugin: 'feega.object-3d', item: 'shape:cube', target, place: Place.After });
+  });
+
+  it.each([[AddPlace.Child, Place.Child], [AddPlace.Before, Place.Before], [AddPlace.After, Place.After], [AddPlace.Auto, Place.Auto]])('maps %s to %s', (place, expected) => {
+    expect(pluginDrop(itemId('p', 'i'), { target, place })?.place).toBe(expected);
+  });
+
+  it('leaves built-in items alone', () => {
+    expect(pluginDrop('text', { target, place: AddPlace.After })).toBeNull();
   });
 });

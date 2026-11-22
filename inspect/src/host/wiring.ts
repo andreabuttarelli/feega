@@ -13,7 +13,7 @@ const MAX_FILES = 4000;
 const VUE_ROUTER_FILE = /(?:^|\/)router(?:\/index)?\.(?:ts|js)$/;
 const NOTHING: Wiring = { link: null, events: [], routes: [], offsets: [] };
 
-async function filesIn(root: string, dir = '', depth = 0, found: string[] = []): Promise<string[]> {
+export async function filesIn(root: string, dir = '', depth = 0, found: string[] = []): Promise<string[]> {
   if (depth > MAX_DEPTH || found.length > MAX_FILES) {
     return found;
   }

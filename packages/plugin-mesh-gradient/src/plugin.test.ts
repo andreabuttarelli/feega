@@ -64,8 +64,8 @@ const node = <T extends UiNode['type']>(tree: UiNode[], type: T, id?: string) =>
 describe('manifest', () => {
   it('declares one right-bar section and one overlay, and asks only for what it uses', () => {
     const { manifest: m } = load(null);
-    expect(m.contributions.rightBar).toEqual([{ id: SECTION, title: 'Mesh gradient' }]);
-    expect(m.contributions.overlay).toEqual([{ id: OVERLAY }]);
+    expect(m.contributions.rightBar).toEqual([{ id: SECTION, title: 'Mesh gradient', when: ['!attribute:data-feega-scene'] }]);
+    expect(m.contributions.overlay).toEqual([{ id: OVERLAY, when: ['!attribute:data-feega-scene'] }]);
     expect([...m.grants].sort()).toEqual(['edit.style', 'selection']);
     expect(m.hosts).toEqual([]);
   });

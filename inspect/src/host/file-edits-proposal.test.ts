@@ -148,4 +148,48 @@ describe('a plugin proposal goes through the edit engine', () => {
     const page = read('src/Page.svelte');
     expect(page.indexOf('<Scene3D')).toBeGreaterThan(page.indexOf('</h1>'));
   });
+
+  it('inserts next to the root element of a file, where there is no parent element', async () => {
+    const { root, read } = app();
+    writeFileSync(join(root, 'src/Page.svelte'), '<section class="hero">\n  <h1>Hi</h1>\n</section>\n\n<style>\n  .hero {\n    color: red;\n  }\n</style>\n');
+    const out = await fileEdits(root).proposal({ label: '3D', ops: [{ kind: OpKind.Insert, at: AT, place: Place.After, component: COMPONENT }] }, '');
+    expect(out.ok).toBe(true);
+    const page = read('src/Page.svelte');
+    expect(page).toContain("<script>\n  import Scene3D from './lib/feega/Scene3D.svelte';\n</script>");
+    expect(page.indexOf('<Scene3D')).toBeGreaterThan(page.indexOf('</section>'));
+    expect(page.indexOf('<Scene3D')).toBeLessThan(page.indexOf('<style>'));
+  });
+
+  it('finds a root-level usage by tag when the parent does not hold it', async () => {
+    const { root, read } = app();
+    writeFileSync(join(root, 'src/Page.svelte'), '<section class="hero"></section>\n<Scene3D shape="cube" />\n');
+    const out = await fileEdits(root).proposal({ label: '3D', ops: [{ kind: OpKind.Attributes, at: AT, tag: 'Scene3D', set: { material: 'metal' } }] }, '');
+    expect(out.ok).toBe(true);
+    expect(read('src/Page.svelte')).toContain('<Scene3D shape="cube" material="metal" />');
+  });
+
+  it('finds the usage by tag alone when no element is given', async () => {
+    const { root, read } = app();
+    writeFileSync(join(root, 'src/Page.svelte'), '<Scene3D shape="cube" />\n');
+    const out = await fileEdits(root).proposal({ label: '3D', ops: [{ kind: OpKind.Attributes, tag: 'Scene3D', set: { lights: 'soft' } }] }, '');
+    expect(out.ok).toBe(true);
+    expect(read('src/Page.svelte')).toContain('lights="soft"');
+  });
+
+  it('refuses when the tag is used in more than one place', async () => {
+    const { root, read } = app();
+    writeFileSync(join(root, 'src/Page.svelte'), '<Scene3D />\n');
+    writeFileSync(join(root, 'src/Other.svelte'), '<Scene3D />\n');
+    const out = await fileEdits(root).proposal({ label: '3D', ops: [{ kind: OpKind.Attributes, tag: 'Scene3D', set: { lights: 'soft' } }] }, '');
+    expect(out.ok).toBe(false);
+    expect(read('src/Page.svelte')).toBe('<Scene3D />\n');
+  });
+
+  it('does not look inside node_modules for the usage', async () => {
+    const { root } = app();
+    mkdirSync(join(root, 'node_modules/x'), { recursive: true });
+    writeFileSync(join(root, 'node_modules/x/A.svelte'), '<Scene3D />\n');
+    const out = await fileEdits(root).proposal({ label: '3D', ops: [{ kind: OpKind.Attributes, tag: 'Scene3D', set: { lights: 'soft' } }] }, '');
+    expect(out.ok).toBe(false);
+  });
 });

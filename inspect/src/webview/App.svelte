@@ -69,7 +69,7 @@
   import PluginOverlay from './PluginOverlay.svelte';
   import { createPlugins } from './plugins.svelte';
   import { selectionOf, sourceOfText } from './plugin-editor';
-  import { addMenuItems, contextMenuItems, parseItemId } from './plugin-menus';
+  import { addMenuItems, contextMenuItems, parseItemId, pluginDrop } from './plugin-menus';
 
   const SETTLE_MS = 1200;
   const BAR_DEFAULT_PX = 300;
@@ -787,7 +787,9 @@
     const spot = addSpot;
     addSpot = null;
     addMenu = null;
-    if (kind && spot && runPluginItem(kind, spot.target, spot.place as unknown as PluginPlace)) {
+    const dropped = kind && spot ? pluginDrop(kind, spot) : null;
+    if (dropped) {
+      plugins.host.menu(dropped.plugin, dropped.item, dropped.target, dropped.place);
       return;
     }
     if (kind && spot) {

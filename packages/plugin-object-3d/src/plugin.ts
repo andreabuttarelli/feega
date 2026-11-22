@@ -1,12 +1,12 @@
 import type { PluginApi } from '@feega/plugin-api/client';
 import { Control, Framework, OpKind, Place, frameworkOf, type Op, type ProjectInfo, type Selection, type Source, type UiNode } from '@feega/plugin-api/protocol';
+import fontSource from './runtime/helvetiker_bold.typeface.json?raw';
 import runtimeSource from './runtime/scene3d.ts?raw';
 import { COMPONENT_NAME, DEFAULT_SCENE, RUNTIME_FILE, attributeText, componentFor, sceneOf, type Scene } from './scene';
 
 export const SECTION = 'scene';
 export const THREE_VERSION = '^0.180.0';
-export const FONT_URL = 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r160/examples/fonts/helvetiker_bold.typeface.json';
-
+export 
 const LABEL = '3D object';
 const SHAPE_PREFIX = 'shape:';
 const MODEL_ACCEPT = ['.glb', '.gltf'];
@@ -15,9 +15,9 @@ const TEXT_SHAPE = 'text';
 const FONT_DIR = 'feega/fonts';
 const MODEL_DIR = 'feega/models';
 const FONT_FILE = 'helvetiker_bold.typeface.json';
-const OK_STATUS = 200;
+const MAX_HEIGHT = 800;
+const HEIGHT_STEP = 10;
 const NOT_A_COMPONENT = 'Add a 3D object to a Svelte, React, Vue or Astro file.';
-const FONT_FAILED = 'Could not download the font for 3D text.';
 
 const SHAPES = new Set(['cube', 'sphere', 'torus', TEXT_SHAPE, MODEL_SHAPE]);
 const MATERIALS = ['glass', 'metal', 'matte'];
@@ -38,6 +38,7 @@ function treeOf(scene: Scene): UiNode[] {
     { type: Control.Select, id: 'lights', label: 'Lights', value: scene.lights, options: options(LIGHTS) },
     { type: Control.Toggle, id: 'autorotate', label: 'Auto-rotate', value: scene.autorotate === 'true' },
     { type: Control.Toggle, id: 'follow', label: 'Mouse follow', value: scene.follow === 'true' },
+    { type: Control.Slider, id: 'height', label: 'Height', min: 0, max: MAX_HEIGHT, step: HEIGHT_STEP, value: Number(scene.height) || 0 },
     { type: Control.Colour, id: 'color', label: 'Colour', value: scene.color }
   ];
 }
@@ -69,12 +70,7 @@ export function objectPlugin(api: PluginApi) {
   }
 
   async function textOps(info: ProjectInfo): Promise<Extras | null> {
-    const font = await api.fetch(FONT_URL).catch(() => null);
-    if (font?.status !== OK_STATUS) {
-      await api.notify(FONT_FAILED);
-      return null;
-    }
-    return { ops: [{ kind: OpKind.Asset, file: `${info.publicDir}/${FONT_DIR}/${FONT_FILE}`, base64: base64Of(font.text) }], scene: { font: `/${FONT_DIR}/${FONT_FILE}` } };
+    return { ops: [{ kind: OpKind.Asset, file: `${info.publicDir}/${FONT_DIR}/${FONT_FILE}`, base64: base64Of(fontSource) }], scene: { font: `/${FONT_DIR}/${FONT_FILE}` } };
   }
 
   const EXTRAS: Record<string, (info: ProjectInfo) => Promise<Extras | null>> = {
@@ -106,10 +102,10 @@ export function objectPlugin(api: PluginApi) {
     if (!selection || !scene) {
       return;
     }
-    const written = String(value);
+    const written = id === 'height' && Number(value) === 0 ? '' : String(value);
     scene = { ...scene, [id]: written };
     await show();
-    await api.propose(LABEL, [{ kind: OpKind.Attributes, at: sourceOf(selection.component ?? selection.source), tag: COMPONENT_NAME, set: { [id]: written } }]);
+    await api.propose(LABEL, [{ kind: OpKind.Attributes, ...(selection.component ? { at: sourceOf(selection.component) } : {}), tag: COMPONENT_NAME, set: { [id]: written } }]);
   }
 
   api.menu.on((item, target, place) => {

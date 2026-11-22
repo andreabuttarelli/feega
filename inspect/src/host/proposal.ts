@@ -10,7 +10,7 @@ import { OpKind, Place, type ComponentFile, type Op, type SupportFile } from '@f
 
 export type Changes = { ok: true; changes: FileChange[] } | { ok: false; reason: string; at?: LiveAt };
 
-export type ProposalDeps = { root: string; read: ReadFile; appDir: string; style: (read: ReadFile, at: LiveAt, css: Css) => Promise<Changes> };
+export type ProposalDeps = { root: string; read: ReadFile; files: () => Promise<string[]>; appDir: string; style: (read: ReadFile, at: LiveAt, css: Css) => Promise<Changes> };
 
 type Handler<K extends OpKind> = (deps: ProposalDeps, op: Extract<Op, { kind: K }>) => Promise<Changes>;
 
@@ -40,13 +40,41 @@ const style: Handler<OpKind.Style> = async (deps, op) => {
   return typeof at === 'string' ? refused(at) : deps.style(deps.read, at, op.css);
 };
 
+const COMPONENT_FILE = /\.(?:svelte|vue|astro|tsx|jsx)$/;
+
+const lineColOf = (text: string, offset: number) => {
+  const lines = text.slice(0, offset).split('\n');
+  return { line: lines.length, col: lines[lines.length - 1].length + 1 };
+};
+
+async function usagesOf(deps: ProposalDeps, tag: string): Promise<LiveAt[]> {
+  const pattern = new RegExp(`<${tag}(?=[\\s/>])`, 'g');
+  const found: LiveAt[] = [];
+  for (const file of (await deps.files()).filter((f) => COMPONENT_FILE.test(f) && f.startsWith(deps.appDir))) {
+    const text = (await deps.read(file)) ?? '';
+    for (const match of text.matchAll(pattern)) {
+      found.push({ file, ...lineColOf(text, match.index) });
+    }
+  }
+  return found;
+}
+
+const written = (out: Awaited<ReturnType<typeof setAttributes>>): Changes => (out.ok ? { ok: true, changes: [out.change] } : out);
+
 const attributes: Handler<OpKind.Attributes> = async (deps, op) => {
-  const at = located(deps, op.at);
+  const at = op.at ? located(deps, op.at) : null;
   if (typeof at === 'string') {
     return refused(at);
   }
-  const out = await setAttributes(deps.read, at, op.set, op.tag);
-  return out.ok ? { ok: true, changes: [out.change] } : out;
+  const near = at ? await setAttributes(deps.read, at, op.set, op.tag) : null;
+  if (near?.ok || !op.tag) {
+    return near ? written(near) : refused('no element given');
+  }
+  const usages = await usagesOf(deps, op.tag);
+  if (usages.length !== 1) {
+    return refused(usages.length ? `<${op.tag}> is used in ${usages.length} places: select the one to change in its own file` : `cannot find <${op.tag}> in the project`);
+  }
+  return written(await setAttributes(deps.read, usages[0], op.set));
 };
 
 const dependency: Handler<OpKind.Dependency> = async (deps, op) => {

@@ -33,6 +33,7 @@ import { stylingOf } from './styling';
 import { breakpointsOf } from './breakpoints';
 import { themesOf } from './themes';
 import { proposalChanges } from './proposal';
+import { filesIn } from './wiring';
 
 export type StructureAsk = { op: StructureOp; at: string; to?: string; usage?: Usage; loop?: LoopMove; instance?: number; add?: { kind: AddKind; src?: string; place?: AddPlace }; wrap?: WrapTag };
 
@@ -310,7 +311,7 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
   async function proposed(proposal: Proposal, appDir: string): Promise<Written> {
     const first = proposal.ops.find((op) => 'at' in op);
     meta = { at: first && 'at' in first ? first.at : '', prop: 'plugin', value: proposal.label, scope: '' };
-    const out = await proposalChanges(proposal.ops, { root, read: reader(root), appDir, style: (read, at, css) => cssWriterOf(at.file).write(read, at, css) });
+    const out = await proposalChanges(proposal.ops, { root, read: reader(root), files: () => filesIn(root), appDir, style: (read, at, css) => cssWriterOf(at.file).write(read, at, css) });
     return out.ok ? writtenAll(out.changes, '') : out;
   }
 

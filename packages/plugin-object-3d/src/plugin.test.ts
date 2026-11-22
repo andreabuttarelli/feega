@@ -5,7 +5,8 @@ import { parseManifest } from '@feega/plugin-api/manifest';
 import { Control, OpKind, Place, type HostMessage, type Picked, type PluginMessage, type ProjectInfo, type Proposal, type Selection } from '@feega/plugin-api/protocol';
 import manifest from '../feega-plugin.json';
 import { COMPONENT_NAME, DEFAULT_SCENE, RUNTIME_FILE } from './scene';
-import { FONT_URL, SECTION, THREE_VERSION, objectPlugin } from './plugin';
+import { FONT_FILE, SECTION, THREE_VERSION, objectPlugin } from './plugin';
+import font from './runtime/helvetiker_bold.typeface.json?raw';
 
 const TARGET = { file: 'src/routes/+page.svelte', line: 5, col: 3 };
 
@@ -53,10 +54,11 @@ function load(options: { info?: Partial<ProjectInfo>; picked?: Picked | null; se
 const kinds = (proposal: Proposal) => proposal.ops.map((op) => op.kind);
 
 describe('manifest', () => {
-  it('has an add-menu category with every shape, one section, and names its network host', () => {
+  it('has an add-menu category with every shape and one section, and asks for no network', () => {
     const parsed = parseManifest(manifest);
     expect(parsed.ok && parsed.manifest.contributions.addMenu?.map((e) => e.category)).toEqual(Array(5).fill('3D object'));
-    expect(parsed.ok && parsed.manifest.hosts).toEqual(['cdn.jsdelivr.net']);
+    expect(parsed.ok && parsed.manifest.hosts).toEqual([]);
+    expect(parsed.ok && parsed.manifest.contributions.rightBar?.[0].when).toEqual(['attribute:data-feega-scene']);
   });
 });
 
@@ -120,21 +122,15 @@ describe('inserting a shape', () => {
 });
 
 describe('3D text', () => {
-  it('fetches the font from its host and adds it as an asset the component points at', async () => {
+  it('adds the bundled font as an asset the component points at, with no network', async () => {
     const plugin = load();
     await plugin.insert('shape:text');
-    expect(plugin.fetched).toEqual([FONT_URL]);
+    expect(plugin.fetched).toEqual([]);
     const ops = plugin.proposals[0].ops;
-    expect(ops.find((op) => op.kind === OpKind.Asset)).toMatchObject({ file: 'public/feega/fonts/helvetiker_bold.typeface.json', base64: Buffer.from('{"glyphs":{}}').toString('base64') });
+    expect(ops.find((op) => op.kind === OpKind.Asset)).toMatchObject({ file: 'public/feega/fonts/helvetiker_bold.typeface.json', base64: Buffer.from(font).toString('base64') });
     expect(ops.at(-1)).toMatchObject({ component: { attributes: expect.stringContaining('font="/feega/fonts/helvetiker_bold.typeface.json"') } });
   });
 
-  it('reports a font it cannot fetch and writes nothing', async () => {
-    const plugin = load({ font: { status: 404, text: '' } });
-    await plugin.insert('shape:text');
-    expect(plugin.proposals).toEqual([]);
-    expect(plugin.notices[0]).toMatch(/font/);
-  });
 });
 
 describe('model', () => {
@@ -167,11 +163,11 @@ describe('right-bar controls', () => {
     expect(plugin.ui()).toEqual([]);
   });
 
-  it('shows material, lights, auto-rotate, mouse follow and colour for a scene', async () => {
+  it('shows material, lights, auto-rotate, mouse follow, height and colour for a scene', async () => {
     const plugin = load({ selection: PAGE_PICK });
     await plugin.settle();
     const tree = plugin.ui();
-    expect(tree.map((n) => ('id' in n ? n.id : n.type))).toEqual(['material', 'lights', 'autorotate', 'follow', 'color']);
+    expect(tree.map((n) => ('id' in n ? n.id : n.type))).toEqual(['material', 'lights', 'autorotate', 'follow', 'height', 'color']);
     expect(tree[0]).toMatchObject({ type: Control.Select, value: 'glass', options: [{ value: 'glass' }, { value: 'metal' }, { value: 'matte' }] });
     expect(tree[2]).toMatchObject({ type: Control.Toggle, value: true });
   });
@@ -195,6 +191,22 @@ describe('right-bar controls', () => {
     ]);
   });
 
+  it('writes the height as pixels, and nothing for automatic', async () => {
+    const plugin = load({ selection: PAGE_PICK });
+    await plugin.settle();
+    expect(plugin.ui().find((n) => 'id' in n && n.id === 'height')).toMatchObject({ type: Control.Slider, value: 0 });
+    await plugin.control('height', 420);
+    await plugin.control('height', 0);
+    expect(plugin.proposals.map((p) => p.ops[0])).toEqual([expect.objectContaining({ set: { height: '420' } }), expect.objectContaining({ set: { height: '' } })]);
+  });
+
+  it('leaves the element out of the proposal when the usage is at the root of its file', async () => {
+    const plugin = load({ selection: { ...PAGE_PICK, component: null } });
+    await plugin.settle();
+    await plugin.control('material', 'matte');
+    expect(plugin.proposals[0].ops[0]).toEqual({ kind: OpKind.Attributes, tag: COMPONENT_NAME, set: { material: 'matte' } });
+  });
+
   it('shows the new value right away', async () => {
     const plugin = load({ selection: PAGE_PICK });
     await plugin.settle();
@@ -213,7 +225,7 @@ describe('right-bar controls', () => {
   it('follows the selection', async () => {
     const plugin = load({ selection: null });
     await plugin.select(PAGE_PICK);
-    expect(plugin.ui()).toHaveLength(5);
+    expect(plugin.ui()).toHaveLength(6);
     await plugin.select(null);
     expect(plugin.ui()).toEqual([]);
   });

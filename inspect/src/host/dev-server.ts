@@ -151,7 +151,7 @@ const has = (path: string) => access(path).then(() => true, () => false);
 
 export type StartHooks = { log: (line: string) => void; installing: (app: string) => void; spawned: (pid: number) => void; signal: AbortSignal };
 
-function install(dir: string, argv: string[], hooks: StartHooks): Promise<DepsOutcome | Failed> {
+export function install(dir: string, argv: string[], hooks: StartHooks): Promise<DepsOutcome | Failed> {
   const [bin, ...args] = argv;
   const child = spawn(bin, args, { cwd: dir, env: process.env, detached: process.platform !== 'win32', shell: process.platform === 'win32' });
   const seen = watchOutput(child);
