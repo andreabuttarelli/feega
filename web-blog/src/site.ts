@@ -13,14 +13,30 @@ export const SOCIAL_PREVIEW = {
 const WORDS_PER_MINUTE = 220;
 
 export type Post = CollectionEntry<'posts'>;
+export type UseCase = CollectionEntry<'usecases'>;
+export type Entry = Post | UseCase;
 
-export async function postsNewestFirst(): Promise<Post[]> {
-  const posts = await getCollection('posts');
-  return posts.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
+export type Section = 'posts' | 'use-cases';
+
+export const SECTIONS: Record<Section, { path: string; label: string; indexTitle: string }> = {
+  posts: { path: '/posts/', label: 'posts', indexTitle: 'blog' },
+  'use-cases': { path: '/use-cases/', label: 'use cases', indexTitle: 'use cases' }
+};
+
+function newestFirst<T extends Entry>(entries: T[]): T[] {
+  return entries.sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
 }
 
-export function readingMinutes(post: Post): number {
-  const words = (post.body ?? '').split(/\s+/).filter(Boolean).length;
+export async function postsNewestFirst(): Promise<Post[]> {
+  return newestFirst(await getCollection('posts'));
+}
+
+export async function useCasesNewestFirst(): Promise<UseCase[]> {
+  return newestFirst(await getCollection('usecases'));
+}
+
+export function readingMinutes(entry: Entry): number {
+  const words = (entry.body ?? '').split(/\s+/).filter(Boolean).length;
   return Math.max(1, Math.round(words / WORDS_PER_MINUTE));
 }
 
