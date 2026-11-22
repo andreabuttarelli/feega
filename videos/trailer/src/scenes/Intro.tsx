@@ -3,12 +3,12 @@ import type { ReactNode } from "react";
 import { Browser, Chrome, CHROME_HEIGHT } from "../components/Browser";
 import { Camera, type Shot } from "../components/Camera";
 import { App, Desktop, dockIconCenter, type Pointer } from "../components/Desktop";
-import { Feed, FEED_LEFT, FEED_WIDTH, HOOK, HOOK_CENTER, HOOK_HEIGHT, PostCard } from "../components/Feed";
-import { keyClick, Sfx, Sound, type Cue } from "../components/Sfx";
+import { Feed, FEED_LEFT, FEED_WIDTH, HOOK, HOOK_COMMAND, HOOK_CENTER, HOOK_HEIGHT, PostCard } from "../components/Feed";
+import { Sfx, Sound, type Cue } from "../components/Sfx";
 import { PixelgodTui, Shell, type Rect } from "../components/Terminal";
 import { VSCODE, VSCodeWindow } from "../components/VSCode";
 import { lift, mix, settle, tween } from "../ease";
-import { COLORS } from "../theme";
+import { COLORS, SANS } from "../theme";
 import { Focus as ColdFocus } from "./coldOpenTimeline";
 import { SHOTS as COLD_SHOTS } from "./ColdOpen";
 
@@ -24,8 +24,10 @@ const HOOK_Y = 540;
 const SCROLL_END = HOOK_CENTER - (HOOK_Y - WINDOW.y - CHROME_HEIGHT);
 const BLUR_PER_PX = 0.35;
 const MAX_BLUR = 22;
-const COMMAND = "npx pixelgod";
-const KEY_GAP = 2;
+const CARD_LEFT = WINDOW.x + FEED_LEFT;
+const SELECT_Y = HOOK_Y - HOOK_HEIGHT / 2 + 104;
+const SELECT_FROM = CARD_LEFT + 296;
+const SELECT_TO = SELECT_FROM + 134;
 
 const T = {
   crtLine: 6,
@@ -45,19 +47,20 @@ const T = {
   count: 222,
   countLength: 50,
   like: 250,
-  zoomOut: 272,
-  close: 290,
-  closeLength: 18,
-  dockBack: 292,
-  clickCode: 342,
-  codeWide: 346,
-  codeOpen: 348,
-  typeStart: 376,
-  enter: 376 + COMMAND.length * KEY_GAP + 8,
-  tui: 376 + COMMAND.length * KEY_GAP + 14,
-  toPrompt: 420,
-  stage: 422,
-  end: 456,
+  grab: 286,
+  dragLength: 16,
+  copy: 308,
+  keycapLength: 20,
+  dockBack: 324,
+  clickCode: 364,
+  codeWide: 368,
+  codeOpen: 370,
+  paste: 398,
+  enter: 408,
+  tui: 414,
+  toPrompt: 436,
+  stage: 438,
+  end: 472,
 };
 
 export const INTRO_FRAMES = T.end;
@@ -74,7 +77,6 @@ const CAMERA_KEYS = [
   { at: T.dockIn, focus: Focus.Dock, move: 26 },
   { at: T.wideOut, focus: Focus.Wide, move: 30 },
   { at: T.zoom, focus: Focus.Hook },
-  { at: T.zoomOut, focus: Focus.Wide },
   { at: T.dockBack, focus: Focus.Dock, move: 26 },
   { at: T.codeWide, focus: Focus.Wide, move: 30 },
   { at: T.toPrompt, focus: Focus.Prompt },
@@ -104,7 +106,11 @@ const PATHS = [
   ),
   glidePath(
     [
-      { at: T.dockBack + 6, x: 1330, y: 760 },
+      { at: T.grab - 18, x: SELECT_FROM - 40, y: SELECT_Y + 50 },
+      { at: T.grab - 2, x: SELECT_FROM, y: SELECT_Y },
+      { at: T.grab, x: SELECT_FROM, y: SELECT_Y },
+      { at: T.grab + T.dragLength, x: SELECT_TO, y: SELECT_Y },
+      { at: T.dockBack + 2, x: SELECT_TO, y: SELECT_Y },
       { at: T.dockBack + 24, x: 1200, y: DOCK_Y },
       { at: T.clickCode - 6, x: 915, y: DOCK_Y },
     ],
@@ -167,7 +173,7 @@ const PRESS_LENGTH = 4;
 
 const bounceAt = (frame: number, click: number) => Math.sin(Math.PI * Math.min(1, Math.max(0, (frame - click) / BOUNCE_LENGTH)));
 
-const typedCommand = (frame: number) => COMMAND.slice(0, Math.max(0, Math.min(COMMAND.length, Math.floor((frame - T.typeStart) / KEY_GAP) + 1)));
+const selectionAt = (frame: number) => tween(frame, T.grab, T.dragLength);
 
 const CUES: Cue[] = [
   { at: 0, sound: Sound.Power, volume: 0.5 },
@@ -177,12 +183,12 @@ const CUES: Cue[] = [
   { at: T.scroll + 6, sound: Sound.Whoosh, volume: 0.5 },
   { at: T.zoom, sound: Sound.Whoosh, volume: 0.38 },
   { at: T.like, sound: Sound.Pop, volume: 0.25 },
-  { at: T.zoomOut, sound: Sound.Whoosh, volume: 0.32 },
-  { at: T.close, sound: Sound.Pop, volume: 0.25 },
+  { at: T.grab, sound: Sound.Mouse, volume: 0.4 },
+  { at: T.copy, sound: Sound.Tap, volume: 0.5 },
   { at: T.dockBack + 4, sound: Sound.Whoosh, volume: 0.3 },
   { at: T.clickCode, sound: Sound.Mouse, volume: 0.6 },
   { at: T.codeOpen, sound: Sound.Pop, volume: 0.35 },
-  ...[...COMMAND].map((_, i) => keyClick(T.typeStart + i * KEY_GAP, i)),
+  { at: T.paste, sound: Sound.Tap, volume: 0.5 },
   { at: T.enter, sound: Sound.Enter, volume: 0.5 },
   { at: T.tui, sound: Sound.Chime, volume: 0.25 },
   { at: T.toPrompt, sound: Sound.Whoosh, volume: 0.38 },
@@ -219,6 +225,41 @@ const Arrow = ({ x, y, opacity, pressed }: { x: number; y: number; opacity: numb
   </svg>
 );
 
+const Keycap = ({ frame, at, letter }: { frame: number; at: number; letter: string }) => {
+  const shown = lift(frame, at, 6) - tween(frame, at + T.keycapLength - 6, 6);
+
+  if (shown <= 0) {
+    return null;
+  }
+
+  return (
+    <div style={{ position: "absolute", left: 0, right: 0, bottom: 150, display: "flex", justifyContent: "center", gap: 14, opacity: Math.min(1, shown), transform: `translateY(${(1 - shown) * 30}px) scale(${mix(0.85, 1, shown)})` }}>
+      {["⌘", letter].map((k) => (
+        <div
+          key={k}
+          style={{
+            width: 96,
+            height: 96,
+            borderRadius: 20,
+            background: "linear-gradient(180deg,#3a3a42,#1c1c22)",
+            border: "1px solid rgba(255,255,255,0.18)",
+            boxShadow: "0 6px 0 #0c0c10, 0 20px 50px rgba(0,0,0,0.5)",
+            color: "#fff",
+            fontSize: 46,
+            fontFamily: SANS,
+            fontWeight: 600,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          {k}
+        </div>
+      ))}
+    </div>
+  );
+};
+
 const PowerOn = ({ frame, children }: { frame: number; children: ReactNode }) => {
   if (frame >= T.crtEnd) {
     return <>{children}</>;
@@ -254,18 +295,17 @@ export const Intro = () => {
   const frame = useCurrentFrame();
   const pointer = pointerAt(frame);
   const cursor = cursorAt(frame);
-  const pressed = [T.clickX, T.clickCode].some((c) => frame >= c && frame < c + PRESS_LENGTH);
+  const pressed = [T.clickX, T.clickCode].some((c) => frame >= c && frame < c + PRESS_LENGTH) || (frame >= T.grab && frame < T.grab + T.dragLength + 2);
 
   const open = tween(frame, T.browserOpen, T.open);
-  const away = tween(frame, T.isolate, T.fade) - tween(frame, T.zoomOut - 4, T.fade);
-  const close = tween(frame, T.close, T.closeLength);
+  const away = tween(frame, T.isolate, T.fade) - tween(frame, T.dockBack - 4, T.fade);
   const codeOpen = tween(frame, T.codeOpen, T.open);
   const stage = tween(frame, T.stage, T.fade + 6);
   const scroll = scrollAt(frame);
   const blur = Math.min(MAX_BLUR, Math.abs(scrollAt(frame + 1) - scroll) * BLUR_PER_PX);
   const isolated = frame >= T.scroll + T.scrollLength;
-  const browserOpacity = Math.min(open * 3, 1) * (1 - away) * (1 - close);
-  const xRunning = frame >= T.clickX && frame < T.close + T.closeLength;
+  const browserOpacity = Math.min(open * 3, 1) * (1 - away);
+  const xRunning = frame >= T.clickX;
 
   return (
     <AbsoluteFill style={{ background: `radial-gradient(ellipse at 50% 40%, #15151a 0%, ${COLORS.stage} 70%)` }}>
@@ -279,13 +319,13 @@ export const Intro = () => {
             running={[App.Files, ...(xRunning ? [App.X] : []), ...(frame >= T.clickCode ? [App.VSCode] : [])]}
           />
           {browserOpacity > 0 && (
-            <Window rect={WINDOW} transform={`${fromDock(App.X, WINDOW, open, pointer)} scale(${mix(1, 0.92, close)})`} opacity={browserOpacity}>
+            <Window rect={WINDOW} transform={fromDock(App.X, WINDOW, open, pointer)} opacity={browserOpacity}>
               <Browser chrome={Chrome.Dark} rect={WINDOW} url="x.com/home" tab="Home / X" opacity={1} scale={1}>
                 <Feed offset={scroll} blur={blur} hideHook={isolated} />
               </Browser>
             </Window>
           )}
-          {isolated && frame < T.close + T.closeLength && (
+          {isolated && (
             <div
               style={{
                 position: "absolute",
@@ -297,11 +337,9 @@ export const Intro = () => {
                 borderRadius: 18 * away,
                 border: `1px solid rgba(47,51,54,${away})`,
                 boxShadow: `0 30px 90px rgba(0,0,0,${0.7 * away})`,
-                opacity: 1 - close,
-                transform: `scale(${mix(1, 0.92, close)})`,
               }}
             >
-              <PostCard post={{ ...HOOK, stats: hookStats(frame) }} liked={settle(Math.min(1, Math.max(0, (frame - T.like) / 6)))} />
+              <PostCard post={{ ...HOOK, stats: hookStats(frame) }} liked={settle(Math.min(1, Math.max(0, (frame - T.like) / 6)))} selected={selectionAt(frame)} />
             </div>
           )}
           {codeOpen > 0 && (
@@ -310,13 +348,15 @@ export const Intro = () => {
                 {frame >= T.tui ? (
                   <PixelgodTui lines={[]} input="" cursorOn={frame % 30 < 15} spinnerGlyph="" />
                 ) : (
-                  <Shell command={typedCommand(frame)} cursorOn={frame < T.typeStart || frame % 30 < 15 || frame < T.enter} />
+                  <Shell command={frame >= T.paste ? HOOK_COMMAND : ""} cursorOn={frame % 30 < 15 || frame >= T.paste} />
                 )}
               </VSCodeWindow>
             </Window>
           )}
           {cursor && <Arrow x={cursor.x} y={cursor.y} opacity={cursor.opacity} pressed={pressed} />}
         </Camera>
+        <Keycap frame={frame} at={T.copy} letter="C" />
+        <Keycap frame={frame} at={T.paste} letter="V" />
       </PowerOn>
     </AbsoluteFill>
   );

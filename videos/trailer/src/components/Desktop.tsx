@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { SANS } from "../theme";
+import { AlpacaWallpaper } from "./AlpacaWallpaper";
 import { FeegaMark, Mark, MARKS, VSCODE_BLUE } from "./brandIcons";
 
 const MENUS = ["Finder", "File", "Edit", "View", "Go", "Window", "Help"];
@@ -83,17 +84,6 @@ type Props = {
   running: App[];
 };
 
-const Wallpaper = () => (
-  <div
-    style={{
-      position: "absolute",
-      inset: 0,
-      background:
-        "radial-gradient(ellipse at 20% 80%, #3b2a7a 0%, transparent 55%), radial-gradient(ellipse at 85% 20%, #1d5c8f 0%, transparent 50%), radial-gradient(ellipse at 60% 90%, #8a3b6b 0%, transparent 45%), #0d1024",
-    }}
-  />
-);
-
 const MenuBar = () => (
   <div
     style={{
@@ -145,7 +135,7 @@ export const Desktop = ({ opacity, pointer, bounce, running }: Props) => {
 
   return (
     <div style={{ position: "absolute", inset: 0, opacity, fontFamily: SANS }}>
-      <Wallpaper />
+      <AlpacaWallpaper />
       <MenuBar />
 
       <div

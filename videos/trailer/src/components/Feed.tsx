@@ -101,7 +101,30 @@ const LinkCard = ({ scale }: { scale: number }) => (
   </div>
 );
 
-export const PostCard = ({ post, scale = 1, liked = 0 }: { post: Post; scale?: number; liked?: number }) => {
+export const HOOK_COMMAND = "npx pixelgod";
+
+const SELECTION = "rgba(29,155,240,0.45)";
+
+const Selectable = ({ text, selected }: { text: string; selected: number }) => {
+  const [before, after] = text.split(HOOK_COMMAND);
+
+  if (after === undefined) {
+    return <>{text}</>;
+  }
+
+  return (
+    <>
+      {before}
+      <span style={{ position: "relative", display: "inline-block" }}>
+        <span style={{ position: "absolute", left: -2, right: -2, top: 0, bottom: 0, borderRadius: 3, background: SELECTION, transformOrigin: "left center", transform: `scaleX(${selected})` }} />
+        <span style={{ position: "relative" }}>{HOOK_COMMAND}</span>
+      </span>
+      {after}
+    </>
+  );
+};
+
+export const PostCard = ({ post, scale = 1, liked = 0, selected = 0 }: { post: Post; scale?: number; liked?: number; selected?: number }) => {
   const big = post.handle === HOOK.handle;
   const fs = (n: number) => n * scale;
 
@@ -118,7 +141,9 @@ export const PostCard = ({ post, scale = 1, liked = 0 }: { post: Post; scale?: n
           <span style={{ marginLeft: "auto", color: X.muted, letterSpacing: 1 }}>···</span>
         </div>
         {post.text && (
-          <div style={{ fontSize: fs(big ? 21 : 17), lineHeight: 1.3, marginTop: 4, whiteSpace: "pre-line", fontWeight: big ? 500 : 400 }}>{post.text}</div>
+          <div style={{ fontSize: fs(big ? 21 : 17), lineHeight: 1.3, marginTop: 4, whiteSpace: "pre-line", fontWeight: big ? 500 : 400 }}>
+            <Selectable text={post.text} selected={selected} />
+          </div>
         )}
         {big && <LinkCard scale={scale} />}
         {post.media && (

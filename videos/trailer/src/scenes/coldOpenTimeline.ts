@@ -43,11 +43,11 @@ export type Pace = {
 };
 
 const ACCELERATION: Pace[] = [
-  { typing: Typing.Human, speed: 1.4, lead: 10, enter: 14, think: 56, lag: 6, swap: 5, change: 26, hold: 40 },
-  { typing: Typing.Human, speed: 1, lead: 8, enter: 12, think: 26, lag: 5, swap: 5, change: 18, hold: 34 },
-  { typing: Typing.Human, speed: 0.55, lead: 5, enter: 10, think: 10, lag: 4, swap: 3, change: 8, hold: 26 },
-  { typing: Typing.Burst, speed: 4, lead: 3, enter: 12, think: 3, lag: 4, swap: 0, change: 0, hold: 18 },
-  { typing: Typing.Burst, speed: 3, lead: 3, enter: 10, think: 0, lag: 0, swap: 0, change: 0, hold: 60 },
+  { typing: Typing.Human, speed: 0.7, lead: 6, enter: 8, think: 14, lag: 4, swap: 5, change: 20, hold: 20 },
+  { typing: Typing.Human, speed: 0.6, lead: 5, enter: 8, think: 10, lag: 4, swap: 4, change: 14, hold: 22 },
+  { typing: Typing.Human, speed: 0.45, lead: 4, enter: 7, think: 6, lag: 3, swap: 3, change: 8, hold: 20 },
+  { typing: Typing.Burst, speed: 4, lead: 3, enter: 10, think: 3, lag: 11, swap: 0, change: 0, hold: 16 },
+  { typing: Typing.Burst, speed: 3, lead: 3, enter: 10, think: 0, lag: 0, swap: 0, change: 0, hold: 90 },
 ];
 
 const KEY_GAPS = [2, 1, 2, 2, 1, 3, 1, 2, 2, 1, 2, 3];
