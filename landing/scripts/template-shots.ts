@@ -14,7 +14,8 @@ const QUALITY = 78;
 const BACKGROUNDS = { light: '#f7f6f2', dark: '#050505' } as const;
 
 const HOVERS: Record<string, { target: string; x: number }> = {
-  'glass-button': { target: '.glass', x: 0.3 }
+  'glass-button': { target: '.glass', x: 0.3 },
+  'topo-shader': { target: '.field', x: 0.62 }
 };
 
 type Theme = keyof typeof BACKGROUNDS;

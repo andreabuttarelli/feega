@@ -1,0 +1,38 @@
+{
+  "id": "topo-shader",
+  "name": "Topo shader",
+  "description": "A card of glowing topographic contour lines. The pointer raises a hill that wraps it in gold rings.",
+  "category": "component",
+  "tags": [
+    "shader",
+    "topographic",
+    "webgl",
+    "interactive",
+    "card"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    },
+    {
+      "family": "Fragment Mono",
+      "weights": [
+        400
+      ]
+    }
+  ],
+  "tier": "free"
+}
