@@ -140,7 +140,7 @@ const Terminal = () => {
         ))}
         <span style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: 18, color: "#f0eee9" }}>
           <Mark mark={{ path: siClaude.path, viewBox: BOX }} size={16} color={CLAUDE} />
-          claude — ~/aurel
+          claude — ~/lumen
         </span>
       </div>
       <div style={{ flex: 1, padding: "18px 24px", display: "flex", flexDirection: "column", gap: 12, overflow: "hidden" }}>
@@ -148,7 +148,7 @@ const Terminal = () => {
           <div>
             <span style={{ color: CLAUDE }}>✻</span> Welcome to <b>Claude Code</b>
           </div>
-          <div style={{ color: "#8a8780", fontSize: 15 }}>cwd: ~/aurel</div>
+          <div style={{ color: "#8a8780", fontSize: 15 }}>cwd: ~/lumen</div>
         </div>
         {frame >= PROMPT_AT ? (
           <div style={{ borderRadius: 10, background: "#1f1f1e", padding: "10px 16px" }}>

@@ -33,9 +33,9 @@ const KIND_STYLE: Record<Kind, { sign: string; bg: string; fg: string }> = {
 
 const LINES: { kind: Kind; n: number; text: string }[] = [
   { kind: Kind.Same, n: 12, text: '<section class="hero">' },
-  { kind: Kind.Removed, n: 13, text: '  <h1 class="text-[#2a1c12]">' },
+  { kind: Kind.Removed, n: 13, text: '  <h1 class="text-[#14142b]">' },
   { kind: Kind.Added, n: 13, text: '  <h1 class="text-[#ff5100]">' },
-  { kind: Kind.Same, n: 14, text: "    Scent, slowly made." },
+  { kind: Kind.Same, n: 14, text: "    see every deploy" },
   { kind: Kind.Same, n: 15, text: "  </h1>" },
 ];
 

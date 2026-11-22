@@ -3,32 +3,35 @@ import { Img, staticFile } from "remotion";
 import { FeegaMark } from "../../components/brandIcons";
 import { GLYPH, LAYER, type Glyph, type LayerGlyph } from "./glyphs";
 import {
-  BASE_FONT, BODY_Y, Control, EDITING_H, H1_LEFT, H1_TOP, H1_W, HEAD_H, LABEL_W, LAYERS_TOP, LAYER_ROW, LEFT_W, LIBRARY_TOP, MESH_BOX, MESH_PROPS,
+  BASE_FONT, BODY_Y, Control, EDITING_H, H1_LEFT, H1_TOP, H1_W, H1_X, HEAD_H, LABEL_W, LAYERS_TOP, LAYER_ROW, LEFT_W, LIBRARY_TOP, MESH_BOX, MESH_PROPS,
   PAGE, POPOVER, RIGHT_W, RIGHT_X, ROW_H, SCOPE_H, SIDE_PAD, STATE_Y, TABS, TEXT_PROPS, TOP_ROW, Tab, WHAT_H, WIN, h1Rect, insertY,
   libraryRect, placeProps, swatchRect, type PlacedRow, type Rect,
 } from "./layout";
 
 const ACCENT = "#0a84ff";
 const PANEL = "#181818";
-const TEXT = "#cccccc";
-const TEXT_2 = "rgba(204,204,204,.6)";
-const TEXT_3 = "rgba(204,204,204,.4)";
-const DIVIDER = "#2b2b2b";
-const INPUT = "#2a2a2a";
-const THUMB = "#5a5a5e";
+const TEXT = "#e4e4e4";
+const TEXT_2 = "#9c9c9c";
+const TEXT_3 = "#6f6f6f";
+const DIVIDER = "#2f2f2f";
+const INPUT = "#282828";
+const THUMB = "#5b5a5f";
+const PICKED = "#132e4a";
+const ALIGNED = "alignCenter";
 const BACKDROP = "#262626";
 const LINK = "#3794ff";
 const DANGER = "#f14c4c";
 const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
 const CODE = '"Fragment Mono", "SF Mono", Menlo, monospace';
-const PAGE_BG = "#f6efe6";
-const PAGE_INK = "#2a1c12";
-const PAGE_ACCENT = "#b4532a";
-const PAGE_SOFT = "#ebdfd0";
-const SERIF = "Georgia, serif";
+const PAGE_BG = "#f5f6fb";
+const PAGE_INK = "#14142b";
+const PAGE_MUTED = "#4b4b63";
+const PAGE_ACCENT = "#4f46e5";
+const PAGE_SOFT = "#e9ebfa";
+const PAGE_FONT = '"BDO Grotesk", "Inter Tight", -apple-system, sans-serif';
 const AGENT = "#d97757";
 
-export const SWATCHES = ["#2a1c12", "#ff5100", "#004dff", "#1f9d55", "#c026d3"];
+export const SWATCHES = ["#14142b", "#ff5100", "#004dff", "#1f9d55", "#c026d3"];
 
 export enum LeftPanel {
   Layers = "Layers",
@@ -49,15 +52,16 @@ type Layer = { depth: number; open?: boolean; icon: LayerGlyph; name: string; co
 const LAYERS: Layer[] = [
   { depth: 0, open: true, icon: "block", name: "html" },
   { depth: 1, open: true, icon: "flexColumn", name: "body" },
-  { depth: 2, open: false, icon: "header", name: "header.bar" },
-  { depth: 2, open: true, icon: "flexColumn", name: "section.hero" },
-  { depth: 3, icon: "text", name: "span.tag" },
-  { depth: 3, icon: "h1", name: "h1.title", h1: true },
-  { depth: 3, icon: "text", name: "p.lead" },
-  { depth: 3, icon: "flexRow", name: "div.actions" },
-  { depth: 2, open: false, icon: "grid", name: "section.pricing", fresh: true },
-  { depth: 2, open: true, icon: "grid", name: "section.products" },
-  { depth: 3, icon: "repeat", name: "article.card", count: "×3" },
+  { depth: 2, open: false, icon: "header", name: "header.fl-navbar" },
+  { depth: 2, open: true, icon: "block", name: "section.fl-hero" },
+  { depth: 3, open: true, icon: "flexColumn", name: "div.fl-container" },
+  { depth: 4, icon: "text", name: "p.fl-eyebrow" },
+  { depth: 4, icon: "h1", name: "h1.title", h1: true },
+  { depth: 4, icon: "text", name: "p.fl-lead" },
+  { depth: 4, open: false, icon: "flexRow", name: "div.cta" },
+  { depth: 2, open: false, icon: "grid", name: "section.fl-pricing", fresh: true },
+  { depth: 2, open: false, icon: "block", name: "section.fl-live-preview" },
+  { depth: 2, open: false, icon: "block", name: "section.fl-bento-grid" },
   { depth: 2, open: false, icon: "footer", name: "footer" },
 ];
 
@@ -76,10 +80,10 @@ const DIFF_STYLE: Record<Diff, { sign: string; bg: string; fg: string }> = {
 const DIFF_LINES: { kind: Diff; text: string; n: number }[] = [
   { kind: Diff.Same, text: '<section class="hero">', n: 12 },
   { kind: Diff.Removed, text: '  <h1 class="text-[64px]', n: 14 },
-  { kind: Diff.Removed, text: '      text-[#2a1c12]">', n: 15 },
+  { kind: Diff.Removed, text: '      text-[#14142b]">', n: 15 },
   { kind: Diff.Added, text: '  <h1 class="text-[76px]', n: 14 },
   { kind: Diff.Added, text: '      text-[#ff5100]">', n: 15 },
-  { kind: Diff.Same, text: "    Scent, slowly made.", n: 16 },
+  { kind: Diff.Same, text: "    see every deploy", n: 16 },
 ];
 
 const CHANGES = [
@@ -90,9 +94,9 @@ const CHANGES = [
 export const DIFF_COUNT = DIFF_LINES.length;
 
 const PLANS = [
-  { name: "Single", price: "€24", note: "one refill a season" },
-  { name: "Pro", price: "€44", note: "two scents, swapped monthly" },
-  { name: "Atelier", price: "€80", note: "a private blending session" },
+  { name: "Hobby", price: "$0", note: "one project, 7-day history" },
+  { name: "Pro", price: "$24", note: "unlimited deploys, alerts" },
+  { name: "Team", price: "$80", note: "SSO, audit log, 90 days" },
 ];
 
 export type MeshPoint = { x: number; y: number; c: string };
@@ -161,7 +165,7 @@ const Ico = ({ name, size = 14 }: { name: Glyph; size?: number }) => (
 );
 
 const LayerIco = ({ name }: { name: LayerGlyph }) => (
-  <svg width={16} height={16} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={0.9} strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", color: TEXT_3 }} dangerouslySetInnerHTML={{ __html: LAYER[name] }} />
+  <svg width={16} height={16} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.1} strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", color: "#8a8a8a" }} dangerouslySetInnerHTML={{ __html: LAYER[name] }} />
 );
 
 const box = (r: Rect): CSSProperties => ({ position: "absolute", left: r.x, top: r.y, width: r.w, height: r.h });
@@ -175,7 +179,7 @@ const IconButton = ({ name, on, dim }: { name: Glyph; on?: boolean; dim?: boolea
 const Field = ({ prefix, value, unit, active }: { prefix: string; value: string; unit: string; active?: boolean }) => (
   <div style={{ display: "flex", alignItems: "center", height: 28, borderRadius: 4, background: active ? "#33363d" : INPUT, boxShadow: active ? `0 0 0 1.5px ${ACCENT}` : "none", minWidth: 0, flex: 1 }}>
     <span style={{ minWidth: 20, textAlign: "center", color: TEXT_3, fontSize: 11 }}>{prefix}</span>
-    <span style={{ flex: 1, color: TEXT, fontSize: 12, fontVariantNumeric: "tabular-nums", overflow: "hidden", whiteSpace: "nowrap" }}>{value}</span>
+    <span style={{ flex: 1, color: TEXT, fontSize: 12.5, fontVariantNumeric: "tabular-nums", overflow: "hidden", whiteSpace: "nowrap" }}>{value}</span>
     <span style={{ display: "flex", alignItems: "center", gap: 2, color: TEXT_3, fontSize: 11, paddingRight: 6 }}>
       {unit}
       {unit ? <Ico name="chevronDown" size={9} /> : null}
@@ -184,7 +188,7 @@ const Field = ({ prefix, value, unit, active }: { prefix: string; value: string;
 );
 
 const PanelHead = ({ title, children }: { title: string; children?: ReactNode }) => (
-  <div style={{ height: TOP_ROW, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 12px", borderBottom: `1px solid ${DIVIDER}`, color: TEXT_2, fontSize: 11, fontWeight: 600, boxSizing: "border-box" }}>
+  <div style={{ height: TOP_ROW, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 12px", borderBottom: `1px solid ${DIVIDER}`, color: TEXT_2, fontSize: 12.5, fontWeight: 600, boxSizing: "border-box" }}>
     {title}
     {children}
   </div>
@@ -198,7 +202,7 @@ const Layers = ({ state }: { state: EditorState }) => {
   return (
     <div>
       <PanelHead title="Layers">
-        <span style={{ display: "flex", alignItems: "center", gap: 3, height: 18, padding: "0 7px", borderRadius: 4, background: "#d4d4d4", color: "#1e1e1e", fontSize: 11, fontWeight: 600 }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 3, height: 18, padding: "0 7px", borderRadius: 4, background: "#cdcdcd", color: "#141414", fontSize: 12, fontWeight: 600 }}>
           <Ico name="plus" size={10} />
           Add
         </span>
@@ -209,7 +213,7 @@ const Layers = ({ state }: { state: EditorState }) => {
           const height = row.fresh ? LAYER_ROW * fresh : LAYER_ROW;
 
           return (
-            <div key={row.name} style={{ display: "flex", alignItems: "center", gap: 4, height, overflow: "hidden", paddingLeft: 8 + row.depth * 12, paddingRight: 8, fontSize: 12, color: TEXT, opacity: row.fresh ? fresh : 1, background: picked ? "rgba(10,132,255,.22)" : row.h1 && state.hover > 0.5 ? "rgba(255,255,255,.05)" : "transparent", boxShadow: row.fresh && state.agentGlow > 0 ? `inset 2px 0 0 ${AGENT}` : "none" }}>
+            <div key={row.name} style={{ display: "flex", alignItems: "center", gap: 4, height, overflow: "hidden", paddingLeft: 8 + row.depth * 11, paddingRight: 8, fontSize: 12.5, color: TEXT, opacity: row.fresh ? fresh : 1, background: picked ? PICKED : row.h1 && state.hover > 0.5 ? "rgba(255,255,255,.05)" : "transparent", boxShadow: row.fresh && state.agentGlow > 0 ? `inset 2px 0 0 ${AGENT}` : "none" }}>
               <span style={{ width: 14, display: "grid", placeItems: "center", color: TEXT_3, transform: row.open ? "rotate(90deg)" : "none" }}>
                 {row.open === undefined ? null : <Ico name="chevronRight" size={12} />}
               </span>
@@ -302,7 +306,7 @@ const Toolbar = () => (
       ))}
     </div>
     <span style={{ height: 24, display: "flex", alignItems: "center", gap: 4, padding: "0 6px", borderRadius: 4, background: INPUT, color: TEXT_2, fontSize: 12 }}>
-      <span style={{ color: TEXT }}>1140</span>× 860
+      <span style={{ color: TEXT }}>720</span>× 860
     </span>
     <span style={{ height: 24, display: "flex", alignItems: "center", gap: 4, padding: "0 6px", borderRadius: 4, background: INPUT, color: TEXT_2, fontSize: 12 }}>
       <Ico name="theme" size={12} />
@@ -315,9 +319,9 @@ const Toolbar = () => (
 );
 
 const PricingSection = ({ agent, glow }: { agent: number; glow: number }) => (
-  <div style={{ position: "relative", height: pricingHeight(agent), padding: `${PRICING_PAD}px ${H1_LEFT}px`, boxSizing: "border-box", background: "#fbf7f1" }}>
-    <div style={{ fontSize: 10, letterSpacing: "0.12em", color: PAGE_ACCENT, fontFamily: CODE }}>■ REFILL PLANS</div>
-    <div style={{ fontFamily: SERIF, fontSize: 28, letterSpacing: "-0.02em", marginTop: 6 }}>Pick your pace.</div>
+  <div style={{ position: "relative", height: pricingHeight(agent), padding: `${PRICING_PAD}px ${H1_LEFT}px`, boxSizing: "border-box", background: "#ffffff" }}>
+    <div style={{ fontSize: 10, letterSpacing: "0.12em", color: PAGE_ACCENT, fontFamily: CODE }}>■ PRICING</div>
+    <div style={{ fontFamily: PAGE_FONT, fontSize: 28, letterSpacing: "-0.02em", marginTop: 6 }}>pay for calm, not seats.</div>
     <div style={{ position: "absolute", left: H1_LEFT, top: PRICING_PAD + PRICING_HEAD, width: PRICING_W }}>
       {PLANS.map((plan, i) => {
         const a = layoutOf(TWO_COL, i);
@@ -326,12 +330,12 @@ const PricingSection = ({ agent, glow }: { agent: number; glow: number }) => (
         const pro = i === 1 ? agent : 0;
 
         return (
-          <div key={plan.name} style={{ ...box(r), borderRadius: 12, padding: "14px 16px", boxSizing: "border-box", fontSize: 12, background: pro > 0.5 ? PAGE_INK : PAGE_SOFT, color: pro > 0.5 ? "#fff" : PAGE_INK, boxShadow: pro > 0 ? `0 ${10 * pro}px ${24 * pro}px rgba(42,28,18,${0.25 * pro})` : "none", transform: `translateY(${-6 * pro}px)` }}>
+          <div key={plan.name} style={{ ...box(r), borderRadius: 12, padding: "14px 16px", boxSizing: "border-box", fontSize: 12, background: pro > 0.5 ? PAGE_INK : PAGE_SOFT, color: pro > 0.5 ? "#fff" : PAGE_INK, boxShadow: pro > 0 ? `0 ${10 * pro}px ${24 * pro}px rgba(20,20,43,${0.25 * pro})` : "none", transform: `translateY(${-6 * pro}px)` }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <b style={{ fontWeight: 600 }}>{plan.name}</b>
-              {i === 1 ? <span style={{ padding: "2px 8px", borderRadius: 999, background: "#ff5100", color: "#fff", fontSize: 10, opacity: pro, transform: `scale(${0.6 + 0.4 * pro})` }}>popular</span> : null}
+              {i === 1 ? <span style={{ padding: "2px 8px", borderRadius: 999, background: PAGE_ACCENT, color: "#fff", fontSize: 10, opacity: pro, transform: `scale(${0.6 + 0.4 * pro})` }}>popular</span> : null}
             </div>
-            <div style={{ fontFamily: SERIF, fontSize: 28, marginTop: 4 }}>{plan.price}</div>
+            <div style={{ fontFamily: PAGE_FONT, fontSize: 28, marginTop: 4 }}>{plan.price}</div>
             <div style={{ opacity: 0.7, marginTop: 2 }}>{plan.note}</div>
           </div>
         );
@@ -356,9 +360,9 @@ const Mesh = ({ points }: { points: MeshPoint[] }) => {
   const background = points.map((p) => `radial-gradient(circle at ${p.x}px ${p.y}px, ${p.c} 0, transparent 62%)`).join(", ");
 
   return (
-    <div style={{ ...box(r), borderRadius: 14, background: `${background}, #f6efe6`, overflow: "hidden" }}>
-      <div style={{ position: "absolute", left: 36, top: 120, fontFamily: SERIF, fontSize: 58, color: "#fff", letterSpacing: "-0.03em", lineHeight: 1 }}>Ambre Noir</div>
-      <div style={{ position: "absolute", left: 38, top: 192, fontSize: 14, color: "rgba(255,255,255,.85)" }}>eau de parfum · 50 ml</div>
+    <div style={{ ...box(r), borderRadius: 14, background: `${background}, #f5f6fb`, overflow: "hidden" }}>
+      <div style={{ position: "absolute", left: 36, top: 120, fontFamily: PAGE_FONT, fontSize: 64, fontWeight: 620, color: "#fff", letterSpacing: "-0.055em", lineHeight: 1 }}>ship calmer.</div>
+      <div style={{ position: "absolute", left: 38, top: 192, fontSize: 14, color: "rgba(255,255,255,.85)" }}>hero background · mesh gradient</div>
       <div style={{ position: "absolute", inset: 0, outline: `2px solid ${ACCENT}`, outlineOffset: -2, borderRadius: 14 }} />
       {points.map((p, i) => (
         <div key={i} style={{ position: "absolute", left: p.x - 10, top: p.y - 10, width: 20, height: 20, borderRadius: 10, background: p.c, border: "3px solid #fff", boxShadow: "0 0 0 1px rgba(0,0,0,.25), 0 2px 6px rgba(0,0,0,.3)" }} />
@@ -367,41 +371,73 @@ const Mesh = ({ points }: { points: MeshPoint[] }) => {
   );
 };
 
+const BARS = [22, 30, 26, 38, 34, 46, 52, 64, 80];
+
+const LivePreview = () => (
+  <div style={{ position: "relative", margin: `24px ${H1_LEFT}px 0`, height: 330, borderRadius: 14, background: `radial-gradient(#c9cdea 1px, transparent 1.2px) 0 0 / 14px 14px, #eef0fb`, boxShadow: "inset 0 0 0 1px #e1e4f4" }}>
+    <span style={{ position: "absolute", right: 14, top: 12, fontFamily: CODE, fontSize: 9, letterSpacing: "0.1em", color: PAGE_MUTED }}>LIVE PREVIEW</span>
+    <div style={{ position: "absolute", left: 34, right: 34, top: 34, bottom: -40, borderRadius: 10, background: "#fff", boxShadow: "0 10px 30px rgba(20,20,43,.08), 0 0 0 1px #e6e8f3", overflow: "hidden" }}>
+      <div style={{ height: 30, display: "flex", alignItems: "center", gap: 5, padding: "0 12px", borderBottom: "1px solid #eceef6" }}>
+        {[0, 1, 2].map((i) => (
+          <i key={i} style={{ width: 7, height: 7, borderRadius: 4, background: "#d6d9ec" }} />
+        ))}
+        <span style={{ flex: 1, textAlign: "center", fontFamily: CODE, fontSize: 9.5, color: PAGE_MUTED, marginRight: 30 }}>app.lumen.dev</span>
+      </div>
+      <div style={{ display: "flex", height: "100%" }}>
+        <div style={{ width: 150, borderRight: "1px solid #eceef6", padding: "16px 14px", display: "flex", flexDirection: "column", gap: 9 }}>
+          <i style={{ width: 70, height: 7, borderRadius: 2, background: PAGE_ACCENT }} />
+          {[0, 1, 2, 3].map((i) => (
+            <i key={i} style={{ height: 7, borderRadius: 2, background: "#eceefa" }} />
+          ))}
+        </div>
+        <div style={{ flex: 1, padding: "18px 22px", position: "relative" }}>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <i style={{ width: 170, height: 14, borderRadius: 2, background: PAGE_INK }} />
+            <i style={{ width: 60, height: 16, borderRadius: 8, background: PAGE_ACCENT }} />
+          </div>
+          <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+            {[0, 1, 2].map((i) => (
+              <i key={i} style={{ flex: 1, height: 48, borderRadius: 6, background: "#eceefa" }} />
+            ))}
+          </div>
+          <div style={{ position: "absolute", left: 22, right: 22, top: 130, display: "flex", alignItems: "flex-end", gap: 5, height: 90 }}>
+            {BARS.map((h, i) => (
+              <i key={i} style={{ flex: 1, height: h, background: i === BARS.length - 1 ? PAGE_ACCENT : "#c7cbee" }} />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
 const Hero = ({ state }: { state: EditorState }) => {
   const below = H1_TOP + state.fontSize * 2;
   const inserted = state.library?.inserted ?? 0;
 
   return (
     <>
-      <span style={{ position: "absolute", left: H1_LEFT, top: H1_TOP - 34, display: "flex", alignItems: "center", gap: 8, fontFamily: CODE, fontSize: 11, letterSpacing: "0.1em" }}>
-        <i style={{ width: 7, height: 7, background: PAGE_ACCENT }} />
-        NEW · AMBRE NOIR
+      <span style={{ position: "absolute", left: 0, right: 0, top: H1_TOP - 36, display: "flex", justifyContent: "center", alignItems: "center", gap: 8, fontFamily: CODE, fontSize: 11, letterSpacing: "0.12em", color: PAGE_MUTED }}>
+        <i style={{ width: 6, height: 6, background: PAGE_ACCENT }} />
+        RELEASE MONITORING
       </span>
-      <div style={{ position: "absolute", left: H1_LEFT, top: H1_TOP, width: H1_W, fontFamily: SERIF, fontSize: state.fontSize, fontWeight: 500, letterSpacing: "-0.03em", lineHeight: 1, color: state.headColor }}>Scent, slowly made.</div>
-      <div style={{ position: "absolute", left: 0, right: 0, top: below + 16 }}>
-        <p style={{ margin: `0 ${H1_LEFT}px`, maxWidth: 460, color: "#6b5645", fontSize: 14, lineHeight: "20px" }}>Small-batch perfume, blended by hand in Grasse and refilled for life. Nothing rushed, nothing wasted.</p>
-        <div style={{ display: "flex", gap: 10, margin: `20px ${H1_LEFT}px 0`, fontSize: 12, fontWeight: 600 }}>
-          <span style={{ padding: "11px 20px", borderRadius: 999, background: PAGE_INK, color: "#fff" }}>Shop the collection</span>
-          <span style={{ padding: "11px 20px", borderRadius: 999, boxShadow: `inset 0 0 0 1px ${PAGE_INK}` }}>Find your scent</span>
+      <div style={{ position: "absolute", left: H1_X, top: H1_TOP, width: H1_W, textAlign: "center", fontFamily: PAGE_FONT, fontSize: state.fontSize, fontWeight: 620, letterSpacing: "-0.055em", lineHeight: 0.98, color: state.headColor, whiteSpace: "nowrap" }}>
+        see every deploy
+        <br />
+        before users do
+      </div>
+      <div style={{ position: "absolute", left: 0, right: 0, top: below + 18, textAlign: "center" }}>
+        <p style={{ margin: "0 auto", maxWidth: 470, color: PAGE_MUTED, fontSize: 14.5, lineHeight: "21px", letterSpacing: "-0.01em" }}>Lumen watches builds, traces and rollouts in one view, so a bad release never reaches Friday.</p>
+        <div style={{ display: "flex", justifyContent: "center", gap: 10, marginTop: 20, fontSize: 14, fontWeight: 500, letterSpacing: "-0.02em" }}>
+          <span style={{ padding: "11px 22px", borderRadius: 999, background: PAGE_ACCENT, color: "#fff" }}>start free</span>
+          <span style={{ padding: "11px 22px", borderRadius: 999, background: "#fff", boxShadow: "inset 0 0 0 1px #d4d6e4", color: PAGE_INK }}>take the tour →</span>
         </div>
       </div>
       <div style={{ position: "absolute", left: 0, right: 0, top: insertY(state.fontSize) - PAGE.y }}>
         <div style={{ height: pricingHeight(state.agent) * inserted, overflow: "hidden", opacity: inserted }}>
           {state.library ? <PricingSection agent={state.agent} glow={state.agentGlow} /> : null}
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, padding: `28px ${H1_LEFT}px 0` }}>
-          {[
-            ["Ambre Noir", "€128", "linear-gradient(135deg, #e7a46a, #b4532a)"],
-            ["Fig & Cedar", "€112", "linear-gradient(135deg, #cdd5b5, #7c8a5a)"],
-            ["Iris Blanc", "€104", "linear-gradient(135deg, #d9d4ea, #8c82b8)"],
-          ].map(([name, price, bg]) => (
-            <div key={name} style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12 }}>
-              <i style={{ height: 150, marginBottom: 8, borderRadius: 12, background: bg }} />
-              <b style={{ fontWeight: 600 }}>{name}</b>
-              <span style={{ color: "#6b5645" }}>{price}</span>
-            </div>
-          ))}
-        </div>
+        <LivePreview />
       </div>
     </>
   );
@@ -453,17 +489,22 @@ const Preview = ({ state }: { state: EditorState }) => {
   return (
     <div style={{ ...box(PAGE), background: BACKDROP, overflow: "hidden" }}>
       <div style={{ position: "absolute", inset: 0, background: PAGE_BG, color: PAGE_INK, fontFamily: FONT }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: `20px ${H1_LEFT}px`, fontSize: 11 }}>
-          <span style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: SERIF, fontSize: 17, fontWeight: 600 }}>
-            <i style={{ width: 20, height: 20, borderRadius: 10, background: PAGE_INK }} />
-            Aurel
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: `16px 28px`, fontSize: 14, letterSpacing: "-0.03em" }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: PAGE_FONT, fontSize: 18, fontWeight: 650, letterSpacing: "-0.04em" }}>
+            <svg width={16} height={16} viewBox="0 0 8 8" shapeRendering="crispEdges">
+              <path d="M3 0h2v3h3v2H5v3H3V5H0V3h3z" fill={PAGE_ACCENT} />
+            </svg>
+            Lumen
           </span>
-          <span style={{ display: "flex", gap: 26 }}>
-            {["Collection", "Refills", "Atelier", "Journal"].map((l) => (
-              <span key={l}>{l}</span>
+          <span style={{ display: "flex", gap: 22, color: PAGE_MUTED }}>
+            {["product", "pricing", "docs", "blog"].map((l, i) => (
+              <span key={l} style={{ color: i === 0 ? PAGE_INK : PAGE_MUTED }}>{l}</span>
             ))}
           </span>
-          <span style={{ padding: "8px 16px", borderRadius: 999, background: PAGE_ACCENT, color: "#fff", fontWeight: 600 }}>Bag (0)</span>
+          <span style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <span style={{ color: PAGE_MUTED }}>log in</span>
+            <span style={{ padding: "8px 16px", borderRadius: 999, background: PAGE_ACCENT, color: "#fff" }}>get started</span>
+          </span>
         </div>
         {state.mesh ? <Mesh points={state.mesh} /> : <Hero state={state} />}
       </div>
@@ -482,7 +523,7 @@ const Outline = ({ rect, hover, selected }: { rect: Rect; hover: number; selecte
     <div style={{ ...box({ x: rect.x - 4, y: rect.y - 4, w: rect.w + 8, h: rect.h + 8 }), outline: `${selected > 0.5 ? 2 : 1.5}px solid ${ACCENT}`, opacity: on, background: selected > 0.5 ? "transparent" : "rgba(10,132,255,.06)" }}>
       {selected > 0.5 ? (
         <span style={{ position: "absolute", top: -20, left: -2, padding: "0 5px", borderRadius: 2, background: ACCENT, color: "#fff", fontSize: 11, lineHeight: "18px", fontFamily: FONT, whiteSpace: "nowrap" }}>
-          … › section.hero › <b>h1.title</b>
+          … › div.fl-container › <b>h1.title</b>
         </span>
       ) : null}
     </div>
@@ -496,7 +537,7 @@ const RowControl = ({ row, state }: { row: PlacedRow; state: EditorState }) => {
     return (
       <div style={{ display: "flex", gap: 2, height: 28, padding: 2, borderRadius: 4, background: INPUT, boxSizing: "border-box" }}>
         {v.map((item, i) => (
-          <span key={item} style={{ flex: 1, display: "grid", placeItems: "center", borderRadius: 3, color: i === 0 ? "#fff" : TEXT_2, background: i === 0 ? THUMB : "transparent" }}>
+          <span key={item} style={{ flex: 1, display: "grid", placeItems: "center", borderRadius: 3, color: item === ALIGNED ? "#fff" : TEXT_2, background: item === ALIGNED ? THUMB : "transparent" }}>
             <Ico name={item as Glyph} size={13} />
           </span>
         ))}
@@ -509,7 +550,7 @@ const RowControl = ({ row, state }: { row: PlacedRow; state: EditorState }) => {
       <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 4 }}>
         {v.map((item) => (
           <span key={item} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: 28, padding: "0 8px", borderRadius: 4, background: INPUT, color: TEXT, fontSize: 12, whiteSpace: "nowrap" }}>
-            <span style={{ fontFamily: item === "Georgia" ? SERIF : FONT }}>{item}</span>
+            <span style={{ fontFamily: item === "BDO Grotesk" ? PAGE_FONT : FONT }}>{item}</span>
             <Ico name="chevronDown" size={11} />
           </span>
         ))}
@@ -554,12 +595,12 @@ const RowControl = ({ row, state }: { row: PlacedRow; state: EditorState }) => {
 };
 
 const What = ({ name }: { name: string }) => (
-  <div style={{ position: "absolute", left: RIGHT_X, top: BODY_Y, width: RIGHT_W, height: WHAT_H, boxSizing: "border-box", padding: "10px 16px", borderBottom: `1px solid ${DIVIDER}`, display: "flex", flexDirection: "column", gap: 3, fontSize: 11, whiteSpace: "nowrap" }}>
+  <div style={{ position: "absolute", left: RIGHT_X, top: BODY_Y, width: RIGHT_W, height: WHAT_H, boxSizing: "border-box", padding: "9px 14px", borderBottom: `1px solid ${DIVIDER}`, display: "flex", flexDirection: "column", gap: 2, fontSize: 12, whiteSpace: "nowrap" }}>
     <span style={{ color: TEXT_2 }}>
-      … › section.hero › <b style={{ color: TEXT }}>{name}</b>
+      … › div.fl-container › <b style={{ color: TEXT }}>{name}</b>
     </span>
     <span style={{ color: TEXT_2 }}>Hero.svelte:14 · Copy for agent · Comment</span>
-    <span style={{ color: TEXT_3, fontFamily: CODE, fontSize: 10 }}>title font-serif text-[64px]</span>
+    <span style={{ color: TEXT_3, fontFamily: CODE, fontSize: 11 }}>title font-display text-[64px]</span>
   </div>
 );
 
@@ -570,16 +611,16 @@ const Properties = ({ state }: { state: EditorState }) => {
   return (
     <div style={{ opacity: 0.25 + 0.75 * shown }}>
       <What name={state.mesh ? "div.mesh" : "h1.title"} />
-      <span style={{ position: "absolute", left: RIGHT_X + SIDE_PAD, top: BODY_Y + WHAT_H + 8, height: EDITING_H - 12, display: "flex", alignItems: "center", gap: 4, padding: "0 6px", border: `1px solid ${ACCENT}`, borderRadius: 3, color: LINK, fontSize: 11, fontWeight: 600 }}>
-        editing: auto · 1140px
+      <span style={{ position: "absolute", left: RIGHT_X + SIDE_PAD, top: BODY_Y + WHAT_H + 8, height: EDITING_H - 12, display: "flex", alignItems: "center", gap: 4, padding: "0 6px", border: "1px solid #9a9a9a", background: "#f0f0f0", borderRadius: 3, color: ACCENT, fontSize: 12.5, fontWeight: 700 }}>
+        editing: auto · 720px
         <Ico name="chevronDown" size={10} />
       </span>
-      <div style={{ position: "absolute", left: RIGHT_X + SIDE_PAD, top: BODY_Y + WHAT_H + EDITING_H + 4, width: RIGHT_W - 2 * SIDE_PAD, height: SCOPE_H - 8, display: "flex", gap: 2, padding: 2, boxSizing: "border-box", borderRadius: 6, background: INPUT, fontSize: 11 }}>
+      <div style={{ position: "absolute", left: RIGHT_X + SIDE_PAD, top: BODY_Y + WHAT_H + EDITING_H + 4, width: RIGHT_W - 2 * SIDE_PAD, height: SCOPE_H - 8, display: "flex", gap: 2, padding: 2, boxSizing: "border-box", borderRadius: 6, background: INPUT, fontSize: 12.5 }}>
         <span style={{ flex: 1, display: "grid", placeItems: "center", borderRadius: 4, background: THUMB, color: "#fff" }}>This element</span>
-        <span style={{ flex: 1, display: "grid", placeItems: "center", color: TEXT_2 }}>All .title (2)</span>
+        <span style={{ flex: 1, display: "grid", placeItems: "center", color: TEXT_2 }}>All .title (1)</span>
       </div>
       <div style={{ position: "absolute", left: RIGHT_X + SIDE_PAD, top: STATE_Y, width: RIGHT_W - 2 * SIDE_PAD, height: ROW_H, display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={{ width: LABEL_W, flex: "none", color: TEXT_2, fontSize: 11 }}>State</span>
+        <span style={{ width: LABEL_W, flex: "none", color: TEXT_2, fontSize: 12.5 }}>State</span>
         <span style={{ flex: 1, height: 28, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 8px", borderRadius: 4, background: INPUT, fontSize: 12 }}>
           Default
           <Ico name="chevronDown" size={11} />
@@ -587,7 +628,7 @@ const Properties = ({ state }: { state: EditorState }) => {
       </div>
       {sections.map((section) => (
         <div key={section.title}>
-          <div style={{ position: "absolute", left: RIGHT_X, top: section.y, width: RIGHT_W, height: HEAD_H, display: "flex", alignItems: "center", gap: 4, padding: "0 10px 0 6px", boxSizing: "border-box", borderTop: `1px solid ${DIVIDER}`, fontSize: 11, fontWeight: 600, color: TEXT }}>
+          <div style={{ position: "absolute", left: RIGHT_X, top: section.y, width: RIGHT_W, height: HEAD_H, display: "flex", alignItems: "center", gap: 4, padding: "0 10px 0 6px", boxSizing: "border-box", borderTop: `1px solid ${DIVIDER}`, fontSize: 12.5, fontWeight: 600, color: TEXT }}>
             <span style={{ color: TEXT_3, display: "grid" }}>
               <Ico name={section.rows.length ? "chevronDown" : "chevronRight"} size={12} />
             </span>
@@ -599,7 +640,7 @@ const Properties = ({ state }: { state: EditorState }) => {
           </div>
           {section.placed.map((row) => (
             <div key={row.label} style={{ position: "absolute", left: RIGHT_X + SIDE_PAD, top: row.y, width: RIGHT_W - 2 * SIDE_PAD, height: ROW_H, display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ width: LABEL_W, flex: "none", color: TEXT_2, fontSize: 11 }}>{row.label}</span>
+              <span style={{ width: LABEL_W, flex: "none", color: TEXT_2, fontSize: 12.5 }}>{row.label}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <RowControl row={row} state={state} />
               </div>
@@ -670,7 +711,7 @@ const RightBar = ({ state }: { state: EditorState }) => {
         <div style={{ height: TOP_ROW, borderBottom: `1px solid ${DIVIDER}`, boxSizing: "border-box" }} />
       </div>
       {Object.values(Tab).map((tab) => (
-        <span key={tab} style={{ ...box(TABS[tab]), display: "grid", placeItems: "center", borderRadius: 4, fontSize: 12, background: state.tab === tab ? INPUT : "transparent", color: state.tab === tab ? TEXT : TEXT_2 }}>
+        <span key={tab} style={{ ...box(TABS[tab]), display: "grid", placeItems: "center", borderRadius: 5, fontSize: 13, background: state.tab === tab ? INPUT : "transparent", color: state.tab === tab ? TEXT : TEXT_2 }}>
           {tab === Tab.Changes && state.changes > 0 ? `${tab} ${CHANGES.length}` : tab}
         </span>
       ))}

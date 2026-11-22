@@ -14,10 +14,11 @@ export const LAYERS_TOP = BODY_Y + 6;
 
 export const H1_TOP = 120;
 export const H1_LEFT = 40;
-export const H1_W = 470;
+export const H1_W = 560;
+export const H1_X = (PAGE.w - H1_W) / 2;
 export const BASE_FONT = 64;
 
-export const h1Rect = (fontSize: number): Rect => ({ x: PAGE.x + H1_LEFT, y: PAGE.y + H1_TOP, w: H1_W, h: fontSize * 2 });
+export const h1Rect = (fontSize: number): Rect => ({ x: PAGE.x + H1_X, y: PAGE.y + H1_TOP, w: H1_W, h: fontSize * 2 });
 
 export const ACTIONS_GAP = 150;
 export const insertY = (fontSize: number) => PAGE.y + H1_TOP + fontSize * 2 + ACTIONS_GAP;
@@ -53,10 +54,10 @@ export const TEXT_PROPS: PropSection[] = [
   {
     title: "Typography",
     rows: [
-      { label: "Font", control: Control.Select, values: ["Georgia", "Medium 500"] },
-      { label: "Size", control: Control.Triple, values: ["Aa", "64", "px", "↕", "64", "px", "↔", "-3", "%"] },
+      { label: "Font", control: Control.Select, values: ["BDO Grotesk", "Semibold"] },
+      { label: "Size", control: Control.Triple, values: ["Aa", "64", "px", "↕", "64", "px", "↔", "-5", "%"] },
       { label: "Align", control: Control.Segmented, values: ["alignStart", "alignCenter", "alignEnd", "alignJustify"] },
-      { label: "Solid", control: Control.Colour, values: ["#2a1c12"] },
+      { label: "Solid", control: Control.Colour, values: ["#14142b"] },
     ],
   },
   { title: "Radius", rows: [] },

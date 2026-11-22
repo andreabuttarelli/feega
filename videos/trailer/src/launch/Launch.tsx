@@ -9,7 +9,7 @@ import { END_FRAMES, END_TONE, EndCard, LOGO_AT } from "./scenes/EndCard";
 import { FRAMEWORKS_CUES, FRAMEWORKS_FRAMES, FRAMEWORKS_TONE, Frameworks } from "./scenes/Frameworks";
 import { HERO_FRAMES, HERO_TONE, Hero } from "./scenes/Hero";
 import { OPEN_SOURCE_FRAMES, OPEN_SOURCE_TONE, OpenSource, STAR_CLICK } from "./scenes/OpenSource";
-import { DRAG_FROM, PLUGINS_FRAMES, PLUGINS_TONE, Plugins } from "./scenes/Plugins";
+import { PLUGINS_CUES, PLUGINS_FRAMES, PLUGINS_TONE, Plugins } from "./scenes/Plugins";
 import { COLOUR_CLICK, SELECT_CLICK, SELECT_FRAMES, SELECT_TONE, SWATCH_CLICK, Select } from "./scenes/Select";
 import { TEMPLATES_FRAMES, TEMPLATES_TONE, Templates } from "./scenes/Templates";
 import { TONES, Tone, loadFonts } from "./style";
@@ -30,7 +30,7 @@ const SHOTS: Shot[] = [
   { scene: Code, frames: CODE_FRAMES, tone: CODE_TONE, exit: Exit.Cut, cues: [whoosh(0), whoosh(DIFF_IN), ...title(), ...DIFF_TICKS.map((at) => tap(at + 2))] },
   { scene: Templates, frames: TEMPLATES_FRAMES, tone: TEMPLATES_TONE, exit: Exit.Cut, cues: [whoosh(0), ...title()] },
   { scene: Collab, frames: COLLAB_FRAMES, tone: COLLAB_TONE, exit: Exit.Pixels, cues: COLLAB_CUES },
-  { scene: Plugins, frames: PLUGINS_FRAMES, tone: PLUGINS_TONE, exit: Exit.Pixels, cues: [whoosh(4), ...title(), click(DRAG_FROM)] },
+  { scene: Plugins, frames: PLUGINS_FRAMES, tone: PLUGINS_TONE, exit: Exit.Pixels, cues: PLUGINS_CUES },
   { scene: Editors, frames: EDITORS_FRAMES, tone: EDITORS_TONE, exit: Exit.Cut, cues: [whoosh(6), ...EDITORS_CUES] },
   { scene: Frameworks, frames: FRAMEWORKS_FRAMES, tone: FRAMEWORKS_TONE, exit: Exit.Panel, cues: [...FRAMEWORKS_CUES, whoosh(FRAMEWORKS_FRAMES - 22)] },
   { scene: OpenSource, frames: OPEN_SOURCE_FRAMES, tone: OPEN_SOURCE_TONE, exit: Exit.Panel, cues: [...title(), whoosh(22), click(STAR_CLICK)] },
