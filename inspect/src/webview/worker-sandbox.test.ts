@@ -8,7 +8,7 @@ function fakeWorker(): WorkerLike & { posted: unknown[]; terminated: boolean; em
     terminated: false,
     onmessage: null as ((event: { data: unknown }) => void) | null,
     postMessage(message: unknown) {
-      this.posted.push(message);
+      this.posted.push(structuredClone(message));
     },
     terminate() {
       this.terminated = true;
@@ -28,6 +28,14 @@ describe('workerSandbox', () => {
     channel.post({ type: 'signal', signal: 'command' as never, payload: {} });
     expect(factory).toHaveBeenCalledOnce();
     expect(worker.posted).toHaveLength(1);
+  });
+
+  it('sends reactive proxies as plain data, which a worker can clone', () => {
+    const worker = fakeWorker();
+    const channel = workerSandbox({ a: () => worker }, {} as WorkerRuntime)('a', '');
+    const selection = new Proxy({ source: new Proxy({ file: 'a.svelte' }, {}) }, {});
+    channel.post({ type: 'signal', signal: 'selection' as never, payload: { selection } });
+    expect(worker.posted).toEqual([{ type: 'signal', signal: 'selection', payload: { selection: { source: { file: 'a.svelte' } } } }]);
   });
 
   it('passes what the plugin posts to the listener', () => {

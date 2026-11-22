@@ -128,6 +128,22 @@
     accent-color: var(--ui-accent);
   }
 
+  select,
+  .hex {
+    height: 28px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background-color: var(--ui-input);
+    color: var(--ui-text);
+    font: inherit;
+  }
+
+  select {
+    flex: 1;
+    min-width: 0;
+  }
+
   .hex {
     flex: 1;
     min-width: 0;

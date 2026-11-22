@@ -18,7 +18,7 @@ export const workerSandbox =
     const url = factory ? null : runtime.createBlobUrl([LOCKDOWN_SOURCE, '\n', code]);
     const worker = factory ? factory() : runtime.createWorker(url!);
     return {
-      post: (message) => worker.postMessage(message),
+      post: (message) => worker.postMessage(JSON.parse(JSON.stringify(message))),
       listen: (handle) => (worker.onmessage = (event) => handle(event.data as never)),
       close: () => (worker.terminate(), url && runtime.revoke(url))
     };

@@ -23,7 +23,10 @@ const gradient = () => source().match(/background-image:\s*([^;]+);/)?.[1] ?? ''
 reset();
 const panel = await openPanel(APP);
 const { page, frame } = panel;
-const shot = (name: string) => page.screenshot({ path: join(SHOTS, `${name}.png`) });
+const shot = async (name: string) => {
+  await page.locator(PLUGIN).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: join(SHOTS, `${name}.png`) });
+};
 const settle = (ms = 1800) => page.waitForTimeout(ms);
 
 try {
