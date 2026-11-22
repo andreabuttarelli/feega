@@ -19,7 +19,7 @@ import { Category, Framework, Theme, Tier } from './template';
 const STATIC = resolve(import.meta.dirname, '../../../../static');
 const LIBRARY = resolve(import.meta.dirname, '../../../../../packages/library');
 const LIBRARY_SIZE = ['items', 'pro'].flatMap((dir) => readdirSync(resolve(LIBRARY, dir))).length;
-const PRO_ID = 'parallax-gallery';
+const PRO_IDS = readdirSync(resolve(LIBRARY, 'pro'));
 const CATEGORY_WORDS = { min: 150, max: 300 };
 const FRAMEWORK_WORDS = { min: 400, max: 700 };
 
@@ -164,7 +164,7 @@ describe('what each item page says', () => {
   });
 });
 
-describe('a pro item', () => {
+describe.each(PRO_IDS)('the pro item %s', (PRO_ID) => {
   const pro = templateById(PRO_ID)!;
 
   it('is read from the library as pro', () => {
@@ -173,7 +173,7 @@ describe('a pro item', () => {
 
   it('has no live preview page, so its html never ships', () => {
     expect(PREVIEWABLE.map((t) => t.id)).not.toContain(PRO_ID);
-    expect(PREVIEWABLE).toHaveLength(TEMPLATES.length - 1);
+    expect(PREVIEWABLE).toHaveLength(TEMPLATES.length - PRO_IDS.length);
   });
 
   it('has no source to read, not even for the facts', async () => {

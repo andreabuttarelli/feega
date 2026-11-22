@@ -1,10 +1,11 @@
 import { render } from 'svelte/server';
+import { readdirSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import Page from '../../../routes/templates/[id=template]/+page.svelte';
 import { load } from '../../../routes/templates/[id=template]/+page.server';
 
-const PRO_ID = 'parallax-gallery';
-const PRO_SOURCE_MARK = `fl-${PRO_ID}`;
+const PRO_IDS = readdirSync(resolve(import.meta.dirname, '../../../../../packages/library/pro'));
 const CLOUD = 'Included in Feega Cloud';
 
 async function pageOf(id: string) {
@@ -19,7 +20,8 @@ describe('the template page', () => {
     expect(body).toContain('tpl-code');
   });
 
-  it('shows a pro item as a looping video, with no code and no live frame', async () => {
+  it.each(PRO_IDS)('shows the pro item %s as a looping video, with no code and no live frame', async (PRO_ID) => {
+    const PRO_SOURCE_MARK = `fl-${PRO_ID}`;
     const { data, body } = await pageOf(PRO_ID);
     expect(body).not.toContain('<iframe');
     expect(body).not.toContain('tpl-code');
