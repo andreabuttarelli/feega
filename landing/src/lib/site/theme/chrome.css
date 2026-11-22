@@ -187,16 +187,6 @@
     display: none;
   }
 
-  .sx-star {
-    display: none;
-  }
-}
-
-@media (min-width: 1200px) {
-  .sx-star {
-    display: inline-flex;
-  }
-
   .sx-links {
     position: absolute;
     left: 50%;
