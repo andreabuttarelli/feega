@@ -19,7 +19,7 @@ const BINARY = 'base64';
 
 const ORDER: OpKind[] = [OpKind.Style, OpKind.Attributes, OpKind.Dependency, OpKind.Asset, OpKind.Insert];
 
-const PLACES: Record<Place, AddPlace> = { [Place.Child]: AddPlace.Child, [Place.After]: AddPlace.After, [Place.Before]: AddPlace.Before };
+const PLACES: Record<Place, AddPlace> = { [Place.Auto]: AddPlace.Auto, [Place.Child]: AddPlace.Child, [Place.After]: AddPlace.After, [Place.Before]: AddPlace.Before };
 
 const refused = (reason: string): Changes => ({ ok: false, reason });
 

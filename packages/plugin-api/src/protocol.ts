@@ -26,6 +26,7 @@ export enum OpKind {
 }
 
 export enum Place {
+  Auto = 'auto',
   Child = 'child',
   After = 'after',
   Before = 'before'
@@ -53,6 +54,7 @@ export enum Call {
   Propose = 'propose',
   Preview = 'preview',
   Fetch = 'fetch',
+  PickFile = 'pick-file',
   Render = 'render',
   Overlay = 'overlay'
 }
@@ -80,6 +82,8 @@ export type Handle = { id: string; x: number; y: number; color: string; selected
 
 export type Fetched = { status: number; text: string };
 
+export type Picked = { name: string; base64: string };
+
 export type CallArgs = {
   [Call.Selection]: undefined;
   [Call.Project]: undefined;
@@ -87,6 +91,7 @@ export type CallArgs = {
   [Call.Propose]: Proposal;
   [Call.Preview]: { at: string; css: Css | null };
   [Call.Fetch]: { url: string };
+  [Call.PickFile]: { accept: string[] };
   [Call.Render]: { contribution: string; tree: UiNode[] };
   [Call.Overlay]: { contribution: string; handles: Handle[] };
 };
@@ -98,6 +103,7 @@ export type CallResult = {
   [Call.Propose]: Outcome;
   [Call.Preview]: null;
   [Call.Fetch]: Fetched;
+  [Call.PickFile]: Picked | null;
   [Call.Render]: null;
   [Call.Overlay]: null;
 };
@@ -123,7 +129,7 @@ export type Signals = {
   [Signal.Selection]: { selection: Selection | null };
   [Signal.Control]: { contribution: string; id: string; value: string | number | boolean };
   [Signal.Handle]: { contribution: string; id: string; phase: HandlePhase; x: number; y: number };
-  [Signal.Menu]: { item: string; target: Source | null };
+  [Signal.Menu]: { item: string; target: Source | null; place: Place | null };
   [Signal.Command]: { command: string };
   [Signal.Action]: { action: string };
 };

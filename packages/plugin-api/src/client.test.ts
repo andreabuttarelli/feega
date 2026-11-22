@@ -21,7 +21,8 @@ function wire(permissions: string[], contributions: Record<string, unknown>) {
     sourceText: async () => 'text',
     propose: async (p) => (proposals.push(p), { ok: true }),
     preview: () => undefined,
-    fetch: async () => ({ status: 200, text: '' })
+    fetch: async () => ({ status: 200, text: '' }),
+    pickFile: async () => null
   };
   const host = createPluginHost({
     editor,
@@ -97,13 +98,13 @@ describe('plugin api against the host', () => {
   it('runs menu and command handlers', async () => {
     const { api, host } = wire([], {});
     const heard: string[] = [];
-    api.menu.on((item) => heard.push(`menu:${item}`));
+    api.menu.on((item, _target, place) => heard.push(`menu:${item}:${place}`));
     api.command.on((command) => heard.push(`command:${command}`));
     api.action.on((action) => heard.push(`action:${action}`));
-    host.menu('acme.wired', 'cube', null);
+    host.menu('acme.wired', 'cube', null, Place.After);
     host.command('acme.wired', 'go');
     host.action('acme.wired', 'bar');
     await tick();
-    expect(heard).toEqual(['menu:cube', 'command:go', 'action:bar']);
+    expect(heard).toEqual(['menu:cube:after', 'command:go', 'action:bar']);
   });
 });

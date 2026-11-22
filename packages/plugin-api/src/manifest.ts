@@ -16,7 +16,8 @@ export enum Permission {
   EditAttributes = 'edit.attributes',
   EditInsert = 'edit.insert',
   EditDependency = 'edit.dependency',
-  EditAsset = 'edit.asset'
+  EditAsset = 'edit.asset',
+  PickFile = 'file.pick'
 }
 
 export enum Where {

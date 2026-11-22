@@ -39,7 +39,8 @@ function setup(permissions: string[], contributions: Record<string, unknown> = {
     sourceText: async () => 'source',
     propose: async (p): Promise<Outcome> => (proposals.push(p), { ok: true }),
     preview: vi.fn(),
-    fetch: vi.fn(async () => ({ status: 200, text: 'body' }))
+    fetch: vi.fn(async () => ({ status: 200, text: 'body' })),
+    pickFile: vi.fn(async () => ({ name: 'a.glb', base64: 'AA==' }))
   };
   const host = createPluginHost({ sandbox: () => plugin.channel, editor });
   host.load(manifestOf(permissions, contributions), 'code');
@@ -143,6 +144,15 @@ describe('permissions', () => {
     expect(editor.fetch).not.toHaveBeenCalled();
   });
 
+  it('picks a file only with the file permission', async () => {
+    const denied = setup([]);
+    expect(await denied.call(Call.PickFile, { accept: ['.glb'] })).toMatchObject({ ok: false, reason: expect.stringContaining('file.pick') });
+    expect(denied.editor.pickFile).not.toHaveBeenCalled();
+    const allowed = setup(['file.pick']);
+    expect(await allowed.call(Call.PickFile, { accept: ['.glb'] })).toMatchObject({ ok: true, value: { name: 'a.glb' } });
+    expect(allowed.editor.pickFile).toHaveBeenCalledWith(['.glb']);
+  });
+
   it('ignores messages that are not calls', async () => {
     const { plugin } = setup(['selection']);
     plugin.emit({ type: 'call', id: 'x', call: Call.Selection });
@@ -195,7 +205,7 @@ describe('signals to the plugin', () => {
     const { host, plugin } = setup([]);
     host.control('acme.test', 'main', 'size', 4);
     host.handle('acme.test', 'ov', 'p1', HandlePhase.Move, 0.2, 0.3);
-    host.menu('acme.test', 'item', null);
+    host.menu('acme.test', 'item', null, Place.After);
     host.command('acme.test', 'go');
     expect(plugin.sent.map((m) => (m.type === 'signal' ? m.signal : null))).toEqual([Signal.Control, Signal.Handle, Signal.Menu, Signal.Command]);
   });

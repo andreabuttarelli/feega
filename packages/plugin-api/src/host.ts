@@ -12,6 +12,8 @@ import {
   type HandlePhase,
   type HostMessage,
   type Outcome,
+  type Picked,
+  type Place,
   type PluginMessage,
   type ProjectInfo,
   type Proposal,
@@ -31,6 +33,7 @@ export type EditorPort = {
   propose: (proposal: Proposal) => Promise<Outcome>;
   preview: (at: string, css: Css | null) => void;
   fetch: (url: string) => Promise<Fetched>;
+  pickFile: (accept: string[]) => Promise<Picked | null>;
 };
 
 export type Contributed = { plugin: string; entry: Contribution };
@@ -83,6 +86,7 @@ const HANDLERS: { [K in Call]: Handler<K> } = {
   [Call.Propose]: propose,
   [Call.Preview]: ({ editor }, args) => (editor.preview(args.at, args.css), null),
   [Call.Fetch]: fetched,
+  [Call.PickFile]: ({ editor }, args) => editor.pickFile(args.accept),
   [Call.Render]: ({ plugin, changed }, args) => remember(plugin.ui, plugin.manifest, Point.RightBar, args.contribution, args.tree, changed),
   [Call.Overlay]: ({ plugin, changed }, args) => remember(plugin.handles, plugin.manifest, Point.Overlay, args.contribution, args.handles, changed)
 };
@@ -146,7 +150,7 @@ export function createPluginHost(deps: { sandbox: Sandbox; editor: EditorPort })
     selectionChanged: (selection: Selection | null) => plugins.forEach((p) => !missing(p.manifest, CALL_PERMISSION[Call.Selection]) && signal(p, Signal.Selection, { selection })),
     control: (plugin: string, contribution: string, id: string, value: string | number | boolean) => signal(plugins.get(plugin), Signal.Control, { contribution, id, value }),
     handle: (plugin: string, contribution: string, id: string, phase: HandlePhase, x: number, y: number) => signal(plugins.get(plugin), Signal.Handle, { contribution, id, phase, x, y }),
-    menu: (plugin: string, item: string, target: Source | null) => signal(plugins.get(plugin), Signal.Menu, { item, target }),
+    menu: (plugin: string, item: string, target: Source | null, place: Place | null = null) => signal(plugins.get(plugin), Signal.Menu, { item, target, place }),
     command: (plugin: string, command: string) => signal(plugins.get(plugin), Signal.Command, { command }),
     action: (plugin: string, action: string) => signal(plugins.get(plugin), Signal.Action, { action })
   };
