@@ -34,6 +34,7 @@ export type EditorPort = {
   preview: (at: string, css: Css | null) => void;
   fetch: (url: string) => Promise<Fetched>;
   pickFile: (accept: string[]) => Promise<Picked | null>;
+  notify: (text: string) => void;
 };
 
 export type Contributed = { plugin: string; entry: Contribution };
@@ -87,6 +88,7 @@ const HANDLERS: { [K in Call]: Handler<K> } = {
   [Call.Preview]: ({ editor }, args) => (editor.preview(args.at, args.css), null),
   [Call.Fetch]: fetched,
   [Call.PickFile]: ({ editor }, args) => editor.pickFile(args.accept),
+  [Call.Notify]: ({ editor }, args) => (editor.notify(args.text), null),
   [Call.Render]: ({ plugin, changed }, args) => remember(plugin.ui, plugin.manifest, Point.RightBar, args.contribution, args.tree, changed),
   [Call.Overlay]: ({ plugin, changed }, args) => remember(plugin.handles, plugin.manifest, Point.Overlay, args.contribution, args.handles, changed)
 };

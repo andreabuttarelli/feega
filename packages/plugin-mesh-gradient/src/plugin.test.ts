@@ -29,7 +29,8 @@ function load(initial: Selection | null) {
     propose: async (p) => (proposals.push(p), { ok: true }),
     preview: (at, css) => previews.push({ at, css }),
     fetch: async () => ({ status: 200, text: '' }),
-    pickFile: async () => null
+    pickFile: async () => null,
+    notify: () => undefined
   };
   const host = createPluginHost({
     editor,

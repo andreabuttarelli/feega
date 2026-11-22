@@ -1,0 +1,11 @@
+{
+  "name": "@feega/plugin-object-3d",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    "./manifest": "./feega-plugin.json",
+    "./worker": "./src/worker.ts",
+    "./*": "./src/*.ts"
+  }
+}

@@ -9,6 +9,7 @@ export const CALL_PERMISSION: Record<Call, Permission | null> = {
   [Call.Preview]: Permission.EditStyle,
   [Call.Fetch]: null,
   [Call.PickFile]: Permission.PickFile,
+  [Call.Notify]: null,
   [Call.Render]: null,
   [Call.Overlay]: null
 };

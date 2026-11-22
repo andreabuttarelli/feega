@@ -40,7 +40,8 @@ function setup(permissions: string[], contributions: Record<string, unknown> = {
     propose: async (p): Promise<Outcome> => (proposals.push(p), { ok: true }),
     preview: vi.fn(),
     fetch: vi.fn(async () => ({ status: 200, text: 'body' })),
-    pickFile: vi.fn(async () => ({ name: 'a.glb', base64: 'AA==' }))
+    pickFile: vi.fn(async () => ({ name: 'a.glb', base64: 'AA==' })),
+    notify: vi.fn()
   };
   const host = createPluginHost({ sandbox: () => plugin.channel, editor });
   host.load(manifestOf(permissions, contributions), 'code');
@@ -151,6 +152,12 @@ describe('permissions', () => {
     const allowed = setup(['file.pick']);
     expect(await allowed.call(Call.PickFile, { accept: ['.glb'] })).toMatchObject({ ok: true, value: { name: 'a.glb' } });
     expect(allowed.editor.pickFile).toHaveBeenCalledWith(['.glb']);
+  });
+
+  it('lets any plugin show a notice', async () => {
+    const { call, editor } = setup([]);
+    expect(await call(Call.Notify, { text: 'hello' })).toMatchObject({ ok: true });
+    expect(editor.notify).toHaveBeenCalledWith('hello');
   });
 
   it('ignores messages that are not calls', async () => {

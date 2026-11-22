@@ -59,13 +59,19 @@ export function createApi(port: Port) {
   return {
     selection: {
       get: (): Promise<Selection | null> => call(Call.Selection),
-      on: (listener: (selection: Selection | null) => void) => on(Signal.Selection, (p) => listener(p.selection))
+      on: (listener: (selection: Selection | null) => void) => on(Signal.Selection, (p) => listener(p.selection)),
+      watch: (listener: (selection: Selection | null) => void) => {
+        let changed = false;
+        on(Signal.Selection, (p) => ((changed = true), listener(p.selection)));
+        void call(Call.Selection).then((current) => !changed && listener(current));
+      }
     },
     project: { info: (): Promise<ProjectInfo> => call(Call.Project) },
     source: { text: (): Promise<string | null> => call(Call.SourceText) },
     propose: (label: string, ops: Op[]): Promise<Outcome> => call(Call.Propose, { label, ops }),
     preview: (at: string, css: Css | null): Promise<null> => call(Call.Preview, { at, css }),
     fetch: (url: string): Promise<Fetched> => call(Call.Fetch, { url }),
+    notify: (text: string): Promise<null> => call(Call.Notify, { text }),
     pickFile: (accept: string[]): Promise<Picked | null> => call(Call.PickFile, { accept }),
     section: (contribution: string) => ({
       render: (tree: UiNode[]) => call(Call.Render, { contribution, tree }),

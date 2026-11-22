@@ -55,6 +55,7 @@ export enum Call {
   Preview = 'preview',
   Fetch = 'fetch',
   PickFile = 'pick-file',
+  Notify = 'notify',
   Render = 'render',
   Overlay = 'overlay'
 }
@@ -92,6 +93,7 @@ export type CallArgs = {
   [Call.Preview]: { at: string; css: Css | null };
   [Call.Fetch]: { url: string };
   [Call.PickFile]: { accept: string[] };
+  [Call.Notify]: { text: string };
   [Call.Render]: { contribution: string; tree: UiNode[] };
   [Call.Overlay]: { contribution: string; handles: Handle[] };
 };
@@ -104,6 +106,7 @@ export type CallResult = {
   [Call.Preview]: null;
   [Call.Fetch]: Fetched;
   [Call.PickFile]: Picked | null;
+  [Call.Notify]: null;
   [Call.Render]: null;
   [Call.Overlay]: null;
 };

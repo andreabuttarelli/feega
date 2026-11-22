@@ -22,7 +22,8 @@ function wire(permissions: string[], contributions: Record<string, unknown>) {
     propose: async (p) => (proposals.push(p), { ok: true }),
     preview: () => undefined,
     fetch: async () => ({ status: 200, text: '' }),
-    pickFile: async () => null
+    pickFile: async () => null,
+    notify: () => undefined
   };
   const host = createPluginHost({
     editor,
@@ -68,6 +69,20 @@ describe('plugin api against the host', () => {
     host.selectionChanged(null);
     await tick();
     expect(seen).toEqual([SELECTION, null]);
+  });
+
+  it('watches the selection: the current one first, then changes, never the stale read over a newer change', async () => {
+    const { api, host } = wire(['selection'], {});
+    const seen: (Selection | null)[] = [];
+    api.selection.watch((s) => seen.push(s));
+    host.selectionChanged(null);
+    await tick();
+    expect(seen).toEqual([null]);
+    const later = wire(['selection'], {});
+    const first: (Selection | null)[] = [];
+    later.api.selection.watch((s) => first.push(s));
+    await tick();
+    expect(first).toEqual([SELECTION]);
   });
 
   it('renders a section and receives its control events', async () => {

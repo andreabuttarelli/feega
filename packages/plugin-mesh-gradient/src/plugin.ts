@@ -89,6 +89,5 @@ export function meshPlugin(api: PluginApi, rng: () => number = Math.random) {
     await handlers[phase]();
   });
 
-  api.selection.on(pick);
-  api.selection.get().then(pick);
+  api.selection.watch(pick);
 }
