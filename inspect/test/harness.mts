@@ -49,7 +49,7 @@ export async function openPanel(appRoot: string, theme = DARK, cloud?: CommentsC
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 });
   if (process.env.PROBE) {
-    page.on('console', (m) => console.log('console', m.text().slice(0, 160)));
+    page.on('console', (m) => console.log('console', m.text().slice(0, 800)));
     page.on('pageerror', (e) => console.log('pageerror', e.message));
   }
   const reply = (m: unknown) => page.evaluate((msg) => window.postMessage(msg, '*'), m);

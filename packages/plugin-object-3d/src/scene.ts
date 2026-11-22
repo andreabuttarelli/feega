@@ -2,7 +2,7 @@ import { Framework } from '@feega/plugin-api/protocol';
 
 export const COMPONENT_NAME = 'Scene3D';
 export const SCENE_DIR = 'src/feega';
-export const RUNTIME_FILE = `${SCENE_DIR}/scene3d.ts`;
+export const RUNTIME_FILE = `${SCENE_DIR}/mount-scene.ts`;
 export const SCENE_MARKER = 'data-feega-scene';
 
 export type Scene = { shape: string; material: string; lights: string; autorotate: string; follow: string; color: string; text: string; model: string; font: string; height: string };
@@ -49,7 +49,7 @@ const defaultsObject = (quote: string) => `{ ${PROPS.map((prop) => `${prop}: ${q
 
 const svelte = () => `<script>
   import { onMount } from 'svelte';
-  import { mountScene } from './scene3d';
+  import { mountScene } from './mount-scene';
 
   let { ${PROPS.map((prop) => `${prop} = '${DEFAULT_SCENE[prop]}'`).join(', ')} } = $props();
 
@@ -74,7 +74,7 @@ const svelte = () => `<script>
 
 const vue = (typescript: boolean) => `<script setup${typescript ? ' lang="ts"' : ''}>
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { mountScene } from './scene3d';
+import { mountScene } from './mount-scene';
 
 const props = defineProps({
 ${PROPS.map((prop) => `  ${prop}: { type: String, default: '${DEFAULT_SCENE[prop]}' }`).join(',\n')}
@@ -104,7 +104,7 @@ const { ${PROPS.map((prop) => `${prop} = '${DEFAULT_SCENE[prop]}'`).join(', ')} 
 <div class="feega-scene" ${dataAstro} style={'${FILL}' + (height ? 'height:' + height + 'px' : 'aspect-ratio:${RATIO}')}></div>
 
 <script>
-  import { mountScene } from './scene3d';
+  import { mountScene } from './mount-scene';
 
   document.querySelectorAll<HTMLElement>('[${SCENE_MARKER}]').forEach((host) => {
     if (host.dataset.mounted) {
@@ -124,7 +124,7 @@ ${PROPS.filter((prop) => prop !== 'shape')
 const react = (typescript: boolean) => `'use client';
 
 import { useEffect, useRef } from 'react';
-import { mountScene${typescript ? ', type SceneOptions' : ''} } from './scene3d';
+import { mountScene${typescript ? ', type SceneOptions' : ''} } from './mount-scene';
 
 const DEFAULTS${typescript ? ': SceneOptions' : ''} = ${defaultsObject("'")};
 

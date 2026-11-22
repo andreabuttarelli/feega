@@ -1,7 +1,7 @@
 import type { PluginApi } from '@feega/plugin-api/client';
 import { Control, Framework, OpKind, Place, frameworkOf, type Op, type ProjectInfo, type Selection, type Source, type UiNode } from '@feega/plugin-api/protocol';
 import fontSource from './runtime/helvetiker_bold.typeface.json?raw';
-import runtimeSource from './runtime/scene3d.ts?raw';
+import runtimeSource from './runtime/mount-scene.ts?raw';
 import { COMPONENT_NAME, DEFAULT_SCENE, RUNTIME_FILE, attributeText, componentFor, sceneOf, type Scene } from './scene';
 
 export const SECTION = 'scene';

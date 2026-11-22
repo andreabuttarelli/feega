@@ -31,19 +31,21 @@ a mesh gradient in this form, the section reads it back.
 
 One undoable step:
 
-- adds the `three` package to `package.json` (and `@types/three` in TypeScript projects). Install
-  dependencies afterwards;
+- adds the `three` package to `package.json` (and `@types/three` in TypeScript projects). Feega
+  then offers **Install now**, which runs your package manager (npm, pnpm, yarn or bun, from your
+  lockfile). Astro restarts its dev server after a `package.json` change: reload the page;
 - writes `src/feega/Scene3D` (`.svelte`, `.vue`, `.astro`, `.tsx` or `.jsx`, matching the file you
-  add it to) and `src/feega/scene3d.ts`, the three.js code;
+  add it to) and `src/feega/mount-scene.ts`, the three.js code;
 - imports the component and places it in the selected element;
 - for a model, copies the file to `public/feega/models/` (`static/` in SvelteKit apps);
-- for 3D text, downloads a font from `cdn.jsdelivr.net` into `public/feega/fonts/`.
+- for 3D text, copies a bundled font to `public/feega/fonts/`. No network needed.
 
 Select the scene to edit it in **Properties**: **Material** (glass, metal, matte), **Lights**
-(studio, soft, dramatic), **Auto-rotate**, **Mouse follow** and **Colour**. These are written as
+(studio, soft, dramatic), **Auto-rotate**, **Mouse follow**, **Height** and **Colour**. These are written as
 attributes on the component tag. Models keep their own materials.
 
-Svelte projects that force runes mode need the component rewritten by hand: it uses `export let`.
+The scene is 16:9 and fills the width until you set a **Height** (0 means automatic). The Svelte
+component uses runes, so it needs Svelte 5.
 
 ## Safety
 
@@ -55,7 +57,7 @@ access of their own. A plugin can only:
 - propose edits (`edit.style`, `edit.attributes`, `edit.insert`, `edit.dependency`,
   `edit.asset`). A proposal with one operation the manifest does not allow is refused whole;
 - ask for a file with the system dialog (`file.pick`);
-- fetch from hosts it lists as `network:<host>`.
+- fetch from hosts it lists as `network:<host>` (neither built-in plugin does).
 
 ## Where plugins appear
 

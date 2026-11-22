@@ -52,7 +52,7 @@ describe('componentFor', () => {
   it.each(Object.values(Framework))('%s mounts the runtime and shows the data attributes the plugin reads back', (framework) => {
     const { source } = componentFor(framework, true);
     expect(source).toContain('mountScene');
-    expect(source).toContain('./scene3d');
+    expect(source).toContain('./mount-scene');
     expect(source).toContain('data-feega-scene');
     for (const attribute of ['data-material', 'data-lights', 'data-autorotate', 'data-follow', 'data-color']) {
       expect(source).toContain(attribute);
@@ -69,8 +69,13 @@ describe('componentFor', () => {
     expect(componentFor(Framework.Vue, true).source).toContain('lang="ts"');
   });
 
+  it('never names the runtime like the component, which a case-insensitive disk would confuse', () => {
+    const runtime = RUNTIME_FILE.split('/').pop()!.replace(/\.[^.]+$/, '').toLowerCase();
+    expect(runtime).not.toBe(COMPONENT_NAME.toLowerCase());
+  });
+
   it('names the runtime file next to the component', () => {
-    expect(RUNTIME_FILE).toBe(`${SCENE_DIR}/scene3d.ts`);
+    expect(RUNTIME_FILE).toBe(`${SCENE_DIR}/mount-scene.ts`);
   });
 
   it('uses runes in the svelte component, which also runs in runes-mode projects', () => {
