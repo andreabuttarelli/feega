@@ -1,6 +1,6 @@
 import type { Db } from '$lib/server/db/client';
 import type { Database } from '$lib/database.types';
-import { modeOf, ProjectMode } from '$lib/project-mode';
+import { modeOf, type ProjectMode } from '$lib/project-mode';
 
 type ProjectRow = Database['public']['Tables']['projects']['Row'];
 
@@ -41,89 +41,4 @@ export async function listProjects(db: Db, orgId: string): Promise<Project[]> {
   }
 
   return (data ?? []).map((row) => toProject(row, row.last_edited_at));
-}
-
-export async function findProjectBySlug(
-  db: Db,
-  input: { orgId: string; slug: string }
-): Promise<Project | null> {
-  const { data, error } = await db
-    .from('projects')
-    .select(PROJECT_COLUMNS)
-    .eq('org_id', input.orgId)
-    .eq('slug', input.slug)
-    .maybeSingle();
-
-  if (error) {
-    throw error;
-  }
-  return data ? toProject(data) : null;
-}
-
-export async function findProjectById(
-  db: Db,
-  input: { orgId: string; projectId: string }
-): Promise<Project | null> {
-  const { data, error } = await db
-    .from('projects')
-    .select(PROJECT_COLUMNS)
-    .eq('org_id', input.orgId)
-    .eq('id', input.projectId)
-    .maybeSingle();
-
-  if (error) {
-    throw error;
-  }
-  return data ? toProject(data) : null;
-}
-
-export async function createProject(
-  db: Db,
-  input: { orgId: string; name: string; slug: string; mode?: ProjectMode }
-): Promise<Project> {
-  const { data, error } = await db
-    .from('projects')
-    .insert({
-      org_id: input.orgId,
-      name: input.name,
-      slug: input.slug,
-      mode: input.mode ?? ProjectMode.Standard
-    })
-    .select(PROJECT_COLUMNS)
-    .single();
-
-  if (error) {
-    throw error;
-  }
-  return toProject(data);
-}
-
-export async function renameProject(
-  db: Db,
-  input: { orgId: string; projectId: string; name: string }
-): Promise<void> {
-  const { error } = await db
-    .from('projects')
-    .update({ name: input.name, updated_at: new Date().toISOString() })
-    .eq('id', input.projectId)
-    .eq('org_id', input.orgId);
-
-  if (error) {
-    throw error;
-  }
-}
-
-export async function archiveProject(
-  db: Db,
-  input: { orgId: string; projectId: string }
-): Promise<void> {
-  const { error } = await db
-    .from('projects')
-    .update({ archived_at: new Date().toISOString() })
-    .eq('id', input.projectId)
-    .eq('org_id', input.orgId);
-
-  if (error) {
-    throw error;
-  }
 }
