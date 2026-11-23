@@ -30,8 +30,8 @@ describe('editor guide', () => {
   describe('section', () => {
     const { body } = render(EditorGuide);
 
-    it('draws every feature as a mockup, twice: inline and sticky', () => {
-      GUIDE_FEATURES.forEach((feature) => expect(body.split(`data-mock-for="${feature.id}"`), feature.id).toHaveLength(3));
+    it('draws every feature as exactly one mockup', () => {
+      GUIDE_FEATURES.forEach((feature) => expect(body.split(`data-mock-for="${feature.id}"`), feature.id).toHaveLength(2));
     });
 
     it('uses no images', () => {
@@ -44,8 +44,11 @@ describe('editor guide', () => {
     });
 
     it('hides the mockups from assistive tech', () => {
-      expect(body).toMatch(/class="stage[^"]*" aria-hidden="true"/);
       expect(body.match(/class="box[^"]*" aria-hidden="true"/g)).toHaveLength(GUIDE_FEATURES.length);
+    });
+
+    it('has no sticky stage', () => {
+      expect(body).not.toContain('class="stage');
     });
 
     it('uses no tab roles', () => {

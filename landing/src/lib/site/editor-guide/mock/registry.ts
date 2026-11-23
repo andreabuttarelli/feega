@@ -17,12 +17,12 @@ export type MockEntry = {
 const PANEL_ZOOM = { desktop: 1.8, phone: 1.25 } as const;
 
 export const MOCKS: Readonly<Record<GuideId, MockEntry>> = {
-  [GuideId.States]: { component: PropertiesMock, props: {}, anchor: Anchor.Focus, focus: { x: 150, y: 316 }, zoom: PANEL_ZOOM },
+  [GuideId.States]: { component: PropertiesMock, props: {}, anchor: Anchor.Focus, focus: { x: 150, y: 349 }, zoom: PANEL_ZOOM },
   [GuideId.Breakpoints]: { component: PropertiesMock, props: {}, anchor: Anchor.Focus, focus: { x: 110, y: 222 }, zoom: PANEL_ZOOM },
   [GuideId.Shared]: { component: PropertiesMock, props: {}, anchor: Anchor.Focus, focus: { x: 150, y: 205 }, zoom: PANEL_ZOOM },
-  [GuideId.Snap]: { component: PropertiesMock, props: {}, anchor: Anchor.Focus, focus: { x: 150, y: 435 }, zoom: PANEL_ZOOM },
+  [GuideId.Snap]: { component: PropertiesMock, props: {}, anchor: Anchor.Focus, focus: { x: 150, y: 476 }, zoom: PANEL_ZOOM },
   [GuideId.Themes]: { component: ThemesMock, props: {}, anchor: Anchor.TopRight, focus: { x: 0, y: 0 }, zoom: { desktop: 1.15, phone: 0.9 } },
   [GuideId.Attributes]: { component: PropertiesMock, props: { subject: Subject.Image }, anchor: Anchor.Focus, focus: { x: 150, y: 980 }, zoom: PANEL_ZOOM },
-  [GuideId.Library]: { component: LibraryMock, props: {}, anchor: Anchor.Focus, focus: { x: 130, y: 200 }, zoom: { desktop: 1.6, phone: 1.2 } },
+  [GuideId.Library]: { component: LibraryMock, props: {}, anchor: Anchor.Focus, focus: { x: 130, y: 186 }, zoom: { desktop: 1.6, phone: 1.2 } },
   [GuideId.Changes]: { component: ChangesMock, props: {}, anchor: Anchor.Focus, focus: { x: 150, y: 100 }, zoom: PANEL_ZOOM }
 };

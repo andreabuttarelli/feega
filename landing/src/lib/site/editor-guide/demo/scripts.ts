@@ -83,7 +83,7 @@ export const SCRIPTS: Readonly<Record<GuideId, Script>> = {
   },
   [GuideId.Shared]: {
     duration: 6200,
-    poster: 3600,
+    poster: 1900,
     rest: { target: Target.ScopeAll, dx: 0, dy: 0 },
     initial: { [Key.Scope]: SCOPE_SOLO, [Key.Chip]: OFF },
     steps: [
