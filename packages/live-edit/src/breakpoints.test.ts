@@ -49,6 +49,15 @@ describe('readBreakpoints', () => {
     expect(readBreakpoints({ tailwindConfig: null, sheets: [sheet] }).direction).toBe(Direction.DesktopFirst);
   });
 
+  it('keeps the named defaults of a Tailwind v4 project that only has its own media queries', () => {
+    const sheet = '@import "tailwindcss";\n@media (max-width: 720px) {}';
+    expect(readBreakpoints({ tailwindConfig: null, sheets: [sheet] })).toEqual(DEFAULT_BREAKPOINTS);
+  });
+
+  it('keeps the named defaults of a Tailwind v3 project without screens', () => {
+    expect(readBreakpoints({ tailwindConfig: 'module.exports = {}', sheets: ['@media (max-width: 720px) {}'] })).toEqual(DEFAULT_BREAKPOINTS);
+  });
+
   it('ignores media queries when tailwind breakpoints exist', () => {
     const sheet = '@theme { --breakpoint-md: 48rem; }\n@media (max-width: 500px) {}';
     expect(readBreakpoints({ tailwindConfig: null, sheets: [sheet] }).direction).toBe(Direction.MobileFirst);
@@ -88,6 +97,16 @@ describe('targetOf', () => {
     expect(targetOf(desk, 'md')).toEqual({ variant: 'max-md', media: '(max-width: 768px)' });
   });
 
+  it('writes an arbitrary width as a bracketed variant, desktop-first', () => {
+    const desk = { direction: Direction.DesktopFirst, points: [{ name: '720px', px: 720 }] };
+    expect(targetOf(desk, '720px')).toEqual({ variant: 'max-[720px]', media: '(max-width: 720px)' });
+  });
+
+  it('writes an arbitrary width as a bracketed variant, mobile-first', () => {
+    const up = { direction: Direction.MobileFirst, points: [{ name: '720px', px: 720 }] };
+    expect(targetOf(up, '720px')).toEqual({ variant: 'min-[720px]', media: '(min-width: 720px)' });
+  });
+
   it('refuses an unknown breakpoint', () => {
     expect(targetOf(DEFAULT_BREAKPOINTS, 'huge')).toBeNull();
   });
@@ -95,6 +114,11 @@ describe('targetOf', () => {
 
 describe('overriddenAt', () => {
   const owns = (utility: string) => utility.startsWith('p-');
+
+  it('finds a bracketed arbitrary width', () => {
+    const up = { direction: Direction.MobileFirst, points: [{ name: '720px', px: 720 }] };
+    expect(overriddenAt(up, 'p-2 min-[720px]:p-4', owns)).toEqual(['720px']);
+  });
 
   it('lists the breakpoints that override the property', () => {
     expect(overriddenAt(DEFAULT_BREAKPOINTS, 'p-2 md:p-4 lg:p-8 md:flex', owns)).toEqual(['md', 'lg']);
