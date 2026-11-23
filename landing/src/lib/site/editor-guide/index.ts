@@ -2,6 +2,7 @@ export enum GuideId {
   States = 'states',
   Breakpoints = 'breakpoints',
   Shared = 'shared',
+  Snap = 'snap',
   Themes = 'themes',
   Attributes = 'attributes',
   Library = 'library',
@@ -52,12 +53,22 @@ export const GUIDE_FEATURES: readonly GuideFeature[] = [
   {
     id: GuideId.Shared,
     title: 'Shared components',
-    text: 'This element ×3 edits the component, so all three instances change. Detach copies it to change one usage only.',
+    text: 'This element ×3 edits the component, so all three instances change. Detach, here or in the Layers right-click menu, copies it to change one usage only.',
     lands: ['Button.jsx', '<ButtonHome />'],
     src: `${DIR}/scope.webp`,
     width: 600,
     height: 240,
     alt: 'The scope toggle of the Feega editor on a button used three times: This element ×3 selected, and a bar reading Edits 3 instances with Detach, Dismiss and Don’t show again'
+  },
+  {
+    id: GuideId.Snap,
+    title: 'Snap to your theme',
+    text: 'On Tailwind projects, spacing, size, radius and font size snap to your theme steps. Hold Alt for an exact value. An orange dot marks an off-theme value and applies the nearest step.',
+    lands: ['p-[13px] → p-3'],
+    src: `${DIR}/snap.webp`,
+    width: 598,
+    height: 226,
+    alt: 'The Spacing section of the Feega Properties bar with a padding of 13 px and an orange dot marking it as off the Tailwind theme'
   },
   {
     id: GuideId.Themes,
