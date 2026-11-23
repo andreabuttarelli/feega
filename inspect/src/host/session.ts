@@ -26,7 +26,8 @@ import { Stored, type Platform } from './platform';
 import { stylingOf } from './styling';
 import { breakpointsOf } from './breakpoints';
 import { themesOf } from './themes';
-import { usageSession } from './usage';
+import { EditKind, usageSession } from './usage';
+import { editKindOf } from './edit-kind';
 import { selectionSync } from './selection-sync';
 import { wiringOf } from './wiring';
 import { INCLUDED_IN_CLOUD, entriesOf, insertAskOf } from './library';
@@ -74,7 +75,9 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   const editsAt = (dir: string) => fileEdits(dir, stylingChoice, platform.stored<Snapshot>(Stored.History));
   let edits = editsAt(root);
   const post = (message: ViewMessage) => platform.send(message);
-  const usage = platform.usage ? usageSession(platform.usage) : null;
+  let signedIn = false;
+  let editKind = EditKind.Other;
+  const usage = platform.usage ? usageSession({ ...platform.usage, facts: () => ({ framework: running?.plan.framework ?? null, signedIn }) }) : null;
   usage?.begin();
 
   async function postSettings() {
@@ -90,7 +93,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
 
   async function edited(out: Written, ask: EditAsk | null, replay = Replay.Fresh) {
     if (out.ok) {
-      usage?.edit();
+      usage?.edit(editKind);
     }
     await postHistory();
     const saved = ask ? (liveAtOf(ask.at) ?? undefined) : undefined;
@@ -210,7 +213,10 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   const comments = commentsHost(platform.cloud, post);
   const sharing = shareSession({ platform, workspace, appUrl: () => running?.url ?? null, post });
 
-  const postAccount = (state: AccountState, email?: string) => post({ kind: ToView.Account, state, email });
+  const postAccount = (state: AccountState, email?: string) => {
+    signedIn = state === AccountState.SignedIn;
+    return post({ kind: ToView.Account, state, email });
+  };
 
   async function showAccount() {
     const account = await platform.account.read();
@@ -558,10 +564,17 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.Plugin]: async (m) => post({ kind: ToView.Plugin, id: m.id, result: await pluginRun(m.ask) }),
     [ToHost.PluginEnable]: (m) => pluginList?.enable(m.id, m.enabled),
     [ToHost.PluginRemove]: (m) => pluginList?.remove(m.id),
-    [ToHost.PluginInstall]: (m) => pluginList?.install(m.source)
+    [ToHost.PluginInstall]: (m) => pluginList?.install(m.source),
+    [ToHost.PreviewReady]: () => usage?.previewReady()
   };
 
-  platform.receive((message) => (handlers[message.kind] as (m: HostMessage) => unknown)(message));
+  platform.receive((message) => {
+    const kind = editKindOf(message);
+    if (kind !== EditKind.Other) {
+      editKind = kind;
+    }
+    return (handlers[message.kind] as (m: HostMessage) => unknown)(message);
+  });
 
   function pick(x: number, y: number): Promise<Pick | null> {
     const id = ++nextPick;

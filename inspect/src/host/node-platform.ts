@@ -12,7 +12,7 @@ import { openTarget } from './open-source';
 import type { Platform, Stored, Transport } from './platform';
 import type { PluginsHost } from './plugins-session';
 import { HintSurface, nodeSkillHint } from './skill-hint';
-import { Device, Editor, fileInstallStore, installIdOf, nodeUsageEnabled, type InstallStore } from './usage';
+import { Device, Editor, fileFirstEdit, fileInstallStore, installIdOf, nodeUsageEnabled, type FirstEditFlag, type InstallStore } from './usage';
 
 const FEEGA_DIR = '.feega';
 const SETTINGS_FILE = 'settings.json';
@@ -24,7 +24,7 @@ const LINUX_OPENER = ['xdg-open'];
 
 export type Launch = (command: string, args: string[]) => Promise<boolean>;
 
-export type NodeHost = { root: string; launcher: string; version: string; transport: Transport; print: (line: string) => void; launch?: Launch; env?: NodeJS.ProcessEnv; account?: AccountStore; onboarding?: OnboardingStore; install?: InstallStore; cloud?: Platform['cloud']; share?: Platform['share']; plugins?: PluginsHost };
+export type NodeHost = { root: string; launcher: string; version: string; transport: Transport; print: (line: string) => void; launch?: Launch; env?: NodeJS.ProcessEnv; account?: AccountStore; onboarding?: OnboardingStore; install?: InstallStore; firstEdit?: FirstEditFlag; cloud?: Platform['cloud']; share?: Platform['share']; plugins?: PluginsHost };
 
 export const launchDetached: Launch = (command, args) =>
   new Promise((resolve) => {
@@ -46,7 +46,7 @@ const stateDirFor = (root: string, env: NodeJS.ProcessEnv) => {
   return join(env.XDG_CACHE_HOME || join(homedir(), '.cache'), CACHE_DIR, key);
 };
 
-export function nodePlatform({ root, launcher, version, transport, print, launch = launchDetached, env = process.env, account = fileAccountStore(), onboarding = fileOnboardingStore(), install = fileInstallStore(), cloud, share, plugins = { root: pluginsRoot(), dev: () => [] } }: NodeHost): Platform {
+export function nodePlatform({ root, launcher, version, transport, print, launch = launchDetached, env = process.env, account = fileAccountStore(), onboarding = fileOnboardingStore(), install = fileInstallStore(), firstEdit = fileFirstEdit(), cloud, share, plugins = { root: pluginsRoot(), dev: () => [] } }: NodeHost): Platform {
   const dir = join(root, FEEGA_DIR);
   const settingsPath = join(dir, SETTINGS_FILE);
   const stateDir = stateDirFor(root, env);
@@ -117,7 +117,8 @@ export function nodePlatform({ root, launcher, version, transport, print, launch
     skillHint: nodeSkillHint(HintSurface.Terminal),
     usage: {
       identity: () => ({ installId: installIdOf(install), version, editor: Editor.Npx, os: process.platform, arch: process.arch, device: Device.Cli }),
-      enabled: () => nodeUsageEnabled(env, settingsWith((row) => settings[row.key]))
+      enabled: () => nodeUsageEnabled(env, settingsWith((row) => settings[row.key])),
+      firstEdit
     }
   };
 }
