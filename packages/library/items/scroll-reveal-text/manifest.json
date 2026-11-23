@@ -1,0 +1,30 @@
+{
+  "id": "scroll-reveal-text",
+  "name": "Scroll reveal text",
+  "description": "Large centred paragraphs that light up word by word, or letter by letter, as you scroll.",
+  "category": "section",
+  "tags": [
+    "text",
+    "scroll",
+    "animation"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    }
+  ],
+  "tier": "free"
+}

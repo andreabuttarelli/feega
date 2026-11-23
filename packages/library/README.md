@@ -20,7 +20,11 @@ preview/                   static page with every item in light and dark
 `<Name>` is the id in PascalCase (`hero-split` is `HeroSplit`). Required frameworks: svelte, react,
 vue, astro. `html` is a fallback only. No Angular.
 
-Categories: `section`, `component`, `app`. Tier is `free` or `pro`; every item here is `free`.
+Categories: `section`, `component`, `app`. Tier is `free` or `pro`. Free items live in `items/`,
+pro items keep only `pro/<id>/manifest.json` and `preview.webp` here; their source lives in the
+private repo feega-library-pro and is served to Feega Cloud through `/api/v1/library/pro/:id`. The
+landing reads only pro manifests and the extension catalog carries pro items as metadata and the
+preview image, never their files.
 Optional `preview` is a URL to a preview image. Items have no dependencies.
 
 `fonts` lists the Google Fonts families an item needs, with weights, so the editor can add the
@@ -38,7 +42,7 @@ every framework file and manifest from one markup and one CSS list per item. Nev
 Every colour, radius and font comes from `--feega-*` tokens in `tokens.css`. Override them on
 `:root` (or any ancestor) to retheme. Dark follows `prefers-color-scheme`; `data-theme="light"` or
 `data-theme="dark"` on any element forces a theme for its subtree. The test fails on a colour
-literal in any item, and on text/fill token pairs under WCAG AA (4.5:1) in either theme.
+literal in any item (except a palette table declared in `PALETTE_TABLES`, such as the pride flag presets), and on text/fill token pairs under WCAG AA (4.5:1) in either theme.
 
 ## Preview
 

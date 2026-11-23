@@ -1,0 +1,32 @@
+{
+  "id": "parallax-gallery",
+  "name": "Parallax gallery",
+  "description": "An endless, airy field of image cards at three depths that drift on their own and pan with drag, touch or arrow keys.",
+  "category": "section",
+  "tags": [
+    "gallery",
+    "parallax",
+    "drag",
+    "animation"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    }
+  ],
+  "tier": "pro",
+  "preview": "https://www.feega.app/templates-shots/parallax-gallery-light.webp"
+}

@@ -17,6 +17,11 @@ export enum Tier {
   Pro = 'pro'
 }
 
+export const TIER_WORD: Readonly<Record<Tier, string>> = {
+  [Tier.Free]: 'free',
+  [Tier.Pro]: 'Feega Cloud'
+};
+
 export type FontNeed = { readonly family: string; readonly weights: readonly number[] };
 
 export type Template = {

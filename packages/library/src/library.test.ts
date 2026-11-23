@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { compile } from 'svelte/compiler';
 import ts from 'typescript';
 import {
 	CATEGORIES,
 	GOOGLE_FONTS,
 	ITEMS_DIR,
+	PRO_DIR,
 	REQUIRED_FRAMEWORKS,
 	TOKENS_FILE,
 	itemFiles,
@@ -13,9 +15,13 @@ import {
 	parseManifest
 } from './index';
 
-const items = loadItems();
+const freeItems = loadItems();
+const proItems = loadItems(PRO_DIR);
+const items = [...freeItems, ...proItems];
 const tokens = readFileSync(TOKENS_FILE, 'utf8');
 const COLOR_LITERAL = /#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\(/;
+const PALETTE_TABLES: Readonly<Record<string, RegExp>> = { 'ascii-pride': /--ascii-c\d+:#[0-9a-fA-F]{6}\b/g };
+const withoutPalette = (id: string, source: string) => (id in PALETTE_TABLES ? source.replace(PALETTE_TABLES[id], '') : source);
 const NAMED_COLOR =
 	/(?:^|[;{\s])(?:color|background(?:-color)?|border(?:-[a-z]+)?-color|border|outline|fill|stroke)\s*:\s*[^;}]*\b(?:white|black|red|green|blue|gray|grey|orange|purple|yellow)\b/;
 const TOKEN_REF = /var\(\s*(--feega-[a-z0-9-]+)/g;
@@ -74,8 +80,20 @@ describe('library items', () => {
 	});
 
 	it('has one folder per manifest id', () => {
-		const folders = readdirSync(ITEMS_DIR).sort();
-		expect(items.map((item) => item.id).sort()).toEqual(folders);
+		expect(freeItems.map((item) => item.id).sort()).toEqual(readdirSync(ITEMS_DIR).sort());
+		expect(proItems.map((item) => item.id).sort()).toEqual(readdirSync(PRO_DIR).sort());
+	});
+
+	it('keeps free items in items/ and pro items apart in pro/', () => {
+		expect(freeItems.every((item) => item.tier === 'free')).toBe(true);
+		expect(proItems.length).toBeGreaterThan(0);
+		expect(proItems.every((item) => item.tier === 'pro')).toBe(true);
+	});
+
+	it('keeps nothing but the manifest and the preview of a pro item in the public repo', () => {
+		for (const item of proItems) {
+			expect(readdirSync(join(PRO_DIR, item.id)).sort(), item.id).toEqual(['manifest.json', 'preview.webp']);
+		}
 	});
 
 	it('requires a valid manifest', () => {
@@ -92,16 +110,21 @@ describe('library items', () => {
 		expect(() => parseManifest({ ...VALID_MANIFEST, fonts: [{ family: SANS, weights: [] }] })).toThrow();
 	});
 
+	it('allows colour literals only in a declared palette table', () => {
+		expect(COLOR_LITERAL.test(withoutPalette('ascii-pride', '--ascii-c1:#E40303;'))).toBe(false);
+		expect(COLOR_LITERAL.test(withoutPalette('ascii-pride', '--ascii-c1:#E40303;color:#fff'))).toBe(true);
+		expect(COLOR_LITERAL.test(withoutPalette('card', '--ascii-c1:#E40303;'))).toBe(true);
+	});
+
 	it('covers every category', () => {
 		for (const category of CATEGORIES) {
 			expect(items.some((item) => item.category === category)).toBe(true);
 		}
 	});
 
-	for (const item of items) {
+	for (const item of freeItems) {
 		describe(item.id, () => {
-			it('is free, dependency free and in every required framework', () => {
-				expect(item.tier).toBe('free');
+			it('is dependency free and in every required framework', () => {
 				expect(item.dependencies).toEqual([]);
 				for (const framework of REQUIRED_FRAMEWORKS) {
 					expect(item.frameworks).toContain(framework);
@@ -119,7 +142,7 @@ describe('library items', () => {
 			it('uses only tokens for colour', () => {
 				for (const framework of item.frameworks) {
 					for (const file of itemFiles(item, framework)) {
-						const source = readFileSync(file, 'utf8');
+						const source = withoutPalette(item.id, readFileSync(file, 'utf8'));
 						expect(COLOR_LITERAL.test(source), file).toBe(false);
 						expect(NAMED_COLOR.test(source), file).toBe(false);
 					}

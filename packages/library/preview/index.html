@@ -670,6 +670,33 @@ body{margin:0;padding:2rem 1rem;background:#0b0b0b;color:#f0eee9;font-family:"In
 .fl-gallery .cap small{color:var(--feega-fg-subtle)}
 @media (max-width:820px){.fl-gallery .grid{grid-template-columns:repeat(2,minmax(0,1fr))}.fl-gallery li,.fl-gallery li:nth-child(-n+2){grid-column:auto}.fl-gallery li:first-child{grid-column:1/-1}}
 @media (max-width:480px){.fl-gallery .grid{grid-template-columns:minmax(0,1fr)}}
+.fl-glass-button{font-family:var(--feega-font);font-size:var(--feega-text-body);line-height:1.5;letter-spacing:var(--feega-tracking);color:var(--feega-fg);background:var(--feega-bg);-webkit-font-smoothing:antialiased}
+:where(.fl-glass-button) *,:where(.fl-glass-button) *::before,:where(.fl-glass-button) *::after{box-sizing:border-box}
+:where(.fl-glass-button) :is(h1,h2,h3,h4,p,ul,ol,figure,blockquote,dl,dd){margin:0}
+:where(.fl-glass-button) a{color:inherit;text-decoration:none}
+:where(.fl-glass-button) :focus-visible{outline:2px solid var(--feega-focus);outline-offset:3px}
+.fl-glass-button{--glow-1:deeppink;--glow-2:orange;--glow-3:gold;--glow-4:springgreen;--glow-5:deepskyblue;--glow-6:blueviolet;--shine:white;--spin:6s;--radius:var(--feega-radius-full);--blur:12px;--glow:0.9;--fade:300ms;--mx:50%;--my:0%;--gx:50%;--gy:50%;--fx:50%;--fy:50%;position:relative;display:inline-grid;place-items:center;padding:var(--feega-space-12) var(--feega-space-16);max-width:100%}
+.fl-glass-button .glow{position:absolute;inset:calc(var(--feega-space-12) - 8px) calc(var(--feega-space-16) - 8px);filter:blur(var(--blur));opacity:0;pointer-events:none;transition:opacity var(--fade) var(--feega-ease)}
+.fl-glass-button .hue{position:absolute;inset:0;background:linear-gradient(90deg,var(--glow-1),var(--glow-2),var(--glow-3),var(--glow-4),var(--glow-5),var(--glow-6),var(--glow-1)) 0 0/200% 100%;opacity:0.4;-webkit-mask:radial-gradient(ellipse 55% 45% at var(--gx) var(--gy),black,transparent);mask:radial-gradient(ellipse 55% 45% at var(--gx) var(--gy),black,transparent);animation:fl-glass-spin var(--spin) linear infinite}
+@keyframes fl-glass-spin{to{background-position:200% 0}}
+.fl-glass-button[data-lit] .glow{opacity:var(--glow)}
+.fl-glass-button[data-lit="focus"] .glow{opacity:calc(var(--glow) * 0.6)}
+.fl-glass-button .glass{position:relative;display:inline-flex;align-items:center;justify-content:center;min-height:56px;max-width:100%;padding:0 var(--feega-space-8);border:0;border-radius:var(--radius);background:linear-gradient(180deg,color-mix(in srgb,var(--feega-raised) 30%,transparent),color-mix(in srgb,var(--feega-raised) 8%,transparent));color:var(--feega-fg);font:inherit;font-size:1.0625rem;font-weight:500;letter-spacing:var(--feega-tracking);white-space:nowrap;cursor:pointer;-webkit-backdrop-filter:blur(8px) saturate(1.6);backdrop-filter:blur(8px) saturate(1.6);box-shadow:inset 0 1px 0 color-mix(in srgb,var(--shine) 80%,transparent),inset 0 -1px 0 color-mix(in srgb,var(--shine) 25%,transparent),inset 0 -12px 20px -12px color-mix(in srgb,var(--feega-fg) 22%,transparent),inset 1px 0 0 color-mix(in srgb,var(--glow-5) 22%,transparent),inset -1px 0 0 color-mix(in srgb,var(--glow-1) 22%,transparent),0 0 0 1px color-mix(in srgb,var(--feega-fg) 8%,transparent),0 8px 24px -12px color-mix(in srgb,var(--feega-fg) 30%,transparent);transition:transform var(--feega-dur-fast) var(--feega-ease)}
+.fl-glass-button[data-lens] .glass{-webkit-backdrop-filter:var(--lens) blur(1.5px) saturate(1.6);backdrop-filter:var(--lens) blur(1.5px) saturate(1.6)}
+.fl-glass-button .glass::before{content:"";position:absolute;inset:0;padding:1.5px;border-radius:inherit;background:radial-gradient(90% 130% at var(--mx) var(--my),var(--shine),transparent 70%);-webkit-mask:linear-gradient(black 0 0) content-box exclude,linear-gradient(black 0 0);mask:linear-gradient(black 0 0) content-box exclude,linear-gradient(black 0 0);pointer-events:none}
+.fl-glass-button .glass::after{content:"";position:absolute;inset:0;border-radius:inherit;background:radial-gradient(60% 90% at var(--mx) var(--my),color-mix(in srgb,var(--shine) 40%,transparent),transparent 70%);opacity:0.3;pointer-events:none;transition:opacity var(--fade) var(--feega-ease)}
+.fl-glass-button .light{position:absolute;inset:-8px;opacity:0;pointer-events:none;-webkit-mask:radial-gradient(ellipse 75% 150% at calc(var(--fx) + 8px) calc(var(--fy) + 8px),black,color-mix(in srgb,black 35%,transparent) 40%,transparent);mask:radial-gradient(ellipse 75% 150% at calc(var(--fx) + 8px) calc(var(--fy) + 8px),black,color-mix(in srgb,black 35%,transparent) 40%,transparent);transition:opacity var(--fade) var(--feega-ease)}
+.fl-glass-button .halo{position:absolute;inset:0;filter:blur(5px);opacity:0.8}
+.fl-glass-button .ring{position:absolute;inset:8px;padding:1.5px;border-radius:var(--radius);background:conic-gradient(from 90deg at var(--fx) var(--fy),var(--glow-1),var(--glow-2),var(--glow-3),var(--glow-4),var(--glow-5),var(--glow-6),var(--glow-1));-webkit-mask:linear-gradient(black 0 0) content-box exclude,linear-gradient(black 0 0);mask:linear-gradient(black 0 0) content-box exclude,linear-gradient(black 0 0)}
+.fl-glass-button .halo .ring{padding:5px}
+.fl-glass-button .tint{position:absolute;inset:8px;border-radius:var(--radius);background:linear-gradient(90deg,var(--glow-1),var(--glow-2),var(--glow-3),var(--glow-4),var(--glow-5),var(--glow-6),var(--glow-1));opacity:0.12;filter:blur(6px)}
+.fl-glass-button[data-lit] .light{opacity:var(--glow)}
+.fl-glass-button[data-lit="focus"] .light{opacity:calc(var(--glow) * 0.6)}
+.fl-glass-button .label{position:relative;z-index:1;text-shadow:0 1px 1px color-mix(in srgb,var(--feega-bg) 45%,transparent)}
+.fl-glass-button .lens{position:absolute;width:0;height:0;overflow:hidden}
+.fl-glass-button[data-lit] .glass::after{opacity:0.6}
+.fl-glass-button .glass:active{transform:scale(0.97,0.93)}
+@media (prefers-reduced-motion:reduce){.fl-glass-button .hue{animation:none}.fl-glass-button .glow,.fl-glass-button .light{transition:none}}
 .fl-hero-bento{font-family:var(--feega-font);font-size:var(--feega-text-body);line-height:1.5;letter-spacing:var(--feega-tracking);color:var(--feega-fg);background:var(--feega-bg);-webkit-font-smoothing:antialiased}
 :where(.fl-hero-bento) *,:where(.fl-hero-bento) *::before,:where(.fl-hero-bento) *::after{box-sizing:border-box}
 :where(.fl-hero-bento) :is(h1,h2,h3,h4,p,ul,ol,figure,blockquote,dl,dd){margin:0}
@@ -853,6 +880,31 @@ body{margin:0;padding:2rem 1rem;background:#0b0b0b;color:#f0eee9;font-family:"In
 .fl-hero-split .cursor .fl-px{width:18px}
 @keyframes fl-hero-split-cursor{from{transform:translate(18px,22px)}to{transform:translate(0,0)}}
 @media (max-width:900px){.fl-hero-split .grid{grid-template-columns:minmax(0,1fr);gap:var(--feega-space-12)}.fl-hero-split .stage{padding:var(--feega-space-4)}}
+.fl-image-tunnel{font-family:var(--feega-font);font-size:var(--feega-text-body);line-height:1.5;letter-spacing:var(--feega-tracking);color:var(--feega-fg);background:var(--feega-bg);-webkit-font-smoothing:antialiased}
+:where(.fl-image-tunnel) *,:where(.fl-image-tunnel) *::before,:where(.fl-image-tunnel) *::after{box-sizing:border-box}
+:where(.fl-image-tunnel) :is(h1,h2,h3,h4,p,ul,ol,figure,blockquote,dl,dd){margin:0}
+:where(.fl-image-tunnel) a{color:inherit;text-decoration:none}
+:where(.fl-image-tunnel) :focus-visible{outline:2px solid var(--feega-focus);outline-offset:3px}
+.fl-image-tunnel{position:relative;background:var(--feega-bg);color:var(--feega-fg);user-select:none;-webkit-user-select:none;touch-action:manipulation;cursor:pointer}
+.fl-image-tunnel .stage{position:relative;height:clamp(30rem,90svh,52rem);overflow:hidden;contain:paint;perspective-origin:50% 50%}
+.fl-image-tunnel .world{position:absolute;top:50%;left:50%;width:0;height:0;transform-style:preserve-3d}
+.fl-image-tunnel .wall,.fl-image-tunnel .card{position:absolute;will-change:transform}
+.fl-image-tunnel .wall{--line:linear-gradient(var(--feega-line-strong) 1px,transparent 1px);--rule:linear-gradient(90deg,var(--feega-line-strong) 1px,transparent 1px);background-image:var(--line),var(--rule)}
+.fl-image-tunnel .floor,.fl-image-tunnel .ceiling{background-size:calc(100% / 6 - 0.1px) var(--cell)}
+.fl-image-tunnel .left,.fl-image-tunnel .right{background-size:var(--cell) calc(100% / 4 - 0.1px)}
+.fl-image-tunnel .floor{-webkit-mask-image:linear-gradient(to top,var(--feega-fg) 55%,transparent);mask-image:linear-gradient(to top,var(--feega-fg) 55%,transparent)}
+.fl-image-tunnel .ceiling{-webkit-mask-image:linear-gradient(to bottom,var(--feega-fg) 55%,transparent);mask-image:linear-gradient(to bottom,var(--feega-fg) 55%,transparent)}
+.fl-image-tunnel .left{-webkit-mask-image:linear-gradient(to right,var(--feega-fg) 55%,transparent);mask-image:linear-gradient(to right,var(--feega-fg) 55%,transparent)}
+.fl-image-tunnel .right{-webkit-mask-image:linear-gradient(to left,var(--feega-fg) 55%,transparent);mask-image:linear-gradient(to left,var(--feega-fg) 55%,transparent)}
+.fl-image-tunnel .card{margin:0;overflow:hidden;border-radius:var(--feega-radius-sm);opacity:0;will-change:transform,opacity}
+.fl-image-tunnel .card img{display:block;width:100%;height:100%;object-fit:cover;pointer-events:none}
+.fl-image-tunnel .card[data-tone="0"]{background:linear-gradient(160deg,var(--feega-accent),var(--feega-accent-soft))}
+.fl-image-tunnel .card[data-tone="1"]{background:linear-gradient(200deg,var(--feega-fg-subtle),var(--feega-raised))}
+.fl-image-tunnel .card[data-tone="2"]{background:linear-gradient(135deg,var(--feega-accent-soft),var(--feega-line-strong))}
+.fl-image-tunnel .card[data-tone="3"]{background:radial-gradient(circle at 30% 30%,var(--feega-fg-muted),var(--feega-surface))}
+.fl-image-tunnel .overlay{position:absolute;inset:0;display:grid;place-content:center;gap:var(--feega-space-3);padding:var(--feega-gutter);text-align:center;pointer-events:none}
+.fl-image-tunnel h2{font-family:var(--feega-font-display);font-size:var(--feega-text-title);font-weight:500;line-height:0.95;letter-spacing:var(--feega-tracking-tight);text-wrap:balance}
+.fl-image-tunnel .overlay p{color:var(--feega-fg-muted);font-size:var(--feega-text-sm);text-wrap:balance}
 .fl-integrations-grid{font-family:var(--feega-font);font-size:var(--feega-text-body);line-height:1.5;letter-spacing:var(--feega-tracking);color:var(--feega-fg);background:var(--feega-bg);-webkit-font-smoothing:antialiased}
 :where(.fl-integrations-grid) *,:where(.fl-integrations-grid) *::before,:where(.fl-integrations-grid) *::after{box-sizing:border-box}
 :where(.fl-integrations-grid) :is(h1,h2,h3,h4,p,ul,ol,figure,blockquote,dl,dd){margin:0}
@@ -1187,6 +1239,19 @@ body{margin:0;padding:2rem 1rem;background:#0b0b0b;color:#f0eee9;font-family:"In
 .fl-quote-block .who{display:grid;font-size:var(--feega-text-sm)}
 .fl-quote-block .who b{font-weight:600}
 .fl-quote-block .who span{color:var(--feega-fg-muted)}
+.fl-scroll-reveal-text{font-family:var(--feega-font);font-size:var(--feega-text-body);line-height:1.5;letter-spacing:var(--feega-tracking);color:var(--feega-fg);background:var(--feega-bg);-webkit-font-smoothing:antialiased}
+:where(.fl-scroll-reveal-text) *,:where(.fl-scroll-reveal-text) *::before,:where(.fl-scroll-reveal-text) *::after{box-sizing:border-box}
+:where(.fl-scroll-reveal-text) :is(h1,h2,h3,h4,p,ul,ol,figure,blockquote,dl,dd){margin:0}
+:where(.fl-scroll-reveal-text) a{color:inherit;text-decoration:none}
+:where(.fl-scroll-reveal-text) :focus-visible{outline:2px solid var(--feega-focus);outline-offset:3px}
+.fl-scroll-reveal-text{padding-block:var(--feega-space-section)}
+.fl-scroll-reveal-text .reveal{--p:0;--dim:0.22;--edge:4;display:grid;gap:var(--feega-space-8);max-width:56rem;margin-inline:auto;text-align:center;font-family:var(--feega-font-display);font-size:clamp(1.625rem,4.2vw,3.25rem);font-weight:500;line-height:1.12;letter-spacing:var(--feega-tracking-tight)}
+.fl-scroll-reveal-text .reveal[data-reveal="char"]{--edge:14}
+.fl-scroll-reveal-text .reveal p{text-wrap:balance;overflow-wrap:anywhere}
+.fl-scroll-reveal-text .w{display:inline-block;white-space:nowrap}
+.fl-scroll-reveal-text .u{opacity:clamp(var(--dim),calc(var(--dim) + (1 - var(--dim)) * (var(--p) * (var(--n) + var(--edge)) - var(--i)) / var(--edge)),1)}
+.fl-scroll-reveal-text .sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+@media (prefers-reduced-motion:reduce){.fl-scroll-reveal-text .u{opacity:1}}
 .fl-settings-form{font-family:var(--feega-font);font-size:var(--feega-text-body);line-height:1.5;letter-spacing:var(--feega-tracking);color:var(--feega-fg);background:var(--feega-bg);-webkit-font-smoothing:antialiased}
 :where(.fl-settings-form) *,:where(.fl-settings-form) *::before,:where(.fl-settings-form) *::after{box-sizing:border-box}
 :where(.fl-settings-form) :is(h1,h2,h3,h4,p,ul,ol,figure,blockquote,dl,dd){margin:0}
@@ -1395,7 +1460,7 @@ body{margin:0;padding:2rem 1rem;background:#0b0b0b;color:#f0eee9;font-family:"In
 </style>
 </head>
 <body>
-<header class="intro"><h1>feega library</h1><p>61 free items. Svelte, React, Vue, Astro and HTML. Light and dark.</p></header>
+<header class="intro"><h1>feega library</h1><p>64 free items. Svelte, React, Vue, Astro and HTML. Light and dark.</p></header>
 <section class="item" id="announcement-bar">
   <h2>Announcement bar <small>section / banner, announcement</small></h2>
   <div class="frame" data-theme="light" data-frame="announcement-bar-light"><aside class="fl-announcement-bar" aria-label="Announcement">
@@ -2381,6 +2446,411 @@ document.querySelectorAll('.fl-command-palette:not([data-ready])').forEach((root
 </section>
 </div>
 </section>
+<section class="item" id="glass-button">
+  <h2>Glass button <small>component / button, glass, glow, animation</small></h2>
+  <div class="frame" data-theme="light" data-frame="glass-button-light"><div class="fl-glass-button" data-speed="1" data-intensity="1">
+  <span class="glow" aria-hidden="true"><span class="hue"></span></span>
+  <button class="glass" type="button"><span class="light" aria-hidden="true"><span class="halo"><span class="ring"></span></span><span class="ring"></span><span class="tint"></span></span><span class="label">get started</span></button>
+  <svg class="lens" aria-hidden="true" focusable="false">
+    <filter x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+      <feImage x="0" y="0" preserveAspectRatio="none" result="map" />
+      <feDisplacementMap in="SourceGraphic" in2="map" scale="36" xChannelSelector="R" yChannelSelector="G" />
+    </filter>
+  </svg>
+</div>
+
+<script>
+(() => {
+  const RIM = 14;
+  const BEND = 36;
+  const EASE = 0.16;
+  const SETTLE = 0.5;
+  let lenses = 0;
+
+  function lensMap(w, h) {
+    const r = h / 2;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><defs><linearGradient id="x"><stop offset="0" stop-color="red"/><stop offset="1" stop-color="black"/></linearGradient><linearGradient id="y" x2="0" y2="1"><stop offset="0" stop-color="lime"/><stop offset="1" stop-color="black"/></linearGradient><filter id="s"><feGaussianBlur stdDeviation="${RIM / 2}"/></filter></defs><rect width="${w}" height="${h}" fill="black"/><rect width="${w}" height="${h}" rx="${r}" fill="url(#x)"/><rect width="${w}" height="${h}" rx="${r}" fill="url(#y)" style="mix-blend-mode:screen"/><rect x="${RIM}" y="${RIM}" width="${w - RIM * 2}" height="${h - RIM * 2}" rx="${r - RIM}" fill="gray" filter="url(#s)"/></svg>`;
+    return 'data:image/svg+xml,' + encodeURIComponent(svg);
+  }
+
+  function refracts() {
+    return CSS.supports('backdrop-filter', 'url(#a)') && 'userAgentData' in navigator;
+  }
+
+  function glass(root) {
+    const button = root.querySelector('.glass');
+    const glow = root.querySelector('.glow');
+    const filter = root.querySelector('filter');
+    const map = root.querySelector('feImage');
+    const bend = root.querySelector('feDisplacementMap');
+    const speed = Number(root.dataset.speed) || 1;
+    const intensity = Number(root.dataset.intensity) || 1;
+    const still = matchMedia('(prefers-reduced-motion: reduce)');
+    const id = 'fl-glass-lens-' + ++lenses;
+    const target = { x: 0, y: 0 };
+    const at = { x: 0, y: 0 };
+    let hovering = false;
+    let frame = 0;
+
+    filter.id = id;
+    root.style.setProperty('--spin', 6 / speed + 's');
+    root.style.setProperty('--glow', String(Math.min(1, 0.9 * intensity)));
+    bend.setAttribute('scale', String(BEND * intensity));
+
+    function resize() {
+      const w = Math.round(button.offsetWidth);
+      const h = Math.round(button.offsetHeight);
+      map.setAttribute('width', String(w));
+      map.setAttribute('height', String(h));
+      map.setAttribute('href', lensMap(w, h));
+    }
+
+    function paint() {
+      root.style.setProperty('--gx', at.x + 'px');
+      root.style.setProperty('--gy', at.y + 'px');
+      root.style.setProperty('--fx', at.x + glow.offsetLeft - button.offsetLeft + 'px');
+      root.style.setProperty('--fy', at.y + glow.offsetTop - button.offsetTop + 'px');
+    }
+
+    function step() {
+      const k = Math.min(1, EASE * speed);
+      at.x += (target.x - at.x) * k;
+      at.y += (target.y - at.y) * k;
+      paint();
+
+      if (Math.abs(target.x - at.x) + Math.abs(target.y - at.y) < SETTLE) {
+        frame = 0;
+        return;
+      }
+      frame = requestAnimationFrame(step);
+    }
+
+    function aim(x, y, move) {
+      target.x = x;
+      target.y = y;
+
+      if (move === 'jump' || still.matches) {
+        at.x = x;
+        at.y = y;
+        paint();
+        return;
+      }
+      if (!frame) {
+        frame = requestAnimationFrame(step);
+      }
+    }
+
+    function aimAt(event, move) {
+      const box = glow.getBoundingClientRect();
+      const face = button.getBoundingClientRect();
+      root.style.setProperty('--mx', ((event.clientX - face.left) / face.width) * 100 + '%');
+      root.style.setProperty('--my', ((event.clientY - face.top) / face.height) * 100 + '%');
+      aim(event.clientX - box.left, event.clientY - box.top, move);
+    }
+
+    function aimCentre() {
+      aim(glow.offsetWidth / 2, glow.offsetHeight / 2, 'jump');
+    }
+
+    function showFocus() {
+      aimCentre();
+      root.setAttribute('data-lit', 'focus');
+    }
+
+    function onEnter(event) {
+      if (event.pointerType === 'touch') {
+        return;
+      }
+      aimAt(event, root.getAttribute('data-lit') === 'pointer' ? 'ease' : 'jump');
+      hovering = true;
+      root.setAttribute('data-lit', 'pointer');
+    }
+
+    function onDown(event) {
+      if (event.pointerType !== 'touch') {
+        return;
+      }
+      aimAt(event, 'jump');
+      hovering = true;
+      root.setAttribute('data-lit', 'pointer');
+    }
+
+    function onMove(event) {
+      if (!hovering) {
+        return;
+      }
+      aimAt(event, 'ease');
+    }
+
+    function onLeave() {
+      hovering = false;
+      root.style.setProperty('--mx', '50%');
+      root.style.setProperty('--my', '0%');
+
+      if (button.matches(':focus-visible')) {
+        showFocus();
+        return;
+      }
+      root.removeAttribute('data-lit');
+    }
+
+    function onUp(event) {
+      if (event.pointerType === 'touch') {
+        onLeave();
+      }
+    }
+
+    function onFocus() {
+      if (hovering || !button.matches(':focus-visible')) {
+        return;
+      }
+      showFocus();
+    }
+
+    function onBlur() {
+      if (hovering) {
+        return;
+      }
+      root.removeAttribute('data-lit');
+    }
+
+    const watch = new ResizeObserver(resize);
+    const events = [
+      [root, 'pointerenter', onEnter],
+      [root, 'pointerdown', onDown],
+      [root, 'pointermove', onMove],
+      [root, 'pointerleave', onLeave],
+      [root, 'pointerup', onUp],
+      [root, 'pointercancel', onLeave],
+      [button, 'focus', onFocus],
+      [button, 'blur', onBlur]
+    ];
+
+    if (refracts()) {
+      root.style.setProperty('--lens', 'url(#' + id + ')');
+      root.setAttribute('data-lens', '');
+      watch.observe(button);
+    }
+    events.forEach(([el, type, fn]) => el.addEventListener(type, fn));
+
+    return () => {
+      cancelAnimationFrame(frame);
+      watch.disconnect();
+      events.forEach(([el, type, fn]) => el.removeEventListener(type, fn));
+      root.removeAttribute('data-lens');
+      root.removeAttribute('data-lit');
+    };
+  }
+
+  document.querySelectorAll('.fl-glass-button:not([data-ready])').forEach((root) => {
+    root.setAttribute('data-ready', '');
+    glass(root);
+  });
+})();
+</script>
+</div>
+  <div class="frame" data-theme="dark" data-frame="glass-button-dark"><div class="fl-glass-button" data-speed="1" data-intensity="1">
+  <span class="glow" aria-hidden="true"><span class="hue"></span></span>
+  <button class="glass" type="button"><span class="light" aria-hidden="true"><span class="halo"><span class="ring"></span></span><span class="ring"></span><span class="tint"></span></span><span class="label">get started</span></button>
+  <svg class="lens" aria-hidden="true" focusable="false">
+    <filter x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+      <feImage x="0" y="0" preserveAspectRatio="none" result="map" />
+      <feDisplacementMap in="SourceGraphic" in2="map" scale="36" xChannelSelector="R" yChannelSelector="G" />
+    </filter>
+  </svg>
+</div>
+
+<script>
+(() => {
+  const RIM = 14;
+  const BEND = 36;
+  const EASE = 0.16;
+  const SETTLE = 0.5;
+  let lenses = 0;
+
+  function lensMap(w, h) {
+    const r = h / 2;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><defs><linearGradient id="x-dark"><stop offset="0" stop-color="red"/><stop offset="1" stop-color="black"/></linearGradient><linearGradient id="y-dark" x2="0" y2="1"><stop offset="0" stop-color="lime"/><stop offset="1" stop-color="black"/></linearGradient><filter id="s-dark"><feGaussianBlur stdDeviation="${RIM / 2}"/></filter></defs><rect width="${w}" height="${h}" fill="black"/><rect width="${w}" height="${h}" rx="${r}" fill="url(#x)"/><rect width="${w}" height="${h}" rx="${r}" fill="url(#y)" style="mix-blend-mode:screen"/><rect x="${RIM}" y="${RIM}" width="${w - RIM * 2}" height="${h - RIM * 2}" rx="${r - RIM}" fill="gray" filter="url(#s)"/></svg>`;
+    return 'data:image/svg+xml,' + encodeURIComponent(svg);
+  }
+
+  function refracts() {
+    return CSS.supports('backdrop-filter', 'url(#a)') && 'userAgentData' in navigator;
+  }
+
+  function glass(root) {
+    const button = root.querySelector('.glass');
+    const glow = root.querySelector('.glow');
+    const filter = root.querySelector('filter');
+    const map = root.querySelector('feImage');
+    const bend = root.querySelector('feDisplacementMap');
+    const speed = Number(root.dataset.speed) || 1;
+    const intensity = Number(root.dataset.intensity) || 1;
+    const still = matchMedia('(prefers-reduced-motion: reduce)');
+    const id = 'fl-glass-lens-' + ++lenses;
+    const target = { x: 0, y: 0 };
+    const at = { x: 0, y: 0 };
+    let hovering = false;
+    let frame = 0;
+
+    filter.id = id;
+    root.style.setProperty('--spin', 6 / speed + 's');
+    root.style.setProperty('--glow', String(Math.min(1, 0.9 * intensity)));
+    bend.setAttribute('scale', String(BEND * intensity));
+
+    function resize() {
+      const w = Math.round(button.offsetWidth);
+      const h = Math.round(button.offsetHeight);
+      map.setAttribute('width', String(w));
+      map.setAttribute('height', String(h));
+      map.setAttribute('href', lensMap(w, h));
+    }
+
+    function paint() {
+      root.style.setProperty('--gx', at.x + 'px');
+      root.style.setProperty('--gy', at.y + 'px');
+      root.style.setProperty('--fx', at.x + glow.offsetLeft - button.offsetLeft + 'px');
+      root.style.setProperty('--fy', at.y + glow.offsetTop - button.offsetTop + 'px');
+    }
+
+    function step() {
+      const k = Math.min(1, EASE * speed);
+      at.x += (target.x - at.x) * k;
+      at.y += (target.y - at.y) * k;
+      paint();
+
+      if (Math.abs(target.x - at.x) + Math.abs(target.y - at.y) < SETTLE) {
+        frame = 0;
+        return;
+      }
+      frame = requestAnimationFrame(step);
+    }
+
+    function aim(x, y, move) {
+      target.x = x;
+      target.y = y;
+
+      if (move === 'jump' || still.matches) {
+        at.x = x;
+        at.y = y;
+        paint();
+        return;
+      }
+      if (!frame) {
+        frame = requestAnimationFrame(step);
+      }
+    }
+
+    function aimAt(event, move) {
+      const box = glow.getBoundingClientRect();
+      const face = button.getBoundingClientRect();
+      root.style.setProperty('--mx', ((event.clientX - face.left) / face.width) * 100 + '%');
+      root.style.setProperty('--my', ((event.clientY - face.top) / face.height) * 100 + '%');
+      aim(event.clientX - box.left, event.clientY - box.top, move);
+    }
+
+    function aimCentre() {
+      aim(glow.offsetWidth / 2, glow.offsetHeight / 2, 'jump');
+    }
+
+    function showFocus() {
+      aimCentre();
+      root.setAttribute('data-lit', 'focus');
+    }
+
+    function onEnter(event) {
+      if (event.pointerType === 'touch') {
+        return;
+      }
+      aimAt(event, root.getAttribute('data-lit') === 'pointer' ? 'ease' : 'jump');
+      hovering = true;
+      root.setAttribute('data-lit', 'pointer');
+    }
+
+    function onDown(event) {
+      if (event.pointerType !== 'touch') {
+        return;
+      }
+      aimAt(event, 'jump');
+      hovering = true;
+      root.setAttribute('data-lit', 'pointer');
+    }
+
+    function onMove(event) {
+      if (!hovering) {
+        return;
+      }
+      aimAt(event, 'ease');
+    }
+
+    function onLeave() {
+      hovering = false;
+      root.style.setProperty('--mx', '50%');
+      root.style.setProperty('--my', '0%');
+
+      if (button.matches(':focus-visible')) {
+        showFocus();
+        return;
+      }
+      root.removeAttribute('data-lit');
+    }
+
+    function onUp(event) {
+      if (event.pointerType === 'touch') {
+        onLeave();
+      }
+    }
+
+    function onFocus() {
+      if (hovering || !button.matches(':focus-visible')) {
+        return;
+      }
+      showFocus();
+    }
+
+    function onBlur() {
+      if (hovering) {
+        return;
+      }
+      root.removeAttribute('data-lit');
+    }
+
+    const watch = new ResizeObserver(resize);
+    const events = [
+      [root, 'pointerenter', onEnter],
+      [root, 'pointerdown', onDown],
+      [root, 'pointermove', onMove],
+      [root, 'pointerleave', onLeave],
+      [root, 'pointerup', onUp],
+      [root, 'pointercancel', onLeave],
+      [button, 'focus', onFocus],
+      [button, 'blur', onBlur]
+    ];
+
+    if (refracts()) {
+      root.style.setProperty('--lens', 'url(#' + id + ')');
+      root.setAttribute('data-lens', '');
+      watch.observe(button);
+    }
+    events.forEach(([el, type, fn]) => el.addEventListener(type, fn));
+
+    return () => {
+      cancelAnimationFrame(frame);
+      watch.disconnect();
+      events.forEach(([el, type, fn]) => el.removeEventListener(type, fn));
+      root.removeAttribute('data-lens');
+      root.removeAttribute('data-lit');
+    };
+  }
+
+  document.querySelectorAll('.fl-glass-button:not([data-ready])').forEach((root) => {
+    root.setAttribute('data-ready', '');
+    glass(root);
+  });
+})();
+</script>
+</div>
+</section>
 <section class="item" id="hero-bento">
   <h2>Hero, bento <small>section / hero, landing, bento</small></h2>
   <div class="frame" data-theme="light" data-frame="hero-bento-light"><section class="fl-hero-bento">
@@ -2682,6 +3152,477 @@ document.querySelectorAll('.fl-command-palette:not([data-ready])').forEach((root
     </div>
   </div>
 </section>
+</div>
+</section>
+<section class="item" id="image-tunnel">
+  <h2>Image tunnel <small>section / gallery, 3d, tunnel, animation</small></h2>
+  <div class="frame" data-theme="light" data-frame="image-tunnel-light"><section class="fl-image-tunnel" data-theme="dark" tabindex="0" aria-label="Image tunnel, press to pause" data-speed="0.9" data-boost="5">
+  <div class="stage">
+    <div class="world" aria-hidden="true">
+      <div class="wall left" data-wall="left"></div>
+      <div class="wall right" data-wall="right"></div>
+      <div class="wall floor" data-wall="floor"></div>
+      <div class="wall ceiling" data-wall="ceiling"></div>
+      <figure class="card" data-tone="0"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 1" loading="lazy" decoding="async" /></figure>
+      <figure class="card" data-tone="1"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 2" loading="lazy" decoding="async" /></figure>
+      <figure class="card" data-tone="2"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 3" loading="lazy" decoding="async" /></figure>
+      <figure class="card" data-tone="3"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 4" loading="lazy" decoding="async" /></figure>
+      <figure class="card" data-tone="0"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 5" loading="lazy" decoding="async" /></figure>
+      <figure class="card" data-tone="1"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 6" loading="lazy" decoding="async" /></figure>
+      <figure class="card" data-tone="2"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 7" loading="lazy" decoding="async" /></figure>
+      <figure class="card" data-tone="3"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 8" loading="lazy" decoding="async" /></figure>
+      <figure class="card" data-tone="0"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 1" loading="lazy" decoding="async" /></figure>
+      <figure class="card" data-tone="1"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 2" loading="lazy" decoding="async" /></figure>
+      <figure class="card" data-tone="2"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 3" loading="lazy" decoding="async" /></figure>
+      <figure class="card" data-tone="3"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 4" loading="lazy" decoding="async" /></figure>
+      <figure class="card" data-tone="0"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 5" loading="lazy" decoding="async" /></figure>
+      <figure class="card" data-tone="1"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 6" loading="lazy" decoding="async" /></figure>
+      <figure class="card" data-tone="2"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 7" loading="lazy" decoding="async" /></figure>
+      <figure class="card" data-tone="3"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 8" loading="lazy" decoding="async" /></figure>
+    </div>
+    <div class="overlay">
+      <h2>welcome to the tunnel</h2>
+      <p>click to pause, press and hold to speed up</p>
+    </div>
+  </div>
+</section>
+
+<script>
+(() => {
+  const DEFAULT_SPEED = 0.9;
+  const DEFAULT_BOOST = 5;
+  const WALLS = ['left', 'right', 'floor', 'ceiling'];
+  const LANES = [-0.4, 0.35, -0.1, 0.4];
+  const DEPTH = 10;
+  const RINGS = 20;
+  const EASE = 4;
+  const MAX_STEP = 0.1;
+  const HOLD_MS = 250;
+  const SETTLED = 0.001;
+  const FADE = 0.4;
+  const INSET = 1;
+
+  function tunnel(root) {
+    const stage = root.querySelector('.stage');
+    const walls = [...root.querySelectorAll('.wall')];
+    const cards = [...root.querySelectorAll('.card')];
+    const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const pace = Number(root.dataset.speed) || DEFAULT_SPEED;
+    const boost = Number(root.dataset.boost) || DEFAULT_BOOST;
+
+    let hw = 0;
+    let hh = 0;
+    let depth = 0;
+    let cell = 0;
+    let span = 0;
+    let offset = 0;
+    let speed = 1;
+    let paused = false;
+    let held = false;
+    let pressedAt = 0;
+    let visible = true;
+    let frame = 0;
+    let last = 0;
+
+    function pose(wall, lane, z, inset) {
+      if (wall === 'left') {
+        return `translate3d(${inset - hw}px,${lane * hh}px,${z}px) rotateY(90deg)`;
+      }
+      if (wall === 'right') {
+        return `translate3d(${hw - inset}px,${lane * hh}px,${z}px) rotateY(-90deg)`;
+      }
+      if (wall === 'floor') {
+        return `translate3d(${lane * hw}px,${hh - inset}px,${z}px) rotateX(90deg)`;
+      }
+      return `translate3d(${lane * hw}px,${inset - hh}px,${z}px) rotateX(-90deg)`;
+    }
+
+    function size(el, w, h) {
+      el.style.width = `${w}px`;
+      el.style.height = `${h}px`;
+      el.style.left = `${-w / 2}px`;
+      el.style.top = `${-h / 2}px`;
+    }
+
+    function measure() {
+      hw = stage.clientWidth / 2;
+      hh = stage.clientHeight / 2;
+      depth = hh * DEPTH;
+      cell = depth / RINGS;
+      span = depth + cell * 2;
+      stage.style.perspective = `${Math.max(hw, hh) * 1.1}px`;
+      root.style.setProperty('--cell', `${cell}px`);
+
+      walls.forEach((el) => {
+        const side = el.dataset.wall === 'left' || el.dataset.wall === 'right';
+        size(el, side ? span : hw * 2, side ? hh * 2 : span);
+      });
+      cards.forEach((el, i) => {
+        const side = i % WALLS.length < 2;
+        size(el, side ? hh * 0.62 : hw * 0.5, side ? hh * 0.86 : hw * 0.34);
+      });
+    }
+
+    function place() {
+      const shift = offset % cell;
+      walls.forEach((el) => {
+        el.style.transform = pose(el.dataset.wall ?? '', 0, shift - depth / 2, 0);
+      });
+      cards.forEach((el, i) => {
+        const z = ((i / cards.length) * span + offset) % span - depth;
+        const lane = LANES[Math.floor(i / WALLS.length) % LANES.length];
+        el.style.transform = pose(WALLS[i % WALLS.length], lane, z, INSET);
+        el.style.opacity = String(Math.min(1, Math.max(0, (z + depth) / (depth * FADE))));
+      });
+    }
+
+    function tick(now) {
+      const step = Math.min(MAX_STEP, (now - last) / 1000);
+      last = now;
+      const goal = held ? boost : paused ? 0 : 1;
+      speed += (goal - speed) * Math.min(1, step * EASE);
+      offset += speed * pace * hh * step;
+      place();
+      frame = 0;
+      if (goal === 0 && speed < SETTLED) {
+        speed = 0;
+        return;
+      }
+      start();
+    }
+
+    function start() {
+      if (frame || still || !visible || document.hidden) {
+        return;
+      }
+      if (!last || performance.now() - last > MAX_STEP * 1000) {
+        last = performance.now();
+      }
+      frame = requestAnimationFrame(tick);
+    }
+
+    function stop() {
+      cancelAnimationFrame(frame);
+      frame = 0;
+      last = 0;
+    }
+
+    function toggle() {
+      paused = !paused;
+      start();
+    }
+
+    function press() {
+      held = true;
+      pressedAt = performance.now();
+      start();
+    }
+
+    function release() {
+      if (!held) {
+        return;
+      }
+      held = false;
+      if (performance.now() - pressedAt < HOLD_MS) {
+        paused = !paused;
+      }
+      start();
+    }
+
+    function key(event) {
+      if (event.key !== ' ' && event.key !== 'Enter') {
+        return;
+      }
+      event.preventDefault();
+      toggle();
+    }
+
+    function sync() {
+      if (document.hidden) {
+        stop();
+        return;
+      }
+      start();
+    }
+
+    const sizes = new ResizeObserver(() => {
+      measure();
+      place();
+    });
+    const view = new IntersectionObserver(([entry]) => {
+      visible = entry.isIntersecting;
+      if (visible) {
+        start();
+        return;
+      }
+      stop();
+    });
+
+    sizes.observe(stage);
+    view.observe(root);
+    root.addEventListener('pointerdown', press);
+    root.addEventListener('pointerup', release);
+    root.addEventListener('pointercancel', release);
+    root.addEventListener('pointerleave', release);
+    root.addEventListener('keydown', key);
+    document.addEventListener('visibilitychange', sync);
+    measure();
+    place();
+    start();
+
+    return () => {
+      stop();
+      sizes.disconnect();
+      view.disconnect();
+      root.removeEventListener('pointerdown', press);
+      root.removeEventListener('pointerup', release);
+      root.removeEventListener('pointercancel', release);
+      root.removeEventListener('pointerleave', release);
+      root.removeEventListener('keydown', key);
+      document.removeEventListener('visibilitychange', sync);
+    };
+  }
+
+  document.querySelectorAll('.fl-image-tunnel:not([data-ready])').forEach((root) => {
+    root.setAttribute('data-ready', '');
+    tunnel(root);
+  });
+})();
+</script>
+</div>
+  <div class="frame" data-theme="dark" data-frame="image-tunnel-dark"><section class="fl-image-tunnel" data-theme="dark" tabindex="0" aria-label="Image tunnel, press to pause" data-speed="0.9" data-boost="5">
+  <div class="stage">
+    <div class="world" aria-hidden="true">
+      <div class="wall left" data-wall="left"></div>
+      <div class="wall right" data-wall="right"></div>
+      <div class="wall floor" data-wall="floor"></div>
+      <div class="wall ceiling" data-wall="ceiling"></div>
+      <figure class="card" data-tone="0"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 1" loading="lazy" decoding="async" /></figure>
+      <figure class="card" data-tone="1"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 2" loading="lazy" decoding="async" /></figure>
+      <figure class="card" data-tone="2"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 3" loading="lazy" decoding="async" /></figure>
+      <figure class="card" data-tone="3"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 4" loading="lazy" decoding="async" /></figure>
+      <figure class="card" data-tone="0"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 5" loading="lazy" decoding="async" /></figure>
+      <figure class="card" data-tone="1"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 6" loading="lazy" decoding="async" /></figure>
+      <figure class="card" data-tone="2"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 7" loading="lazy" decoding="async" /></figure>
+      <figure class="card" data-tone="3"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 8" loading="lazy" decoding="async" /></figure>
+      <figure class="card" data-tone="0"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 1" loading="lazy" decoding="async" /></figure>
+      <figure class="card" data-tone="1"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 2" loading="lazy" decoding="async" /></figure>
+      <figure class="card" data-tone="2"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 3" loading="lazy" decoding="async" /></figure>
+      <figure class="card" data-tone="3"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 4" loading="lazy" decoding="async" /></figure>
+      <figure class="card" data-tone="0"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 5" loading="lazy" decoding="async" /></figure>
+      <figure class="card" data-tone="1"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 6" loading="lazy" decoding="async" /></figure>
+      <figure class="card" data-tone="2"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 7" loading="lazy" decoding="async" /></figure>
+      <figure class="card" data-tone="3"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" alt="Placeholder image 8" loading="lazy" decoding="async" /></figure>
+    </div>
+    <div class="overlay">
+      <h2>welcome to the tunnel</h2>
+      <p>click to pause, press and hold to speed up</p>
+    </div>
+  </div>
+</section>
+
+<script>
+(() => {
+  const DEFAULT_SPEED = 0.9;
+  const DEFAULT_BOOST = 5;
+  const WALLS = ['left', 'right', 'floor', 'ceiling'];
+  const LANES = [-0.4, 0.35, -0.1, 0.4];
+  const DEPTH = 10;
+  const RINGS = 20;
+  const EASE = 4;
+  const MAX_STEP = 0.1;
+  const HOLD_MS = 250;
+  const SETTLED = 0.001;
+  const FADE = 0.4;
+  const INSET = 1;
+
+  function tunnel(root) {
+    const stage = root.querySelector('.stage');
+    const walls = [...root.querySelectorAll('.wall')];
+    const cards = [...root.querySelectorAll('.card')];
+    const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const pace = Number(root.dataset.speed) || DEFAULT_SPEED;
+    const boost = Number(root.dataset.boost) || DEFAULT_BOOST;
+
+    let hw = 0;
+    let hh = 0;
+    let depth = 0;
+    let cell = 0;
+    let span = 0;
+    let offset = 0;
+    let speed = 1;
+    let paused = false;
+    let held = false;
+    let pressedAt = 0;
+    let visible = true;
+    let frame = 0;
+    let last = 0;
+
+    function pose(wall, lane, z, inset) {
+      if (wall === 'left') {
+        return `translate3d(${inset - hw}px,${lane * hh}px,${z}px) rotateY(90deg)`;
+      }
+      if (wall === 'right') {
+        return `translate3d(${hw - inset}px,${lane * hh}px,${z}px) rotateY(-90deg)`;
+      }
+      if (wall === 'floor') {
+        return `translate3d(${lane * hw}px,${hh - inset}px,${z}px) rotateX(90deg)`;
+      }
+      return `translate3d(${lane * hw}px,${inset - hh}px,${z}px) rotateX(-90deg)`;
+    }
+
+    function size(el, w, h) {
+      el.style.width = `${w}px`;
+      el.style.height = `${h}px`;
+      el.style.left = `${-w / 2}px`;
+      el.style.top = `${-h / 2}px`;
+    }
+
+    function measure() {
+      hw = stage.clientWidth / 2;
+      hh = stage.clientHeight / 2;
+      depth = hh * DEPTH;
+      cell = depth / RINGS;
+      span = depth + cell * 2;
+      stage.style.perspective = `${Math.max(hw, hh) * 1.1}px`;
+      root.style.setProperty('--cell', `${cell}px`);
+
+      walls.forEach((el) => {
+        const side = el.dataset.wall === 'left' || el.dataset.wall === 'right';
+        size(el, side ? span : hw * 2, side ? hh * 2 : span);
+      });
+      cards.forEach((el, i) => {
+        const side = i % WALLS.length < 2;
+        size(el, side ? hh * 0.62 : hw * 0.5, side ? hh * 0.86 : hw * 0.34);
+      });
+    }
+
+    function place() {
+      const shift = offset % cell;
+      walls.forEach((el) => {
+        el.style.transform = pose(el.dataset.wall ?? '', 0, shift - depth / 2, 0);
+      });
+      cards.forEach((el, i) => {
+        const z = ((i / cards.length) * span + offset) % span - depth;
+        const lane = LANES[Math.floor(i / WALLS.length) % LANES.length];
+        el.style.transform = pose(WALLS[i % WALLS.length], lane, z, INSET);
+        el.style.opacity = String(Math.min(1, Math.max(0, (z + depth) / (depth * FADE))));
+      });
+    }
+
+    function tick(now) {
+      const step = Math.min(MAX_STEP, (now - last) / 1000);
+      last = now;
+      const goal = held ? boost : paused ? 0 : 1;
+      speed += (goal - speed) * Math.min(1, step * EASE);
+      offset += speed * pace * hh * step;
+      place();
+      frame = 0;
+      if (goal === 0 && speed < SETTLED) {
+        speed = 0;
+        return;
+      }
+      start();
+    }
+
+    function start() {
+      if (frame || still || !visible || document.hidden) {
+        return;
+      }
+      if (!last || performance.now() - last > MAX_STEP * 1000) {
+        last = performance.now();
+      }
+      frame = requestAnimationFrame(tick);
+    }
+
+    function stop() {
+      cancelAnimationFrame(frame);
+      frame = 0;
+      last = 0;
+    }
+
+    function toggle() {
+      paused = !paused;
+      start();
+    }
+
+    function press() {
+      held = true;
+      pressedAt = performance.now();
+      start();
+    }
+
+    function release() {
+      if (!held) {
+        return;
+      }
+      held = false;
+      if (performance.now() - pressedAt < HOLD_MS) {
+        paused = !paused;
+      }
+      start();
+    }
+
+    function key(event) {
+      if (event.key !== ' ' && event.key !== 'Enter') {
+        return;
+      }
+      event.preventDefault();
+      toggle();
+    }
+
+    function sync() {
+      if (document.hidden) {
+        stop();
+        return;
+      }
+      start();
+    }
+
+    const sizes = new ResizeObserver(() => {
+      measure();
+      place();
+    });
+    const view = new IntersectionObserver(([entry]) => {
+      visible = entry.isIntersecting;
+      if (visible) {
+        start();
+        return;
+      }
+      stop();
+    });
+
+    sizes.observe(stage);
+    view.observe(root);
+    root.addEventListener('pointerdown', press);
+    root.addEventListener('pointerup', release);
+    root.addEventListener('pointercancel', release);
+    root.addEventListener('pointerleave', release);
+    root.addEventListener('keydown', key);
+    document.addEventListener('visibilitychange', sync);
+    measure();
+    place();
+    start();
+
+    return () => {
+      stop();
+      sizes.disconnect();
+      view.disconnect();
+      root.removeEventListener('pointerdown', press);
+      root.removeEventListener('pointerup', release);
+      root.removeEventListener('pointercancel', release);
+      root.removeEventListener('pointerleave', release);
+      root.removeEventListener('keydown', key);
+      document.removeEventListener('visibilitychange', sync);
+    };
+  }
+
+  document.querySelectorAll('.fl-image-tunnel:not([data-ready])').forEach((root) => {
+    root.setAttribute('data-ready', '');
+    tunnel(root);
+  });
+})();
+</script>
 </div>
 </section>
 <section class="item" id="integrations-grid">
@@ -3389,6 +4330,197 @@ document.querySelectorAll('.fl-modal:not([data-ready])').forEach((root) => {
     </figcaption>
   </figure>
 </section>
+</div>
+</section>
+<section class="item" id="scroll-reveal-text">
+  <h2>Scroll reveal text <small>section / text, scroll, animation</small></h2>
+  <div class="frame" data-theme="light" data-frame="scroll-reveal-text-light"><section class="fl-scroll-reveal-text">
+  <div class="fl-container">
+    <div class="reveal" data-reveal="word">
+      <p>This is placeholder copy. Replace it with a short statement about what your product does and who it is for.</p>
+      <p>Each word lights up as the reader scrolls, so keep the sentences short and the ideas clear.</p>
+      <p>Scroll back up and the text fades again. Swap these lines for your own words.</p>
+    </div>
+  </div>
+</section>
+
+<script>
+(() => {
+  const START = 0.8;
+  const END = 0.4;
+
+  function track(root) {
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      root.style.setProperty('--p', '1');
+      return () => {};
+    }
+
+    let frame = 0;
+
+    function update() {
+      frame = 0;
+      const rect = root.getBoundingClientRect();
+      const raw = (innerHeight * START - rect.top) / (rect.height + innerHeight * (START - END));
+      root.style.setProperty('--p', String(Math.min(1, Math.max(0, raw))));
+    }
+
+    function schedule() {
+      if (!frame) {
+        frame = requestAnimationFrame(update);
+      }
+    }
+
+    addEventListener('scroll', schedule, { passive: true });
+    addEventListener('resize', schedule);
+    update();
+
+    return () => {
+      removeEventListener('scroll', schedule);
+      removeEventListener('resize', schedule);
+      cancelAnimationFrame(frame);
+    };
+  }
+
+  function build(root, reveal) {
+    let i = 0;
+
+    root.querySelectorAll('p').forEach((p) => {
+      const text = (p.textContent ?? '').trim();
+      const hidden = document.createElement('span');
+      hidden.setAttribute('aria-hidden', 'true');
+
+      text.split(' ').forEach((word, index, all) => {
+        const w = document.createElement('span');
+        w.className = 'w';
+        (reveal === 'char' ? [...word] : [word]).forEach((t) => {
+          const u = document.createElement('span');
+          u.className = 'u';
+          u.textContent = t;
+          u.style.setProperty('--i', String(i++));
+          w.append(u);
+        });
+        hidden.append(w);
+        if (index < all.length - 1) {
+          hidden.append(' ');
+        }
+      });
+
+      const sr = document.createElement('span');
+      sr.className = 'sr';
+      sr.textContent = text;
+      p.replaceChildren(sr, hidden);
+    });
+
+    root.style.setProperty('--n', String(i));
+  }
+
+  function mount(root) {
+    if (!root.hasAttribute('data-ready')) {
+      root.setAttribute('data-ready', '');
+      build(root, root.dataset.reveal === 'char' ? 'char' : 'word');
+    }
+    return track(root);
+  }
+
+  document.querySelectorAll('.fl-scroll-reveal-text .reveal:not([data-ready])').forEach((root) => {
+    mount(root);
+  });
+})();
+</script>
+</div>
+  <div class="frame" data-theme="dark" data-frame="scroll-reveal-text-dark"><section class="fl-scroll-reveal-text">
+  <div class="fl-container">
+    <div class="reveal" data-reveal="word">
+      <p>This is placeholder copy. Replace it with a short statement about what your product does and who it is for.</p>
+      <p>Each word lights up as the reader scrolls, so keep the sentences short and the ideas clear.</p>
+      <p>Scroll back up and the text fades again. Swap these lines for your own words.</p>
+    </div>
+  </div>
+</section>
+
+<script>
+(() => {
+  const START = 0.8;
+  const END = 0.4;
+
+  function track(root) {
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      root.style.setProperty('--p', '1');
+      return () => {};
+    }
+
+    let frame = 0;
+
+    function update() {
+      frame = 0;
+      const rect = root.getBoundingClientRect();
+      const raw = (innerHeight * START - rect.top) / (rect.height + innerHeight * (START - END));
+      root.style.setProperty('--p', String(Math.min(1, Math.max(0, raw))));
+    }
+
+    function schedule() {
+      if (!frame) {
+        frame = requestAnimationFrame(update);
+      }
+    }
+
+    addEventListener('scroll', schedule, { passive: true });
+    addEventListener('resize', schedule);
+    update();
+
+    return () => {
+      removeEventListener('scroll', schedule);
+      removeEventListener('resize', schedule);
+      cancelAnimationFrame(frame);
+    };
+  }
+
+  function build(root, reveal) {
+    let i = 0;
+
+    root.querySelectorAll('p').forEach((p) => {
+      const text = (p.textContent ?? '').trim();
+      const hidden = document.createElement('span');
+      hidden.setAttribute('aria-hidden', 'true');
+
+      text.split(' ').forEach((word, index, all) => {
+        const w = document.createElement('span');
+        w.className = 'w';
+        (reveal === 'char' ? [...word] : [word]).forEach((t) => {
+          const u = document.createElement('span');
+          u.className = 'u';
+          u.textContent = t;
+          u.style.setProperty('--i', String(i++));
+          w.append(u);
+        });
+        hidden.append(w);
+        if (index < all.length - 1) {
+          hidden.append(' ');
+        }
+      });
+
+      const sr = document.createElement('span');
+      sr.className = 'sr';
+      sr.textContent = text;
+      p.replaceChildren(sr, hidden);
+    });
+
+    root.style.setProperty('--n', String(i));
+  }
+
+  function mount(root) {
+    if (!root.hasAttribute('data-ready')) {
+      root.setAttribute('data-ready', '');
+      build(root, root.dataset.reveal === 'char' ? 'char' : 'word');
+    }
+    return track(root);
+  }
+
+  document.querySelectorAll('.fl-scroll-reveal-text .reveal:not([data-ready])').forEach((root) => {
+    mount(root);
+  });
+})();
+</script>
 </div>
 </section>
 <section class="item" id="settings-form">
