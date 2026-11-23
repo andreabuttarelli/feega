@@ -3,9 +3,10 @@ import { join, relative, resolve } from 'node:path';
 import { appsIn } from '@feega/dev-run/run-plan';
 import { AddKind, type AddPlace } from '@feega/live-edit/add-node';
 import { liveAtOf } from '@feega/live-edit/live-ask';
+import { LiveProp } from '@feega/live-edit/live-fields';
 import { StructureOp } from '@feega/live-edit/structure';
 import type { SupportItem } from '../support';
-import { AccountState, Onboarding, OnboardingOutcome, ServerAction, ServerState, ToHost, ToView, type EditAsk, type HostMessage, type Pick, type Prefs, type ViewMessage } from '../messages';
+import { AccountState, Gate, ImpactKind, Onboarding, OnboardingOutcome, ServerAction, ServerState, ToHost, ToView, type EditAsk, type ImpactAsk, type HostMessage, type Pick, type Prefs, type ViewMessage } from '../messages';
 import { SettingKey, StylingChoice } from '../settings';
 import { SignInEnd, signIn } from './sign-in';
 import { addPlugin } from './add-plugin';
@@ -21,6 +22,9 @@ import { commentsHost } from './comments';
 import { shareSession } from './share/share-session';
 import { copyImage } from './image-copy';
 import { fileEdits, type Snapshot, type Written } from './file-edits';
+import { impactOf } from './impact';
+import { usageIndex } from './usages';
+import { diffOf } from './diff-preview';
 import type { KeptServers } from './kept-servers';
 import { forget, remember, type Memo } from './orphans';
 import { Stored, type Platform } from './platform';
@@ -82,6 +86,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   const stylingChoice = () => platform.settings()[SettingKey.Styling] as StylingChoice;
   const editsAt = (dir: string) => fileEdits(dir, stylingChoice, platform.stored<Snapshot>(Stored.History));
   let edits = editsAt(root);
+  let usages = usageIndex(root);
   const post = (message: ViewMessage) => platform.send(message);
   let signedIn = false;
   let editKind = EditKind.Other;
@@ -103,6 +108,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     if (out.ok) {
       usage?.edit(editKind);
     }
+    usages.invalidate();
     await postHistory();
     const saved = ask ? (liveAtOf(ask.at) ?? undefined) : undefined;
     await post(out.ok ? { kind: ToView.Edited, ok: true, fromHistory: replay === Replay.History, written: out.written, saved, note: out.note, select: out.selected } : { kind: ToView.Edited, ok: false, reason: out.reason, at: out.at });
@@ -316,7 +322,33 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     delayMs: SYNC_SELECTION_DELAY_MS
   });
 
-  const edit = (ask: EditAsk) => edits.edit(ask).then((out) => edited(out, ask));
+  const impact = (ask: ImpactAsk) => impactOf(root, ask, edits.targets, usages);
+
+  async function impactShown(id: number, ask: ImpactAsk) {
+    await post({ kind: ToView.Impact, id, impact: await impact(ask) });
+  }
+
+  async function held(ask: EditAsk): Promise<boolean> {
+    const asked = platform.settings()[SettingKey.PreviewUnknown] !== false && ask.prop !== LiveProp.Text;
+    const found = asked ? await impact(ask) : null;
+    if (found?.kind !== ImpactKind.Unknown) {
+      return false;
+    }
+    const preview = await edits.preview(ask);
+    const files = preview.ok ? diffOf(preview.changes ?? []) : [];
+    if (!files.length) {
+      return false;
+    }
+    await post({ kind: ToView.Preview, ask, reason: found.reason, files });
+    return true;
+  }
+
+  async function edit(ask: EditAsk, gate = Gate.Ask): Promise<Written | null> {
+    if (gate === Gate.Ask && (await held(ask))) {
+      return null;
+    }
+    return edits.edit(ask).then((out) => edited(out, ask));
+  }
   const undo = () => edits.undo().then((out) => edited(out, null, Replay.History));
 
   async function revert(id: number | null) {
@@ -378,6 +410,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     app = next;
     root = join(workspace, next);
     edits = editsAt(root);
+    usages = usageIndex(root);
     await platform.store(Stored.App, next);
   }
 
@@ -555,7 +588,8 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
 
   const handlers: { [K in ToHost]: (m: Extract<HostMessage, { kind: K }>) => unknown } = {
     [ToHost.Ready]: () => (showApp(), postSettings(), postHistory(), showAccount(), showOnboarding(), showSupport(), showSkillHint(), comments.show(), sharing.show(), pluginList?.show()),
-    [ToHost.Edit]: (m) => edit(m.ask),
+    [ToHost.Edit]: (m) => edit(m.ask, m.gate),
+    [ToHost.Impact]: (m) => impactShown(m.id, m.ask),
     [ToHost.Undo]: undo,
     [ToHost.Open]: (m) => platform.openSource(root, m.at),
     [ToHost.Picked]: (m) => (picks.get(m.id)?.(m.pick), picks.delete(m.id)),

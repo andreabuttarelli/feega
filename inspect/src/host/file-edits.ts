@@ -32,7 +32,7 @@ import { addGo, type GoAsk } from '@feega/live-edit/go-action';
 import { linkWrite, type LinkEdit } from '@feega/live-edit/link-edit';
 import { attributeWrite } from '@feega/live-edit/attribute-edit';
 import type { Proposal } from '@feega/plugin-api/protocol';
-import { Styling, type EditAsk } from '../messages';
+import { Styling, type EditAsk, type ImpactAsk } from '../messages';
 import { StylingChoice } from '../settings';
 import { stylingOf } from './styling';
 import { breakpointsOf } from './breakpoints';
@@ -47,7 +47,7 @@ export type DetachAsk = { at: string; usage: string; which: Which };
 
 export type ManyAsk = { op: StructureOp; targets: { at: string; instance?: number }[]; wrap?: WrapTag };
 
-export type Written = { ok: true; path: string; written: string; note?: string; selected?: LiveAt } | { ok: false; reason: string; at?: LiveAt };
+export type Written = { ok: true; path: string; written: string; note?: string; selected?: LiveAt; changes?: FileChange[] } | { ok: false; reason: string; at?: LiveAt };
 
 type Changes = { ok: true; changes: FileChange[] } | { ok: false; reason: string; at?: LiveAt };
 
@@ -99,6 +99,13 @@ async function ruled(read: ReadFile, out: Extract<Structured, { ok: true }>, css
   return rule.ok ? { ...out, changes: mergedChanges(out.changes, rule.changes) } : rule;
 }
 
+export enum Commit {
+  Write = 'write',
+  Preview = 'preview'
+}
+
+const PROBE_CSS: Css = { 'outline-offset': '7.25px' };
+
 type Step = { full: string; before: string; after: string; encoding?: 'base64' }[];
 
 export type Change = { id: number; at: string; prop: string; value: string; scope: string; files: string[]; time: number };
@@ -127,9 +134,12 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     return next;
   };
 
-  async function writtenAll(changes: FileChange[], token: string, note?: string): Promise<Written> {
+  async function writtenAll(changes: FileChange[], token: string, note?: string, mode = Commit.Write): Promise<Written> {
     const step: Step = [];
     const moving = changes.filter((c) => c.before !== c.after);
+    if (mode === Commit.Preview) {
+      return { ok: true, path: changes[0]?.path ?? '', written: token, note, changes: moving };
+    }
     if (!moving.length) {
       return { ok: true, path: changes[0]?.path ?? '', written: token, note };
     }
@@ -150,9 +160,9 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     return { ok: true, path: changes[0]?.path ?? '', written: token, note };
   }
 
-  async function edited(ask: EditAsk, extra: FileChange[] = []): Promise<Written> {
+  async function edited(ask: EditAsk, extra: FileChange[] = [], mode = Commit.Write): Promise<Written> {
     meta = { at: ask.at, prop: ask.prop, value: ask.value ?? '', scope: ask.scope ?? '' };
-    const written = (changes: FileChange[], token: string, note?: string) => writtenAll([...changes, ...extra.filter((e) => !changes.some((c) => c.path === e.path))], token, note);
+    const written = (changes: FileChange[], token: string, note?: string) => writtenAll([...changes, ...extra.filter((e) => !changes.some((c) => c.path === e.path))], token, note, mode);
     const breakpoint = ask.breakpoint === undefined ? undefined : targetOf(await breakpointsOf(root), ask.breakpoint);
     if (breakpoint === null) {
       return { ok: false, reason: `${ask.breakpoint} is not a breakpoint of this project` };
@@ -199,6 +209,18 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
       return { ok: false, reason: out.skipped[0] };
     }
     return out.files.length || extra.length ? written(out.files, token ?? '') : { ok: true, path: at.file, written: token ?? '' };
+  }
+
+  async function targetsOf(ask: ImpactAsk): Promise<string[] | null> {
+    const at = liveAtOf(ask.at);
+    if (!at) {
+      return null;
+    }
+    if ((await stylingOf(root, choice())) !== Styling.Css) {
+      return [at.file];
+    }
+    const out = await edited({ ...ask, prop: LiveProp.Color, value: undefined, css: PROBE_CSS }, [], Commit.Preview);
+    return out.ok ? (out.changes ?? []).map((c) => c.path) : null;
   }
 
   async function fontWiring(read: ReadFile, family: string, google: boolean): Promise<{ changes: FileChange[]; unloaded: boolean }> {
@@ -451,6 +473,8 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     structureMany: (ask: ManyAsk) => inTurn(() => restructuredMany(ask)),
     move: (from: string, to: string, place: Place) => inTurn(() => moved(from, to, place)),
     edit: (ask: EditAsk) => inTurn(() => edited(ask)),
+    preview: (ask: EditAsk) => inTurn(() => edited(ask, [], Commit.Preview)),
+    targets: (ask: ImpactAsk) => inTurn(() => targetsOf(ask)),
     icon: (at: string, name: string) => inTurn(() => iconSwapped(at, name)),
     svg: (at: string, markup: string, inner?: string) => inTurn(() => svgWritten(at, markup, inner)),
     font: (ask: EditAsk, google: boolean) => inTurn(() => fontEdited(ask, google)),

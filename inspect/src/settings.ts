@@ -5,7 +5,7 @@ export enum SettingKey {
   DefaultSize = 'feegaInspect.defaultSize',
   KeepServerAlive = 'feegaInspect.keepServerAlive',
   SyncSelection = 'feegaInspect.syncSelection',
-  SharedWarning = 'feegaInspect.sharedWarning'
+  PreviewUnknown = 'feegaInspect.previewUnknown'
 }
 
 export enum StylingChoice {
@@ -69,9 +69,9 @@ export const SETTINGS: SettingRow[] = [
     fallback: true
   },
   {
-    key: SettingKey.SharedWarning,
-    label: 'Warn when an edit reaches several instances',
-    hint: 'A bar in Properties tells you when the element belongs to a component used more than once, and offers to detach this instance.',
+    key: SettingKey.PreviewUnknown,
+    label: 'Preview edits with unknown impact',
+    hint: 'When Feega cannot tell where an edit will land (global CSS, a class built from props or a function, a CSS variable), it shows the diff and waits for Apply.',
     fallback: true
   }
 ];

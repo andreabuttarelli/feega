@@ -124,10 +124,10 @@
           "default": true,
           "description": "Reveal the source of the selected element in a text editor beside Feega, with its line selected, without taking focus. Coding agents that read the editor selection then see it."
         },
-        "feegaInspect.sharedWarning": {
+        "feegaInspect.previewUnknown": {
           "type": "boolean",
           "default": true,
-          "description": "Warn in Properties when an edit reaches every instance of a shared component, and offer to detach this instance."
+          "description": "Show the diff and wait for Apply when Feega cannot tell where an edit will land (global CSS, a class built from props or a function, a CSS variable)."
         },
         "feegaInspect.plugins.dev": {
           "type": "array",

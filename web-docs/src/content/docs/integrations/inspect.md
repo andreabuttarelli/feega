@@ -48,17 +48,31 @@ Feega Inspect is a small editor extension, separate from the Feega canvas. No ac
    rule next to the base rule in CSS, CSS modules and Svelte/Vue scoped styles; `×` removes only
    that state's value. States set by JavaScript, `:has()` and CSS nesting are not forced.
 
-   **Shared components.** When the element belongs to a component used more than once and the
-   scope is **This element ×N**, a bar in Properties says "Edits N instances". **Dismiss** hides
-   it for that component until you reopen the panel; **Don't show again** turns it off
-   (`feegaInspect.sharedWarning`). **Detach** (also **Detach instance** in the right-click menu of
-   the preview and the Layers tree) copies the component file next to the original, named after
-   the page or route that uses it (`Button.tsx` becomes `ButtonPricing.tsx`), renames the
+   **Impact label.** One line under the breadcrumb says, before you edit, where the edit will
+   land. It updates when you select an element and when the scope, state, breakpoint or theme
+   changes.
+   - **This element only**: the markup is in a file no other file imports. In a list it reads
+     "This file only · ×N on this page".
+   - **Button component · used in N files**: the edit lands in a component's source that N other
+     project files import, directly, through an index file that re-exports it, or with an alias
+     such as `@/` or `$lib`. Tests and stories do not count. "×N here" is the number of instances
+     on this page. Click the label to list the files; click a file to open it at the usage.
+     **Only this one** detaches this instance.
+   - **Impact unknown**: Feega cannot tell where the edit lands: the rule would go to a global
+     stylesheet, the value is a CSS variable (`var(--x)`), or the class comes from props, `cn()`,
+     `cva`, a template string, a conditional or a spread. Hover the label for the reason. Before
+     writing, Feega shows a compact diff with **Apply** and **Cancel**; **Don't ask again** turns
+     it off (`feegaInspect.previewUnknown`). Local and component edits write immediately.
+
+   **Detach.** **Detach instance** (**Only this one** in the impact label, and the right-click
+   menu of the preview and the Layers tree) copies the component file next to the original, named
+   after the page or route that uses it (`Button.tsx` becomes `ButtonPricing.tsx`), renames the
    component inside the copy and points only that usage, its import and its tag, at the copy. It
    is one undo step and shows in the diff. It works on React (`.tsx`, `.jsx`), Svelte, Vue and
    Astro, and refuses, saying why, when the component is imported through a re-export, rendered
    in a loop or a dynamic component, when its usage is not in the file of the nearest parent, or
    when that element holds several usages of it.
+
    **Theme snapping.** In a Tailwind project, dragging or typing a padding, margin, gap, width,
    height, radius or font size snaps to the nearest step of your theme (the Tailwind scale plus
    `--spacing`, `--radius-*` and `--text-*` from your CSS) when it is within 2px or 8%. Tick marks

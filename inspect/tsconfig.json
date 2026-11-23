@@ -10,5 +10,6 @@
     "noEmit": true,
     "types": ["node", "vscode"]
   },
-  "include": ["src/**/*.ts", "src/**/*.json"]
+  "include": ["src/**/*.ts", "src/**/*.json"],
+  "exclude": ["src/host/impact-fixtures"]
 }
