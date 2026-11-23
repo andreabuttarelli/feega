@@ -52,6 +52,7 @@
   <meta name="twitter:image" content={OG.image.url} />
   <meta name="twitter:image:alt" content={OG.image.alt} />
   <meta name="twitter:creator" content="@andreabttrll" />
+  <meta name="toolfolio-verify" content="qh2Rig8KEJjGMsXDszsaQ7F7vs0alLES" />
   <meta name="robots" content="max-image-preview:large" />
 </svelte:head>
 
