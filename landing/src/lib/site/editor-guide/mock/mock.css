@@ -130,13 +130,12 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  height: 21px;
-  padding: 1px 6px;
-  border: 1px solid #8a8a8e;
-  border-radius: 4px;
-  background: #efeff0;
-  color: #000000;
-  font: 13.333px -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-input);
+  color: var(--ui-text);
+  font-size: var(--ui-text-sm);
 }
 
 .gm .badge {
@@ -148,10 +147,6 @@
   display: inline-grid;
   margin-left: auto;
   color: var(--ui-text-2);
-}
-
-.gm .reach .caret {
-  color: #000000;
 }
 
 .gm .scope {
