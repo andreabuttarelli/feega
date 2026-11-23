@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -113,6 +113,15 @@ describe('the node platform on disk', () => {
 
     expect(existsSync(join(root, '.feega/state.json'))).toBe(false);
     expect(make().stored(Stored.Prefs)).toEqual({ size: 'phone' });
+  });
+
+  it('serves the library catalog that ships next to the launcher', async () => {
+    const dist = mkdtempSync(join(tmpdir(), 'feega-dist-'));
+    mkdirSync(join(dist, 'launcher'));
+    writeFileSync(join(dist, 'library.json'), JSON.stringify({ items: [], tokens: '' }));
+    const platform = nodePlatform({ root: '/app', launcher: join(dist, 'launcher'), version: '', env: {}, transport: { send: () => undefined, receive: () => undefined }, print: () => undefined });
+
+    expect(await platform.library?.()).toEqual({ items: [], tokens: '' });
   });
 
   it('opens a source in VS Code at its line, else prints where it is', async () => {

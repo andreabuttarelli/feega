@@ -9,6 +9,7 @@ import { pluginsRoot } from '@feega/plugin-store/registry';
 import { fileAccountStore, type AccountStore } from './account';
 import { fileOnboardingStore, type OnboardingStore } from './onboarding';
 import { fileSupportStore, type SupportStore } from './support';
+import { catalogFile } from './library';
 import { openTarget } from './open-source';
 import type { Platform, Stored, Transport } from './platform';
 import type { PluginsHost } from './plugins-session';
@@ -110,6 +111,7 @@ export function nodePlatform({ root, launcher, version, transport, print, launch
     sourceControl: () => print(`feega: review the changes with \`git -C ${root} diff\``),
     notify: (text) => print(`feega: ${text}`),
     warn: async (text) => (print(`feega: ${text}`), false),
+    library: catalogFile(join(dirname(launcher), 'library.json')),
     account,
     cloud,
     share,
