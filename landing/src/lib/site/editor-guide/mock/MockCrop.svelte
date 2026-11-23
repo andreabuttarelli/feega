@@ -14,7 +14,6 @@
   const entry = $derived(MOCKS[id]);
   const script = $derived(SCRIPTS[id]);
   const Mock = $derived(entry.component);
-  const Preview = $derived(entry.preview);
 
   let root: HTMLDivElement;
   let live = $state<DemoState | undefined>();
@@ -99,7 +98,6 @@
 
 <div class="crop" bind:this={root} data-mock-for={id} style:--fx={(focus ?? entry.focus).x} style:--fy={(focus ?? entry.focus).y} style:--zp={entry.zoom.phone} style:--zd={entry.zoom.desktop}>
   <div class="placed" class:corner={entry.anchor === Anchor.TopRight}><Mock {...entry.props} {demo} /></div>
-  {#if Preview}<div class="strip"><Preview {demo} /></div>{/if}
   <DemoChip text={demo[Key.Chip] ?? ''} />
   {#if cursor}<DemoCursor at={cursor.at} pressed={cursor.pressed} ring={cursor.ring} />{/if}
 </div>
@@ -132,21 +130,6 @@
     left: auto;
     transform: scale(var(--z));
     transform-origin: 100% 0;
-  }
-
-  .strip {
-    position: absolute;
-    top: 0;
-    right: 0;
-    left: 0;
-    z-index: 3;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 44px;
-    border-bottom: 1px solid #2b2b2b;
-    background: #0d0d0d;
-    pointer-events: none;
   }
 
   @media (min-width: 900px) {
