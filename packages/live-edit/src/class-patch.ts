@@ -8,6 +8,7 @@ export type LiveChange = { prop: LiveProp; family?: string; value: string; side?
 
 export type LivePatched = { files: FileChange[]; skipped: string[] };
 
+const EMPTY_ARBITRARY = /\[(?:[\w-]+:)?\]/;
 const CLASS_ATTR = /(\s(?:class|className)=)("([^"{}]*)"|\{)/;
 
 export function offsetOf(text: string, at: LiveAt): number {
@@ -78,6 +79,10 @@ function added(open: string, closing: number, attr: string, made: string, varian
 const label = (at: LiveAt) => `${at.file}:${at.line}`;
 
 async function classPatch(read: ReadFile, at: LiveAt, change: LiveChange, rule: ClassRule): Promise<LivePatched> {
+  if (EMPTY_ARBITRARY.test(change.value)) {
+    return { files: [], skipped: [] };
+  }
+
   const text = await read(at.file);
   const start = text === null ? -1 : offsetOf(text, at);
   const end = start < 0 || text![start] !== '<' ? -1 : openTagEnd(text!, start);
