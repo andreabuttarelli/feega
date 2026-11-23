@@ -20,7 +20,7 @@ export type GuideFeature = {
 export const GUIDE_COPY = {
   eyebrow: 'editor guide',
   heading: 'what the editor does',
-  lead: 'The real editor panels, drawn in code, on a React and Tailwind app.',
+  lead: 'The panels you use on any React, Next.js, Vue, Nuxt, Svelte or Astro app.',
   landsLabel: 'lands in your code'
 } as const;
 
