@@ -1377,3 +1377,7 @@ Signal: a test of code under `packages/` hangs or ignores your edit in a worktre
 ## A reversible toggle that writes into the shared rule is not reversible
 
 **Signal:** Hide then Show leaves a diff (`- display: flex;`): the toggle overwrote a declaration the user authored, and the inverse can only delete it. **Move:** a toggle writes its own override (inline style for Hide) that the inverse removes, never the property of the rule; test it as hide then show leaving the file byte-identical.
+
+## The selection box floats after a Library insert
+
+**Signal:** after inserting a section, the old selection outline stays fixed on screen while the preview scrolls. The insert adds an import above the markup, the selected element's `data-feega-src` line shifts, the tracker finds nothing and sends a null rect, and the page bridge dropped null rects. **Move:** a null rect is a message, not noise: forward it and hide the outline (`page-bridge.test.ts`).
