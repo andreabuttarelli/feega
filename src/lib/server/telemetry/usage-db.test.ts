@@ -35,7 +35,7 @@ describe('usage sink', () => {
   it('retries without the funnel columns and new events when the table lacks them', async () => {
     const insert = vi.fn().mockResolvedValueOnce({ error: { code: 'PGRST204' } }).mockResolvedValueOnce({ error: null });
 
-    await makeSink(insert)([row(), row({ event: 'preview_ready' })]);
+    await makeSink(insert)([row(), row({ event: 'preview_ready' }), row({ event: 'install' }), row({ event: 'sign_in' }), row({ event: 'opened' })]);
 
     const retried = insert.mock.calls[1][0];
     expect(retried).toHaveLength(1);
