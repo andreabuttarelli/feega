@@ -14,7 +14,7 @@
   import { MOVES, Shortcut, isMac, needsBareFocus, shortcutOf, typingIn } from './selection-keys';
   import { Click, NONE, Surface, clickOf, contains, extend, keyOf, only, primary, refOf, siblingsOf, toggle, visibleRows, type Selection } from './selection';
   import type { SupportItem } from '../support';
-  import { AccountState, Mode, Onboarding, OnboardingOutcome, Move, ServerAction, Slot, type ChangeRow, type FontChoice, type LayerNode, type LibraryEntry, type Palette, ServerState, type ServerInfo, Styling, ToHost, ToView, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
+  import { AccountState, Mode, Onboarding, OnboardingOutcome, Move, ServerAction, Slot, type ChangeRow, type FontChoice, type LayerNode, type LibraryEntry, type Palette, ServerState, type ServerInfo, Styling, ToHost, ToView, type Impact, type ImpactAsk, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
   import { fromHost, inVscode, toHost } from './host';
   import { imageSaved } from './image-file.svelte';
   import { iconDrawn, iconsFound } from './icon-search.svelte';
@@ -57,8 +57,10 @@
   import { Place } from '@feega/live-edit/move-node';
   import { StructureOp } from '@feega/live-edit/structure';
   import StructureMenu from './StructureMenu.svelte';
-  import SharedBar from './SharedBar.svelte';
-  import { detachState, sharedWarning } from './detach';
+  import ImpactLabel from './ImpactLabel.svelte';
+  import PreviewBar from './PreviewBar.svelte';
+  import { applyMessage, heldOf, muteMessage, type Held } from './preview-gate';
+  import { detachState } from './detach';
   import LibraryPanel from './LibraryPanel.svelte';
   import { LIBRARY_DRAG_TYPE } from './library';
   import { agentContexts, commentContext } from './agent-context';
@@ -551,6 +553,8 @@
     },
     [ToView.Server]: (m) => ((server = m.state), (restarting = restarting ? m.state !== ServerState.Stopped : m.state === ServerState.Restarting), (serverReason = m.reason ?? ''), (serverInfo = m.info ?? serverInfo)),
     [ToView.Reload]: () => reloadAfterRestart(),
+    [ToView.Impact]: (m) => (m.id === impactId ? (impact = m.impact) : impact),
+    [ToView.Preview]: (m) => (held = heldOf(m)),
     [ToView.Status]: (m) => (problem = { text: m.text }),
     [ToView.Edited]: (m) => {
       const unsavedText = textPending;
@@ -567,6 +571,7 @@
         }
         return;
       }
+      held = null;
       problem = null;
       saved = m.saved ?? null;
       warning = m.note ?? '';
@@ -980,18 +985,43 @@
     }
   }
 
-  let sharedDismissed = $state(new Set<string>());
+  let impact = $state<Impact | null>(null);
+  let impactId = 0;
+  let held = $state<Held | null>(null);
 
-  const shared = $derived(sharedWarning({ pick: picked, scope, dismissed: sharedDismissed, enabled: settings?.[SettingKey.SharedWarning] !== false }));
+  const impactAsk = $derived(
+    picked ? { at: sourceText(picked.source), scope, inner: picked.inner, page: picked.page, state: writtenState, breakpoint: target, theme: writtenThemeName } : null
+  );
+  const impactKey = $derived(JSON.stringify(impactAsk));
 
-  function dismissShared() {
-    if (shared) {
-      sharedDismissed = new Set([...sharedDismissed, shared.component]);
+  $effect(() => {
+    held = null;
+    const ask: ImpactAsk | null = JSON.parse(impactKey);
+    if (!ask) {
+      impact = null;
+      return;
+    }
+    toHost({ kind: ToHost.Impact, id: ++impactId, ask });
+  });
+
+  function applyHeld() {
+    if (held) {
+      toHost(applyMessage(held));
+      held = null;
     }
   }
 
-  function muteShared() {
-    toHost({ kind: ToHost.Setting, key: SettingKey.SharedWarning, value: false });
+  function cancelHeld() {
+    held = null;
+    if (picked) {
+      bridge.clear(picked.source, writtenState);
+      refresh();
+    }
+  }
+
+  function muteHeld() {
+    toHost(muteMessage());
+    applyHeld();
   }
 
   function pickMenu(id: string) {
@@ -1300,6 +1330,7 @@
         {:else if picked}
           <div class="what" data-testid="selection">
             <Breadcrumb pick={picked} onselect={select} state={elementState} />
+            <ImpactLabel {impact} instances={picked.instances} detachable={detachState(picked).show} detachReason={detachState(picked).reason} ondetach={detach} onopen={(at) => toHost({ kind: ToHost.Open, at })} />
             <span class="where">{#if picked.component}in {picked.component.file.split('/').pop()} · {/if}<button type="button" class="link" onclick={() => toHost({ kind: ToHost.Open, at: picked!.source })}>{picked.source.file.split('/').pop()}:{picked.source.line}</button> · <button type="button" class="link" data-testid="copy-for-agent" title="Copy file, selector and view for your coding agent" onclick={copyForAgent}>Copy for agent</button>{#if cloudOn} · <button type="button" class="link" data-testid="comment-start" title="Comment on this element (C)" onclick={startComment}>Comment</button>{/if}</span>
             {#if authored(picked.classes)}<code class="classes">{authored(picked.classes)}</code>{/if}
           </div>
@@ -1308,7 +1339,7 @@
             <button type="button" class:on={scope === Scope.Element} onclick={() => (scope = Scope.Element)} title="Only this element (every instance of its component: {picked.instances})">This element{picked.instances > 1 ? ` ×${picked.instances}` : ''}</button>
             <button type="button" class:on={scope === Scope.Class} disabled={!picked.classCount || styling === Styling.Tailwind} onclick={() => (scope = Scope.Class)} title={styling === Styling.Tailwind ? 'Class scope needs CSS rules, not Tailwind' : `Every element with this class: ${picked.classCount}`}>All .{picked.classes.split(' ')[0] || 'class'}{picked.classCount ? ` (${picked.classCount})` : ''}</button>
           </div>
-          {#if shared}<SharedBar instances={shared.instances} reason={detachState(picked).reason} ondetach={detach} ondismiss={dismissShared} onmute={muteShared} />{/if}
+          {#if held}<PreviewBar {held} onapply={applyHeld} oncancel={cancelHeld} onmute={muteHeld} />{/if}
           <Properties pick={picked} {breakpoints} {scales} {palette} {elementState} {baseline} onstate={chooseState} onpreview={preview} onchange={change} onsavevar={saveVar} onhint={(h) => (hint = h)} onfont={pickFont} onfontreplace={replaceFont} onfontload={loadFont} onnotice={showToast} />
           <Attributes pick={picked} {palette} />
           <PluginSections {plugins} {palette} />

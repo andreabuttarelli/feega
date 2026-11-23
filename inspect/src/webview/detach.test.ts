@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { Scope } from '@feega/live-edit/scoped-rule';
 import { DETACH_ID, MENU_ITEMS, menuFor } from './structure-menu';
-import { detachState, sharedWarning, type DetachPick, type SharedFacts } from './detach';
+import { detachState, type DetachPick } from './detach';
 
 const pick = (over: Partial<DetachPick> = {}): DetachPick => ({ source: { file: 'src/Button.tsx', line: 1, col: 1 }, component: { file: 'src/Home.tsx', line: 5, col: 5 }, instances: 3, ...over });
 
-const facts = (over: Partial<SharedFacts> = {}): SharedFacts => ({ pick: pick(), scope: Scope.Element, dismissed: new Set(), enabled: true, ...over });
 
 describe('detachState', () => {
   it('is available on an instance of a React component', () => {
@@ -50,32 +48,5 @@ describe('menuFor with detach', () => {
 
   it('keeps every other entry unchanged', () => {
     expect(ids(menuFor(1, { show: true })).filter((id) => id !== DETACH_ID)).toEqual(ids(MENU_ITEMS.filter((item) => item.id !== DETACH_ID)));
-  });
-});
-
-describe('sharedWarning', () => {
-  it('shows for an edit that reaches several instances', () => {
-    expect(sharedWarning(facts())).toEqual({ instances: 3, component: 'src/Button.tsx' });
-  });
-
-  it('is silent for a single instance', () => {
-    expect(sharedWarning(facts({ pick: pick({ instances: 1 }) }))).toBeNull();
-  });
-
-  it('is silent when the scope is not the element', () => {
-    expect(sharedWarning(facts({ scope: Scope.Class }))).toBeNull();
-  });
-
-  it('is silent for a dismissed component only', () => {
-    expect(sharedWarning(facts({ dismissed: new Set(['src/Button.tsx']) }))).toBeNull();
-    expect(sharedWarning(facts({ dismissed: new Set(['src/Other.tsx']) }))).not.toBeNull();
-  });
-
-  it('is silent once the setting is off', () => {
-    expect(sharedWarning(facts({ enabled: false }))).toBeNull();
-  });
-
-  it('is silent without a selection', () => {
-    expect(sharedWarning(facts({ pick: null }))).toBeNull();
   });
 });

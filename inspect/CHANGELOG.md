@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+An impact label in Properties says before you edit whether an edit stays on the element, changes a shared component (and in how many files) or has an unknown impact, with a diff to Apply first for the unknown ones. Replaces the "Edits N instances" bar.
+
 Optional Support Feega checklist at the end of onboarding and in the Feega menu.
 
 ## 0.2.14

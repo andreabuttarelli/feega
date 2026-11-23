@@ -17,6 +17,7 @@ import type { Breakpoints } from '@feega/live-edit/breakpoints';
 import type { Theme } from '@feega/live-edit/themes';
 import type { Scales } from '@feega/live-edit/theme-scales';
 import type { CloudComment, CommentDraft } from './host/cloud-api';
+import type { DiffFile } from './host/diff-preview';
 import type { Catalog } from '@feega/plugin-api/external';
 import type { Proposal } from '@feega/plugin-api/protocol';
 import type { Present, VisitorRole } from '../../packages/share-protocol/src/frame';
@@ -32,6 +33,23 @@ export type IconHit = { name: string; label?: string; source: IconSource; svg?: 
 export type Rect = { x: number; y: number; width: number; height: number };
 
 export type Source = { file: string; line: number; col: number };
+
+export enum ImpactKind {
+  Local = 'local',
+  Component = 'component',
+  Unknown = 'unknown'
+}
+
+export type UsageSite = { file: string; line: number };
+
+export type Impact = { kind: ImpactKind.Local } | { kind: ImpactKind.Component; name: string; files: UsageSite[] } | { kind: ImpactKind.Unknown; reason: string };
+
+export type ImpactAsk = { at: string } & Partial<EditAsk>;
+
+export enum Gate {
+  Ask = 'ask',
+  Apply = 'apply'
+}
 
 export type Pick = {
   source: Source;
@@ -131,6 +149,7 @@ export enum Mode {
 export enum ToHost {
   Ready = 'ready',
   Edit = 'edit',
+  Impact = 'impact',
   Undo = 'undo',
   Open = 'open',
   Picked = 'picked',
@@ -217,7 +236,9 @@ export enum ToView {
   Library = 'library',
   Plugin = 'plugin',
   Plugins = 'plugins',
-  Reload = 'reload'
+  Reload = 'reload',
+  Impact = 'impact',
+  Preview = 'preview'
 }
 
 export enum ShareState {
@@ -252,7 +273,8 @@ export enum AccountState {
 
 export type HostMessage =
   | { kind: ToHost.Ready }
-  | { kind: ToHost.Edit; ask: EditAsk }
+  | { kind: ToHost.Edit; ask: EditAsk; gate?: Gate }
+  | { kind: ToHost.Impact; id: number; ask: ImpactAsk }
   | { kind: ToHost.Undo }
   | { kind: ToHost.Open; at: Source }
   | { kind: ToHost.Picked; id: number; pick: Pick | null }
@@ -334,7 +356,9 @@ export type ViewMessage =
   | { kind: ToView.Library; items: LibraryEntry[] }
   | { kind: ToView.Plugin; id: number; result: PluginResult }
   | { kind: ToView.Plugins; catalog: Catalog; canInstall: boolean }
-  | { kind: ToView.Reload };
+  | { kind: ToView.Reload }
+  | { kind: ToView.Impact; id: number; impact: Impact }
+  | { kind: ToView.Preview; ask: EditAsk; reason: string; files: DiffFile[] };
 
 export const INSPECT = 'feega:inspect';
 export const INSPECT_RESULT = 'feega:inspect:result';
