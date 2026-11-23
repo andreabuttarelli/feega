@@ -49,4 +49,23 @@ describe('POST /api/v1/telemetry', () => {
     expect(res.status).toBe(204);
     expect(stored.rows as UsageRow[]).toMatchObject([{ event }]);
   });
+
+  const post = (extra: object) => POST({ request: new Request('https://oh.feega.app/api/v1/telemetry', { method: 'POST', body: JSON.stringify({ events: [{ ...body.events[0], ...extra }] }) }), getClientAddress: () => `route-test-${JSON.stringify(extra)}` } as Parameters<typeof POST>[0]);
+
+  it.each(['onboarding_started', 'onboarding_finished', 'onboarding_skipped', 'setup_applied', 'setup_failed', 'skill_hint_shown', 'skill_installed', 'plugin_installed'])('accepts the lifecycle event %s', async (event) => {
+    expect((await post({ event })).status).toBe(204);
+    expect(stored.rows as UsageRow[]).toMatchObject([{ event, step: null, tier: null }]);
+  });
+
+  it('stores the onboarding step and the library tier', async () => {
+    await post({ event: 'onboarding_step', step: 'sign_in' });
+    await post({ event: 'library_insert', tier: 'pro' });
+
+    expect(stored.rows as UsageRow[]).toMatchObject([{ event: 'onboarding_step', step: 'sign_in' }, { event: 'library_insert', tier: 'pro' }]);
+  });
+
+  it('rejects a step or tier outside the known ids', async () => {
+    expect((await post({ event: 'onboarding_step', step: 'free text' })).status).toBe(400);
+    expect((await post({ event: 'library_insert', tier: 'a-secret-item' })).status).toBe(400);
+  });
 });

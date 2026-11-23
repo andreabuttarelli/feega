@@ -4,6 +4,7 @@
   const FUNNEL_STEPS = [
     ['Installed', 'installed'],
     ['Opened', 'opened'],
+    ['Finished onboarding', 'onboarded'],
     ['Session started', 'started'],
     ['Preview ready', 'preview_ready'],
     ['First edit', 'first_edit'],

@@ -19,6 +19,8 @@ const row = (extra: Partial<UsageRow> = {}): UsageRow => ({
   framework: 'next',
   edit_kind: 'text',
   signed_in: true,
+  step: null,
+  tier: null,
   ...extra
 });
 
@@ -35,13 +37,15 @@ describe('usage sink', () => {
   it('retries without the funnel columns and new events when the table lacks them', async () => {
     const insert = vi.fn().mockResolvedValueOnce({ error: { code: 'PGRST204' } }).mockResolvedValueOnce({ error: null });
 
-    await makeSink(insert)([row(), row({ event: 'preview_ready' }), row({ event: 'install' }), row({ event: 'sign_in' }), row({ event: 'opened' })]);
+    await makeSink(insert)([row(), row({ event: 'preview_ready' }), row({ event: 'install' }), row({ event: 'sign_in' }), row({ event: 'opened' }), row({ event: 'library_insert', tier: 'pro' })]);
 
     const retried = insert.mock.calls[1][0];
     expect(retried).toHaveLength(1);
     expect(retried[0]).not.toHaveProperty('framework');
     expect(retried[0]).not.toHaveProperty('edit_kind');
     expect(retried[0]).not.toHaveProperty('signed_in');
+    expect(retried[0]).not.toHaveProperty('step');
+    expect(retried[0]).not.toHaveProperty('tier');
   });
 
   it('throws other errors', async () => {

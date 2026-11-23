@@ -1,6 +1,6 @@
 export type WeeklyRow = { week: string; editor: string; installs: number };
 export type RetentionRaw = { cohort: string; installs: number; w1: number; w2: number; w4: number; w8: number };
-export type Funnel = { installed: number; opened: number; started: number; preview_ready: number; first_edit: number; signed_in: number; multi_day: number };
+export type Funnel = { installed: number; opened: number; onboarded: number; started: number; preview_ready: number; first_edit: number; signed_in: number; multi_day: number };
 export type SignupRow = { week: string; total: number; confirmed: number };
 
 export type StatsSource = {
