@@ -4,6 +4,7 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import type { OnboardingStep } from '../messages';
 import { SettingKey, type Settings } from '../settings';
+import type { SupportItem } from '../support';
 import { APP_URL } from './sign-in';
 
 export const USAGE_URL = `${APP_URL}/api/v1/telemetry`;
@@ -35,7 +36,8 @@ export enum UsageKind {
   SkillHintShown = 'skill_hint_shown',
   SkillInstalled = 'skill_installed',
   LibraryInsert = 'library_insert',
-  PluginInstalled = 'plugin_installed'
+  PluginInstalled = 'plugin_installed',
+  SupportAction = 'support_action'
 }
 
 export type LibraryTier = 'free' | 'pro';
@@ -86,6 +88,7 @@ export type UsageEvent = {
   signed_in?: boolean;
   step?: OnboardingStep;
   tier?: LibraryTier;
+  item?: SupportItem;
 };
 
 export type Send = (events: UsageEvent[]) => Promise<unknown>;
@@ -290,7 +293,7 @@ export function usageSession({ identity: identityOf, enabled, send = httpSend, n
     }
   }
 
-  function track(kind: UsageKind, extra: Pick<UsageEvent, 'step' | 'tier'> = {}) {
+  function track(kind: UsageKind, extra: Pick<UsageEvent, 'step' | 'tier' | 'item'> = {}) {
     if (state === 'running' && enabled()) {
       queue.push(event(kind, extra));
     }

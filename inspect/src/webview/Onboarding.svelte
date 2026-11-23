@@ -1,16 +1,19 @@
 <script lang="ts">
   import X from '@lucide/svelte/icons/x';
   import { onMount } from 'svelte';
-  import { AccountState, OnboardingOutcome, type OnboardingStep, ToHost } from '../messages';
+  import { AccountState, OnboardingOutcome, OnboardingStep, ToHost } from '../messages';
+  import type { SupportItem } from '../support';
   import { SLIDES } from './onboarding-slides';
+  import SupportList from './SupportList.svelte';
 
-  let { account, onaccount, onstep, ondone }: { account: { state: AccountState; email?: string }; onaccount: (kind: ToHost.SignIn | ToHost.CancelSignIn) => void; onstep: (step: OnboardingStep) => void; ondone: (outcome: OnboardingOutcome) => void } = $props();
+  let { account, support, onaccount, onsupport, onstep, ondone }: { account: { state: AccountState; email?: string }; support: SupportItem[]; onaccount: (kind: ToHost.SignIn | ToHost.CancelSignIn) => void; onsupport: (item: SupportItem) => void; onstep: (step: OnboardingStep) => void; ondone: (outcome: OnboardingOutcome) => void } = $props();
 
   let index = $state(0);
   let dialog = $state<HTMLDivElement | null>(null);
 
   const slide = $derived(SLIDES[index]);
   const last = $derived(index === SLIDES.length - 1);
+  const signing = $derived(slide.step === OnboardingStep.SignIn);
 
   function focusables() {
     return [...(dialog?.querySelectorAll<HTMLElement>('button:not(:disabled)') ?? [])];
@@ -59,18 +62,27 @@
       <p id="onb-body">{slide.body}</p>
       {#if slide.more}<p class="more">{slide.more}</p>{/if}
 
-      {#if last}
+      {#if signing}
         <div class="account">
           {#if account.state === AccountState.SignedIn}
             <p class="signed" data-testid="onboarding-email">Signed in as {account.email}</p>
-            <button type="button" class="primary" data-primary data-testid="onboarding-finish" onclick={() => ondone(OnboardingOutcome.Finished)}>Start designing</button>
           {:else if account.state === AccountState.Waiting}
             <button type="button" class="primary" data-primary disabled>Waiting for the browser…</button>
             <button type="button" class="ghost" data-testid="onboarding-cancel" onclick={() => onaccount(ToHost.CancelSignIn)}>cancel</button>
           {:else}
             <button type="button" class="primary" data-primary data-testid="onboarding-sign-in" onclick={() => onaccount(ToHost.SignIn)}>Sign in to Feega</button>
-            <button type="button" class="ghost" data-testid="onboarding-later" onclick={() => ondone(OnboardingOutcome.Finished)}>maybe later</button>
+            <button type="button" class="ghost" data-testid="onboarding-sign-in-later" onclick={() => (index += 1)}>maybe later</button>
             {#if account.state === AccountState.Cancelled}<p class="hint">Sign-in cancelled or timed out.</p>{/if}
+          {/if}
+        </div>
+      {/if}
+
+      {#if last}
+        <div class="account">
+          <SupportList done={support} onact={onsupport} />
+          <button type="button" class="primary" data-primary data-testid="onboarding-finish" onclick={() => ondone(OnboardingOutcome.Finished)}>Start designing</button>
+          {#if support.length === 0}
+            <button type="button" class="ghost" data-testid="onboarding-later" onclick={() => ondone(OnboardingOutcome.Finished)}>maybe later</button>
           {/if}
         </div>
       {/if}

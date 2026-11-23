@@ -12,7 +12,7 @@ const CLI = here('../dist/cli.cjs');
 const SHOTS = join(homedir(), 'Documents/feega-videos/screens');
 const PORT = 4723;
 const READY_MS = 120_000;
-const SLIDE_COUNT = 3;
+const SLIDE_COUNT = 4;
 
 const home = mkdtempSync(join(tmpdir(), 'feega-onb-home-'));
 const env = { ...process.env, HOME: home, USERPROFILE: home, XDG_CONFIG_HOME: join(home, '.config'), XDG_CACHE_HOME: join(home, '.cache'), FEEGA_STOP_ON_STDIN_END: '1' };
