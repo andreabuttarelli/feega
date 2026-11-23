@@ -27,4 +27,18 @@ describe('POST /api/v1/telemetry', () => {
     expect(res.status).toBe(204);
     expect(stored.rows as UsageRow[]).toMatchObject([{ event: 'edit', editor: 'cursor', country: 'DE', city: 'Berlin', edit_count: 3 }]);
   });
+
+  it('accepts funnel fields and rejects unknown ones', async () => {
+    const send = (extra: object) =>
+      POST({
+        request: new Request('https://oh.feega.app/api/v1/telemetry', { method: 'POST', body: JSON.stringify({ events: [{ ...body.events[0], ...extra }] }) }),
+        getClientAddress: () => `funnel-${Math.random()}`
+      } as Parameters<typeof POST>[0]);
+
+    expect((await send({ edit_kind: 'style', framework: 'sveltekit', signed_in: false })).status).toBe(204);
+    expect(stored.rows).toMatchObject([{ edit_kind: 'style', framework: 'sveltekit', signed_in: false }]);
+    expect((await send({ event: 'preview_ready' })).status).toBe(204);
+    expect((await send({ edit_kind: 'bogus' })).status).toBe(400);
+    expect((await send({ framework: 'not a framework' })).status).toBe(400);
+  });
 });

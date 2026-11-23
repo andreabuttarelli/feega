@@ -29,6 +29,11 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
     tables: ['usage_events']
   },
   {
+    path: 'src/lib/server/admin/stats-db.ts — statsDb (page /app/admin/stats)',
+    why: "usage_events grants nothing to anon/authenticated, and the rows are anonymous installs, not the viewer's org. The page load checks the signed-in email against the ADMIN_EMAILS allowlist before any call. Read-only: it calls three SQL functions that return aggregate counts per week, cohort and funnel step, never rows, ids or locations.",
+    tables: ['usage_events']
+  },
+  {
     path: 'src/lib/server/cloud-emails/send-once.ts — dbStore (sendOnce)',
     why: "An email goes out from a webhook, a cron or another user's action (an invite, a share, a failed payment), so the recipient has no session, and user_emails grants nothing to anon/authenticated: only the server writes it. user_id is the recipient the caller resolved, never a value chosen by a request. It inserts one (user_id, kind, ref_id) row to claim the send, deletes that same row if the send fails, and reads nothing.",
     tables: ['user_emails']
