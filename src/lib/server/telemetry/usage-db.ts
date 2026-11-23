@@ -12,7 +12,7 @@ type Insert = (rows: unknown[]) => PromiseLike<{ error: { code?: string } | null
 function withoutFunnel(rows: UsageRow[]) {
   return rows
     .filter((row) => LEGACY_EVENTS.includes(row.event))
-    .map(({ framework: _framework, edit_kind: _editKind, signed_in: _signedIn, ...legacy }) => legacy);
+    .map(({ framework: _framework, edit_kind: _editKind, signed_in: _signedIn, step: _step, tier: _tier, ...legacy }) => legacy);
 }
 
 export const makeSink =

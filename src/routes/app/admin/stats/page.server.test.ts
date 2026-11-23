@@ -18,7 +18,7 @@ vi.mock('$env/dynamic/private', () => ({
   }
 }));
 
-const FUNNEL = { installed: 12, opened: 11, started: 10, preview_ready: 8, first_edit: 5, signed_in: 3, multi_day: 2 };
+const FUNNEL = { installed: 12, opened: 11, onboarded: 6, started: 10, preview_ready: 8, first_edit: 5, signed_in: 3, multi_day: 2 };
 const SIGNUPS = [{ week: '2026-11-16', total: 7, confirmed: 5 }];
 
 const { load } = await import('./+page.server');
