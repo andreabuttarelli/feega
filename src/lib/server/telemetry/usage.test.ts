@@ -109,4 +109,28 @@ describe('handleUsage', () => {
 
     expect(res.status).toBe(204);
   });
+
+  it('rejects an ext_version that is not semver', async () => {
+    const { rows, sink } = recorder();
+    const res = await handleUsage(post({ events: [event({ ext_version: '1' })] }), freshClient(), sink);
+
+    expect(res.status).toBe(400);
+    expect(rows).toEqual([]);
+  });
+
+  it('accepts a prerelease semver', async () => {
+    const { rows, sink } = recorder();
+    const res = await handleUsage(post({ events: [event({ ext_version: '0.2.14-rc.1' })] }), freshClient(), sink);
+
+    expect(res.status).toBe(204);
+    expect(rows).toHaveLength(1);
+  });
+
+  it('drops a batch from a client that declares CI', async () => {
+    const { rows, sink } = recorder();
+    const res = await handleUsage(post({ events: [event()] }, { 'x-feega-ci': '1' }), freshClient(), sink);
+
+    expect(res.status).toBe(204);
+    expect(rows).toEqual([]);
+  });
 });
