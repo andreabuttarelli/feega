@@ -25,6 +25,7 @@ import { forget, remember, type Memo } from './orphans';
 import { Stored, type Platform } from './platform';
 import { stylingOf } from './styling';
 import { breakpointsOf } from './breakpoints';
+import { scalesOf } from './scales';
 import { themesOf } from './themes';
 import { EditKind, usageSession } from './usage';
 import { editKindOf } from './edit-kind';
@@ -325,7 +326,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
       return;
     }
     const prefs = platform.stored<Prefs>(Stored.Prefs) ?? null;
-    await post({ kind: ToView.App, url: running.url, styling: await stylingOf(root, stylingChoice()), prefs, route, breakpoints: await breakpointsOf(root), themes: await themesOf(root) });
+    await post({ kind: ToView.App, url: running.url, styling: await stylingOf(root, stylingChoice()), prefs, route, breakpoints: await breakpointsOf(root), themes: await themesOf(root), scales: await scalesOf(root, stylingChoice()) });
     await post({ kind: ToView.Server, state: ServerState.Running, info: infoOf(running) });
     await postSettings();
   }
