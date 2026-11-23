@@ -66,7 +66,8 @@
 
 <style>
   .guide {
-    padding-top: var(--site-section);
+    padding: var(--site-section) var(--site-gutter) 0;
+    box-sizing: border-box;
     color: var(--site-ink);
   }
 
@@ -161,6 +162,10 @@
   }
 
   @media (min-width: 810px) {
+    .guide {
+      padding-inline: 0;
+    }
+
     h2 {
       font-size: 40px;
       line-height: 42px;
