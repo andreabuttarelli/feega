@@ -64,6 +64,23 @@ describe('POST /api/v1/telemetry', () => {
     expect(stored.rows as UsageRow[]).toMatchObject([{ event: 'onboarding_step', step: 'sign_in' }, { event: 'library_insert', tier: 'pro' }]);
   });
 
+  it('stores the support step and the support action item', async () => {
+    await post({ event: 'onboarding_step', step: 'support' });
+    await post({ event: 'support_action', item: 'coffee' });
+
+    expect(stored.rows as UsageRow[]).toMatchObject([{ event: 'onboarding_step', step: 'support' }, { event: 'support_action', item: 'coffee' }]);
+  });
+
+  it('rejects a support item outside the known ids', async () => {
+    expect((await post({ event: 'support_action', item: 'a-secret-item' })).status).toBe(400);
+  });
+
+  it('leaves item out of rows that carry none', async () => {
+    await post({ event: 'edit' });
+
+    expect(stored.rows[0]).not.toHaveProperty('item');
+  });
+
   it('rejects a step or tier outside the known ids', async () => {
     expect((await post({ event: 'onboarding_step', step: 'free text' })).status).toBe(400);
     expect((await post({ event: 'library_insert', tier: 'a-secret-item' })).status).toBe(400);

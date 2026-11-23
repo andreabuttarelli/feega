@@ -6,35 +6,54 @@ const USAGE_USE = SERVICE_ROLE_USES.find((use) => use.path.startsWith('src/lib/s
 
 const MISSING_FUNNEL_CODES = ['PGRST204', '42703', '23514'];
 const LEGACY_EVENTS = ['session_start', 'edit', 'session_end'];
+const SUPPORT_EVENT = 'support_action';
 
 type Insert = (rows: unknown[]) => PromiseLike<{ error: { code?: string } | null }>;
+type Reduce = (rows: UsageRow[]) => UsageRow[];
 
-function withoutFunnel(rows: UsageRow[]) {
-  return rows
+const withoutSupport: Reduce = (rows) => {
+  if (!rows.some((row) => row.event === SUPPORT_EVENT)) {
+    return rows;
+  }
+
+  return rows.filter((row) => row.event !== SUPPORT_EVENT);
+};
+
+const withoutFunnel: Reduce = (rows) =>
+  rows
     .filter((row) => LEGACY_EVENTS.includes(row.event))
-    .map(({ framework: _framework, edit_kind: _editKind, signed_in: _signedIn, step: _step, tier: _tier, ...legacy }) => legacy);
-}
+    .map(({ framework: _framework, edit_kind: _editKind, signed_in: _signedIn, step: _step, tier: _tier, ...legacy }) => legacy as UsageRow);
+
+const FALLBACKS: Reduce[] = [withoutSupport, withoutFunnel];
 
 export const makeSink =
   (insert: Insert): UsageSink =>
   async (rows) => {
-    const { error } = await insert(rows);
-    if (!error) {
-      return;
-    }
-    if (!MISSING_FUNNEL_CODES.includes(error.code ?? '')) {
-      throw error;
+    let sent = rows;
+    let failure: { code?: string } | null = null;
+
+    for (const reduce of [(all: UsageRow[]) => all, ...FALLBACKS]) {
+      const batch = reduce(rows);
+      if (batch === sent && failure) {
+        continue;
+      }
+      if (batch.length === 0) {
+        return;
+      }
+
+      const { error } = await insert(batch);
+      if (!error) {
+        return;
+      }
+      if (!MISSING_FUNNEL_CODES.includes(error.code ?? '')) {
+        throw error;
+      }
+
+      sent = batch;
+      failure = error;
     }
 
-    const legacy = withoutFunnel(rows);
-    if (legacy.length === 0) {
-      return;
-    }
-
-    const retry = await insert(legacy);
-    if (retry.error) {
-      throw retry.error;
-    }
+    throw failure;
   };
 
 export const dbSink: UsageSink = async (rows) => {
