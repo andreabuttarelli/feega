@@ -148,7 +148,24 @@ const EDITORS_BY_APP_NAME: [string, Editor][] = [
 
 export const editorOf = (appName: string): Editor => EDITORS_BY_APP_NAME.find(([needle]) => appName.toLowerCase().includes(needle))?.[1] ?? Editor.VsCode;
 
-export const nodeUsageEnabled = (env: NodeJS.ProcessEnv, settings: Settings): boolean => env.FEEGA_TELEMETRY !== '0' && env.DO_NOT_TRACK !== '1' && settings[SettingKey.Telemetry] !== false;
+const AUTOMATION_MARKERS: [string, (value: string) => boolean][] = [
+  ['CI', (value) => !['', '0', 'false'].includes(value.toLowerCase())],
+  ['GITHUB_ACTIONS', Boolean],
+  ['BUILDKITE', Boolean],
+  ['GITLAB_CI', Boolean],
+  ['CIRCLECI', Boolean],
+  ['JENKINS_URL', Boolean],
+  ['TF_BUILD', Boolean],
+  ['VITEST', Boolean],
+  ['TEST_WORKER_INDEX', Boolean],
+  ['NODE_ENV', (value) => value === 'test']
+];
+
+export const automated = (env: NodeJS.ProcessEnv): boolean => AUTOMATION_MARKERS.some(([name, marks]) => marks(env[name] ?? ''));
+
+export const optedOut = (env: NodeJS.ProcessEnv): boolean => env.FEEGA_TELEMETRY === '0' || env.DO_NOT_TRACK === '1';
+
+export const nodeUsageEnabled = (env: NodeJS.ProcessEnv, settings: Settings): boolean => !optedOut(env) && !automated(env) && settings[SettingKey.Telemetry] !== false;
 
 export function usageSession({ identity: identityOf, enabled, send = httpSend, now = Date.now, every = intervalEvery, newId = randomUUID, facts, firstEdit }: UsageHost) {
   const sessionId = newId();
