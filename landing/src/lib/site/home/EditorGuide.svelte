@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { lower } from '../lower';
   import { GUIDE_COPY, GUIDE_FEATURES } from '../editor-guide';
+  import MockCrop from '../editor-guide/mock/MockCrop.svelte';
 
   const CENTRE_LINE = '-50% 0px -50% 0px';
 
@@ -35,15 +36,10 @@
     <ul class="features">
       {#each GUIDE_FEATURES as feature, index (feature.id)}
         <li class="feature" class:on={index === active} data-feature={feature.id} bind:this={items[index]}>
-          <img
-            class="inline"
-            src={feature.src}
-            alt={feature.alt}
-            width={feature.width}
-            height={feature.height}
-            loading="lazy"
-            decoding="async"
-          />
+          <figure class="inline">
+            <div class="box" aria-hidden="true"><MockCrop id={feature.id} /></div>
+            <figcaption class="sr">{feature.alt}</figcaption>
+          </figure>
           <h3>{lower(feature.title)}</h3>
           <p class="text">{lower(feature.text)}</p>
           <p class="lands">{lower(GUIDE_COPY.landsLabel)}</p>
@@ -57,7 +53,7 @@
     <div class="stage" aria-hidden="true">
       <div class="shots">
         {#each GUIDE_FEATURES as feature, index (feature.id)}
-          <img class:on={index === active} src={feature.src} alt="" width={feature.width} height={feature.height} loading="lazy" decoding="async" />
+          <div class="shot" class:on={index === active}><MockCrop id={feature.id} /></div>
         {/each}
       </div>
     </div>
@@ -107,16 +103,18 @@
   }
 
   .inline {
-    display: block;
-    width: 100%;
-    height: auto;
-    max-height: 320px;
-    object-fit: contain;
-    margin-bottom: 20px;
-    padding: 16px;
-    box-sizing: border-box;
-    border-radius: 12px;
-    background: #0d0d0d;
+    margin: 0 0 20px;
+  }
+
+  .sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    clip-path: inset(50%);
   }
 
   h3 {
@@ -211,13 +209,11 @@
     }
 
     .inline {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      margin: -1px;
-      padding: 0;
-      overflow: hidden;
-      clip-path: inset(50%);
+      margin: 0;
+    }
+
+    .box {
+      display: none;
     }
 
     .stage {
@@ -227,36 +223,26 @@
     }
 
     .shots {
-      display: grid;
-      grid-template: minmax(0, 1fr) / minmax(0, 1fr);
-      place-items: center;
+      position: relative;
       height: 360px;
       max-width: 520px;
-      padding: 20px;
-      border-radius: 12px;
-      background: #0d0d0d;
     }
 
-    .shots img {
-      grid-area: 1 / 1;
-      display: block;
-      width: auto;
-      max-width: 100%;
-      height: auto;
-      max-height: 100%;
-      border-radius: 8px;
+    .shot {
+      position: absolute;
+      inset: 0;
       opacity: 0;
       transition: opacity 0.4s;
     }
 
-    .shots img.on {
+    .shot.on {
       opacity: 1;
     }
   }
 
   @media (prefers-reduced-motion: reduce) {
     .feature,
-    .shots img {
+    .shot {
       transition: none;
     }
   }
