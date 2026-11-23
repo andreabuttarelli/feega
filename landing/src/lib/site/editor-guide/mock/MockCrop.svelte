@@ -9,7 +9,7 @@
   import { MOCKS } from './registry';
   import { Anchor } from './subjects';
 
-  let { id, active = true }: { id: GuideId; active?: boolean } = $props();
+  let { id }: { id: GuideId } = $props();
 
   const entry = $derived(MOCKS[id]);
   const script = $derived(SCRIPTS[id]);
@@ -24,7 +24,7 @@
   let tabVisible = $state(true);
   let reduced = $state(false);
 
-  const playing = $derived(active && inView && tabVisible && !reduced);
+  const playing = $derived(inView && tabVisible && !reduced);
   const player = $derived(createPlayer(script, show));
 
   const sameState = (a: DemoState, b: DemoState) => Object.keys(a).length === Object.keys(b).length && Object.keys(a).every((k) => a[k] === b[k]);
@@ -83,15 +83,6 @@
       player.play();
 
       return () => player.pause();
-    }
-  });
-
-  $effect(() => {
-    if (!active) {
-      player.reset();
-      live = undefined;
-      focus = undefined;
-      cursor = undefined;
     }
   });
 </script>

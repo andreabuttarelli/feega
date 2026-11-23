@@ -45,6 +45,21 @@ describe.each(IDS)('demo script %s', (id) => {
   });
 });
 
+describe('shared components bar', () => {
+  const renderWith = (id: GuideId) => render(MOCKS[id].component, { props: { ...MOCKS[id].props, demo: SCRIPTS[id].initial } }).body;
+  const barShown = (body: string) => /class="shared"/.test(body);
+
+  it('stays hidden in the other properties demos', () => {
+    [GuideId.States, GuideId.Breakpoints, GuideId.Snap, GuideId.Attributes].forEach((id) => expect(barShown(renderWith(id)), id).toBe(false));
+  });
+
+  it('shows in the shared demo once the scope is shared', () => {
+    const { body } = render(MOCKS[GuideId.Shared].component, { props: { demo: { ...SCRIPTS[GuideId.Shared].initial, scope: 'shared' } } });
+
+    expect(barShown(body)).toBe(true);
+  });
+});
+
 describe('selector', () => {
   it('matches the data attribute', () => {
     expect(targetSelector('x')).toBe('[data-t="x"]');

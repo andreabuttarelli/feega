@@ -15,7 +15,7 @@
   const scrubbing = $derived(demo[Key.Value] !== undefined);
   const padding = $derived(demo[Key.Padding] ?? demo[Key.Value] ?? '12');
   const ticks = $derived(scrubbing ? ticksAround(Number(padding)) : []);
-  const shared = $derived(demo[Key.Scope] !== 'solo');
+  const shared = $derived(demo[Key.Scope] === 'shared');
   const stateLabel = $derived(demo[Key.State] ?? STATES[0].label);
   const fit = $derived(demo[Key.Fit] ?? ATTRIBUTES[1].value);
   const badge = $derived(demo[Key.Reach] === 'md' ? REACH_BADGE_MD : REACH_BADGE);

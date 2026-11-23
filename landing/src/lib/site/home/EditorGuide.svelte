@@ -1,30 +1,7 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
   import { lower } from '../lower';
   import { GUIDE_COPY, GUIDE_FEATURES } from '../editor-guide';
   import MockCrop from '../editor-guide/mock/MockCrop.svelte';
-
-  const CENTRE_LINE = '-50% 0px -50% 0px';
-
-  let active = $state(0);
-  let items: HTMLLIElement[] = [];
-
-  onMount(() => {
-    const watcher = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            active = items.indexOf(entry.target as HTMLLIElement);
-          }
-        });
-      },
-      { rootMargin: CENTRE_LINE }
-    );
-
-    items.forEach((item) => watcher.observe(item));
-
-    return () => watcher.disconnect();
-  });
 </script>
 
 <section class="guide site-wide" id="editor-guide" aria-labelledby="guide-title">
@@ -34,32 +11,24 @@
     <p class="lead">{lower(GUIDE_COPY.lead)}</p>
   </header>
 
-  <div class="scroller">
-    <ul class="features">
-      {#each GUIDE_FEATURES as feature, index (feature.id)}
-        <li class="feature" class:on={index === active} data-feature={feature.id} bind:this={items[index]}>
-          <figure class="inline">
-            <div class="box" aria-hidden="true"><MockCrop id={feature.id} /></div>
-            <figcaption class="sr">{feature.alt}</figcaption>
-          </figure>
+  <ul class="features">
+    {#each GUIDE_FEATURES as feature (feature.id)}
+      <li class="feature" data-feature={feature.id}>
+        <figure class="visual">
+          <div class="box" aria-hidden="true"><MockCrop id={feature.id} /></div>
+          <figcaption class="sr">{feature.alt}</figcaption>
+        </figure>
+        <div class="copy">
           <h3>{lower(feature.title)}</h3>
           <p class="text">{lower(feature.text)}</p>
           <p class="lands">{lower(GUIDE_COPY.landsLabel)}</p>
           <ul class="code">
             {#each feature.lands as line (line)}<li><code>{line}</code></li>{/each}
           </ul>
-        </li>
-      {/each}
-    </ul>
-
-    <div class="stage" aria-hidden="true">
-      <div class="shots">
-        {#each GUIDE_FEATURES as feature, index (feature.id)}
-          <div class="shot" class:on={index === active}><MockCrop id={feature.id} active={index === active} /></div>
-        {/each}
-      </div>
-    </div>
-  </div>
+        </div>
+      </li>
+    {/each}
+  </ul>
 </section>
 
 <style>
@@ -77,7 +46,7 @@
 
   .band {
     width: 100vw;
-    margin: 0 calc(50% - 50vw) 64px;
+    margin: 0 calc(50% - 50vw) 32px;
     padding: 200px var(--site-gutter) 72px;
     box-sizing: border-box;
     text-align: center;
@@ -112,7 +81,7 @@
   .features {
     display: grid;
     gap: 48px;
-    margin: 48px 0 0;
+    margin: 24px 0 0;
     padding: 0;
     list-style: none;
   }
@@ -121,7 +90,7 @@
     min-width: 0;
   }
 
-  .inline {
+  .visual {
     margin: 0 0 20px;
   }
 
@@ -174,10 +143,6 @@
     font-size: 13px;
   }
 
-  .stage {
-    display: none;
-  }
-
   @media (min-width: 810px) {
     .guide {
       padding-inline: 0;
@@ -185,7 +150,7 @@
 
     .band {
       padding: 280px 24px 96px;
-      margin-bottom: 96px;
+      margin-bottom: 56px;
     }
 
     h2 {
@@ -195,79 +160,35 @@
   }
 
   @media (min-width: 900px) {
-    .scroller {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-      gap: 64px;
-      align-items: start;
-    }
-
     .features {
-      gap: 0;
+      gap: 108px;
       margin-top: 0;
     }
 
     .feature {
-      position: relative;
-      display: flex;
-      min-height: 44vh;
-      flex-direction: column;
-      justify-content: center;
-      opacity: 0.3;
-      transition: opacity 0.35s;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 520px);
+      grid-template-areas: 'copy visual';
+      gap: 64px;
+      align-items: center;
     }
 
-    .feature.on {
-      opacity: 1;
+    .feature:nth-child(even) {
+      grid-template-columns: minmax(0, 520px) minmax(0, 1fr);
+      grid-template-areas: 'visual copy';
     }
 
-    .feature:first-child {
-      min-height: 0;
-      padding: 40px 0 15vh;
-      justify-content: flex-start;
-    }
-
-    .feature:last-child {
-      min-height: 0;
-      padding: 15vh 0 0;
-    }
-
-    .inline {
+    .visual {
+      grid-area: visual;
       margin: 0;
     }
 
+    .copy {
+      grid-area: copy;
+    }
+
     .box {
-      display: none;
-    }
-
-    .stage {
-      position: sticky;
-      top: calc(50vh - 180px);
-      display: block;
-    }
-
-    .shots {
-      position: relative;
       height: 360px;
-      max-width: 520px;
-    }
-
-    .shot {
-      position: absolute;
-      inset: 0;
-      opacity: 0;
-      transition: opacity 0.4s;
-    }
-
-    .shot.on {
-      opacity: 1;
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .feature,
-    .shot {
-      transition: none;
     }
   }
 </style>
