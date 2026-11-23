@@ -3,23 +3,18 @@
   import type { Glyph as GlyphName } from '../../editor-mock/glyphs';
   import { Key, ON, type DemoState } from '../demo/script';
   import { Target } from '../demo/scripts';
-  import { ATTRIBUTES, FIT_OPTIONS, FRAME_VARIABLE, REACH, REACH_BADGE, REACH_BADGE_MD, STATES, Subject, VARIABLES, ticksAround } from './subjects';
+  import { REACH, REACH_BADGE, REACH_BADGE_MD, STATES, ticksAround } from './subjects';
   import './mock.css';
 
-  type Props = { subject?: Subject; demo: DemoState };
-
-  let { subject = Subject.Button, demo }: Props = $props();
+  let { demo }: { demo: DemoState } = $props();
 
   const ALIGNS: GlyphName[] = ['alignStart', 'alignCenter', 'alignEnd', 'alignJustify'];
-  const isButton = $derived(subject === Subject.Button);
   const scrubbing = $derived(demo[Key.Value] !== undefined);
   const padding = $derived(demo[Key.Padding] ?? demo[Key.Value] ?? '12');
   const ticks = $derived(scrubbing ? ticksAround(Number(padding)) : []);
   const shared = $derived(demo[Key.Scope] === 'shared');
   const stateLabel = $derived(demo[Key.State] ?? STATES[0].label);
-  const fit = $derived(demo[Key.Fit] ?? ATTRIBUTES[1].value);
   const badge = $derived(demo[Key.Reach] === 'md' ? REACH_BADGE_MD : REACH_BADGE);
-  const colourOf = (name: string, value: string) => (name === FRAME_VARIABLE ? (demo[Key.Colour] ?? value) : value);
 </script>
 
 {#snippet sq(dashed: boolean)}
@@ -66,15 +61,9 @@
   <div class="tab-list"><span class="tab on">Properties</span><span class="tab">Changes</span></div>
 
   <div class="what">
-    {#if isButton}
-      <span class="crumbs"><span>…</span><span class="sep">›</span><span>Hero</span><span class="sep">›</span><span class="current">button</span></span>
-      <span class="where">in Button.jsx · <span class="link">Hero.jsx:12</span> · <span class="link">Copy for agent</span></span>
-      <code class="classes">rounded-lg bg-blue-500 px-5 text-white</code>
-    {:else}
-      <span class="crumbs"><span>…</span><span class="sep">›</span><span>Board</span><span class="sep">›</span><span class="current">img</span></span>
-      <span class="where"><span class="link">Board.jsx:9</span> · <span class="link">Copy for agent</span></span>
-      <code class="classes">rounded-xl ring-2</code>
-    {/if}
+    <span class="crumbs"><span>…</span><span class="sep">›</span><span>Hero</span><span class="sep">›</span><span class="current">button</span></span>
+    <span class="where">in Button.jsx · <span class="link">Hero.jsx:12</span> · <span class="link">Copy for agent</span></span>
+    <code class="classes">rounded-lg bg-blue-500 px-5 text-white</code>
   </div>
 
   <div class="reach-row">
@@ -88,12 +77,8 @@
     </span>
   </div>
 
-  {#if isButton}
-    <div class="scope"><span class="on" data-t={Target.ScopeThis}>{shared ? 'This element ×3' : 'This element'}</span><span class="off" data-t={Target.ScopeAll}>All .rounded-lg (3)</span></div>
-    <div class="shared" class:shut={!shared}><span class="text">Edits 3 instances</span><span class="action" data-t={Target.Detach}>Detach</span><span class="action">Dismiss</span><span class="action">Don't show again</span></div>
-  {:else}
-    <div class="scope"><span class="on">This element</span><span class="off">All .rounded-xl (2)</span></div>
-  {/if}
+  <div class="scope"><span class="on" data-t={Target.ScopeThis}>{shared ? 'This element ×3' : 'This element'}</span><span class="off" data-t={Target.ScopeAll}>All .rounded-lg (3)</span></div>
+  <div class="shared" class:shut={!shared}><span class="text">Edits 3 instances</span><span class="action" data-t={Target.Detach}>Detach</span><span class="action">Dismiss</span><span class="action">Don't show again</span></div>
 
   <div class="properties">
     <div class="state-row">
@@ -113,7 +98,7 @@
     <section>
       <div class="head inline">
         <span class="title-inline">Size</span>
-        <div class="control"><div class="pair">{@render field('W', isButton ? '132' : '320', 'px')}{@render field('H', isButton ? '40' : '180', 'px')}</div></div>
+        <div class="control"><div class="pair">{@render field('W', '132', 'px')}{@render field('H', '40', 'px')}</div></div>
       </div>
       <div class="row"><span class="label"></span><div class="control"><span class="link-row"><Glyph name="plus" size={12} />min/max</span></div></div>
     </section>
@@ -155,35 +140,6 @@
       <div class="head"><span class="title"><span class="chevron"><Glyph name="chevronDown" size={12} /></span>Effects</span><span class="icon"><Glyph name="plus" size={14} /></span></div>
       <div class="row"><span class="label">Opacity</span><div class="control"><div class="pair">{@render field('◐', '100', '%')}</div></div></div>
     </section>
-
-    {#if !isButton}
-      <section data-section="Attributes">
-        <div class="head plain"><span class="title">Attributes</span></div>
-        {#each ATTRIBUTES as attribute (attribute.name)}
-          <div class="row">
-            <span class="label" data-t={attribute.options ? Target.FitLabel : undefined}>{attribute.name}</span>
-            <div class="control" style:position="relative">
-              {#if attribute.options}
-                <span class="attr pick" data-t={Target.Fit}><span>{fit}</span><span class="caret"><Glyph name="chevronDown" size={12} /></span></span>
-                <div class="dropdown-menu" class:shut={demo[Key.Menu] !== 'fit'} style="top: 30px; left: 0; width: 100%">
-                  {#each FIT_OPTIONS as option, i (option)}
-                    <div class="dropdown-item" class:on={option === fit} data-t="fit-item-{i}"><span class="check">{#if option === fit}<Glyph name="check" size={12} />{/if}</span>{option}</div>
-                  {/each}
-                </div>
-              {:else}
-                <span class="attr">{attribute.value}</span>
-              {/if}
-            </div>
-          </div>
-        {/each}
-        {#each VARIABLES as variable (variable.name)}
-          <div class="row">
-            <span class="label">{variable.name}</span>
-            <div class="control"><span class="colour-swatch" data-t="swatch-{variable.name}"><span style:background={colourOf(variable.name, variable.value)}></span></span></div>
-          </div>
-        {/each}
-      </section>
-    {/if}
   </div>
 </div>
 

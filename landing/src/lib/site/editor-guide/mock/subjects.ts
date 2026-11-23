@@ -1,8 +1,3 @@
-export enum Subject {
-  Button = 'button',
-  Image = 'image'
-}
-
 export enum Anchor {
   Focus = 'focus',
   TopRight = 'top-right'
@@ -28,18 +23,3 @@ export const TICK_HALF_WIDTH_PX = 70;
 
 export const ticksAround = (draft: number): readonly number[] =>
   THEME_STEPS_PX.map((step) => (step - draft) * DRAG_PX_PER_STEP).filter((offset) => Math.abs(offset) <= TICK_HALF_WIDTH_PX);
-
-export const ATTRIBUTES = [
-  { name: 'alt', value: 'Launch plan board', options: false },
-  { name: 'fit', value: 'cover', options: true },
-  { name: 'src', value: '/cover.svg', options: false }
-] as const;
-
-export const FIT_OPTIONS = ['cover', 'contain', 'fill'] as const;
-
-export const FRAME_VARIABLE = 'frame';
-
-export const VARIABLES = [
-  { name: 'tw ring offs…', value: '#ffffff' },
-  { name: 'frame', value: '#3b82f6' }
-] as const;
