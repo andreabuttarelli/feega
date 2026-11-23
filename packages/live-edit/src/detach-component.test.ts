@@ -158,6 +158,20 @@ describe('detachComponent', () => {
     expect(out).toEqual({ ok: false, reason: `${PAGE}: 2 <Button> usages in this element: cannot tell which one this is` });
   });
 
+  it('detaches the usage the editor names among several in one element', async () => {
+    const out = await detachComponent(files(REACT_FILES), ask({ usage: { file: PAGE, line: 5, col: 5 }, which: { index: 1, count: 2 } }));
+
+    const page = out.ok && out.changes.find((c) => c.path === PAGE);
+    expect(page && page.after).toContain('<Button>Buy</Button>');
+    expect(page && page.after).toContain('<ButtonHome>Other</ButtonHome>');
+  });
+
+  it('refuses when the page shows a different number of usages than the source holds', async () => {
+    const out = await detachComponent(files(REACT_FILES), ask({ usage: { file: PAGE, line: 5, col: 5 }, which: { index: 0, count: 3 } }));
+
+    expect(out).toEqual({ ok: false, reason: `${PAGE}: 2 <Button> usages in this element: cannot tell which one this is` });
+  });
+
   it('refuses when no usage of the component is written there', async () => {
     const out = await detachComponent(files({ ...REACT_FILES, [PAGE]: HOME_TSX.replace('<Button>Buy</Button>', '<Dynamic>Buy</Dynamic>') }), ask());
 

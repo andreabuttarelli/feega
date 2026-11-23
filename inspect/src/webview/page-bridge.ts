@@ -2,7 +2,7 @@ import type { ElementState } from '@feega/live-edit/element-state';
 import type { Apply } from '@feega/live-edit/themes';
 import { BRIDGE_READY, INSPECT, INSPECT_RESULT, LOCAL_ORIGIN, LOCATION, MODE, PREVIEW, PREVIEW_CLEAR, PREVIEW_CLEAR_ALL, PREVIEW_SETTLE, PREVIEW_SETTLED, SCROLL, SCROLLED, REVEAL, HIDE, PALETTE, PALETTE_RESULT, type Palette, TREE, TREE_RESULT, type LayerNode, TEXT_DONE, TEXT_EDIT, TEXT_RESTORE, TRACK, TRACKED, LEAVE, FORCE, THEME, type Slot, type Mode, type Move, type Pick, type Source } from '../messages';
 
-type Inspected = { source: Source; component: Source | null; html: string; rect: Pick['rect']; styles: Record<string, string>; inherited?: Record<string, string>; classes: string; rem: number; viewport: number; ownText: boolean; inlineText: boolean; elements: number; name: string; parentWidth: number; instances: number; instanceIndex: number; classCount: number; ancestors: Pick['ancestors']; inner?: string; page?: Pick['page']; attributes?: Pick['attributes']; states?: string[] };
+type Inspected = { source: Source; component: Source | null; html: string; rect: Pick['rect']; styles: Record<string, string>; inherited?: Record<string, string>; classes: string; rem: number; viewport: number; ownText: boolean; inlineText: boolean; elements: number; name: string; parentWidth: number; instances: number; instanceIndex: number; usage: Pick['usage']; classCount: number; ancestors: Pick['ancestors']; inner?: string; page?: Pick['page']; attributes?: Pick['attributes']; states?: string[] };
 
 const TAG = /^<([a-zA-Z][\w-]*)/;
 const SOURCE_ATTR = 'data-feega-src';
@@ -10,7 +10,7 @@ const PAGE_SELECTORS: Record<string, string> = { '(page):0:0': 'body', '(html):0
 const selectorOf = (source: Source) => PAGE_SELECTORS[sourceText(source)] ?? `[${SOURCE_ATTR}="${sourceText(source)}"]`;
 
 const pickOf = (r: Inspected | null): Pick | null =>
-  r ? { source: r.source, component: r.component, tag: r.html.match(TAG)?.[1] ?? '', rect: r.rect, styles: r.styles, inherited: r.inherited, classes: r.classes, rem: r.rem, viewport: r.viewport, ownText: r.ownText, inlineText: r.inlineText, elements: r.elements, name: r.name, parentWidth: r.parentWidth, instances: r.instances, instanceIndex: r.instanceIndex, classCount: r.classCount, ancestors: r.ancestors, inner: r.inner, page: r.page, attributes: r.attributes, variables: r.variables, states: r.states, markup: r.html.startsWith('<svg') ? r.html : undefined } : null;
+  r ? { source: r.source, component: r.component, tag: r.html.match(TAG)?.[1] ?? '', rect: r.rect, styles: r.styles, inherited: r.inherited, classes: r.classes, rem: r.rem, viewport: r.viewport, ownText: r.ownText, inlineText: r.inlineText, elements: r.elements, name: r.name, parentWidth: r.parentWidth, instances: r.instances, instanceIndex: r.instanceIndex, usage: r.usage, classCount: r.classCount, ancestors: r.ancestors, inner: r.inner, page: r.page, attributes: r.attributes, variables: r.variables, states: r.states, markup: r.html.startsWith('<svg') ? r.html : undefined } : null;
 
 export const sourceText = (s: Source) => `${s.file}:${s.line}:${s.col}`;
 

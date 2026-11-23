@@ -50,6 +50,7 @@ export type Pick = {
   parentWidth: number;
   instances: number;
   instanceIndex: number;
+  usage: { index: number; count: number };
   classCount: number;
   ancestors: { source: Source; name: string }[];
   inner?: string;
@@ -262,7 +263,7 @@ export type HostMessage =
   | { kind: ToHost.Move; from: string; to: string; place: Place }
   | { kind: ToHost.Structure; op: StructureOp; at: string; to?: string; usage?: Usage; loop?: LoopMove; instance?: number; add?: { kind: AddKind; src?: string; place?: AddPlace }; wrap?: WrapTag }
   | { kind: ToHost.StructureMany; op: StructureOp; targets: { at: string; instance?: number }[]; wrap?: WrapTag }
-  | { kind: ToHost.Detach; at: string; usage: string }
+  | { kind: ToHost.Detach; at: string; usage: string; which: { index: number; count: number } }
   | { kind: ToHost.AddImage; at: string; place?: AddPlace }
   | { kind: ToHost.Server; action: ServerAction }
   | { kind: ToHost.Redo }

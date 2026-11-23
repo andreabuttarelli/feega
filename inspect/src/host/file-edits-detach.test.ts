@@ -7,7 +7,7 @@ import { fileEdits } from './file-edits';
 const BUTTON = 'export function Button() {\n  return <button className="p-2">Go</button>;\n}\n';
 const HOME = "import { Button } from './Button';\n\nexport default function Home() {\n  return (\n    <section>\n      <Button />\n    </section>\n  );\n}\n";
 
-const ASK = { at: 'src/Button.tsx:2:10', usage: 'src/Home.tsx:5:5' };
+const ASK = { at: 'src/Button.tsx:2:10', usage: 'src/Home.tsx:5:5', which: { index: 0, count: 1 } };
 
 function project(): string {
   const root = mkdtempSync(join(tmpdir(), 'inspect-detach-'));
@@ -56,7 +56,7 @@ describe('fileEdits.detach', () => {
   });
 
   it('refuses a path outside the workspace', async () => {
-    const out = await fileEdits(project()).detach({ at: '../x/Button.tsx:1:1', usage: ASK.usage });
+    const out = await fileEdits(project()).detach({ at: '../x/Button.tsx:1:1', usage: ASK.usage, which: ASK.which });
 
     expect(out.ok).toBe(false);
   });

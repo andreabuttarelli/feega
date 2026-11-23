@@ -19,6 +19,7 @@ const PICK: Pick = {
   parentWidth: 100,
   instances: 1,
   instanceIndex: 0,
+  usage: { index: 0, count: 1 },
   classCount: 0,
   ancestors: [],
   attributes: [{ name: 'data-x', value: '1' }]
