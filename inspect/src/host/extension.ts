@@ -186,6 +186,7 @@ export function activate(context: vscode.ExtensionContext) {
     output,
     ...Object.values(Command).map((id) => vscode.commands.registerCommand(id, (target?: vscode.Uri) => COMMANDS[id](context, target))),
     vscode.workspace.onDidChangeConfiguration(settingsChanged),
+    vscode.window.onDidChangeWindowState((state) => (state.focused ? opened?.session.back() : opened?.session.away())),
     vscode.env.onDidChangeTelemetryEnabled(() => opened?.session.usageChanged()),
     beforeProvider(befores),
     vscode.window.registerUriHandler({ handleUri: (uri) => void (uri.path === SIGN_IN_PATH && signInFromUri(uri.query)) })

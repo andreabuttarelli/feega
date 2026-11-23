@@ -236,6 +236,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
       return;
     }
     await platform.account.write(outcome.account);
+    usage?.signedIn();
     await postAccount(AccountState.SignedIn, outcome.account.user.email);
     await platform.notify(`Signed in as ${outcome.account.user.email}`);
   }
@@ -259,6 +260,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
 
   async function signOut() {
     await platform.account.clear();
+    usage?.signedOut();
     await postAccount(AccountState.SignedOut);
   }
 
@@ -605,6 +607,8 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
       await usage?.end();
     },
     usageChanged: () => usage?.recheck(),
+    away: () => usage?.away(),
+    back: () => usage?.back(),
     url: () => running?.url ?? null,
     showApp,
     showRoute,

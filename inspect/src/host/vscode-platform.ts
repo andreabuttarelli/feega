@@ -12,7 +12,7 @@ import { pluginsRoot } from '@feega/plugin-store/registry';
 import { deviceOnboardingStore, globalStateOnboardingStore } from './onboarding';
 import type { Platform } from './platform';
 import { HintSurface, nodeHintFs } from './skill-hint';
-import { automated, Device, editorOf, globalStateFirstEdit, globalStateInstallStore, installIdOf, optedOut, type UsageHost } from './usage';
+import { automated, Device, editorOf, globalStateFirstEdit, globalStateInstallStore, installOf, optedOut, type UsageHost } from './usage';
 
 const BEFORE_SCHEME = 'feega-before';
 
@@ -47,7 +47,7 @@ export const secretAccountStore = (secrets: Pick<vscode.SecretStorage, 'get' | '
 
 export const vsCodeUsage = (context: vscode.ExtensionContext): UsageHost => ({
   identity: () => ({
-    installId: installIdOf(globalStateInstallStore(context.globalState)),
+    ...installOf(globalStateInstallStore(context.globalState)),
     version: String(context.extension.packageJSON.version),
     editor: editorOf(vscode.env.appName),
     os: process.platform,

@@ -12,7 +12,7 @@ import { openTarget } from './open-source';
 import type { Platform, Stored, Transport } from './platform';
 import type { PluginsHost } from './plugins-session';
 import { HintSurface, nodeSkillHint } from './skill-hint';
-import { Device, Editor, fileFirstEdit, fileInstallStore, installIdOf, nodeUsageEnabled, type FirstEditFlag, type InstallStore } from './usage';
+import { Device, Editor, fileFirstEdit, fileInstallStore, installOf, nodeUsageEnabled, type FirstEditFlag, type InstallStore } from './usage';
 
 const FEEGA_DIR = '.feega';
 const SETTINGS_FILE = 'settings.json';
@@ -116,7 +116,7 @@ export function nodePlatform({ root, launcher, version, transport, print, launch
     onboarding,
     skillHint: nodeSkillHint(HintSurface.Terminal),
     usage: {
-      identity: () => ({ installId: installIdOf(install), version, editor: Editor.Npx, os: process.platform, arch: process.arch, device: Device.Cli }),
+      identity: () => ({ ...installOf(install), version, editor: Editor.Npx, os: process.platform, arch: process.arch, device: Device.Cli }),
       enabled: () => nodeUsageEnabled(env, settingsWith((row) => settings[row.key])),
       firstEdit
     }
