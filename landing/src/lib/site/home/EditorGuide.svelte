@@ -108,10 +108,10 @@
 
   .inline {
     display: block;
-    width: auto;
-    max-width: 100%;
+    width: 100%;
     height: auto;
     max-height: 320px;
+    object-fit: contain;
     margin-bottom: 20px;
     padding: 16px;
     box-sizing: border-box;
