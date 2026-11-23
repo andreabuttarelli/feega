@@ -1,6 +1,7 @@
 import { useCurrentFrame } from "remotion";
 import { lift } from "../ease";
 import { float } from "./motion";
+import { useStage } from "./stage";
 
 const SPECK_DEPTH = 10;
 
@@ -101,14 +102,15 @@ const OFFSTAGE = 200;
 
 export const Tumble = ({ sprite, size, y, from, frames, heading }: { sprite: Sprite; size: number; y: number; from: number; frames: number; heading: Heading }) => {
   const frame = useCurrentFrame();
+  const { width } = useStage();
   const t = (frame - from) / frames;
 
   if (t < 0 || t > 1) {
     return null;
   }
 
-  const travel = (1920 + 2 * OFFSTAGE) * t;
-  const x = heading === Heading.Right ? -OFFSTAGE + travel : 1920 + OFFSTAGE - travel;
+  const travel = (width + 2 * OFFSTAGE) * t;
+  const x = heading === Heading.Right ? -OFFSTAGE + travel : width + OFFSTAGE - travel;
   const bounce = -Math.abs(Math.sin(((frame - from) / RUN_HOP) * Math.PI)) * RUN_HEIGHT;
 
   return (
@@ -135,12 +137,12 @@ export const Scatter = ({ specks }: { specks: Speck[] }) => {
   );
 };
 
-export const specks = (seed: number, count: number, colors: string[]): Speck[] =>
+export const specks = (seed: number, count: number, colors: string[], area = { width: 1920, height: 1080 }): Speck[] =>
   Array.from({ length: count }, (_, i) => {
     const r = (k: number) => {
       const v = Math.sin(seed * 97.1 + i * 12.9898 + k * 78.233) * 43758.5453;
       return v - Math.floor(v);
     };
 
-    return { x: r(1) * 1860 + 20, y: r(2) * 1020 + 20, s: 10 + Math.floor(r(3) * 3) * 6, c: colors[i % colors.length], at: Math.floor(r(4) * 30) };
+    return { x: r(1) * (area.width - 60) + 20, y: r(2) * (area.height - 60) + 20, s: 10 + Math.floor(r(3) * 3) * 6, c: colors[i % colors.length], at: Math.floor(r(4) * 30) };
   });

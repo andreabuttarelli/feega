@@ -4,6 +4,7 @@ import { EDITOR_REST, FeegaEditor, SWATCHES } from "../editor/FeegaEditor";
 import { Tab } from "../editor/layout";
 import { Align, Headline } from "../Headline";
 import { Place, Section } from "../Section";
+import { Format, useStage } from "../stage";
 import { MONO, ORANGE, PAPER, Tone } from "../style";
 
 export const CODE_FRAMES = 97;
@@ -11,11 +12,14 @@ export const CODE_TONE = Tone.Paper;
 export const DIFF_IN = 16;
 export const DIFF_LINES_AT = 30;
 
-const APP_SCALE = 0.98;
-const EDITOR_AT = { x: -150, y: 20 };
 const APP_SLIDE = 260;
-const DIFF_AT = { x: 900, y: 330 };
 const DIFF_SLIDE = 900;
+
+const LAYOUT = {
+  [Format.Wide]: { appScale: 0.98, editorAt: { x: -150, y: 20 }, diffAt: { x: 900, y: 330 }, diffScale: 1, title: { at: { x: 100, y: 790 }, lines: ["every edit lands in your code."], size: 108, align: Align.Left, width: undefined } },
+  [Format.Tall]: { appScale: 0.78, editorAt: { x: 41, y: 690 }, diffAt: { x: 90, y: 1295 }, diffScale: 0.85, title: { at: { x: 0, y: 262 }, lines: ["every edit", "lands in", "your code."], size: 112, align: Align.Center, width: 1080 } },
+};
+
 const LINE_STAGGER = 4;
 const MUTED = "#8a8780";
 
@@ -69,20 +73,21 @@ const Diff = ({ frame }: { frame: number }) => (
 
 export const Code = () => {
   const frame = useCurrentFrame();
+  const L = LAYOUT[useStage().format];
   const app = tween(frame, 0, 18);
   const diff = tween(frame, DIFF_IN, 18);
   const state = { ...EDITOR_REST, tab: Tab.Changes, selected: 1, fontSize: 76, headColor: SWATCHES[1], changes: 8, saved: 1 };
 
   return (
     <Section tone={CODE_TONE}>
-      <Place x={EDITOR_AT.x} y={EDITOR_AT.y} style={{ transform: `translate(${(app - 1) * APP_SLIDE}px, ${(app - 1) * APP_SLIDE}px) scale(${APP_SCALE})`, transformOrigin: "0 0" }}>
+      <Place x={L.editorAt.x} y={L.editorAt.y} style={{ transform: `translate(${(app - 1) * APP_SLIDE}px, ${(app - 1) * APP_SLIDE}px) scale(${L.appScale})`, transformOrigin: "0 0" }}>
         <FeegaEditor state={state} />
       </Place>
-      <Place x={DIFF_AT.x} y={DIFF_AT.y} style={{ transform: `translateX(${(1 - diff) * DIFF_SLIDE}px) rotate(${(1 - diff) * 5}deg)` }}>
+      <Place x={L.diffAt.x} y={L.diffAt.y} style={{ transform: `translateX(${(1 - diff) * DIFF_SLIDE}px) rotate(${(1 - diff) * 5}deg) scale(${L.diffScale})`, transformOrigin: "0 0" }}>
         <Diff frame={frame} />
       </Place>
-      <Place x={100} y={790}>
-        <Headline lines={["every edit lands in your code."]} boxed="code" tone={CODE_TONE} size={108} align={Align.Left} />
+      <Place x={L.title.at.x} y={L.title.at.y} style={{ width: L.title.width }}>
+        <Headline lines={L.title.lines} boxed="code" tone={CODE_TONE} size={L.title.size} align={L.title.align} />
       </Place>
     </Section>
   );

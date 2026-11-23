@@ -9,6 +9,7 @@ import { BASE_FONT, PAGE, center, insertY, libraryRect, type Point, type Rect } 
 import { Align, Headline, assembleTicks, boxPopAt } from "../Headline";
 import { Pointer, pointerAt, type Click } from "../Pointer";
 import { Place, Section } from "../Section";
+import { Format, rectOnScreen, useStage, type Camera, type TallClick } from "../stage";
 import { MONO, Tone, UI } from "../style";
 
 export const COLLAB_FRAMES = 222;
@@ -32,26 +33,60 @@ const MAYA_AT = 96;
 const BOX = "0 0 24 24";
 const CLAUDE = `#${siClaude.hex}`;
 const MAYA = "#e255a1";
-const POINTER_SIZE = 1.6;
-const TERMINAL: Rect = { x: 96, y: 290, w: 940, h: 640 };
-
-type Camera = { x: number; y: number; scale: number };
 
 const CARD = libraryRect(0);
 const CARD_CENTER = center(CARD);
 const DROP_POINT: Point = { x: PAGE.x + 300, y: insertY(BASE_FONT) + 6 };
 const PRICING = pricingRect(BASE_FONT, 0);
 
-const CLOSE: Camera = { x: 560 - CARD_CENTER.x * 2.3, y: 480 - CARD_CENTER.y * 2.3, scale: 2.3 };
-const WHOLE: Camera = { x: 90, y: 24, scale: 1.36 };
-const SIDE: Camera = { x: 770, y: 350, scale: 0.84 };
+const TALL_CLOSE_SCALE = 2.8;
+const TALL_FULL = { y: 330, h: 1290 };
+const TALL_SIDE = { y: 1180, h: 440 };
 
-const cameraAt = (frame: number): Camera => {
+const LAYOUT = {
+  [Format.Wide]: {
+    close: { x: 560 - CARD_CENTER.x * 2.3, y: 480 - CARD_CENTER.y * 2.3, scale: 2.3 },
+    whole: { x: 90, y: 24, scale: 1.36 },
+    side: { x: 770, y: 350, scale: 0.84 },
+    terminal: { x: 96, y: 290, w: 940, h: 640 },
+    title: { y: 70, lines: ["collab with your", "team and agents."], size: 92 },
+    pushOrigin: "1300px 560px",
+    pointer: 1.6,
+    clip: false,
+  },
+  [Format.Tall]: {
+    close: { x: 540 - CARD_CENTER.x * TALL_CLOSE_SCALE, y: TALL_FULL.h / 2 - CARD_CENTER.y * TALL_CLOSE_SCALE, scale: TALL_CLOSE_SCALE },
+    whole: { x: 0, y: 80, scale: 1 },
+    side: { x: -287.5, y: -537.5, scale: 1.25 },
+    terminal: { x: 70, y: 650, w: 940, h: 500 },
+    title: { y: 270, lines: ["collab with", "your team", "and agents."], size: 112 },
+    pushOrigin: "540px 1000px",
+    pointer: 2.2,
+    clip: true,
+  },
+};
+
+type Layout = (typeof LAYOUT)[Format];
+
+const cameraAt = (frame: number, L: Layout): Camera => {
   const out = tween(frame, GRAB_AT - 2, DROP_AT - GRAB_AT + 4);
   const side = tween(frame, TERM_AT - 6, 22);
-  const a = { x: mix(CLOSE.x, WHOLE.x, out), y: mix(CLOSE.y, WHOLE.y, out), scale: mix(CLOSE.scale, WHOLE.scale, out) };
+  const a = { x: mix(L.close.x, L.whole.x, out), y: mix(L.close.y, L.whole.y, out), scale: mix(L.close.scale, L.whole.scale, out) };
 
-  return { x: mix(a.x, SIDE.x, side), y: mix(a.y, SIDE.y, side), scale: mix(a.scale, SIDE.scale, side) };
+  return { x: mix(a.x, L.side.x, side), y: mix(a.y, L.side.y, side), scale: mix(a.scale, L.side.scale, side) };
+};
+
+const tallView = (frame: number) => {
+  const side = tween(frame, TERM_AT - 6, 22);
+
+  return { x: 0, y: mix(TALL_FULL.y, TALL_SIDE.y, side), w: 1080, h: mix(TALL_FULL.h, TALL_SIDE.h, side) };
+};
+
+const tallStage = (rect: Rect, at: number): Rect => {
+  const view = tallView(at);
+  const cam = cameraAt(at, LAYOUT[Format.Tall]);
+
+  return rectOnScreen(rect, { x: view.x + cam.x, y: view.y + cam.y, scale: cam.scale });
 };
 
 const PATH = [
@@ -66,6 +101,8 @@ export const COLLAB_CLICKS: Click[] = [
   { label: "grab pricing", at: GRAB_AT, path: PATH, rect: CARD },
   { label: "drop in preview", at: DROP_AT, path: PATH, rect: { x: PAGE.x + 20, y: DROP_POINT.y - 24, w: PAGE.w - 40, h: 48 } },
 ];
+
+export const COLLAB_TALL_CLICKS: TallClick[] = COLLAB_CLICKS.map((c) => ({ label: c.label, at: c.at, target: tallStage(c.rect, c.at), view: tallView(c.at) }));
 
 const MAYA_PATH = [
   { at: MAYA_AT, x: PAGE.x + 640, y: PAGE.y + 690 },
@@ -126,14 +163,14 @@ const Appear = ({ at, children }: { at: number; children: ReactNode }) => {
   return <div style={{ opacity: p, transform: `translateY(${(1 - p) * 14}px)` }}>{children}</div>;
 };
 
-const Terminal = () => {
+const Terminal = ({ box }: { box: Rect }) => {
   const frame = useCurrentFrame();
   const typed = Math.max(0, Math.floor((frame - PROMPT_AT) * 3.2));
   const thinking = frame >= THINK_AT && frame < REPLY_AT;
   const spinner = "✻✳✢·"[Math.floor(frame / 3) % 4];
 
   return (
-    <div style={{ width: TERMINAL.w, height: TERMINAL.h, borderRadius: 14, overflow: "hidden", background: "#141413", boxShadow: "0 0 0 1px #3a3a38, 0 40px 100px rgba(0,0,0,.45)", fontFamily: MONO, fontSize: 18, color: "#e9e7e2", display: "flex", flexDirection: "column" }}>
+    <div style={{ width: box.w, height: box.h, borderRadius: 14, overflow: "hidden", background: "#141413", boxShadow: "0 0 0 1px #3a3a38, 0 40px 100px rgba(0,0,0,.45)", fontFamily: MONO, fontSize: 18, color: "#e9e7e2", display: "flex", flexDirection: "column" }}>
       <div style={{ height: 44, display: "flex", alignItems: "center", gap: 8, padding: "0 16px", background: "#1d1d1c", borderBottom: "1px solid #2e2e2c", fontFamily: UI, fontSize: 14, color: "#8a8780" }}>
         {["#ff5f57", "#febc2e", "#28c840"].map((c) => (
           <span key={c} style={{ width: 12, height: 12, borderRadius: 6, background: c }} />
@@ -219,7 +256,10 @@ const Teammate = ({ frame, scale }: { frame: number; scale: number }) => {
 
 export const Collab = () => {
   const frame = useCurrentFrame();
-  const cam = cameraAt(frame);
+  const { width, format } = useStage();
+  const L = LAYOUT[format];
+  const cam = cameraAt(frame, L);
+  const view = L.clip ? tallView(frame) : null;
   const pointer = pointerAt(frame, PATH);
   const dragging = frame >= GRAB_AT && frame < DROP_AT;
   const reveal = tween(frame, TERM_AT, 20);
@@ -237,13 +277,14 @@ export const Collab = () => {
 
   return (
     <Section tone={COLLAB_TONE}>
-      <div style={{ position: "absolute", inset: 0, transform: `scale(${push})`, transformOrigin: "1300px 560px" }}>
-        <Place x={0} y={70} style={{ width: 1920, opacity: frame >= HEAD_AT ? 1 : 0 }}>
-          <Headline lines={["collab with your", "team and agents."]} boxed="agents" tone={COLLAB_TONE} size={92} align={Align.Center} start={HEAD_AT} />
+      <div style={{ position: "absolute", inset: 0, transform: `scale(${push})`, transformOrigin: L.pushOrigin }}>
+        <Place x={0} y={L.title.y} style={{ width, opacity: frame >= HEAD_AT ? 1 : 0 }}>
+          <Headline lines={L.title.lines} boxed="agents" tone={COLLAB_TONE} size={L.title.size} align={Align.Center} start={HEAD_AT} />
         </Place>
-        <Place x={TERMINAL.x} y={TERMINAL.y} style={{ opacity: reveal, transform: `translate(${(1 - reveal) * 760}px, ${(1 - reveal) * 80}px) scale(${0.92 + 0.08 * reveal})`, transformOrigin: "100% 50%" }}>
-          <Terminal />
+        <Place x={L.terminal.x} y={L.terminal.y} style={{ opacity: reveal, transform: `translate(${(1 - reveal) * 760}px, ${(1 - reveal) * 80}px) scale(${0.92 + 0.08 * reveal})`, transformOrigin: "100% 50%" }}>
+          <Terminal box={L.terminal} />
         </Place>
+        <Place x={view?.x ?? 0} y={view?.y ?? 0} style={view ? { width: view.w, height: view.h, overflow: "hidden" } : undefined}>
         <Place x={cam.x} y={cam.y} style={{ transform: `scale(${cam.scale})`, transformOrigin: "0 0" }}>
           <div style={{ position: "relative" }}>
             <FeegaEditor state={state} />
@@ -251,10 +292,11 @@ export const Collab = () => {
             <Teammate frame={frame} scale={cam.scale} />
             {userCursor > 0 ? (
               <div style={{ opacity: userCursor }}>
-                <Pointer x={pointer.x} y={pointer.y} pressed={dragging || Math.abs(frame - DROP_AT) < 3} scale={cam.scale / POINTER_SIZE} />
+                <Pointer x={pointer.x} y={pointer.y} pressed={dragging || Math.abs(frame - DROP_AT) < 3} scale={cam.scale / L.pointer} />
               </div>
             ) : null}
           </div>
+        </Place>
         </Place>
       </div>
     </Section>

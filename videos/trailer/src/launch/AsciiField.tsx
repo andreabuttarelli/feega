@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef } from "react";
 import { useCurrentFrame } from "remotion";
+import { useStage } from "./stage";
 
 type Rgb = [number, number, number];
 
@@ -16,10 +17,6 @@ const CELL = 16;
 const SCALE = 0.09;
 const MIN_PEAK = 200;
 const EDGE_FLOOR = 0.6;
-const WIDTH = 1920;
-const HEIGHT = 1080;
-const COLS = Math.ceil(WIDTH / CELL);
-const ROWS = Math.ceil(HEIGHT / CELL);
 
 const parse = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)) as Rgb;
 
@@ -59,6 +56,9 @@ const envelope = (nx: number, ny: number) => {
 
 export const AsciiField = ({ fade, strength = 1 }: { fade: string; strength?: number }) => {
   const frame = useCurrentFrame();
+  const { width: WIDTH, height: HEIGHT } = useStage();
+  const COLS = Math.ceil(WIDTH / CELL);
+  const ROWS = Math.ceil(HEIGHT / CELL);
   const canvas = useRef<HTMLCanvasElement>(null);
 
   useLayoutEffect(() => {
@@ -92,7 +92,7 @@ export const AsciiField = ({ fade, strength = 1 }: { fade: string; strength?: nu
         ctx.fillText(glyph, c * CELL + CELL / 2, row * CELL + CELL / 2);
       }
     }
-  }, [frame, strength]);
+  }, [frame, strength, WIDTH, HEIGHT, COLS, ROWS]);
 
   return (
     <div style={{ position: "absolute", inset: 0 }}>

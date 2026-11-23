@@ -6,6 +6,7 @@ import { Align, Headline } from "../Headline";
 import { float } from "../motion";
 import { ICONS, Pixel, hop } from "../pixel";
 import { Place, Section } from "../Section";
+import { Format, useStage } from "../stage";
 import { INK, ORANGE, Tone } from "../style";
 
 export const TEMPLATES_FRAMES = 69;
@@ -29,6 +30,11 @@ const SHOTS = [
   "blog-cards-light",
 ];
 
+const LAYOUT = {
+  [Format.Wide]: { lines: ["free and premium templates."], size: 120, titleY: 150, rowY: 500, rowScale: 1, shiftFrom: 300 },
+  [Format.Tall]: { lines: ["free and", "premium", "templates."], size: 170, titleY: 280, rowY: 960, rowScale: 1.25, shiftFrom: 40 },
+};
+
 const TILE_W = 480;
 const TILE_H = 300;
 const GAP = 48;
@@ -51,15 +57,17 @@ const PixelFrame = ({ color, seed, children }: { color: string; seed: number; ch
 
 export const Templates = () => {
   const frame = useCurrentFrame();
-  const shift = mix(300, -2400, glide(frame, 0, TEMPLATES_FRAMES + 20));
+  const { width, format } = useStage();
+  const L = LAYOUT[format];
+  const shift = mix(L.shiftFrom, -2400, glide(frame, 0, TEMPLATES_FRAMES + 20));
 
   return (
     <Section tone={TEMPLATES_TONE}>
       <AsciiField fade={INK} strength={0.7} />
-      <Place x={0} y={150} style={{ width: 1920 }}>
-        <Headline lines={["free and premium templates."]} boxed="templates" tone={Tone.Ink} size={120} align={Align.Center} />
+      <Place x={0} y={L.titleY} style={{ width }}>
+        <Headline lines={L.lines} boxed="templates" tone={Tone.Ink} size={L.size} align={Align.Center} />
       </Place>
-      <Place x={0} y={500} style={{ display: "flex", gap: GAP, transform: `translateX(${shift}px)` }}>
+      <Place x={0} y={L.rowY} style={{ display: "flex", gap: GAP, transform: `scale(${L.rowScale}) translateX(${shift}px)`, transformOrigin: "0 0" }}>
         {SHOTS.map((shot, i) => (
           <div key={shot} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 18, transform: `translateY(${float(frame, i * 13, BOB)}px) rotate(${float(frame, i * 7, 1.2)}deg)` }}>
             <PixelFrame color={FRAME_COLORS[i % FRAME_COLORS.length]} seed={i + 11}>

@@ -8,6 +8,7 @@ import { useOnBeat } from "../beat";
 import { float } from "../motion";
 import { Heading, Tumble, Scatter, specks } from "../pixel";
 import { Section } from "../Section";
+import { Format, TALL_STAGE, useStage } from "../stage";
 import { INK, MONO, ORANGE, Tone } from "../style";
 
 export const EDITORS_FRAMES = 97;
@@ -17,9 +18,14 @@ const GAP_OPEN = 8;
 const FIRST_SWAP = 16;
 const SWAP_STEP = 11;
 const FLIP = 6;
-const ICON = 150;
-const SLOT = 230;
-const FONT = 64;
+const LABEL_GAP = 22;
+
+const LAYOUT = {
+  [Format.Wide]: { icon: 150, slot: 230, font: 64, label: 22, flow: "row" as const, tumbleY: [140, 150], area: { width: 1920, height: 1080 } },
+  [Format.Tall]: { icon: 230, slot: 330, font: 92, label: 30, flow: "column" as const, tumbleY: [1470, 1500], area: TALL_STAGE },
+};
+
+const useLayout = () => LAYOUT[useStage().format];
 const BOX = "0 0 24 24";
 
 type Tool = { name: string; mark?: BrandMark; color: string };
@@ -36,16 +42,23 @@ export const swapAt = (i: number) => FIRST_SWAP + i * SWAP_STEP;
 
 export const EDITORS_CUES: Cue[] = TOOLS.map((_, i) => ({ at: swapAt(i), sound: Sound.ClickA, volume: 0.55, beat: true }));
 
-const Terminal = () => (
-  <span style={{ width: ICON, height: ICON, borderRadius: 32, background: INK, display: "grid", placeItems: "center", fontFamily: MONO, fontSize: 64, color: ORANGE, letterSpacing: "-0.05em" }}>&gt;_</span>
-);
+const Terminal = () => {
+  const { icon } = useLayout();
 
-const Logo = ({ tool }: { tool: Tool }) => (tool.mark ? <Mark mark={tool.mark} size={ICON} color={tool.color} /> : <Terminal />);
+  return <span style={{ width: icon, height: icon, borderRadius: 32, background: INK, display: "grid", placeItems: "center", fontFamily: MONO, fontSize: icon * 0.43, color: ORANGE, letterSpacing: "-0.05em" }}>&gt;_</span>;
+};
+
+const Logo = ({ tool }: { tool: Tool }) => {
+  const { icon } = useLayout();
+
+  return tool.mark ? <Mark mark={tool.mark} size={icon} color={tool.color} /> : <Terminal />;
+};
 
 const current = (frame: number, snap: (f: number) => number) => TOOLS.reduce((top, _, i) => (frame >= snap(swapAt(i)) ? i : top), -1);
 
 const Flip = () => {
   const frame = useCurrentFrame();
+  const L = useLayout();
   const snap = useOnBeat();
   const top = current(frame, snap);
 
@@ -63,10 +76,10 @@ const Flip = () => {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 18, perspective: 800 }}>
-      <div style={{ width: ICON, height: ICON, transform: `rotateY(${angle}deg) scale(${pop})` }}>
+      <div style={{ width: L.icon, height: L.icon, transform: `rotateY(${angle}deg) scale(${pop})` }}>
         <Logo tool={shown} />
       </div>
-      <span style={{ position: "absolute", top: ICON + 22, fontFamily: MONO, fontSize: 22, letterSpacing: "0", color: "#8a8780", whiteSpace: "nowrap", opacity: label, transform: `translateY(${(1 - label) * 10}px)` }}>{TOOLS[top].name}</span>
+      <span style={{ position: "absolute", top: L.icon + LABEL_GAP, fontFamily: MONO, fontSize: L.label, letterSpacing: "0", color: "#8a8780", whiteSpace: "nowrap", opacity: label, transform: `translateY(${(1 - label) * 10}px)` }}>{TOOLS[top].name}</span>
     </div>
   );
 };
@@ -80,26 +93,29 @@ const Words = ({ text, from, align }: { text: string; from: number; align: "left
 
 const Slot = ({ children }: { children: ReactNode }) => {
   const frame = useCurrentFrame();
+  const L = useLayout();
   const open = glide(frame, GAP_OPEN, 10);
+  const size = L.flow === "row" ? { width: open * L.slot, height: L.icon } : { width: L.icon, height: open * L.slot };
 
-  return <span style={{ position: "relative", display: "inline-flex", justifyContent: "center", alignItems: "flex-start", width: open * SLOT, height: ICON }}>{children}</span>;
+  return <span style={{ position: "relative", display: "inline-flex", justifyContent: "center", alignItems: "flex-start", ...size }}>{children}</span>;
 };
 
 export const Editors = () => {
   const frame = useCurrentFrame();
+  const L = useLayout();
 
   return (
     <Section tone={EDITORS_TONE}>
-      <Scatter specks={specks(6, 18, [ORANGE, "#004dff", "#c9c6bd"])} />
-      <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: MONO, fontSize: FONT, letterSpacing: "-0.03em", color: INK, transform: `translateY(${float(frame, 0, 4)}px)` }}>
+      <Scatter specks={specks(6, 18, [ORANGE, "#004dff", "#c9c6bd"], L.area)} />
+      <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: L.flow, alignItems: "center", justifyContent: "center", fontFamily: MONO, fontSize: L.font, letterSpacing: "-0.03em", color: INK, transform: `translateY(${float(frame, 0, 4)}px)` }}>
         <Words text="feega runs in" from={0} align="right" />
         <Slot>
           <Flip />
         </Slot>
         <Words text="your editor." from={4} align="left" />
       </div>
-      <Tumble sprite="code" size={8} y={140} from={30} frames={80} heading={Heading.Right} />
-      <Tumble sprite="palette" size={8} y={150} from={38} frames={80} heading={Heading.Right} />
+      <Tumble sprite="code" size={8} y={L.tumbleY[0]} from={30} frames={80} heading={Heading.Right} />
+      <Tumble sprite="palette" size={8} y={L.tumbleY[1]} from={38} frames={80} heading={Heading.Right} />
     </Section>
   );
 };

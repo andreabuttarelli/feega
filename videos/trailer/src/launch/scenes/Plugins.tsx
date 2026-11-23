@@ -11,6 +11,7 @@ import { PixelWord, wordBlocks } from "../PixelWord";
 import { pointerAt, type Click, type Waypoint } from "../Pointer";
 import { center, inside, type Rect } from "../editor/layout";
 import { Place, Section } from "../Section";
+import { Format, TALL_STAGE, useStage } from "../stage";
 import { BLUE, DISPLAY, INK, PAPER, Tone, UI, WHITE } from "../style";
 
 const BEAT = (FPS * 60) / MUSIC.bpm;
@@ -20,12 +21,9 @@ export const PLUGINS_FRAMES = beats(12);
 export const PLUGINS_TONE = Tone.Ink;
 
 const WORD = "plugins";
-const WORD_CELL = 52;
 const WORD_IN = 12;
 const WORD_RISE = 220;
 const TILE = 120;
-const TILE_COLS = 16;
-const TILE_ROWS = 9;
 const TILE_SPAN = 10;
 const WORD_OUT = beats(2);
 const CARD_AT = beats(3);
@@ -55,34 +53,62 @@ const LISTINGS: Listing[] = [
   { name: "QR codes", about: "Any link, scannable", sprite: "qr" },
 ];
 
-const CARD = { x: 1010, y: 100, w: 800, h: 880 };
+type Card = Rect;
+
+const LAYOUT = {
+  [Format.Wide]: {
+    card: { x: 1010, y: 100, w: 800, h: 880 } as Card,
+    wordCell: 52,
+    tile: { cols: 16, rows: 9 },
+    head: { at: { x: 120, y: 330 }, lines: ["plugins for", "everything."], size: 112, align: Align.Left, width: undefined },
+    icons: { x: 128, y: 660, size: 9, gap: 34 },
+    stage: { width: 1920, height: 1080 },
+  },
+  [Format.Tall]: {
+    card: { x: 40, y: 750, w: 1000, h: 860 } as Card,
+    wordCell: 26,
+    tile: { cols: 9, rows: 16 },
+    head: { at: { x: 0, y: 270 }, lines: ["plugins for", "everything."], size: 150, align: Align.Center, width: 1080 },
+    icons: { x: 0, y: 640, size: 7, gap: 28 },
+    stage: TALL_STAGE,
+  },
+};
+
 const CARD_PAD = 30;
-const LIST_TOP = CARD.y + 128;
+const listTop = (card: Card) => card.y + 128;
 const ROW_H = 118;
 const ROW_GAP = 10;
 const PICK = 10;
 const FINAL_SCROLL = SCROLL_STEPS.length * SCROLL_ROWS * ROW_H;
+const ROW_PAD = 12;
 const MUTED = "#8a8780";
 const HOVER = "#ecebe6";
 const TEAMMATE = "#e255a1";
 const HOVER_UNTIL = PICK_CLICK + 24;
 
-const rowRect = (i: number, scroll: number): Rect => ({ x: CARD.x + CARD_PAD - 12, y: LIST_TOP + i * ROW_H - scroll, w: CARD.w - 2 * CARD_PAD + 24, h: ROW_H - ROW_GAP });
+const rowRect = (card: Card, i: number, scroll: number): Rect => ({ x: card.x + CARD_PAD - ROW_PAD, y: listTop(card) + i * ROW_H - scroll, w: card.w - 2 * CARD_PAD + 2 * ROW_PAD, h: ROW_H - ROW_GAP });
 
-const PICK_RECT = rowRect(PICK, FINAL_SCROLL);
-const PICK_AT = center(PICK_RECT);
+const pickRect = (card: Card) => rowRect(card, PICK, FINAL_SCROLL);
 
-const CARD_PATH: Waypoint[] = [
-  { at: SCROLL_STEPS[0], x: 1780, y: 1060 },
-  { at: SCROLL_STEPS[2] - 4, x: 1520, y: 760 },
-  { at: PICK_CLICK - 2, ...PICK_AT },
-  { at: PICK_CLICK + 1, ...PICK_AT },
-  { at: PLUGINS_FRAMES, x: PICK_AT.x + 120, y: PICK_AT.y + 150 },
-];
+const cardPath = (card: Card): Waypoint[] => {
+  const at = center(pickRect(card));
 
-export const PLUGINS_CLICKS: Click[] = [
-  { label: "install plugin", at: PICK_CLICK, path: CARD_PATH, rect: PICK_RECT },
-];
+  return [
+    { at: SCROLL_STEPS[0], x: at.x + 370, y: at.y + 306 },
+    { at: SCROLL_STEPS[2] - 4, x: at.x + 110, y: at.y + 6 },
+    { at: PICK_CLICK - 2, ...at },
+    { at: PICK_CLICK + 1, ...at },
+    { at: PLUGINS_FRAMES, x: at.x + 120, y: at.y + 150 },
+  ];
+};
+
+const clicksIn = (card: Card): Click[] => [{ label: "install plugin", at: PICK_CLICK, path: cardPath(card), rect: pickRect(card) }];
+
+export const PLUGINS_CLICKS: Click[] = clicksIn(LAYOUT[Format.Wide].card);
+
+export const PLUGINS_TALL_CLICKS: Click[] = clicksIn(LAYOUT[Format.Tall].card);
+
+export const PLUGINS_TALL_VIEW: Rect = LAYOUT[Format.Tall].card;
 
 const WORD_TICKS = [0, 4, 8];
 
@@ -97,10 +123,11 @@ export const PLUGINS_CUES: Cue[] = [
   { at: PICK_CLICK + 2, sound: Sound.Pop, volume: 0.5 },
 ];
 
-const tileAt = (x: number, y: number) => CARD_AT + ((x + y) / (TILE_COLS + TILE_ROWS)) * TILE_SPAN + noise(x * 31 + y) * 4;
+const tileAt = (x: number, y: number, tile: { cols: number; rows: number }) => CARD_AT + ((x + y) / (tile.cols + tile.rows)) * TILE_SPAN + noise(x * 31 + y) * 4;
 
 const InkTiles = () => {
   const frame = useCurrentFrame();
+  const { tile } = LAYOUT[useStage().format];
 
   if (frame < CARD_AT) {
     return null;
@@ -108,10 +135,10 @@ const InkTiles = () => {
 
   return (
     <>
-      {Array.from({ length: TILE_COLS * TILE_ROWS }, (_, i) => {
-        const x = i % TILE_COLS;
-        const y = Math.floor(i / TILE_COLS);
-        const flip = tween(frame, tileAt(x, y), 6);
+      {Array.from({ length: tile.cols * tile.rows }, (_, i) => {
+        const x = i % tile.cols;
+        const y = Math.floor(i / tile.cols);
+        const flip = tween(frame, tileAt(x, y, tile), 6);
 
         return flip > 0 ? <div key={i} style={{ position: "absolute", left: x * TILE, top: y * TILE, width: TILE + 1, height: TILE + 1, background: INK, transform: `perspective(600px) rotateX(${(1 - flip) * 90}deg)` }} /> : null;
       })}
@@ -121,6 +148,8 @@ const InkTiles = () => {
 
 const Word = () => {
   const frame = useCurrentFrame();
+  const L = LAYOUT[useStage().format];
+  const WORD_CELL = L.wordCell;
   const { cols, rows } = wordBlocks(WORD);
   const rise = lift(frame, WORD_OUT, 16) * WORD_RISE;
 
@@ -129,7 +158,7 @@ const Word = () => {
   }
 
   return (
-    <div style={{ position: "absolute", left: (1920 - cols * WORD_CELL) / 2, top: (1080 - rows * WORD_CELL) / 2 - rise }}>
+    <div style={{ position: "absolute", left: (L.stage.width - cols * WORD_CELL) / 2, top: (L.stage.height - rows * WORD_CELL) / 2 - rise }}>
       <PixelWord word={WORD} cell={WORD_CELL} color={WHITE} scaleOf={(b) => lift(frame, b.seed * (WORD_IN - 6), 6) * (1 - tween(frame, WORD_OUT + b.seed * 10, 6))} />
     </div>
   );
@@ -154,8 +183,8 @@ const Marker = ({ listing, installed }: { listing: Listing; installed: number })
   return listing.unread ? <div style={{ width: 14, height: 14, borderRadius: 7, background: BLUE, marginRight: 14 }} /> : null;
 };
 
-const Row = ({ listing, rect, hovered, installed }: { listing: Listing; rect: Rect; hovered: boolean; installed: number }) => (
-  <div style={{ position: "absolute", left: rect.x - CARD.x, top: rect.y - CARD.y, width: rect.w, height: rect.h, borderRadius: 22, background: hovered ? HOVER : "transparent", display: "flex", alignItems: "center", gap: 24, padding: "0 12px" }}>
+const Row = ({ listing, rect, card, hovered, installed }: { listing: Listing; rect: Rect; card: Card; hovered: boolean; installed: number }) => (
+  <div style={{ position: "absolute", left: rect.x - card.x, top: rect.y - card.y, width: rect.w, height: rect.h, borderRadius: 22, background: hovered ? HOVER : "transparent", display: "flex", alignItems: "center", gap: 24, padding: "0 12px" }}>
     <div style={{ width: 84, height: 84, borderRadius: 20, background: WHITE, display: "grid", placeItems: "center", flexShrink: 0 }}>
       <Pixel sprite={listing.sprite} size={7} />
     </div>
@@ -178,9 +207,13 @@ const TagCursor = ({ x, y, pressed }: { x: number; y: number; pressed: boolean }
 
 const Catalogue = () => {
   const frame = useCurrentFrame();
+  const L = LAYOUT[useStage().format];
+  const CARD = L.card;
+  const LIST_TOP = listTop(CARD);
+  const path = cardPath(CARD);
   const enter = tween(frame, CARD_AT + 4, 14);
   const scroll = scrollAt(frame);
-  const tip = pointerAt(frame, CARD_PATH);
+  const tip = pointerAt(frame, path);
   const cursorIn = frame >= SCROLL_STEPS[0];
   const installed = lift(frame, PICK_CLICK + 2, 8);
 
@@ -191,22 +224,22 @@ const Catalogue = () => {
   return (
     <>
       {frame >= HEAD_AT ? (
-        <Place x={120} y={330}>
-          <Headline lines={["plugins for", "everything."]} boxed="everything" tone={PLUGINS_TONE} size={112} align={Align.Left} start={HEAD_AT} />
+        <Place x={L.head.at.x} y={L.head.at.y} style={{ width: L.head.width }}>
+          <Headline lines={L.head.lines} boxed="everything" tone={PLUGINS_TONE} size={L.head.size} align={L.head.align} start={HEAD_AT} />
         </Place>
       ) : null}
-      <Place x={128} y={660}>
-        <IconRow sprites={["plug", "mesh", "cube", "type", "palette", "star"]} size={9} start={HEAD_AT + 14} gap={34} stagger={3} />
+      <Place x={L.icons.x} y={L.icons.y} style={{ width: L.head.width, display: "flex", justifyContent: L.head.align === Align.Center ? "center" : "flex-start" }}>
+        <IconRow sprites={["plug", "mesh", "cube", "type", "palette", "star"]} size={L.icons.size} start={HEAD_AT + 14} gap={L.icons.gap} stagger={3} />
       </Place>
       <div style={{ position: "absolute", left: CARD.x, top: CARD.y, width: CARD.w, height: CARD.h, borderRadius: 44, background: PAPER, overflow: "hidden", transform: `translateX(${(1 - enter) * 1000}px) rotate(${(1 - enter) * 6}deg)` }}>
         <div style={{ position: "absolute", left: CARD_PAD + 12, top: 44, fontFamily: UI, fontSize: 24, fontWeight: 600, color: MUTED }}>Plugins</div>
         <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, top: LIST_TOP - CARD.y - 16, maskImage: "linear-gradient(transparent, #000 40px, #000 calc(100% - 90px), transparent)" }}>
           <div style={{ position: "absolute", left: 0, top: CARD.y - LIST_TOP + 16 }}>
             {LISTINGS.map((listing, i) => {
-              const rect = rowRect(i, scroll);
+              const rect = rowRect(CARD, i, scroll);
               const hovered = cursorIn && frame <= HOVER_UNTIL && inside(tip, rect);
 
-              return <Row key={listing.name} listing={listing} rect={rect} hovered={hovered} installed={i === PICK ? installed : 0} />;
+              return <Row key={listing.name} listing={listing} rect={rect} card={CARD} hovered={hovered} installed={i === PICK ? installed : 0} />;
             })}
           </div>
         </div>
@@ -218,13 +251,14 @@ const Catalogue = () => {
 
 export const Plugins = () => {
   const frame = useCurrentFrame();
+  const { stage } = LAYOUT[useStage().format];
   const landscapeOn = frame < CARD_AT + TILE_SPAN + 12;
 
   return (
     <Section tone={PLUGINS_TONE}>
       {landscapeOn ? (
         <div style={{ position: "absolute", inset: 0, transform: `scale(${1.08 - 0.08 * tween(frame, 0, 60)})` }}>
-          <Landscape cols={192} rows={108} seed={7} width={1920} height={1080} />
+          <Landscape cols={stage.width / 10} rows={stage.height / 10} seed={7} width={stage.width} height={stage.height} />
         </div>
       ) : null}
       <Word />

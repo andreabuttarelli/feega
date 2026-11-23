@@ -7,6 +7,7 @@ import { Ground, Landscape } from "../Landscape";
 import { float } from "../motion";
 import { Scatter, specks } from "../pixel";
 import { Section } from "../Section";
+import { Format, TALL_STAGE, useStage } from "../stage";
 import { INK, MONO, ORANGE, PAPER, Tone } from "../style";
 
 export const FRAMEWORKS_FRAMES = 97;
@@ -17,11 +18,10 @@ const ENTER_STEP = 4;
 const SUCK = 18;
 const STEP = 8;
 const CARD = 230;
-const CENTER = { x: 960, y: 540 };
 
 type Spot = { icon: SimpleIcon; x: number; y: number; depth: number; tilt: number };
 
-const SPOTS: Spot[] = [
+const WIDE_SPOTS: Spot[] = [
   { icon: siReact, x: 300, y: 250, depth: 1.1, tilt: -8 },
   { icon: siNextdotjs, x: 1540, y: 230, depth: 0.85, tilt: 6 },
   { icon: siVuedotjs, x: 700, y: 170, depth: 0.7, tilt: 4 },
@@ -32,9 +32,25 @@ const SPOTS: Spot[] = [
   { icon: siVite, x: 680, y: 860, depth: 0.8, tilt: -9 },
 ];
 
+const TALL_SPOTS: Spot[] = [
+  { icon: siReact, x: 330, y: 430, depth: 1.1, tilt: -8 },
+  { icon: siNextdotjs, x: 840, y: 400, depth: 0.85, tilt: 6 },
+  { icon: siVuedotjs, x: 560, y: 660, depth: 0.7, tilt: 4 },
+  { icon: siSvelte, x: 740, y: 1330, depth: 1.15, tilt: -5 },
+  { icon: siNuxt, x: 890, y: 790, depth: 0.95, tilt: 9 },
+  { icon: siAstro, x: 330, y: 1230, depth: 0.9, tilt: 7 },
+  { icon: siReactrouter, x: 260, y: 700, depth: 0.65, tilt: -6 },
+  { icon: siVite, x: 560, y: 1530, depth: 0.8, tilt: -9 },
+];
+
+const LAYOUT = {
+  [Format.Wide]: { spots: WIDE_SPOTS, center: { x: 960, y: 540 }, font: 46, area: { width: 1920, height: 1080 } },
+  [Format.Tall]: { spots: TALL_SPOTS, center: { x: 540, y: 960 }, font: 62, area: TALL_STAGE },
+};
+
 const enterAt = (i: number) => ENTER_FROM + i * ENTER_STEP;
 
-export const FRAMEWORKS_CUES: Cue[] = SPOTS.map((_, i) => ({ at: enterAt(i), sound: Sound.Pop, volume: 0.4 }));
+export const FRAMEWORKS_CUES: Cue[] = WIDE_SPOTS.map((_, i) => ({ at: enterAt(i), sound: Sound.Pop, volume: 0.4 }));
 
 const Tile = ({ icon, seed }: { icon: SimpleIcon; seed: number }) => (
   <div style={{ position: "relative", padding: STEP }}>
@@ -56,15 +72,17 @@ const Tile = ({ icon, seed }: { icon: SimpleIcon; seed: number }) => (
 export const Frameworks = () => {
   const frame = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();
+  const L = LAYOUT[useStage().format];
+  const CENTER = L.center;
   const suck = glide(frame, durationInFrames - SUCK - 4, SUCK);
   const text = lift(frame, -8, 12);
 
   return (
     <Section tone={FRAMEWORKS_TONE}>
       <div style={{ position: "absolute", inset: 0, transform: `scale(${1 - suck})`, transformOrigin: "50% 50%", opacity: 1 - suck }}>
-        <Scatter specks={specks(7, 26, [ORANGE, "#004dff", INK])} />
+        <Scatter specks={specks(7, 26, [ORANGE, "#004dff", INK], L.area)} />
       </div>
-      {SPOTS.map((spot, i) => {
+      {L.spots.map((spot, i) => {
         const p = lift(frame, enterAt(i), 14);
         const outward = { x: spot.x - CENTER.x, y: spot.y - CENTER.y };
         const drift = -frame * 1.4 * spot.depth;
@@ -79,7 +97,7 @@ export const Frameworks = () => {
           </div>
         );
       })}
-      <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 14, fontFamily: MONO, fontSize: 46, color: INK, letterSpacing: "-0.02em", opacity: text * (1 - suck), transform: `translateY(${(1 - text) * 20}px) scale(${1 - 0.6 * suck})`, zIndex: 9 }}>
+      <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 14, fontFamily: MONO, fontSize: L.font, color: INK, letterSpacing: "-0.02em", opacity: text * (1 - suck), transform: `translateY(${(1 - text) * 20}px) scale(${1 - 0.6 * suck})`, zIndex: 9 }}>
         <span style={{ width: 16, height: 16, background: ORANGE }} />
         every framework.
       </div>
