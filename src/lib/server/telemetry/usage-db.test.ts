@@ -48,6 +48,24 @@ describe('usage sink', () => {
     expect(retried[0]).not.toHaveProperty('tier');
   });
 
+  it('keeps the other funnel events when only the support action is not accepted yet', async () => {
+    const insert = vi.fn().mockResolvedValueOnce({ error: { code: '23514' } }).mockResolvedValueOnce({ error: null });
+
+    await makeSink(insert)([row({ event: 'install' }), row({ event: 'support_action', item: 'star' }), row({ event: 'onboarding_step', step: 'support' })]);
+
+    expect(insert).toHaveBeenCalledTimes(2);
+    expect(insert.mock.calls[1][0].map((r: UsageRow) => r.event)).toEqual(['install', 'onboarding_step']);
+    expect(insert.mock.calls[1][0].every((r: UsageRow) => !('item' in r))).toBe(true);
+  });
+
+  it('falls back to the legacy rows when the support retry still lacks columns', async () => {
+    const insert = vi.fn().mockResolvedValueOnce({ error: { code: '42703' } }).mockResolvedValueOnce({ error: { code: '42703' } }).mockResolvedValueOnce({ error: null });
+
+    await makeSink(insert)([row(), row({ event: 'support_action', item: 'star' })]);
+
+    expect(insert.mock.calls[2][0].map((r: UsageRow) => r.event)).toEqual(['edit']);
+  });
+
   it('throws other errors', async () => {
     const insert = vi.fn().mockResolvedValue({ error: { code: '500' } });
 

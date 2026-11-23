@@ -14,11 +14,12 @@ const BAD_REQUEST = 400;
 const PAYLOAD_TOO_LARGE = 413;
 const TOO_MANY_REQUESTS = 429;
 
-const EVENTS = ['install', 'opened', 'session_start', 'preview_ready', 'first_edit', 'edit', 'session_end', 'sign_in', 'sign_out', 'session_resume', 'onboarding_started', 'onboarding_step', 'onboarding_finished', 'onboarding_skipped', 'setup_applied', 'setup_failed', 'skill_hint_shown', 'skill_installed', 'library_insert', 'plugin_installed'] as const;
+const EVENTS = ['install', 'opened', 'session_start', 'preview_ready', 'first_edit', 'edit', 'session_end', 'sign_in', 'sign_out', 'session_resume', 'onboarding_started', 'onboarding_step', 'onboarding_finished', 'onboarding_skipped', 'setup_applied', 'setup_failed', 'skill_hint_shown', 'skill_installed', 'library_insert', 'plugin_installed', 'support_action'] as const;
 const FRAMEWORKS = ['sveltekit', 'nuxt', 'astro', 'react-router', 'next', 'gatsby', 'angular', 'cra', 'vite', 'generic'] as const;
 const EDIT_KINDS = ['text', 'style', 'image', 'attribute', 'structure', 'template', 'other'] as const;
 const EDITORS = ['vscode', 'cursor', 'windsurf', 'vscodium', 'npx'] as const;
-const STEPS = ['welcome', 'agent', 'sign_in'] as const;
+const STEPS = ['welcome', 'agent', 'sign_in', 'support'] as const;
+const SUPPORT_ITEMS = ['star', 'follow_x', 'discord', 'coffee', 'share'] as const;
 const TIERS = ['free', 'pro'] as const;
 const DEVICES = ['desktop', 'web', 'cli'] as const;
 
@@ -42,7 +43,8 @@ const eventSchema = z.object({
   edit_kind: z.enum(EDIT_KINDS).optional(),
   signed_in: z.boolean().optional(),
   step: z.enum(STEPS).optional(),
-  tier: z.enum(TIERS).optional()
+  tier: z.enum(TIERS).optional(),
+  item: z.enum(SUPPORT_ITEMS).optional()
 });
 
 const batchSchema = z.object({ events: z.array(eventSchema).min(1).max(MAX_EVENTS) });
