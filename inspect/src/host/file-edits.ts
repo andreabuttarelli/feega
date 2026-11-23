@@ -8,7 +8,7 @@ import { inside, liveAtOf, reader, tokenOf } from '@feega/live-edit/live-ask';
 import { ClassFamily, LiveProp } from '@feega/live-edit/live-fields';
 import { literalText } from '@feega/live-edit/literal-text';
 import { moveNode, type Place } from '@feega/live-edit/move-node';
-import { detachComponent } from '@feega/live-edit/detach-component';
+import { detachComponent, type Which } from '@feega/live-edit/detach-component';
 import { globalSheetOf, googleFontImport, googleFontLink } from '@feega/live-edit/font-wiring';
 import { replaceEverywhere } from '@feega/live-edit/font-replace';
 import { VariableHome, saveVariable, variableName } from '@feega/live-edit/save-variable';
@@ -43,7 +43,7 @@ import { scanProject } from './project-scan';
 
 export type StructureAsk = { op: StructureOp; at: string; to?: string; usage?: Usage; loop?: LoopMove; instance?: number; add?: { kind: AddKind; src?: string; place?: AddPlace }; wrap?: WrapTag };
 
-export type DetachAsk = { at: string; usage: string };
+export type DetachAsk = { at: string; usage: string; which: Which };
 
 export type ManyAsk = { op: StructureOp; targets: { at: string; instance?: number }[]; wrap?: WrapTag };
 
@@ -364,14 +364,14 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     return out.ok && written.ok ? { ...written, selected: out.selected } : written;
   }
 
-  async function detached(rawAt: string, rawUsage: string): Promise<Written> {
+  async function detached(rawAt: string, rawUsage: string, which: Which): Promise<Written> {
     meta = { at: rawAt, prop: 'detach', value: rawUsage, scope: '' };
     const element = placed(rawAt);
     const usage = placed(rawUsage);
     if (!element || !usage) {
       return { ok: false, reason: `${element ? rawUsage : rawAt} is not a file:line:col inside the workspace` };
     }
-    const out = await detachComponent(reader(root), { element, usage });
+    const out = await detachComponent(reader(root), { element, usage, which });
     const written = out.ok ? await writtenAll(out.changes, '') : out;
     return out.ok && written.ok ? { ...written, selected: out.selected } : written;
   }
@@ -446,7 +446,7 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     proposal: (proposal: Proposal, appDir: string) => inTurn(() => proposed(proposal, appDir)),
     saveVariable: (ask: EditAsk, name: string) => inTurn(() => variableSaved(ask, name)),
     structure: (ask: StructureAsk) => inTurn(() => restructured(ask)),
-    detach: (ask: DetachAsk) => inTurn(() => detached(ask.at, ask.usage)),
+    detach: (ask: DetachAsk) => inTurn(() => detached(ask.at, ask.usage, ask.which)),
     library: (at: string, place: AddPlace, item: InsertItem, tokens: string) => inTurn(() => libraryWritten(at, place, item, tokens)),
     structureMany: (ask: ManyAsk) => inTurn(() => restructuredMany(ask)),
     move: (from: string, to: string, place: Place) => inTurn(() => moved(from, to, place)),

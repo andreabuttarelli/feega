@@ -5,7 +5,9 @@ import { addImport } from './add-import';
 import { loopsAt } from './loop-array';
 import { hiddenOut, spanOf } from './move-node';
 
-export type DetachAsk = { element: LiveAt; usage: LiveAt };
+export type Which = { index: number; count: number };
+
+export type DetachAsk = { element: LiveAt; usage: LiveAt; which?: Which };
 
 type Binding = { local: string; named: boolean; statement: string; quote: string; specifier: string };
 
@@ -91,7 +93,7 @@ function rewriteUsage(source: string, hidden: string, tagAt: number, local: stri
 }
 
 export async function detachComponent(read: ReadFile, ask: DetachAsk): Promise<Structured> {
-  const { element, usage } = ask;
+  const { element, usage, which } = ask;
   const ext = extOf(element.file);
   const rename = RENAMERS[ext];
   if (!rename) {
@@ -118,11 +120,12 @@ export async function detachComponent(read: ReadFile, ask: DetachAsk): Promise<S
 
   const tags = new RegExp(`<(?:${escaped(binding.local)}|${escaped(kebab(binding.local))})(?=[\\s/>])`, 'g');
   const inside = [...hidden.slice(parent.start + 1, parent.end).matchAll(tags)];
-  if (inside.length !== 1) {
+  const chosen = inside.length === 1 ? inside[0] : which && which.count === inside.length ? inside[which.index] : undefined;
+  if (!chosen) {
     return refuse(inside.length ? `${inside.length} <${binding.local}> usages in this element: cannot tell which one this is` : `no <${binding.local}> usage in this element (a dynamic component?)`);
   }
 
-  const tagAt = parent.start + 1 + inside[0].index;
+  const tagAt = parent.start + 1 + chosen.index;
   if (loopsAt(hidden, tagAt).length) {
     return refuse('the usage is rendered in a loop: every iteration shares it');
   }

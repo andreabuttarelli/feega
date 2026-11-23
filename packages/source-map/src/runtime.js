@@ -142,6 +142,7 @@ function inspectTagged(tagged, maxHtml) {
     name: nameOf(tagged),
     instances: instancesOf(tagged).length,
     instanceIndex: instancesOf(tagged).indexOf(tagged),
+    usage: usageOf(tagged, source.file),
     classCount: tagged.classList?.[0] ? tagged.ownerDocument.getElementsByClassName(tagged.classList[0]).length : 0,
     parentWidth: tagged.parentElement?.getBoundingClientRect().width ?? 0,
     ancestors: ancestorsOf(tagged),
@@ -576,15 +577,26 @@ function truncate(text, max) {
 
 const LAYOUT_FILE = /(^|\/)(\+layout\.svelte|layout\.[jt]sx?|_app\.[jt]sx?|root\.[jt]sx?)$/;
 
-function componentBoundary(element, file) {
-  let root = parseSource(element.getAttribute(SOURCE_ATTR));
+function boundaryOf(element, file) {
+  let root = { source: parseSource(element.getAttribute(SOURCE_ATTR)), node: element };
   for (let node = element.parentElement?.closest(`[${SOURCE_ATTR}]`); node; node = node.parentElement?.closest(`[${SOURCE_ATTR}]`)) {
     const source = parseSource(node.getAttribute(SOURCE_ATTR));
     if (!source || source.file === file) {
-      root = source ?? root;
+      root = source ? { source, node } : root;
       continue;
     }
-    return LAYOUT_FILE.test(source.file) && !LAYOUT_FILE.test(file) ? root : source;
+    return LAYOUT_FILE.test(source.file) && !LAYOUT_FILE.test(file) ? root : { source, node };
   }
   return null;
+}
+
+const componentBoundary = (element, file) => boundaryOf(element, file)?.source ?? null;
+
+function usageOf(tagged, file) {
+  const boundary = boundaryOf(tagged, file);
+  if (!boundary) {
+    return { index: 0, count: 1 };
+  }
+  const same = [...boundary.node.querySelectorAll(`[${SOURCE_ATTR}="${tagged.getAttribute(SOURCE_ATTR)}"]`)];
+  return { index: Math.max(same.indexOf(tagged), 0), count: Math.max(same.length, 1) };
 }

@@ -976,7 +976,7 @@
 
   function detach() {
     if (picked?.component) {
-      toHost({ kind: ToHost.Detach, at: sourceText(picked.source), usage: sourceText(picked.component) });
+      toHost({ kind: ToHost.Detach, at: sourceText(picked.source), usage: sourceText(picked.component), which: picked.usage });
     }
   }
 
