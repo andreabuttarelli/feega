@@ -109,10 +109,32 @@ describe('the node platform on disk', () => {
     const cache = mkdtempSync(join(tmpdir(), 'feega-cache-'));
     const make = () => nodePlatform({ root, launcher: '', version: '', transport: { send: () => undefined, receive: () => undefined }, print: () => undefined, launch: async () => false, env: { XDG_CACHE_HOME: cache } });
 
-    await make().store(Stored.Prefs, { size: 'phone' });
+    await make().store(Stored.App, 'web');
 
     expect(existsSync(join(root, '.feega/state.json'))).toBe(false);
-    expect(make().stored(Stored.Prefs)).toEqual({ size: 'phone' });
+    expect(make().stored(Stored.App)).toBe('web');
+  });
+
+  it('forgets the edit history when the editor restarts', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'feega-history-'));
+    const cache = mkdtempSync(join(tmpdir(), 'feega-cache-'));
+    const make = () => nodePlatform({ root, launcher: '', version: '', transport: { send: () => undefined, receive: () => undefined }, print: () => undefined, launch: async () => false, env: { XDG_CACHE_HOME: cache } });
+    const running = make();
+
+    await running.store(Stored.History, { steps: [1], undone: [] });
+
+    expect(running.stored(Stored.History)).toEqual({ steps: [1], undone: [] });
+    expect(make().stored(Stored.History)).toBeUndefined();
+  });
+
+  it('starts with the full preview width but keeps the panel widths', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'feega-prefs-'));
+    const cache = mkdtempSync(join(tmpdir(), 'feega-cache-'));
+    const make = () => nodePlatform({ root, launcher: '', version: '', transport: { send: () => undefined, receive: () => undefined }, print: () => undefined, launch: async () => false, env: { XDG_CACHE_HOME: cache } });
+
+    await make().store(Stored.Prefs, { size: 'phone', custom: 700, barClosed: false, barWidth: 320 });
+
+    expect(make().stored(Stored.Prefs)).toEqual({ size: 'full', custom: null, barClosed: false, barWidth: 320 });
   });
 
   it('opens a source in VS Code at its line, else prints where it is', async () => {

@@ -10,7 +10,7 @@ import { fileAccountStore, type AccountStore } from './account';
 import { fileOnboardingStore, type OnboardingStore } from './onboarding';
 import { fileSupportStore, type SupportStore } from './support';
 import { openTarget } from './open-source';
-import type { Platform, Stored, Transport } from './platform';
+import { Stored, type Platform, type Transport } from './platform';
 import type { PluginsHost } from './plugins-session';
 import { HintSurface, nodeSkillHint } from './skill-hint';
 import { Device, Editor, fileFirstEdit, fileInstallStore, installOf, nodeUsageEnabled, type FirstEditFlag, type InstallStore } from './usage';
@@ -22,6 +22,8 @@ const CACHE_DIR = 'feega';
 const STATE_KEY_LENGTH = 16;
 const OPENERS: Partial<Record<NodeJS.Platform, string[]>> = { darwin: ['open'], win32: ['cmd', '/c', 'start', ''] };
 const LINUX_OPENER = ['xdg-open'];
+const SESSION_ONLY = new Set<string>([Stored.History]);
+const FULL_WIDTH = 'full';
 
 export type Launch = (command: string, args: string[]) => Promise<boolean>;
 
@@ -42,6 +44,11 @@ const readJson = (path: string): Record<string, unknown> => {
   }
 };
 
+const freshLaunch = (state: Record<string, unknown>): Record<string, unknown> => {
+  const prefs = state[Stored.Prefs];
+  return prefs && typeof prefs === 'object' ? { ...state, [Stored.Prefs]: { ...prefs, size: FULL_WIDTH, custom: null } } : state;
+};
+
 const stateDirFor = (root: string, env: NodeJS.ProcessEnv) => {
   const key = createHash('sha256').update(root).digest('hex').slice(0, STATE_KEY_LENGTH);
   return join(env.XDG_CACHE_HOME || join(homedir(), '.cache'), CACHE_DIR, key);
@@ -53,7 +60,8 @@ export function nodePlatform({ root, launcher, version, transport, print, launch
   const stateDir = stateDirFor(root, env);
   const statePath = join(stateDir, STATE_FILE);
   const settings = readJson(settingsPath) as Record<string, SettingValue>;
-  const state = readJson(statePath);
+  const state = freshLaunch(readJson(statePath));
+  const session = new Map<string, unknown>();
 
   const save = async (path: string, value: object) => {
     mkdirSync(dirname(path), { recursive: true });
@@ -91,8 +99,15 @@ export function nodePlatform({ root, launcher, version, transport, print, launch
     ...transport,
     settings: () => settingsWith((row) => settings[row.key]),
     setSetting: (key, value) => ((settings[key] = value), save(settingsPath, settings)),
-    stored: <T>(key: Stored) => state[key] as T | undefined,
-    store: (key, value) => ((state[key] = value), save(statePath, state)),
+    stored: <T>(key: Stored) => (SESSION_ONLY.has(key) ? session.get(key) : state[key]) as T | undefined,
+    store: async (key, value) => {
+      if (SESSION_ONLY.has(key)) {
+        session.set(key, value);
+        return;
+      }
+      state[key] = value;
+      await save(statePath, state);
+    },
     log: (line) => print(line.trimEnd()),
     showLogs: () => print('feega: the dev server logs are in this terminal'),
     openSource: (from, at) => {
