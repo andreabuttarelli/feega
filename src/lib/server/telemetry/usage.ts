@@ -14,7 +14,7 @@ const BAD_REQUEST = 400;
 const PAYLOAD_TOO_LARGE = 413;
 const TOO_MANY_REQUESTS = 429;
 
-const EVENTS = ['session_start', 'preview_ready', 'first_edit', 'edit', 'session_end'] as const;
+const EVENTS = ['install', 'opened', 'session_start', 'preview_ready', 'first_edit', 'edit', 'session_end', 'sign_in', 'sign_out', 'session_resume'] as const;
 const FRAMEWORKS = ['sveltekit', 'nuxt', 'astro', 'react-router', 'next', 'gatsby', 'angular', 'cra', 'vite', 'generic'] as const;
 const EDIT_KINDS = ['text', 'style', 'image', 'attribute', 'structure', 'template', 'other'] as const;
 const EDITORS = ['vscode', 'cursor', 'windsurf', 'vscodium', 'npx'] as const;

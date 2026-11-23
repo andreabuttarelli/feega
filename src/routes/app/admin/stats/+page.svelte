@@ -2,9 +2,12 @@
   let { data } = $props();
 
   const FUNNEL_STEPS = [
+    ['Installed', 'installed'],
+    ['Opened', 'opened'],
     ['Session started', 'started'],
     ['Preview ready', 'preview_ready'],
     ['First edit', 'first_edit'],
+    ['Signed in', 'signed_in'],
     ['Edits on 2+ days', 'multi_day']
   ] as const;
 </script>
@@ -28,6 +31,16 @@
     <tbody>
       {#each data.retention as row (row.cohort)}
         <tr><td>{row.cohort}</td><td>{row.installs}</td><td>{row.w1}%</td><td>{row.w2}%</td><td>{row.w4}%</td><td>{row.w8}%</td></tr>
+      {/each}
+    </tbody>
+  </table></div>
+
+  <h2>Sign-ups per week</h2>
+  <div class="scroll"><table>
+    <thead><tr><th>Week</th><th>Total</th><th>Confirmed</th></tr></thead>
+    <tbody>
+      {#each data.signups as row (row.week)}
+        <tr><td>{row.week}</td><td>{row.total}</td><td>{row.confirmed}</td></tr>
       {/each}
     </tbody>
   </table></div>

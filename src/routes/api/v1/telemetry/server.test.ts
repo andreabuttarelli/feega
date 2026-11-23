@@ -41,4 +41,12 @@ describe('POST /api/v1/telemetry', () => {
     expect((await send({ edit_kind: 'bogus' })).status).toBe(400);
     expect((await send({ framework: 'not a framework' })).status).toBe(400);
   });
+
+  it.each(['install', 'opened', 'sign_in', 'sign_out', 'session_resume'])('accepts the account event %s', async (event) => {
+    const request = new Request('https://oh.feega.app/api/v1/telemetry', { method: 'POST', body: JSON.stringify({ events: [{ ...body.events[0], event }] }) });
+    const res = await POST({ request, getClientAddress: () => `route-test-${event}` } as Parameters<typeof POST>[0]);
+
+    expect(res.status).toBe(204);
+    expect(stored.rows as UsageRow[]).toMatchObject([{ event }]);
+  });
 });

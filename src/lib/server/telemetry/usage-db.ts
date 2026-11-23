@@ -5,13 +5,13 @@ import type { UsageRow, UsageSink } from './usage';
 const USAGE_USE = SERVICE_ROLE_USES.find((use) => use.path.startsWith('src/lib/server/telemetry/usage-db.ts'));
 
 const MISSING_FUNNEL_CODES = ['PGRST204', '42703', '23514'];
-const FUNNEL_EVENTS = ['preview_ready', 'first_edit'];
+const LEGACY_EVENTS = ['session_start', 'edit', 'session_end'];
 
 type Insert = (rows: unknown[]) => PromiseLike<{ error: { code?: string } | null }>;
 
 function withoutFunnel(rows: UsageRow[]) {
   return rows
-    .filter((row) => !FUNNEL_EVENTS.includes(row.event))
+    .filter((row) => LEGACY_EVENTS.includes(row.event))
     .map(({ framework: _framework, edit_kind: _editKind, signed_in: _signedIn, ...legacy }) => legacy);
 }
 
