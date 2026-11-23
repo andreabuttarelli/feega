@@ -8,7 +8,7 @@
   const primary = primaryCta();
   const secondary = secondaryCtas();
 
-  const HERO_FACTS = ['free, forever', 'every edit a diff', 'no AI, no tokens'] as const;
+  const HERO_FACTS = ['free, forever', 'every edit a diff', 'no AI inside, no credits'] as const;
 </script>
 
 <div class="install" data-agent-id={id}>

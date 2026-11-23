@@ -17,7 +17,7 @@ import { CATEGORY_SLUGS, HUB_FRAMEWORKS, TEMPLATES_PATH, categoryPath, framework
 import type { Category } from './templates/template';
 import { topicPath } from './topics/topic';
 
-const SUMMARY = 'Feega is a free, open-source (Apache-2.0) tool to design in your codebase: click any element of your running app, edit it like in Figma, and the change is written to your code. No AI, no tokens, with diffs and undo. React, Next.js, SvelteKit, Vue, Nuxt, React Router, Astro and Vite, with Tailwind or plain CSS. Runs as a VS Code extension, or from any terminal with npx feega. Feega Cloud is coming soon.';
+const SUMMARY = 'Feega is a free, open-source (Apache-2.0) tool to design in your codebase: click any element of your running app, edit it like in Figma, and the change is written to your code. No AI inside, no credits, with diffs and undo. React, Next.js, SvelteKit, Vue, Nuxt, React Router, Astro and Vite, with Tailwind or plain CSS. Runs as a VS Code extension, or from any terminal with npx feega. Feega Cloud is coming soon.';
 
 const SURFACES = [
   '- VS Code extension: the same editor inside VS Code, and inside VS Code-based editors Cursor, Windsurf and VSCodium. VS Code installs from the Visual Studio Marketplace; Cursor, Windsurf and VSCodium install from Open VSX. macOS, Windows and Linux.',

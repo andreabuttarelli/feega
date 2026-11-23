@@ -1,5 +1,5 @@
 <script lang="ts">
-  const FACTS = ['€0, forever', 'every edit a diff', 'no AI, no tokens'] as const;
+  const FACTS = ['€0, forever', 'every edit a diff', 'no AI inside, no credits'] as const;
 </script>
 
 <section class="free site-wide" aria-labelledby="free-title">
