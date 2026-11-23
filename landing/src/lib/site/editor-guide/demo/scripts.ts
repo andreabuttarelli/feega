@@ -16,13 +16,6 @@ export const Target = {
   Detach: 'detach',
   Address: 'address',
   Theme: 'theme',
-  FitLabel: 'fit-label',
-  Fit: 'fit',
-  FitContain: 'fit-item-1',
-  SwatchFrame: 'swatch-frame',
-  LibraryTabs: 'library-tabs',
-  CardThumb: 'card-thumb-0',
-  CardInsert: 'card-insert-0',
   ChangesTitle: 'changes-title',
   Undo: 'undo',
   Redo: 'redo',
@@ -33,19 +26,13 @@ const REACH_AUTO = 'auto';
 const REACH_MD = 'md';
 const MENU_STATE = 'state';
 const MENU_REACH = 'reach';
-const MENU_FIT = 'fit';
 const SCOPE_SHARED = 'shared';
 const SCOPE_SOLO = 'solo';
 const THEME_LIGHT = 'light';
 const THEME_DARK = 'dark';
-const COVER = 'cover';
-const CONTAIN = 'contain';
-const BLUE = '#3b82f6';
-const ORANGE = '#f97316';
 const PADDING_STEP = '12';
 const PADDING_OFF_STEP = '13';
 const PADDING_MD = '28';
-const CARD_FIRST = '0';
 const SCRUB_DX = 5;
 const REACH_FOCUS = { x: 110, y: 222 };
 const PADDING_FOCUS = { x: 110, y: 470 };
@@ -118,30 +105,6 @@ export const SCRIPTS: Readonly<Record<GuideId, Script>> = {
       { at: 900, target: Target.Theme, ...click, set: { [Key.Theme]: THEME_DARK } },
       { at: 1500, set: { [Key.Chip]: 'dark:bg-blue-400' } },
       { at: 3900, target: Target.Theme, ...click, set: { [Key.Theme]: THEME_LIGHT, [Key.Chip]: OFF } }
-    ]
-  },
-  [GuideId.Attributes]: {
-    duration: 7200,
-    poster: 4400,
-    rest: { target: Target.FitLabel, dx: 0, dy: 0 },
-    initial: { [Key.Menu]: OFF, [Key.Fit]: COVER, [Key.Colour]: BLUE, [Key.Chip]: OFF },
-    steps: [
-      { at: 900, target: Target.Fit, ...click, set: { [Key.Menu]: MENU_FIT } },
-      { at: 2300, target: Target.FitContain, ...click, set: { [Key.Menu]: OFF, [Key.Fit]: CONTAIN, [Key.Chip]: 'object-contain' } },
-      { at: 3900, target: Target.SwatchFrame, ...click, set: { [Key.Colour]: ORANGE, [Key.Chip]: `--frame: ${ORANGE}` } },
-      { at: 5500, set: { [Key.Fit]: COVER, [Key.Colour]: BLUE, [Key.Chip]: OFF } }
-    ]
-  },
-  [GuideId.Library]: {
-    duration: 6800,
-    poster: 4000,
-    rest: { target: Target.LibraryTabs, dx: 0, dy: 0 },
-    initial: { [Key.Card]: OFF, [Key.Inserted]: OFF, [Key.Chip]: OFF },
-    steps: [
-      { at: 900, target: Target.CardThumb, set: { [Key.Card]: CARD_FIRST } },
-      { at: 2300, target: Target.CardInsert, ...click, set: { [Key.Inserted]: ON } },
-      { at: 2800, set: { [Key.Chip]: '<AnnouncementBar />' } },
-      { at: 5200, set: { [Key.Card]: OFF, [Key.Inserted]: OFF, [Key.Chip]: OFF } }
     ]
   },
   [GuideId.Changes]: {

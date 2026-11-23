@@ -1,16 +1,17 @@
+import { PixelIcon } from '../alternatives/pixel';
+
 export enum GuideId {
   States = 'states',
   Breakpoints = 'breakpoints',
   Shared = 'shared',
   Snap = 'snap',
   Themes = 'themes',
-  Attributes = 'attributes',
-  Library = 'library',
   Changes = 'changes'
 }
 
 export type GuideFeature = {
   readonly id: GuideId;
+  readonly icon: PixelIcon;
   readonly title: string;
   readonly text: string;
   readonly lands: readonly string[];
@@ -27,6 +28,7 @@ export const GUIDE_COPY = {
 export const GUIDE_FEATURES: readonly GuideFeature[] = [
   {
     id: GuideId.States,
+    icon: PixelIcon.Cursor,
     title: 'Interaction states',
     text: 'Pick hover, focus, focus visible, active or disabled, then edit. A dot marks the states that already have styles.',
     lands: ['hover:bg-blue-600', 'md:hover:bg-blue-600'],
@@ -34,6 +36,7 @@ export const GUIDE_FEATURES: readonly GuideFeature[] = [
   },
   {
     id: GuideId.Breakpoints,
+    icon: PixelIcon.Screens,
     title: 'One screen size at a time',
     text: 'Edit what follows the preview, every size, or one breakpoint read from your Tailwind config.',
     lands: ['md:px-7'],
@@ -41,6 +44,7 @@ export const GUIDE_FEATURES: readonly GuideFeature[] = [
   },
   {
     id: GuideId.Shared,
+    icon: PixelIcon.Components,
     title: 'Shared components',
     text: 'This element ×3 edits the component, so all three instances change. Detach, here or in the Layers right-click menu, copies it to change one usage only.',
     lands: ['Button.jsx', '<ButtonHome />'],
@@ -48,6 +52,7 @@ export const GUIDE_FEATURES: readonly GuideFeature[] = [
   },
   {
     id: GuideId.Snap,
+    icon: PixelIcon.Grid,
     title: 'Snap to your theme',
     text: 'On Tailwind projects, spacing, size, radius and font size snap to your theme steps. Hold Alt for an exact value. An orange dot marks an off-theme value and applies the nearest step.',
     lands: ['p-[13px] → p-3'],
@@ -55,27 +60,15 @@ export const GUIDE_FEATURES: readonly GuideFeature[] = [
   },
   {
     id: GuideId.Themes,
+    icon: PixelIcon.Sun,
     title: 'Themes and dark mode',
     text: 'Switch the preview between the themes your project defines, and edit inside the one you picked.',
     lands: ['dark:bg-blue-400'],
     alt: 'The Feega editor toolbar with the theme set to dark and the previewed page in its dark theme'
   },
   {
-    id: GuideId.Attributes,
-    title: 'Attributes',
-    text: 'Edit alt, src and data attributes, choose from a list of options, and set CSS variable colours with a swatch.',
-    lands: ['data-fit-options="cover, contain, fill"', "style={{ '--frame': '#3b82f6' }}"],
-    alt: 'The Attributes section of the Feega Properties bar on an image: alt and src text fields, a fit dropdown set to cover, and colour swatches for CSS variables'
-  },
-  {
-    id: GuideId.Library,
-    title: 'Library',
-    text: 'Insert a section or a component into your page from the Library panel.',
-    lands: ['the markup and styles, in your files'],
-    alt: 'The Library panel of the Feega editor listing sections with an Insert button: Announcement Bar, Bento Feature Grid, Blog Cards and Changelog Timeline'
-  },
-  {
     id: GuideId.Changes,
+    icon: PixelIcon.History,
     title: 'Every edit is a diff',
     text: 'The Changes tab lists each edit with Open, Show diff and Revert. Undo works as in any editor.',
     lands: ['rounded-[14px]'],

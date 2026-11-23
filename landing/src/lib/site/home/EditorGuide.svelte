@@ -1,7 +1,10 @@
 <script lang="ts">
   import { lower } from '../lower';
   import { GUIDE_COPY, GUIDE_FEATURES } from '../editor-guide';
+  import Pixel from '../alternatives/Pixel.svelte';
   import MockCrop from '../editor-guide/mock/MockCrop.svelte';
+
+  const ICON_PX = 4;
 </script>
 
 <section class="guide site-wide" id="editor-guide" aria-labelledby="guide-title">
@@ -19,6 +22,7 @@
           <figcaption class="sr">{feature.alt}</figcaption>
         </figure>
         <div class="copy">
+          <span class="icon"><Pixel icon={feature.icon} size={ICON_PX} /></span>
           <h3>{lower(feature.title)}</h3>
           <p class="text">{lower(feature.text)}</p>
           <details class="lands">
@@ -112,6 +116,17 @@
     line-height: 26px;
     letter-spacing: -0.04em;
     font-weight: 400;
+  }
+
+  .icon {
+    display: block;
+    margin-bottom: 12px;
+    line-height: 0;
+  }
+
+  .icon :global(svg) {
+    display: block;
+    image-rendering: pixelated;
   }
 
   .text {

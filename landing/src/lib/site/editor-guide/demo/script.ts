@@ -46,12 +46,8 @@ export enum Key {
   Dot = 'dot',
   Alt = 'alt',
   Theme = 'theme',
-  Fit = 'fit',
-  Colour = 'colour',
-  Inserted = 'inserted',
   Row = 'row',
-  Diff = 'diff',
-  Card = 'card'
+  Diff = 'diff'
 }
 
 export const ON = 'on';

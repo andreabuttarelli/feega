@@ -6,7 +6,13 @@ export enum PixelIcon {
   Plugin = 'plugin',
   Templates = 'templates',
   MeshGradient = 'mesh-gradient',
-  Object3d = 'object-3d'
+  Object3d = 'object-3d',
+  Cursor = 'cursor',
+  Screens = 'screens',
+  Components = 'components',
+  Grid = 'grid',
+  Sun = 'sun',
+  History = 'history'
 }
 
 export const PIXEL_PALETTE: Readonly<Record<string, string>> = {
@@ -26,7 +32,13 @@ export const PIXEL_ROWS: Readonly<Record<PixelIcon, readonly string[]>> = {
   [PixelIcon.Plugin]: ['..b..b..', '..b..b..', '.######.', '.#oooo#.', '.#oooo#.', '..####..', '...##...'],
   [PixelIcon.Templates]: ['########', '#oooooo#', '########', '#.#bbb#.', '#.#bbb#.', '#.#####.', '........'],
   [PixelIcon.MeshGradient]: ['bbbooo##', 'bbboooo#', 'nbbbooo#', 'nnbbooo#', 'nnnbboo#', 'nnnnbboo', 'nnnnnbbo'],
-  [PixelIcon.Object3d]: ['...bb...', '..bbbb..', '.bbbnnb.', 'bbbnnnnb', 'bbnnnnn.', '.bnnnn..', '..nnn...']
+  [PixelIcon.Object3d]: ['...bb...', '..bbbb..', '.bbbnnb.', 'bbbnnnnb', 'bbnnnnn.', '.bnnnn..', '..nnn...'],
+  [PixelIcon.Cursor]: ['#.......', '##......', '###.....', '####....', '#####...', '###.....', '#.##....', '...##o..'],
+  [PixelIcon.Screens]: ['######...', '#bbbb#...', '#bbbb#.##', '#bbbb#.#o', '######.##', '..##.....', '.####....'],
+  [PixelIcon.Components]: ['..bbbbbb', '..b....b', '####...b', '#oo#...b', '#oo#bbbb', '#oo#....', '####....'],
+  [PixelIcon.Grid]: ['g..g..g.', '........', '........', 'g.oo..g.', '..oo....', '........', 'g..g..g.'],
+  [PixelIcon.Sun]: ['...#....', '.#.#.#..', '..ooo...', '##ooo##.', '..ooo...', '.#.#.#..', '...#....'],
+  [PixelIcon.History]: ['..#.....', '.##.....', '#######.', '.##...#.', '..#....#', '.......#', '..#####.']
 };
 
 export type PixelCell = { readonly x: number; readonly y: number; readonly fill: string };

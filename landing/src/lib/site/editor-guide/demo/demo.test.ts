@@ -50,7 +50,7 @@ describe('shared components bar', () => {
   const barShown = (body: string) => /class="shared"/.test(body);
 
   it('stays hidden in the other properties demos', () => {
-    [GuideId.States, GuideId.Breakpoints, GuideId.Snap, GuideId.Attributes].forEach((id) => expect(barShown(renderWith(id)), id).toBe(false));
+    [GuideId.States, GuideId.Breakpoints, GuideId.Snap].forEach((id) => expect(barShown(renderWith(id)), id).toBe(false));
   });
 
   it('shows in the shared demo once the scope is shared', () => {
