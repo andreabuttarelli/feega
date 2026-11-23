@@ -19,6 +19,8 @@ const row = (extra: Partial<UsageRow> = {}): UsageRow => ({
   framework: 'next',
   edit_kind: 'text',
   signed_in: true,
+  step: null,
+  tier: null,
   ...extra
 });
 
@@ -35,13 +37,33 @@ describe('usage sink', () => {
   it('retries without the funnel columns and new events when the table lacks them', async () => {
     const insert = vi.fn().mockResolvedValueOnce({ error: { code: 'PGRST204' } }).mockResolvedValueOnce({ error: null });
 
-    await makeSink(insert)([row(), row({ event: 'preview_ready' })]);
+    await makeSink(insert)([row(), row({ event: 'preview_ready' }), row({ event: 'install' }), row({ event: 'sign_in' }), row({ event: 'opened' }), row({ event: 'library_insert', tier: 'pro' })]);
 
     const retried = insert.mock.calls[1][0];
     expect(retried).toHaveLength(1);
     expect(retried[0]).not.toHaveProperty('framework');
     expect(retried[0]).not.toHaveProperty('edit_kind');
     expect(retried[0]).not.toHaveProperty('signed_in');
+    expect(retried[0]).not.toHaveProperty('step');
+    expect(retried[0]).not.toHaveProperty('tier');
+  });
+
+  it('keeps the other funnel events when only the support action is not accepted yet', async () => {
+    const insert = vi.fn().mockResolvedValueOnce({ error: { code: '23514' } }).mockResolvedValueOnce({ error: null });
+
+    await makeSink(insert)([row({ event: 'install' }), row({ event: 'support_action', item: 'star' }), row({ event: 'onboarding_step', step: 'support' })]);
+
+    expect(insert).toHaveBeenCalledTimes(2);
+    expect(insert.mock.calls[1][0].map((r: UsageRow) => r.event)).toEqual(['install', 'onboarding_step']);
+    expect(insert.mock.calls[1][0].every((r: UsageRow) => !('item' in r))).toBe(true);
+  });
+
+  it('falls back to the legacy rows when the support retry still lacks columns', async () => {
+    const insert = vi.fn().mockResolvedValueOnce({ error: { code: '42703' } }).mockResolvedValueOnce({ error: { code: '42703' } }).mockResolvedValueOnce({ error: null });
+
+    await makeSink(insert)([row(), row({ event: 'support_action', item: 'star' })]);
+
+    expect(insert.mock.calls[2][0].map((r: UsageRow) => r.event)).toEqual(['edit']);
   });
 
   it('throws other errors', async () => {

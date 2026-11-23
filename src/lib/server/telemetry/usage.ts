@@ -14,10 +14,13 @@ const BAD_REQUEST = 400;
 const PAYLOAD_TOO_LARGE = 413;
 const TOO_MANY_REQUESTS = 429;
 
-const EVENTS = ['session_start', 'preview_ready', 'first_edit', 'edit', 'session_end'] as const;
+const EVENTS = ['install', 'opened', 'session_start', 'preview_ready', 'first_edit', 'edit', 'session_end', 'sign_in', 'sign_out', 'session_resume', 'onboarding_started', 'onboarding_step', 'onboarding_finished', 'onboarding_skipped', 'setup_applied', 'setup_failed', 'skill_hint_shown', 'skill_installed', 'library_insert', 'plugin_installed', 'support_action'] as const;
 const FRAMEWORKS = ['sveltekit', 'nuxt', 'astro', 'react-router', 'next', 'gatsby', 'angular', 'cra', 'vite', 'generic'] as const;
 const EDIT_KINDS = ['text', 'style', 'image', 'attribute', 'structure', 'template', 'other'] as const;
 const EDITORS = ['vscode', 'cursor', 'windsurf', 'vscodium', 'npx'] as const;
+const STEPS = ['welcome', 'agent', 'sign_in', 'support'] as const;
+const SUPPORT_ITEMS = ['star', 'follow_x', 'discord', 'coffee', 'share'] as const;
+const TIERS = ['free', 'pro'] as const;
 const DEVICES = ['desktop', 'web', 'cli'] as const;
 
 const CI_HEADER = 'x-feega-ci';
@@ -38,17 +41,22 @@ const eventSchema = z.object({
   duration_ms: z.number().int().min(0).max(MAX_DURATION_MS).optional(),
   framework: z.enum(FRAMEWORKS).optional(),
   edit_kind: z.enum(EDIT_KINDS).optional(),
-  signed_in: z.boolean().optional()
+  signed_in: z.boolean().optional(),
+  step: z.enum(STEPS).optional(),
+  tier: z.enum(TIERS).optional(),
+  item: z.enum(SUPPORT_ITEMS).optional()
 });
 
 const batchSchema = z.object({ events: z.array(eventSchema).min(1).max(MAX_EVENTS) });
 
-export type UsageRow = Omit<z.infer<typeof eventSchema>, 'edit_count' | 'duration_ms' | 'framework' | 'edit_kind' | 'signed_in'> & {
+export type UsageRow = Omit<z.infer<typeof eventSchema>, 'edit_count' | 'duration_ms' | 'framework' | 'edit_kind' | 'signed_in' | 'step' | 'tier'> & {
   edit_count: number | null;
   duration_ms: number | null;
   framework: (typeof FRAMEWORKS)[number] | null;
   edit_kind: (typeof EDIT_KINDS)[number] | null;
   signed_in: boolean | null;
+  step: (typeof STEPS)[number] | null;
+  tier: (typeof TIERS)[number] | null;
   country: string | null;
   region: string | null;
   city: string | null;
@@ -124,7 +132,7 @@ export async function handleUsage(request: Request, client: string, sink: UsageS
   }
 
   const location = locationOf(request.headers);
-  const rows: UsageRow[] = parsed.data.events.map((e) => ({ ...e, edit_count: e.edit_count ?? null, duration_ms: e.duration_ms ?? null, framework: e.framework ?? null, edit_kind: e.edit_kind ?? null, signed_in: e.signed_in ?? null, ...location }));
+  const rows: UsageRow[] = parsed.data.events.map((e) => ({ ...e, edit_count: e.edit_count ?? null, duration_ms: e.duration_ms ?? null, framework: e.framework ?? null, edit_kind: e.edit_kind ?? null, signed_in: e.signed_in ?? null, step: e.step ?? null, tier: e.tier ?? null, ...location }));
 
   try {
     await sink(rows);

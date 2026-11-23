@@ -39,7 +39,7 @@ export const TICKER_VIDEOS = [
 export const FAQ = [
   {
     q: "What is Feega?",
-    a: `A free tool that runs as a VS Code extension, or in your browser with npx feega. Click any element of your running app, edit it like in Figma, and the change is written to your code. No AI, no tokens, every edit shown as a diff. The code is on <a href="${GITHUB_URL}">GitHub</a>.`
+    a: `A free tool that runs as a VS Code extension, or in your browser with npx feega. Click any element of your running app, edit it like in Figma, and the change is written to your code. No AI inside, no credits, every edit shown as a diff. The code is on <a href="${GITHUB_URL}">GitHub</a>.`
   },
   {
     q: "Can I use Feega for free?",
@@ -51,7 +51,7 @@ export const FAQ = [
   },
   {
     q: "Does it need an AI agent?",
-    a: "No. Feega works without agents. There are no models and no tokens. Your edits are written to your code deterministically, and you review every change as a diff."
+    a: "No. Feega works without agents. There are no models and no credits. Your edits are written to your code deterministically, and you review every change as a diff."
   },
   {
     q: "What is Feega Cloud?",

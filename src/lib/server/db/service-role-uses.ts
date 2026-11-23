@@ -30,7 +30,7 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
   },
   {
     path: 'src/lib/server/admin/stats-db.ts — statsDb (page /app/admin/stats)',
-    why: "usage_events grants nothing to anon/authenticated, and the rows are anonymous installs, not the viewer's org. The page load checks the signed-in email against the ADMIN_EMAILS allowlist before any call. Read-only: it calls three SQL functions that return aggregate counts per week, cohort and funnel step, never rows, ids or locations.",
+    why: "usage_events grants nothing to anon/authenticated, and the rows are anonymous installs, not the viewer's org. The page load checks the signed-in email against the ADMIN_EMAILS allowlist before any call. Read-only: it calls four SQL functions that return aggregate counts per week, cohort, funnel step and sign-up week, never rows, ids, emails or locations.",
     tables: ['usage_events']
   },
   {

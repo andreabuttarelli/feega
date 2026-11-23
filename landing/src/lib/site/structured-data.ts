@@ -36,7 +36,7 @@ const APPLICATION = {
   url: SITE,
   applicationCategory: 'DeveloperApplication',
   operatingSystem: 'Windows, macOS, Linux',
-  description: 'Feega is a free, open-source editor for your running app: click any element, edit it like in Figma, and the change is written to your code. Runs in VS Code, Cursor and Windsurf, or from any terminal with npx feega. No AI, no tokens, with diffs.',
+  description: 'Feega is a free, open-source editor for your running app: click any element, edit it like in Figma, and the change is written to your code. Runs in VS Code, Cursor and Windsurf, or from any terminal with npx feega. No AI inside, no credits, with diffs.',
   offers: { '@type': 'Offer', price: 0, priceCurrency: 'EUR', description: 'Free and open source.' },
   sameAs: SAME_AS,
   publisher: { '@type': 'Organization', name: 'Feega', sameAs: SAME_AS }

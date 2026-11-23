@@ -13,7 +13,7 @@ export const CODEBASE = {
     'A free VS Code extension. Click any element of your running app, edit it like in Figma, and the change is written to your code. No AI, with diffs.',
   eyebrow: 'VS Code · Cursor · Windsurf',
   heading: 'Design in your codebase',
-  lead: 'Click any element of your running app and edit it like in Figma. The change is written to your code. No AI, no tokens, every edit a diff. Free.',
+  lead: 'Click any element of your running app and edit it like in Figma. The change is written to your code. No AI inside, no credits, every edit a diff. Free.',
   start: { href: cta.href, label: cta.label },
   more: { href: GITHUB_URL, label: 'See the source' }
 } as const satisfies ChapterCopy & { title: string; description: string };

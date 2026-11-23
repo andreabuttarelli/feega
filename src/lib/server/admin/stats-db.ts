@@ -1,6 +1,6 @@
 import { createServiceRoleDb } from '$lib/server/db/client';
 import { SERVICE_ROLE_USES } from '$lib/server/db/service-role-uses';
-import type { Funnel, RetentionRaw, StatsSource, WeeklyRow } from './stats';
+import type { Funnel, RetentionRaw, SignupRow, StatsSource, WeeklyRow } from './stats';
 
 const STATS_USE = SERVICE_ROLE_USES.find((use) => use.path.startsWith('src/lib/server/admin/stats-db.ts'));
 
@@ -22,5 +22,6 @@ async function call<T>(fn: string): Promise<T> {
 export const statsDb: StatsSource = {
   weekly: () => call<WeeklyRow[]>('admin_usage_weekly_active'),
   retention: () => call<RetentionRaw[]>('admin_usage_retention'),
-  funnel: async () => (await call<Funnel[]>('admin_usage_funnel'))[0]
+  funnel: async () => (await call<Funnel[]>('admin_usage_funnel'))[0],
+  signups: () => call<SignupRow[]>('admin_signups_weekly')
 };
