@@ -2,7 +2,7 @@
 
 <section class="open site-wide">
   <h2 data-agent-id="open-title">
-    click any element of your running app, design it like in Figma, and the change lands in your code. in VS Code, Cursor and Windsurf. free, no AI, with diffs.
+    Feega is the visual layer for apps built with AI agents. Your agent writes the structure and the logic; you click any element of your running app and make it look right by hand, in your own code. Free, open source, every edit a diff.
   </h2>
 </section>
 
