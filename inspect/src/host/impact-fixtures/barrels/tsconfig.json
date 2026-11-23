@@ -1,0 +1,5 @@
+{
+  "compilerOptions": {
+    "paths": { "@ui": ["./src/ui/index.ts"] }
+  }
+}

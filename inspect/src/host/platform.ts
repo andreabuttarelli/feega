@@ -22,6 +22,8 @@ export enum Stored {
   SkillInstalledSent = 'feegaInspect.skillInstalledSent'
 }
 
+import type { Watch } from './file-watch';
+
 export type ChosenImage = { name: string; bytes: Uint8Array };
 
 export type Transport = {
@@ -52,6 +54,7 @@ export type Platform = Transport & {
   pickImage?: () => Promise<ChosenImage | null>;
   library?: () => Promise<Catalog | null>;
   proFiles?: ProFetch;
+  watchFiles?: Watch;
   usage?: UsageHost;
   account: AccountStore;
   cloud?: CommentsCloud;

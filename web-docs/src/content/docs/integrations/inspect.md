@@ -51,16 +51,26 @@ Feega Inspect is a small editor extension, separate from the Feega canvas. No ac
    **Impact label.** One line under the breadcrumb says, before you edit, where the edit will
    land. It updates when you select an element and when the scope, state, breakpoint or theme
    changes.
-   - **This element only**: the markup is in a file no other file imports. In a list it reads
-     "This file only · ×N on this page".
+   - **This element only**: the markup is in a file no other file imports, in a page or entry
+     file (Next `app/**/page.tsx` and `layout.tsx`, `pages/`, SvelteKit `+page.svelte` and
+     `+layout.svelte`, Nuxt `pages/`, Astro `src/pages/`, React Router `app/routes/` and
+     `root.tsx`), or in a file imported only by the app entry (`App.tsx` from `main.tsx`) or the
+     router. With **This element** scope, a component tag written in its own file also reads this
+     way. In a list it reads "This file only · ×N on this page".
    - **Button component · used in N files**: the edit lands in a component's source that N other
-     project files import, directly, through an index file that re-exports it, or with an alias
-     such as `@/` or `$lib`. Tests and stories do not count. "×N here" is the number of instances
+     project files import, directly, through an index file that re-exports it (`export { Button }`,
+     `export *` or `import X` then `export { X }`), or with an alias such as `@/`, `$lib`, an exact
+     `tsconfig` path or the package's own name. Only files that import that component count, not
+     every importer of the index file. Tests and stories do not count. The count refreshes when a
+     project file is created, changed or deleted. "×N here" is the number of instances
      on this page. Click the label to list the files; click a file to open it at the usage.
      **Only this one** detaches this instance.
    - **Impact unknown**: Feega cannot tell where the edit lands: the rule would go to a global
      stylesheet, the value is a CSS variable (`var(--x)`), or the class comes from props, `cn()`,
-     `cva`, a template string, a conditional or a spread. Hover the label for the reason. Before
+     `cva`, a template string, a conditional or a spread. In Tailwind projects Feega writes into
+     the first standalone static string of `cn()`, `clsx()`, `cva()`, a template literal, Vue
+     `:class` or Svelte `class={...}` (and the text before the first `{}` of a Svelte class
+     string), and refuses with a message when there is none. Hover the label for the reason. Before
      writing, Feega shows a compact diff with **Apply** and **Cancel**; **Don't ask again** turns
      it off (`feegaInspect.previewUnknown`). Local and component edits write immediately.
 

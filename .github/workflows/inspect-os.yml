@@ -120,6 +120,10 @@ jobs:
         if: contains(fromJSON('["vite-vanilla","astro-css","nuxt-css","react-router-css"]'), matrix.fixture)
       - run: node npx/test/attach.e2e.mjs
         if: matrix.fixture == 'react-css'
+      - run: node npx/test/impact.e2e.mjs
+        if: matrix.fixture == 'react-css'
+        env:
+          FEEGA_E2E_SHOTS: ${{ runner.temp }}/impact-label
 
   relay:
     name: relay tunnel end to end

@@ -84,6 +84,43 @@ describe('impactOf in Vue', () => {
   });
 });
 
+describe('impactOf for pages and entries', () => {
+  it.each([
+    ['src/App.tsx', '<main', 'solo importato da main.tsx'],
+    ['app/dashboard/page.tsx', '<section', 'pagina Next'],
+    ['app/dashboard/layout.tsx', '<div', 'layout Next'],
+    ['app/routes/home.tsx', '<article', 'rotta React Router'],
+    ['app/root.tsx', '<body', 'root React Router'],
+    ['pages/index.vue', '<div', 'pagina Nuxt'],
+    ['src/pages/index.astro', '<header', 'pagina Astro'],
+    ['src/routes/+layout.svelte', '<aside', 'layout SvelteKit']
+  ])('%s e locale: %s', async (file, needle) => {
+    expect(await classify('entries', { at: at('entries', file, needle) })).toEqual({ kind: ImpactKind.Local });
+  });
+
+  it('un componente usato da due file resta del componente', async () => {
+    expect(await classify('entries', { at: at('entries', 'src/Widget.tsx', '<aside') })).toMatchObject({ kind: ImpactKind.Component, name: 'Widget' });
+  });
+});
+
+describe('impactOf with the element scope', () => {
+  const root = join(FIXTURES, 'entries');
+  const ownFile = async () => ['src/Panel.tsx'];
+  const ask = (scope: Scope) => ({ at: at('entries', 'src/Panel.tsx', '<Widget'), scope });
+
+  it('il tag di un componente scritto nel proprio file e locale anche se il file e condiviso', async () => {
+    expect(await impactOf(root, ask(Scope.Element), ownFile, usageIndex(root))).toEqual({ kind: ImpactKind.Local });
+  });
+
+  it('con lo scope classe lo stesso tag e del componente', async () => {
+    expect(await impactOf(root, ask(Scope.Class), ownFile, usageIndex(root))).toMatchObject({ kind: ImpactKind.Component, name: 'Panel' });
+  });
+
+  it('con lo scope elemento un file di stile condiviso non e locale', async () => {
+    expect(await impactOf(root, ask(Scope.Element), async () => ['src/Panel.module.css'], usageIndex(root))).toMatchObject({ kind: ImpactKind.Component });
+  });
+});
+
 describe('UNKNOWN_CAUSES', () => {
   it.each([
     ['<span className={cn("a", className)}>', true],

@@ -1,6 +1,7 @@
 import { CLASS_RULE, LiveProp, Side, activeIndex, familyRule, utilityOf, variantOf, type ClassRule, type StyleProp } from './live-fields';
 import type { FileChange, ReadFile } from './files';
 import { ElementState, variantOfState } from './element-state';
+import { classSlot, hasInterpolatedClass, safeIn } from './computed-class';
 
 export type LiveAt = { file: string; line: number; col: number };
 
@@ -93,7 +94,9 @@ async function classPatch(read: ReadFile, at: LiveAt, change: LiveChange, rule: 
   const source = text!;
   const open = source.slice(start, end + 1);
   const found = open.match(CLASS_ATTR);
-  if (found && !found[3] && found[2] === '{') {
+  const literal = found !== null && found[3] !== undefined;
+  const slot = literal ? null : classSlot(open);
+  if (!literal && !slot && hasInterpolatedClass(open)) {
     return { files: [], skipped: [`${label(at)}: class is not a literal, not written`] };
   }
 
@@ -101,6 +104,17 @@ async function classPatch(read: ReadFile, at: LiveAt, change: LiveChange, rule: 
   const state = change.state ?? ElementState.Default;
   const reset = change.value === '' && state !== ElementState.Default;
   const made = reset ? '' : rule.make(change.value, side);
+  if (slot) {
+    const current = open.slice(slot.start, slot.end);
+    const rewritten = swapped(current, rule, made, side, change.viewport ?? 0, state, change.variant);
+    const text = slot.interpolated && rewritten ? `${rewritten} ` : rewritten;
+    if (!safeIn(text, slot)) {
+      return { files: [], skipped: [`${label(at)}: class is not a literal, not written`] };
+    }
+    const after = source.slice(0, start + slot.start) + text + source.slice(start + slot.end);
+    return after === source ? { files: [], skipped: [] } : { files: [{ path: at.file, before: source, after }], skipped: [] };
+  }
+
   const closing = open.endsWith('/>') ? open.length - 2 : open.length - 1;
   const attr = /\.(t|j)sx$/.test(at.file) ? 'className' : 'class';
   const next = found ? open.replace(CLASS_ATTR, `$1"${swapped(found[3] ?? '', rule, made, side, change.viewport ?? 0, state, change.variant)}"`) : added(open, closing, attr, made, joined(change.variant, variantOfState(state)));

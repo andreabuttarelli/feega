@@ -4,6 +4,8 @@
 
 An impact label in Properties says before you edit whether an edit stays on the element, changes a shared component (and in how many files) or has an unknown impact, with a diff to Apply first for the unknown ones. Replaces the "Edits N instances" bar.
 
+Pages, layouts and files imported only by the app entry read "This element only". Component counts follow the exact component through index files and package aliases, and refresh when project files change. Tailwind edits now write into the static string of `cn()`, `clsx()`, `cva()`, template literals, Vue `:class` and Svelte `class={...}`.
+
 Optional Support Feega checklist at the end of onboarding and in the Feega menu.
 
 ## 0.2.14
