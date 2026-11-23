@@ -4,13 +4,13 @@ import { render } from 'svelte/server';
 import { describe, expect, it } from 'vitest';
 import EditorGuide from '../home/EditorGuide.svelte';
 import { GUIDE_FEATURES, GuideId } from '.';
+import { MOCKS } from './mock/registry';
 
 const STATIC_DIR = resolve(import.meta.dirname, '../../../../static');
 const MIN_ALT = 40;
 
 describe('editor guide', () => {
-  it.each(GUIDE_FEATURES)('$id ships a real screenshot, alt text and what lands in code', (feature) => {
-    expect(existsSync(resolve(STATIC_DIR, feature.src.slice(1))), feature.src).toBe(true);
+  it.each(GUIDE_FEATURES)('$id has alt text and what lands in code', (feature) => {
     expect(feature.alt.length).toBeGreaterThan(MIN_ALT);
     expect(feature.lands.length).toBeGreaterThan(0);
   });
@@ -19,20 +19,36 @@ describe('editor guide', () => {
     expect(GUIDE_FEATURES.map((f) => f.id).sort()).toEqual(Object.values(GuideId).sort());
   });
 
+  it('gives every feature a mockup component', () => {
+    Object.values(GuideId).forEach((id) => expect(MOCKS[id].component, id).toBeTruthy());
+  });
+
+  it('ships no screenshots of the editor', () => {
+    expect(existsSync(resolve(STATIC_DIR, 'img/editor-guide'))).toBe(false);
+  });
+
   describe('section', () => {
     const { body } = render(EditorGuide);
 
-    it('references every screenshot', () => {
-      GUIDE_FEATURES.forEach((feature) => expect(body, feature.src).toContain(`src="${feature.src}"`));
+    it('draws every feature as exactly one mockup', () => {
+      GUIDE_FEATURES.forEach((feature) => expect(body.split(`data-mock-for="${feature.id}"`), feature.id).toHaveLength(2));
     });
 
-    it('gives every feature a heading and an image with alt text for screen readers', () => {
+    it('uses no images', () => {
+      expect(body).not.toContain('<img');
+    });
+
+    it('gives every feature a heading and its description for screen readers', () => {
       expect(body.match(/<h3[ >]/g)).toHaveLength(GUIDE_FEATURES.length);
-      GUIDE_FEATURES.forEach((feature) => expect(body, feature.id).toContain(`alt="${feature.alt}"`));
+      GUIDE_FEATURES.forEach((feature) => expect(body, feature.id).toContain(`>${feature.alt}</figcaption>`));
     });
 
-    it('hides the sticky copy of the screenshots from assistive tech', () => {
-      expect(body).toMatch(/class="stage[^"]*" aria-hidden="true"/);
+    it('hides the mockups from assistive tech', () => {
+      expect(body.match(/class="box[^"]*" aria-hidden="true"/g)).toHaveLength(GUIDE_FEATURES.length);
+    });
+
+    it('has no sticky stage', () => {
+      expect(body).not.toContain('class="stage');
     });
 
     it('uses no tab roles', () => {
