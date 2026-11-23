@@ -1,3 +1,4 @@
+import type { SupportItem } from './support';
 import type { LiveEditAsk } from '@feega/live-edit/live-ask';
 import type { Place } from '@feega/live-edit/move-node';
 import type { AddKind, AddPlace } from '@feega/live-edit/add-node';
@@ -162,6 +163,7 @@ export enum ToHost {
   SignOut = 'sign-out',
   OnboardingDone = 'onboarding-done',
   OnboardingStep = 'onboarding-step',
+  Support = 'support',
   SkillHintDismiss = 'skill-hint-dismiss',
   SkillHintNever = 'skill-hint-never',
   ImageChoose = 'image-choose',
@@ -205,6 +207,7 @@ export enum ToView {
   IconPreview = 'icon-preview',
   Account = 'account',
   Onboarding = 'onboarding',
+  Support = 'support',
   SkillHint = 'skill-hint',
   ImageSaved = 'image-saved',
   Wiring = 'wiring',
@@ -225,7 +228,8 @@ export enum ShareState {
 export enum OnboardingStep {
   Welcome = 'welcome',
   Agent = 'agent',
-  SignIn = 'sign_in'
+  SignIn = 'sign_in',
+  Support = 'support'
 }
 
 export enum OnboardingOutcome {
@@ -281,6 +285,7 @@ export type HostMessage =
   | { kind: ToHost.SignOut }
   | { kind: ToHost.OnboardingDone; outcome: OnboardingOutcome }
   | { kind: ToHost.OnboardingStep; step: OnboardingStep }
+  | { kind: ToHost.Support; item: SupportItem }
   | { kind: ToHost.SkillHintDismiss }
   | { kind: ToHost.SkillHintNever }
   | { kind: ToHost.ImageChoose }
@@ -319,6 +324,7 @@ export type ViewMessage =
   | { kind: ToView.IconPreview; name: string; svg: string | null }
   | { kind: ToView.Account; state: AccountState; email?: string }
   | { kind: ToView.Onboarding; state: Onboarding }
+  | { kind: ToView.Support; done: SupportItem[] }
   | { kind: ToView.SkillHint; command: string }
   | { kind: ToView.ImageSaved; url: string }
   | { kind: ToView.Wiring; at: string; instance?: number; wiring: Wiring }

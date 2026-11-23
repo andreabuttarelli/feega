@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+Optional Support Feega checklist at the end of onboarding and in the Feega menu.
+
 ## 0.2.14
 
 Insert Pro library templates for Feega Cloud users. Attribute options and colour variables in Properties. New glass button template.

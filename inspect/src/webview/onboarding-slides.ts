@@ -18,5 +18,10 @@ export const SLIDES: Slide[] = [
     step: OnboardingStep.SignIn,
     title: 'sign in (optional)',
     body: 'Everything works without an account. Signing in connects Feega to your account.'
+  },
+  {
+    step: OnboardingStep.Support,
+    title: 'help a free, open-source project',
+    body: 'Optional. Each one is a small way to keep Feega going.'
   }
 ];

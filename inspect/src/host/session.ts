@@ -4,6 +4,7 @@ import { appsIn } from '@feega/dev-run/run-plan';
 import { AddKind, type AddPlace } from '@feega/live-edit/add-node';
 import { liveAtOf } from '@feega/live-edit/live-ask';
 import { StructureOp } from '@feega/live-edit/structure';
+import type { SupportItem } from '../support';
 import { AccountState, Onboarding, OnboardingOutcome, ServerAction, ServerState, ToHost, ToView, type EditAsk, type HostMessage, type Pick, type Prefs, type ViewMessage } from '../messages';
 import { SettingKey, StylingChoice } from '../settings';
 import { SignInEnd, signIn } from './sign-in';
@@ -38,6 +39,7 @@ import { pluginsSession } from './plugins-session';
 import { dependenciesOf, offerInstall } from './install-offer';
 import { HintSurface, SKILL_COMMAND, hintDue, installedAfterHint } from './skill-hint';
 import { install } from './dev-server';
+import { SUPPORT_ITEMS } from '../support';
 
 const START_WITH_FEEGA = 'Start with Feega';
 const PICK_TIMEOUT_MS = 3000;
@@ -256,6 +258,27 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
       usage?.track(UsageKind.OnboardingStarted);
     }
     await post({ kind: ToView.Onboarding, state });
+  }
+
+  async function showSupport() {
+    await post({ kind: ToView.Support, done: (await platform.support?.read()) ?? [] });
+  }
+
+  async function supportAct(item: SupportItem) {
+    const entry = SUPPORT_ITEMS.find((candidate) => candidate.id === item);
+    if (!entry) {
+      return;
+    }
+
+    if (entry.url) {
+      await platform.openExternal(entry.url);
+    }
+    if (entry.text) {
+      await platform.copyText?.(entry.text);
+    }
+    await platform.support?.mark(item);
+    usage?.track(UsageKind.SupportAction, { item });
+    await showSupport();
   }
 
   async function showSkillHint() {
@@ -531,7 +554,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   };
 
   const handlers: { [K in ToHost]: (m: Extract<HostMessage, { kind: K }>) => unknown } = {
-    [ToHost.Ready]: () => (showApp(), postSettings(), postHistory(), showAccount(), showOnboarding(), showSkillHint(), comments.show(), sharing.show(), pluginList?.show()),
+    [ToHost.Ready]: () => (showApp(), postSettings(), postHistory(), showAccount(), showOnboarding(), showSupport(), showSkillHint(), comments.show(), sharing.show(), pluginList?.show()),
     [ToHost.Edit]: (m) => edit(m.ask),
     [ToHost.Undo]: undo,
     [ToHost.Open]: (m) => platform.openSource(root, m.at),
@@ -566,6 +589,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.SignOut]: signOut,
     [ToHost.OnboardingStep]: (m) => usage?.track(UsageKind.OnboardingStep, { step: m.step }),
     [ToHost.OnboardingDone]: (m) => (usage?.track(ONBOARDING_END[m.outcome]), platform.onboarding.markSeen()),
+    [ToHost.Support]: (m) => supportAct(m.item),
     [ToHost.SkillHintDismiss]: dismissSkillHint,
     [ToHost.SkillHintNever]: neverSkillHint,
     [ToHost.ImageChoose]: imageChosen,

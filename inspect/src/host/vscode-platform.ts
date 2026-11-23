@@ -10,6 +10,7 @@ import { IMAGE_EXTENSIONS } from './image-copy';
 import { catalogFile } from './library';
 import { pluginsRoot } from '@feega/plugin-store/registry';
 import { deviceOnboardingStore, globalStateOnboardingStore } from './onboarding';
+import { globalStateSupportStore } from './support';
 import type { Platform } from './platform';
 import { HintSurface, nodeHintFs } from './skill-hint';
 import { automated, Device, editorOf, globalStateFirstEdit, globalStateInstallStore, installOf, optedOut, type UsageHost } from './usage';
@@ -133,6 +134,7 @@ export function vsCodePlatform(host: VsCodeHost, panel: PanelLike, befores: Map<
     proFiles: (id, framework) => cloudApi({ base: process.env[WEB_URL_VAR], token: () => accountToken(account) }).libraryPro(id, framework),
     account,
     onboarding: deviceOnboardingStore(globalStateOnboardingStore(context.globalState)),
+    support: globalStateSupportStore(context.globalState),
     usage: vsCodeUsage(context),
     skillHint: { fs: nodeHintFs, home: homedir(), surface: HintSurface.Panel, never: () => context.globalState.get(SKILL_HINT_NEVER) === true, setNever: async () => context.globalState.update(SKILL_HINT_NEVER, true) },
     plugins: { root: pluginsRoot(), dev: () => config().get<string[]>(DEV_PLUGINS_SETTING, []), approve: approveInModal }

@@ -13,6 +13,7 @@
   import { untrack } from 'svelte';
   import { MOVES, Shortcut, isMac, needsBareFocus, shortcutOf, typingIn } from './selection-keys';
   import { Click, NONE, Surface, clickOf, contains, extend, keyOf, only, primary, refOf, siblingsOf, toggle, visibleRows, type Selection } from './selection';
+  import type { SupportItem } from '../support';
   import { AccountState, Mode, Onboarding, OnboardingOutcome, Move, ServerAction, Slot, type ChangeRow, type FontChoice, type LayerNode, type LibraryEntry, type Palette, ServerState, type ServerInfo, Styling, ToHost, ToView, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
   import { fromHost, inVscode, toHost } from './host';
   import { imageSaved } from './image-file.svelte';
@@ -258,6 +259,7 @@
   let facts = $state<ReportFacts | null>(null);
   let account = $state<{ state: AccountState; email?: string }>({ state: AccountState.SignedOut });
   let onboarding = $state(Onboarding.Seen);
+  let support = $state<SupportItem[]>([]);
 
   function finishOnboarding(outcome: OnboardingOutcome) {
     onboarding = Onboarding.Seen;
@@ -593,6 +595,7 @@
     [ToView.Library]: (m) => (libraryItems = m.items),
     [ToView.Comments]: (m) => (cloud = { enabled: m.enabled, comments: m.comments, error: m.error ?? '' }),
     [ToView.Onboarding]: (m) => (onboarding = m.state),
+    [ToView.Support]: (m) => (support = m.done),
     [ToView.SkillHint]: (m) => (skillHint = m.command),
     [ToView.IconResults]: (m) => iconsFound({ id: m.id, library: m.library, hits: m.hits, error: m.error ?? '' }),
     [ToView.IconPreview]: (m) => iconDrawn(m.name, m.svg),
@@ -1157,7 +1160,7 @@
   </aside>
   <section class="view">
     <header class="toolbar" bind:clientHeight={toolbarH}>
-      <FeegaMenu commands={plugins.commands} oncommand={(plugin, command) => plugins.host.command(plugin, command)} rows={plugins.rows} problems={plugins.problems} canInstall={plugins.canInstall} onenable={(id, enabled) => toHost({ kind: ToHost.PluginEnable, id, enabled })} onremove={(id) => toHost({ kind: ToHost.PluginRemove, id })} oninstall={(source) => toHost({ kind: ToHost.PluginInstall, source })} values={settings} {facts} {account} onaccount={(kind) => toHost({ kind })} onsetting={(key, value) => toHost({ kind: ToHost.Setting, key, value })} onlink={(link) => toHost({ kind: ToHost.External, url: link })} />
+      <FeegaMenu commands={plugins.commands} oncommand={(plugin, command) => plugins.host.command(plugin, command)} rows={plugins.rows} problems={plugins.problems} canInstall={plugins.canInstall} onenable={(id, enabled) => toHost({ kind: ToHost.PluginEnable, id, enabled })} onremove={(id) => toHost({ kind: ToHost.PluginRemove, id })} oninstall={(source) => toHost({ kind: ToHost.PluginInstall, source })} values={settings} {facts} {account} {support} onaccount={(kind) => toHost({ kind })} onsupport={(item) => toHost({ kind: ToHost.Support, item })} onsetting={(key, value) => toHost({ kind: ToHost.Setting, key, value })} onlink={(link) => toHost({ kind: ToHost.External, url: link })} />
       <button type="button" class="icon" class:on={!leftClosed} title="Layers (⇧⌘\)" aria-label="Toggle Layers" data-testid="left-toggle" onclick={() => ((leftClosed = !leftClosed), savePrefs())}><PanelLeft size={15} /></button>
       <button type="button" class="icon" title="Back (⌘[)" disabled={!canBack} onclick={() => go(history.back())}><ArrowLeft size={15} /></button>
       <button type="button" class="icon" title="Forward (⌘])" disabled={!canForward} onclick={() => go(history.forward())}><ArrowRight size={15} /></button>
@@ -1330,7 +1333,7 @@
 </main>
 
 {#if onboarding === Onboarding.Pending}
-  <OnboardingDialog {account} onaccount={(kind) => toHost({ kind })} onstep={(step) => toHost({ kind: ToHost.OnboardingStep, step })} ondone={finishOnboarding} />
+  <OnboardingDialog {account} {support} onaccount={(kind) => toHost({ kind })} onsupport={(item) => toHost({ kind: ToHost.Support, item })} onstep={(step) => toHost({ kind: ToHost.OnboardingStep, step })} ondone={finishOnboarding} />
 {/if}
 
 <style>
