@@ -1,12 +1,12 @@
 # Changelog
 
-## Unreleased
+## 0.2.15
 
-An impact label in Properties says before you edit whether an edit stays on the element, changes a shared component (and in how many files) or has an unknown impact, with a diff to Apply first for the unknown ones. Replaces the "Edits N instances" bar.
+An impact label in Properties says before you edit whether an edit stays on the element, changes a shared component (and in how many files) or has an unknown impact, with a diff to Apply first for the unknown ones.
 
-Pages, layouts and files imported only by the app entry read "This element only". Component counts follow the exact component through index files and package aliases, and refresh when project files change. Tailwind edits now write into the static string of `cn()`, `clsx()`, `cva()`, template literals, Vue `:class` and Svelte `class={...}`.
+Detach one instance of a shared component from the bar or the right-click menus. Spacing, size and radius snap to your theme; typed values are written exactly. Tailwind edits write into `cn()`, `clsx()`, `cva()`, template literals, Vue `:class` and Svelte `class={...}`, with valid variants for arbitrary widths and Tailwind v4 breakpoints.
 
-Optional Support Feega checklist at the end of onboarding and in the Feega menu.
+npx feega ships the Library and starts with a clean session. Optional Support Feega checklist at the end of onboarding. Usage telemetry adds funnel and account events and stays off in CI. Fixes: the outline hides when its element is gone, the type size row wraps in a narrow panel, empty arbitrary values are never written.
 
 ## 0.2.14
 
