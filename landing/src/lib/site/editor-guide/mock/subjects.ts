@@ -3,20 +3,9 @@ export enum Subject {
   Image = 'image'
 }
 
-export enum Menu {
-  None = 'none',
-  State = 'state',
-  Breakpoint = 'breakpoint'
-}
-
 export enum Anchor {
   Focus = 'focus',
   TopRight = 'top-right'
-}
-
-export enum Snap {
-  Off = 'off',
-  Demo = 'demo'
 }
 
 export const STATES = [
@@ -31,12 +20,11 @@ export const STATES = [
 export const REACH = ['Follow the preview', 'All sizes', 'sm ≥ 640px', 'md ≥ 768px', 'lg ≥ 1024px', 'xl ≥ 1280px', '2xl ≥ 1536px'] as const;
 
 export const REACH_BADGE = 'editing: auto · 880px';
+export const REACH_BADGE_MD = 'editing: md · 768px';
 
 export const THEME_STEPS_PX = [0, 2, 4, 6, 8, 10, 12, 14, 16, 20, 24, 28, 32] as const;
 export const DRAG_PX_PER_STEP = 2;
 export const TICK_HALF_WIDTH_PX = 70;
-export const MARGIN_DRAFT_PX = 8;
-export const PADDING_OFF_THEME_PX = 13;
 
 export const ticksAround = (draft: number): readonly number[] =>
   THEME_STEPS_PX.map((step) => (step - draft) * DRAG_PX_PER_STEP).filter((offset) => Math.abs(offset) <= TICK_HALF_WIDTH_PX);
@@ -46,6 +34,10 @@ export const ATTRIBUTES = [
   { name: 'fit', value: 'cover', options: true },
   { name: 'src', value: '/cover.svg', options: false }
 ] as const;
+
+export const FIT_OPTIONS = ['cover', 'contain', 'fill'] as const;
+
+export const FRAME_VARIABLE = 'frame';
 
 export const VARIABLES = [
   { name: 'tw ring offs…', value: '#ffffff' },

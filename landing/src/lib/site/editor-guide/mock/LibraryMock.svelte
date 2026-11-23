@@ -1,6 +1,10 @@
 <script lang="ts">
   import Glyph from './Glyph.svelte';
+  import { Key, type DemoState } from '../demo/script';
+  import { Target } from '../demo/scripts';
   import './mock.css';
+
+  let { demo }: { demo: DemoState } = $props();
 
   const TABS = ['Sections', 'Components', 'App'];
   const THEMES = ['Light', 'Dark'];
@@ -15,12 +19,12 @@
     <span class="themes">{#each THEMES as theme, i (theme)}<span class:on={i === 0}>{theme}</span>{/each}</span>
   </div>
 
-  <div class="tabs">{#each TABS as tab, i (tab)}<span class:on={i === 0}>{tab}</span>{/each}</div>
+  <div class="tabs" data-t={Target.LibraryTabs}>{#each TABS as tab, i (tab)}<span class:on={i === 0}>{tab}</span>{/each}</div>
 
   <div class="grid">
     {#each CARDS as name, i (name)}
-      <div class="card">
-        <div class="thumb">
+      <div class="card" class:lit={demo[Key.Card] === String(i)}>
+        <div class="thumb" data-t={i === 0 ? Target.CardThumb : undefined}>
           {#if i === 0}
             <div class="announce"><b>NEW</b><span>Version 2.0 is out, with dark mode and faster loads</span><u>read more</u></div>
           {:else if i === 1}
@@ -47,7 +51,7 @@
             </div>
           {/if}
         </div>
-        <div class="meta"><span class="name">{name}</span><span class="insert">Insert</span></div>
+        <div class="meta"><span class="name">{name}</span><span class="insert" data-t={i === 0 ? Target.CardInsert : undefined}>Insert</span></div>
       </div>
     {/each}
   </div>

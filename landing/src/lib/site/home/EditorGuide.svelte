@@ -28,9 +28,11 @@
 </script>
 
 <section class="guide site-wide" id="editor-guide" aria-labelledby="guide-title">
-  <p class="eyebrow">{lower(GUIDE_COPY.eyebrow)}</p>
-  <h2 id="guide-title">{lower(GUIDE_COPY.heading)}</h2>
-  <p class="lead">{lower(GUIDE_COPY.lead)}</p>
+  <header class="band">
+    <p class="eyebrow">{lower(GUIDE_COPY.eyebrow)}</p>
+    <h2 id="guide-title">{lower(GUIDE_COPY.heading)}</h2>
+    <p class="lead">{lower(GUIDE_COPY.lead)}</p>
+  </header>
 
   <div class="scroller">
     <ul class="features">
@@ -53,7 +55,7 @@
     <div class="stage" aria-hidden="true">
       <div class="shots">
         {#each GUIDE_FEATURES as feature, index (feature.id)}
-          <div class="shot" class:on={index === active}><MockCrop id={feature.id} /></div>
+          <div class="shot" class:on={index === active}><MockCrop id={feature.id} active={index === active} /></div>
         {/each}
       </div>
     </div>
@@ -73,8 +75,20 @@
     margin: 0;
   }
 
+  .band {
+    padding: 32px 24px;
+    border-radius: 24px;
+    background:
+      linear-gradient(90deg, rgb(0 0 0 / 0.72), rgb(0 0 0 / 0.2) 80%),
+      linear-gradient(180deg, rgb(0 0 0 / 0.3), rgb(0 0 0 / 0.5)),
+      url('/img/pixel-band.png') center / cover no-repeat;
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08);
+    image-rendering: pixelated;
+    text-shadow: 0 1px 8px rgb(0 0 0 / 0.5);
+  }
+
   .eyebrow {
-    color: #ff5100;
+    color: #ff8a3d;
   }
 
   h2 {
@@ -87,7 +101,7 @@
 
   .lead {
     margin-top: 16px;
-    opacity: 0.7;
+    opacity: 0.85;
   }
 
   .features {
@@ -162,6 +176,10 @@
   @media (min-width: 810px) {
     .guide {
       padding-inline: 0;
+    }
+
+    .band {
+      padding: 56px 48px;
     }
 
     h2 {
