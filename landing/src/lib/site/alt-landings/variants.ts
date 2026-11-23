@@ -52,7 +52,7 @@ export const VARIANTS: readonly Variant[] = [
       },
       {
         q: 'Does Feega need Claude Code or any other AI?',
-        a: 'No. Feega has no model and spends no tokens. Claude Code is optional: right-click an element and choose Copy for agent to hand it the file, line and selector, then let it write the structure.'
+        a: 'No. Feega has no model and spends no credits. Claude Code is optional: right-click an element and choose Copy for agent to hand it the file, line and selector, then let it write the structure.'
       },
       {
         q: 'What happens to the changes I make in Feega?',
@@ -172,7 +172,7 @@ export const VARIANTS: readonly Variant[] = [
       },
       {
         q: 'Does Feega send my code to a model?',
-        a: 'No. Feega has no model and no tokens. Your edits are written deterministically, and the Cursor agent only sees them the next time it reads the file.'
+        a: 'No. Feega has no model and uses no credits. Your edits are written deterministically, and the Cursor agent only sees them the next time it reads the file.'
       },
       {
         q: 'What does Lovable do that this setup does not?',
@@ -296,7 +296,7 @@ export const VARIANTS: readonly Variant[] = [
       },
       {
         q: 'Do I need AI in Feega?',
-        a: 'No. Feega has no model and no tokens, and each edit is a diff you can undo. The AI cost on this path is only Codex’s own plan or API key.'
+        a: 'No. Feega has no model and uses no credits, and each edit is a diff you can undo. The AI cost on this path is only Codex’s own plan or API key.'
       },
       {
         q: 'Is Feega free?',

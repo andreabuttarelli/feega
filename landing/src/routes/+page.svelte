@@ -2,6 +2,7 @@
   import Hero from '$lib/site/home/Hero.svelte';
   import OpenSource from '$lib/site/home/OpenSource.svelte';
   import Codebase from '$lib/site/home/Codebase.svelte';
+  import EditorGuide from '$lib/site/home/EditorGuide.svelte';
   import TemplatesTeaser from '$lib/site/home/TemplatesTeaser.svelte';
   import Pricing from '$lib/site/pricing/Pricing.svelte';
   import { PLAN } from '$lib/site/pricing/plan';
@@ -30,6 +31,8 @@
 <div class="chapters">
   <Codebase />
 </div>
+
+<EditorGuide />
 
 <TemplatesTeaser count={data.freeTemplates} />
 
