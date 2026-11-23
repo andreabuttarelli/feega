@@ -18,13 +18,16 @@ const EVENTS = ['session_start', 'edit', 'session_end'] as const;
 const EDITORS = ['vscode', 'cursor', 'windsurf', 'vscodium', 'npx'] as const;
 const DEVICES = ['desktop', 'web', 'cli'] as const;
 
+const CI_HEADER = 'x-feega-ci';
+const SEMVER = /^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$/;
+
 const text = z.string().min(1).max(MAX_TEXT);
 
 const eventSchema = z.object({
   event: z.enum(EVENTS),
   install_id: z.uuid(),
   session_id: z.uuid(),
-  ext_version: text,
+  ext_version: text.regex(SEMVER),
   editor: z.enum(EDITORS),
   os: text,
   arch: text,
@@ -101,6 +104,10 @@ export async function handleUsage(request: Request, client: string, sink: UsageS
   const body = await parseBody(request);
   if (body === PAYLOAD_TOO_LARGE || body === BAD_REQUEST) {
     return new Response(null, { status: body as number });
+  }
+
+  if (request.headers.has(CI_HEADER)) {
+    return new Response(null, { status: NO_CONTENT });
   }
 
   const parsed = batchSchema.safeParse(body);
