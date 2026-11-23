@@ -185,6 +185,10 @@ describe('social preview', () => {
     expect(LAYOUT).toContain('content="summary_large_image"');
   });
 
+  it('every page names the maker for buildinpublic.com verification', () => {
+    expect(LAYOUT).toContain('<meta name="twitter:creator" content="@andreabttrll" />');
+  });
+
   it('the alt text describes the image, not a code diff it does not show', () => {
     expect(OG.image.alt).not.toMatch(/diff|64px|88px/i);
     expect(OG.image.alt).toMatch(/logo/i);
