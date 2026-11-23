@@ -1,11 +1,33 @@
 <script lang="ts">
   import { lower } from '../lower';
-  import { GUIDE_COPY, GUIDE_FEATURES } from '../editor-guide';
+  import { GUIDE_COPY, GUIDE_FEATURES, GuideLayout, type GuideFeature } from '../editor-guide';
   import Pixel from '../alternatives/Pixel.svelte';
   import MockCrop from '../editor-guide/mock/MockCrop.svelte';
 
   const ICON_PX = 4;
+  const rows = GUIDE_FEATURES.filter((f) => f.layout === GuideLayout.Row);
+  const grid = GUIDE_FEATURES.filter((f) => f.layout === GuideLayout.Grid);
 </script>
+
+{#snippet item(feature: GuideFeature)}
+    <li class="feature" class:cell={feature.layout === GuideLayout.Grid} data-feature={feature.id}>
+      <figure class="visual">
+        <div class="box" aria-hidden="true"><MockCrop id={feature.id} layout={feature.layout} /></div>
+        <figcaption class="sr">{feature.alt}</figcaption>
+      </figure>
+      <div class="copy">
+        <span class="icon"><Pixel icon={feature.icon} size={ICON_PX} /></span>
+        <h3>{lower(feature.title)}</h3>
+        <p class="text">{lower(feature.text)}</p>
+        <details class="lands">
+          <summary>{lower(GUIDE_COPY.landsLabel)}</summary>
+          <ul class="code">
+            {#each feature.lands as line (line)}<li><code>{line}</code></li>{/each}
+          </ul>
+        </details>
+      </div>
+    </li>
+{/snippet}
 
 <section class="guide site-wide" id="editor-guide" aria-labelledby="guide-title">
   <header class="band">
@@ -15,24 +37,14 @@
   </header>
 
   <ul class="features">
-    {#each GUIDE_FEATURES as feature (feature.id)}
-      <li class="feature" data-feature={feature.id}>
-        <figure class="visual">
-          <div class="box" aria-hidden="true"><MockCrop id={feature.id} /></div>
-          <figcaption class="sr">{feature.alt}</figcaption>
-        </figure>
-        <div class="copy">
-          <span class="icon"><Pixel icon={feature.icon} size={ICON_PX} /></span>
-          <h3>{lower(feature.title)}</h3>
-          <p class="text">{lower(feature.text)}</p>
-          <details class="lands">
-            <summary>{lower(GUIDE_COPY.landsLabel)}</summary>
-            <ul class="code">
-              {#each feature.lands as line (line)}<li><code>{line}</code></li>{/each}
-            </ul>
-          </details>
-        </div>
-      </li>
+    {#each rows as feature (feature.id)}
+      {@render item(feature)}
+    {/each}
+  </ul>
+
+  <ul class="features grid">
+    {#each grid as feature (feature.id)}
+      {@render item(feature)}
     {/each}
   </ul>
 </section>
@@ -90,6 +102,10 @@
     margin: 24px 0 0;
     padding: 0;
     list-style: none;
+  }
+
+  .features.grid {
+    margin-top: 48px;
   }
 
   .feature {
@@ -234,6 +250,37 @@
 
     .box {
       height: 360px;
+    }
+
+    .feature.cell {
+      display: block;
+    }
+
+    .cell .visual {
+      margin-bottom: 20px;
+    }
+
+    .cell .box {
+      height: 240px;
+    }
+  }
+
+  @media (min-width: 700px) {
+    .features.grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 48px 32px;
+    }
+  }
+
+  @media (min-width: 900px) {
+    .features.grid {
+      margin-top: 108px;
+    }
+  }
+
+  @media (min-width: 1100px) {
+    .features.grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
     }
   }
 </style>

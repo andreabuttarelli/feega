@@ -9,7 +9,13 @@ export enum GuideId {
   Changes = 'changes'
 }
 
+export enum GuideLayout {
+  Row = 'row',
+  Grid = 'grid'
+}
+
 export type GuideFeature = {
+  readonly layout: GuideLayout;
   readonly id: GuideId;
   readonly icon: PixelIcon;
   readonly title: string;
@@ -28,6 +34,7 @@ export const GUIDE_COPY = {
 export const GUIDE_FEATURES: readonly GuideFeature[] = [
   {
     id: GuideId.States,
+    layout: GuideLayout.Row,
     icon: PixelIcon.Cursor,
     title: 'Interaction states',
     text: 'Pick hover, focus, focus visible, active or disabled, then edit. A dot marks the states that already have styles.',
@@ -36,6 +43,7 @@ export const GUIDE_FEATURES: readonly GuideFeature[] = [
   },
   {
     id: GuideId.Breakpoints,
+    layout: GuideLayout.Row,
     icon: PixelIcon.Screens,
     title: 'One screen size at a time',
     text: 'Edit what follows the preview, every size, or one breakpoint read from your Tailwind config.',
@@ -44,6 +52,7 @@ export const GUIDE_FEATURES: readonly GuideFeature[] = [
   },
   {
     id: GuideId.Shared,
+    layout: GuideLayout.Row,
     icon: PixelIcon.Components,
     title: 'Shared components',
     text: 'This element ×3 edits the component, so all three instances change. Detach, here or in the Layers right-click menu, copies it to change one usage only.',
@@ -52,6 +61,7 @@ export const GUIDE_FEATURES: readonly GuideFeature[] = [
   },
   {
     id: GuideId.Snap,
+    layout: GuideLayout.Grid,
     icon: PixelIcon.Grid,
     title: 'Snap to your theme',
     text: 'On Tailwind projects, spacing, size, radius and font size snap to your theme steps. Hold Alt for an exact value. An orange dot marks an off-theme value and applies the nearest step.',
@@ -60,6 +70,7 @@ export const GUIDE_FEATURES: readonly GuideFeature[] = [
   },
   {
     id: GuideId.Themes,
+    layout: GuideLayout.Grid,
     icon: PixelIcon.Sun,
     title: 'Themes and dark mode',
     text: 'Switch the preview between the themes your project defines, and edit inside the one you picked.',
@@ -68,6 +79,7 @@ export const GUIDE_FEATURES: readonly GuideFeature[] = [
   },
   {
     id: GuideId.Changes,
+    layout: GuideLayout.Grid,
     icon: PixelIcon.History,
     title: 'Every edit is a diff',
     text: 'The Changes tab lists each edit with Open, Show diff and Revert. Undo works as in any editor.',

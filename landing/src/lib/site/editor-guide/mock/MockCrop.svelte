@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { GuideId } from '..';
+  import { GuideId, GuideLayout } from '..';
   import DemoChip from '../demo/DemoChip.svelte';
   import DemoCursor from '../demo/DemoCursor.svelte';
   import { createPlayer } from '../demo/player';
@@ -9,7 +9,7 @@
   import { MOCKS } from './registry';
   import { Anchor } from './subjects';
 
-  let { id }: { id: GuideId } = $props();
+  let { id, layout = GuideLayout.Row }: { id: GuideId; layout?: GuideLayout } = $props();
 
   const entry = $derived(MOCKS[id]);
   const script = $derived(SCRIPTS[id]);
@@ -87,7 +87,7 @@
   });
 </script>
 
-<div class="crop" bind:this={root} data-mock-for={id} style:--fx={(focus ?? entry.focus).x} style:--fy={(focus ?? entry.focus).y} style:--zp={entry.zoom.phone} style:--zd={entry.zoom.desktop}>
+<div class="crop" class:grid={layout === GuideLayout.Grid} bind:this={root} data-mock-for={id} style:--fx={(focus ?? entry.focus).x} style:--fy={(focus ?? entry.focus).y} style:--zp={entry.zoom.phone} style:--zd={entry.zoom.desktop}>
   <div class="placed" class:corner={entry.anchor === Anchor.TopRight}><Mock {...entry.props} {demo} /></div>
   <DemoChip text={demo[Key.Chip] ?? ''} />
   {#if cursor}<DemoCursor at={cursor.at} pressed={cursor.pressed} ring={cursor.ring} />{/if}
@@ -128,6 +128,14 @@
       --z: var(--zd);
 
       height: 100%;
+    }
+  }
+
+  @media (min-width: 900px) {
+    .crop.grid {
+      --z: var(--zp);
+
+      height: 240px;
     }
   }
 
