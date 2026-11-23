@@ -43,6 +43,20 @@ describe('admin stats page', () => {
     expect(data.signups).toEqual(SIGNUPS);
   });
 
+  it('lo shows the other blocks when one fails and logs the failure', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    source.signups.mockRejectedValue(new Error('permission denied for table users'));
+
+    const data = await run({ email: 'boss@feega.app' });
+
+    expect(data.signups).toBeNull();
+    expect(data.weekly).toHaveLength(1);
+    expect(data.retention).toHaveLength(1);
+    expect(data.funnel).toEqual(FUNNEL);
+    expect(log).toHaveBeenCalled();
+    log.mockRestore();
+  });
+
   it('answers 404 to a signed-in user who is not an admin', async () => {
     const error = await run({ email: 'someone@else.com' }).catch((e: unknown) => e);
 
