@@ -14,7 +14,7 @@ The Library holds sections, components and app screens. Free items are bundled w
 3. Search, or pick Sections, Components or App. Switch the thumbnails between Light and Dark.
 4. Click **Insert** to place the item after the selection, or drag it onto the preview and drop where the line shows.
 
-One insert is one undo step.
+The inserted item becomes the selection. One insert is one undo step.
 
 ## What gets written
 
