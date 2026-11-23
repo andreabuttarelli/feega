@@ -21,10 +21,12 @@
         <div class="copy">
           <h3>{lower(feature.title)}</h3>
           <p class="text">{lower(feature.text)}</p>
-          <p class="lands">{lower(GUIDE_COPY.landsLabel)}</p>
-          <ul class="code">
-            {#each feature.lands as line (line)}<li><code>{line}</code></li>{/each}
-          </ul>
+          <details class="lands">
+            <summary>{lower(GUIDE_COPY.landsLabel)}</summary>
+            <ul class="code">
+              {#each feature.lands as line (line)}<li><code>{line}</code></li>{/each}
+            </ul>
+          </details>
         </div>
       </li>
     {/each}
@@ -120,7 +122,35 @@
   .lands {
     margin-top: 16px;
     font-size: 14px;
+  }
+
+  .lands summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    list-style: none;
     opacity: 0.5;
+    transition: opacity 0.2s;
+  }
+
+  .lands summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .lands summary::after {
+    content: '+';
+    font-family: var(--sx-mono);
+  }
+
+  .lands[open] summary::after {
+    content: '−';
+  }
+
+  .lands summary:hover,
+  .lands summary:focus-visible,
+  .lands[open] summary {
+    opacity: 0.8;
   }
 
   .code {
