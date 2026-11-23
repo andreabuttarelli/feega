@@ -24,6 +24,7 @@ import { copyImage } from './image-copy';
 import { fileEdits, type Snapshot, type Written } from './file-edits';
 import { impactOf } from './impact';
 import { usageIndex } from './usages';
+import { fsWatch } from './file-watch';
 import { diffOf } from './diff-preview';
 import type { KeptServers } from './kept-servers';
 import { forget, remember, type Memo } from './orphans';
@@ -86,7 +87,8 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   const stylingChoice = () => platform.settings()[SettingKey.Styling] as StylingChoice;
   const editsAt = (dir: string) => fileEdits(dir, stylingChoice, platform.stored<Snapshot>(Stored.History));
   let edits = editsAt(root);
-  let usages = usageIndex(root);
+  const usagesOf = (dir: string) => usageIndex(dir, { watch: platform.watchFiles ?? fsWatch });
+  let usages = usagesOf(root);
   const post = (message: ViewMessage) => platform.send(message);
   let signedIn = false;
   let editKind = EditKind.Other;
@@ -410,7 +412,8 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     app = next;
     root = join(workspace, next);
     edits = editsAt(root);
-    usages = usageIndex(root);
+    usages.dispose();
+    usages = usagesOf(root);
     await platform.store(Stored.App, next);
   }
 
@@ -682,6 +685,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     addPlugin: installPlugin,
     stop: async () => {
       close();
+      usages.dispose();
       pluginList?.stop();
       await sharing.stop();
       await usage?.end();

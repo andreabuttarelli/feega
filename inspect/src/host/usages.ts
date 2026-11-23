@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { posix, relative, sep } from 'node:path';
 import type { UsageSite } from '../messages';
+import type { Watch } from './file-watch';
 import { scanProject } from './project-scan';
 
 type Edge = { from: string; line: number; reexport: boolean; clause: string };
@@ -26,7 +27,7 @@ const JSX_FILE = /\.[jt]sx$/;
 const SINGLE_COMPONENT_FILE = /\.(svelte|vue|astro)$/;
 const PACKAGE_ENTRY = ['module', 'main', 'source'];
 const DEFAULT_NAME = 'default';
-const CACHE_TTL_MS = 5000;
+const SAFETY_TTL_MS = 5 * 60_000;
 const NO_LINE = 1;
 
 const posixOf = (path: string) => path.split(sep).join('/');
@@ -206,13 +207,21 @@ function usersIn({ graph, texts }: { graph: Graph; texts: Map<string, string> },
   return [...users].map(([from, line]) => ({ file: from, line }));
 }
 
-export function usageIndex(root: string, now: () => number = Date.now) {
+type IndexOptions = { now?: () => number; watch?: Watch };
+
+export function usageIndex(root: string, { now = Date.now, watch }: IndexOptions = {}) {
   let cached: Promise<Awaited<ReturnType<typeof graphOf>>> | null = null;
   let builtAt = 0;
   let scans = 0;
+  let watching: { dispose: () => void } | null = null;
+
+  const invalidate = () => {
+    cached = null;
+  };
 
   const built = () => {
-    if (!cached || now() - builtAt > CACHE_TTL_MS) {
+    watching ??= watch?.(root, invalidate) ?? null;
+    if (!cached || now() - builtAt > SAFETY_TTL_MS) {
       scans++;
       builtAt = now();
       cached = graphOf(root);
@@ -222,8 +231,10 @@ export function usageIndex(root: string, now: () => number = Date.now) {
 
   return {
     usersOf: async (file: string) => usersIn(await built(), file),
-    invalidate: () => {
-      cached = null;
+    invalidate,
+    dispose: () => {
+      watching?.dispose();
+      watching = null;
     },
     scans: () => scans
   };

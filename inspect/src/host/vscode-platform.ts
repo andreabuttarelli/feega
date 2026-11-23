@@ -11,6 +11,7 @@ import { catalogFile } from './library';
 import { pluginsRoot } from '@feega/plugin-store/registry';
 import { deviceOnboardingStore, globalStateOnboardingStore } from './onboarding';
 import { globalStateSupportStore } from './support';
+import { WATCHED, relativeOf, type Watch } from './file-watch';
 import type { Platform } from './platform';
 import { HintSurface, nodeHintFs } from './skill-hint';
 import { automated, Device, editorOf, globalStateFirstEdit, globalStateInstallStore, installOf, optedOut, type UsageHost } from './usage';
@@ -59,6 +60,17 @@ export const vsCodeUsage = (context: vscode.ExtensionContext): UsageHost => ({
     !automated(process.env) && !optedOut(process.env) && context.extensionMode !== vscode.ExtensionMode.Test && vscode.env.isTelemetryEnabled && config().get(SettingKey.Telemetry, true) === true,
   firstEdit: globalStateFirstEdit(context.globalState)
 });
+
+export const vsCodeWatch: Watch = (root, changed) => {
+  const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(root, '**/*'));
+  const seen = (uri: vscode.Uri) => {
+    if (WATCHED(relativeOf(root, uri.fsPath))) {
+      changed();
+    }
+  };
+  const subscriptions = [watcher.onDidCreate(seen), watcher.onDidChange(seen), watcher.onDidDelete(seen)];
+  return { dispose: () => [...subscriptions, watcher].forEach((d) => d.dispose()) };
+};
 
 export function vsCodePlatform(host: VsCodeHost, panel: PanelLike, befores: Map<string, string>): Platform {
   const { context, output } = host;
@@ -131,6 +143,7 @@ export function vsCodePlatform(host: VsCodeHost, panel: PanelLike, befores: Map<
     warn: async (text, action) => (await vscode.window.showWarningMessage(`Feega: ${text}`, ...(action ? [action] : []))) === action,
     pickImage,
     library: catalogFile(join(dirname(host.launcher), 'library.json')),
+    watchFiles: vsCodeWatch,
     proFiles: (id, framework) => cloudApi({ base: process.env[WEB_URL_VAR], token: () => accountToken(account) }).libraryPro(id, framework),
     account,
     onboarding: deviceOnboardingStore(globalStateOnboardingStore(context.globalState)),
