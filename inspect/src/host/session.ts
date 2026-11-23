@@ -4,7 +4,7 @@ import { appsIn } from '@feega/dev-run/run-plan';
 import { AddKind, type AddPlace } from '@feega/live-edit/add-node';
 import { liveAtOf } from '@feega/live-edit/live-ask';
 import { StructureOp } from '@feega/live-edit/structure';
-import { AccountState, ServerAction, ServerState, ToHost, ToView, type EditAsk, type HostMessage, type Pick, type Prefs, type ViewMessage } from '../messages';
+import { AccountState, Onboarding, OnboardingOutcome, ServerAction, ServerState, ToHost, ToView, type EditAsk, type HostMessage, type Pick, type Prefs, type ViewMessage } from '../messages';
 import { SettingKey, StylingChoice } from '../settings';
 import { SignInEnd, signIn } from './sign-in';
 import { addPlugin } from './add-plugin';
@@ -27,7 +27,7 @@ import { stylingOf } from './styling';
 import { breakpointsOf } from './breakpoints';
 import { scalesOf } from './scales';
 import { themesOf } from './themes';
-import { EditKind, usageSession } from './usage';
+import { EditKind, UsageKind, usageSession } from './usage';
 import { editKindOf } from './edit-kind';
 import { selectionSync } from './selection-sync';
 import { wiringOf } from './wiring';
@@ -36,7 +36,7 @@ import { PRICING_URL, ProRefusal, SEE_PRICING, SIGN_IN, SIGN_IN_FOR_PRO, proItem
 import { pluginCalls } from './plugin-calls';
 import { pluginsSession } from './plugins-session';
 import { dependenciesOf, offerInstall } from './install-offer';
-import { HintSurface, SKILL_COMMAND, hintDue } from './skill-hint';
+import { HintSurface, SKILL_COMMAND, hintDue, installedAfterHint } from './skill-hint';
 import { install } from './dev-server';
 
 const START_WITH_FEEGA = 'Start with Feega';
@@ -52,6 +52,11 @@ enum Replay {
   Fresh,
   History
 }
+
+const ONBOARDING_END: Record<OnboardingOutcome, UsageKind> = {
+  [OnboardingOutcome.Finished]: UsageKind.OnboardingFinished,
+  [OnboardingOutcome.Skipped]: UsageKind.OnboardingSkipped
+};
 
 export type Session = ReturnType<typeof inspectSession>;
 
@@ -172,6 +177,9 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     const ready = ask.pro ? await proItemFor(ask.item, await readFile(join(root, 'package.json'), 'utf8').catch(() => null), platform.proFiles) : { ok: true as const, item: ask.item };
     const out: Written = ready.ok ? await edits.library(m.at, m.place, ready.item, ask.tokens) : ready;
     await edited(out, null);
+    if (out.ok) {
+      usage?.track(UsageKind.LibraryInsert, { tier: ask.pro ? 'pro' : 'free' });
+    }
     if (!ready.ok && ready.refusal) {
       void proPrompted(ready.refusal);
     }
@@ -208,7 +216,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   });
 
   const pluginList = platform.plugins
-    ? pluginsSession({ host: { root: platform.plugins.root, dev: () => platform.plugins!.dev().map((folder) => resolve(root, folder)) }, post, notify: platform.notify })
+    ? pluginsSession({ host: { root: platform.plugins.root, dev: () => platform.plugins!.dev().map((folder) => resolve(root, folder)) }, post, notify: platform.notify, onInstalled: () => usage?.track(UsageKind.PluginInstalled) })
     : null;
 
   const comments = commentsHost(platform.cloud, post);
@@ -237,17 +245,28 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
       return;
     }
     await platform.account.write(outcome.account);
+    usage?.signedIn();
     await postAccount(AccountState.SignedIn, outcome.account.user.email);
     await platform.notify(`Signed in as ${outcome.account.user.email}`);
   }
 
   async function showOnboarding() {
-    await post({ kind: ToView.Onboarding, state: await platform.onboarding.read() });
+    const state = await platform.onboarding.read();
+    if (state === Onboarding.Pending) {
+      usage?.track(UsageKind.OnboardingStarted);
+    }
+    await post({ kind: ToView.Onboarding, state });
   }
 
   async function showSkillHint() {
     if (platform.skillHint?.surface === HintSurface.Panel && hintDue(platform, [...new Set([root, workspace])])) {
+      usage?.track(UsageKind.SkillHintShown);
+      await platform.store(Stored.SkillHintShown, true);
       await post({ kind: ToView.SkillHint, command: SKILL_COMMAND });
+    }
+    if (installedAfterHint(platform, [...new Set([root, workspace])])) {
+      usage?.track(UsageKind.SkillInstalled);
+      await platform.store(Stored.SkillInstalledSent, true);
     }
   }
 
@@ -260,6 +279,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
 
   async function signOut() {
     await platform.account.clear();
+    usage?.signedOut();
     await postAccount(AccountState.SignedOut);
   }
 
@@ -460,6 +480,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
 
   async function installPlugin() {
     const out = await addPlugin(join(root, running?.plan.appDir ?? ''));
+    usage?.track(out.ok ? UsageKind.SetupApplied : UsageKind.SetupFailed);
     await post({ kind: ToView.Status, text: out.ok ? (out.files.length ? `Added the Feega plugin to ${out.files.join(', ')}. Install dependencies and restart the dev server.` : 'The Feega plugin is already set up.') : out.reason });
   }
 
@@ -543,7 +564,8 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.SignIn]: startSignIn,
     [ToHost.CancelSignIn]: () => signing?.abort(),
     [ToHost.SignOut]: signOut,
-    [ToHost.OnboardingDone]: () => platform.onboarding.markSeen(),
+    [ToHost.OnboardingStep]: (m) => usage?.track(UsageKind.OnboardingStep, { step: m.step }),
+    [ToHost.OnboardingDone]: (m) => (usage?.track(ONBOARDING_END[m.outcome]), platform.onboarding.markSeen()),
     [ToHost.SkillHintDismiss]: dismissSkillHint,
     [ToHost.SkillHintNever]: neverSkillHint,
     [ToHost.ImageChoose]: imageChosen,
@@ -607,6 +629,8 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
       await usage?.end();
     },
     usageChanged: () => usage?.recheck(),
+    away: () => usage?.away(),
+    back: () => usage?.back(),
     url: () => running?.url ?? null,
     showApp,
     showRoute,

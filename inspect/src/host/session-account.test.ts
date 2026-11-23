@@ -7,6 +7,7 @@ import { accountOfBody, memoryAccountStore } from './account';
 import { memoryOnboardingStore } from './onboarding';
 import type { Platform } from './platform';
 import { inspectSession } from './session';
+import { Device, Editor, type UsageEvent } from './usage';
 
 const jwt = `h.${Buffer.from(JSON.stringify({ sub: 'u1', email: 'a@b.co' })).toString('base64url')}.s`;
 const tokens = { access_token: jwt, refresh_token: 'r', expires_at: 99 };
@@ -16,6 +17,7 @@ function setup() {
   const sent: ViewMessage[] = [];
   const toasts: string[] = [];
   const opened: string[] = [];
+  const usageSent: UsageEvent[] = [];
   let handle: (m: HostMessage) => unknown = () => undefined;
   const stored = new Map<string, unknown>();
   const account = memoryAccountStore();
@@ -32,9 +34,15 @@ function setup() {
     notify: (text: string) => toasts.push(text),
     warn: async () => false,
     account,
-    onboarding: memoryOnboardingStore()
+    onboarding: memoryOnboardingStore(),
+    usage: {
+      identity: () => ({ installId: '3f1c9a52-5b0e-4c1d-9a54-0d2f6f1e7a10', version: '1', editor: Editor.Npx, os: 'linux', arch: 'x64', device: Device.Cli }),
+      enabled: () => true,
+      send: async (events: UsageEvent[]) => void usageSent.push(...events),
+      every: () => () => undefined
+    }
   } as unknown as Platform;
-  inspectSession(platform, mkdtempSync(join(tmpdir(), 'feega-acc-')));
+  const session = inspectSession(platform, mkdtempSync(join(tmpdir(), 'feega-acc-')));
   const send = (m: HostMessage) => handle(m);
   const post = async (state: string) => {
     const url = new URL(opened[opened.length - 1]);
@@ -45,7 +53,7 @@ function setup() {
       await new Promise((r) => setTimeout(r, 5));
     }
   };
-  return { sent, toasts, opened, account, send, post, until };
+  return { sent, toasts, opened, account, send, post, until, session, usageSent };
 }
 
 describe('account nella sessione', () => {
@@ -103,5 +111,19 @@ describe('account nella sessione', () => {
     await t.until(() => accounts(t.sent).length > 0);
     expect(await t.account.read()).toBeNull();
     expect(accounts(t.sent)).toEqual([AccountState.SignedOut]);
+  });
+
+  it('sign in e sign out finiscono nella telemetria senza dati dell account', async () => {
+    const t = setup();
+    t.send({ kind: ToHost.SignIn });
+    await t.until(() => t.opened.length > 0);
+    await t.post(new URL(t.opened[0]).searchParams.get('cli_state')!);
+    await t.until(() => t.toasts.length > 0);
+    t.send({ kind: ToHost.SignOut });
+    await t.until(() => accounts(t.sent).length > 2);
+    await t.session.stop();
+
+    expect(t.usageSent.map((e) => e.event)).toEqual(['opened', 'session_start', 'sign_in', 'sign_out', 'session_end']);
+    expect(JSON.stringify(t.usageSent)).not.toContain('a@b.co');
   });
 });

@@ -161,6 +161,7 @@ export enum ToHost {
   CancelSignIn = 'cancel-sign-in',
   SignOut = 'sign-out',
   OnboardingDone = 'onboarding-done',
+  OnboardingStep = 'onboarding-step',
   SkillHintDismiss = 'skill-hint-dismiss',
   SkillHintNever = 'skill-hint-never',
   ImageChoose = 'image-choose',
@@ -221,6 +222,17 @@ export enum ShareState {
   Live = 'live'
 }
 
+export enum OnboardingStep {
+  Welcome = 'welcome',
+  Agent = 'agent',
+  SignIn = 'sign_in'
+}
+
+export enum OnboardingOutcome {
+  Finished = 'finished',
+  Skipped = 'skipped'
+}
+
 export enum Onboarding {
   Pending = 'pending',
   Seen = 'seen'
@@ -267,7 +279,8 @@ export type HostMessage =
   | { kind: ToHost.SignIn }
   | { kind: ToHost.CancelSignIn }
   | { kind: ToHost.SignOut }
-  | { kind: ToHost.OnboardingDone }
+  | { kind: ToHost.OnboardingDone; outcome: OnboardingOutcome }
+  | { kind: ToHost.OnboardingStep; step: OnboardingStep }
   | { kind: ToHost.SkillHintDismiss }
   | { kind: ToHost.SkillHintNever }
   | { kind: ToHost.ImageChoose }

@@ -1,10 +1,10 @@
 <script lang="ts">
   import X from '@lucide/svelte/icons/x';
   import { onMount } from 'svelte';
-  import { AccountState, ToHost } from '../messages';
+  import { AccountState, OnboardingOutcome, type OnboardingStep, ToHost } from '../messages';
   import { SLIDES } from './onboarding-slides';
 
-  let { account, onaccount, ondone }: { account: { state: AccountState; email?: string }; onaccount: (kind: ToHost.SignIn | ToHost.CancelSignIn) => void; ondone: () => void } = $props();
+  let { account, onaccount, onstep, ondone }: { account: { state: AccountState; email?: string }; onaccount: (kind: ToHost.SignIn | ToHost.CancelSignIn) => void; onstep: (step: OnboardingStep) => void; ondone: (outcome: OnboardingOutcome) => void } = $props();
 
   let index = $state(0);
   let dialog = $state<HTMLDivElement | null>(null);
@@ -19,7 +19,7 @@
   function trap(e: KeyboardEvent) {
     if (e.key === 'Escape') {
       e.stopPropagation();
-      ondone();
+      ondone(OnboardingOutcome.Skipped);
       return;
     }
     if (e.key !== 'Tab') {
@@ -43,6 +43,8 @@
     }
   }
 
+  $effect(() => onstep(slide.step));
+
   onMount(() => dialog?.querySelector<HTMLElement>('[data-primary]')?.focus());
 </script>
 
@@ -50,7 +52,7 @@
 
 <div class="scrim" role="presentation" data-testid="onboarding">
   <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="onb-title" aria-describedby="onb-body" tabindex="-1" bind:this={dialog}>
-    <button type="button" class="close" aria-label="Close" title="Close" data-testid="onboarding-close" onclick={ondone}><X size={14} /></button>
+    <button type="button" class="close" aria-label="Close" title="Close" data-testid="onboarding-close" onclick={() => ondone(OnboardingOutcome.Skipped)}><X size={14} /></button>
 
     <div class="body">
       <h2 id="onb-title">{slide.title}</h2>
@@ -61,13 +63,13 @@
         <div class="account">
           {#if account.state === AccountState.SignedIn}
             <p class="signed" data-testid="onboarding-email">Signed in as {account.email}</p>
-            <button type="button" class="primary" data-primary data-testid="onboarding-finish" onclick={ondone}>Start designing</button>
+            <button type="button" class="primary" data-primary data-testid="onboarding-finish" onclick={() => ondone(OnboardingOutcome.Finished)}>Start designing</button>
           {:else if account.state === AccountState.Waiting}
             <button type="button" class="primary" data-primary disabled>Waiting for the browser…</button>
             <button type="button" class="ghost" data-testid="onboarding-cancel" onclick={() => onaccount(ToHost.CancelSignIn)}>cancel</button>
           {:else}
             <button type="button" class="primary" data-primary data-testid="onboarding-sign-in" onclick={() => onaccount(ToHost.SignIn)}>Sign in to Feega</button>
-            <button type="button" class="ghost" data-testid="onboarding-later" onclick={ondone}>maybe later</button>
+            <button type="button" class="ghost" data-testid="onboarding-later" onclick={() => ondone(OnboardingOutcome.Finished)}>maybe later</button>
             {#if account.state === AccountState.Cancelled}<p class="hint">Sign-in cancelled or timed out.</p>{/if}
           {/if}
         </div>
@@ -75,7 +77,7 @@
     </div>
 
     <footer>
-      <button type="button" class="ghost" data-testid="onboarding-skip" onclick={ondone}>skip</button>
+      <button type="button" class="ghost" data-testid="onboarding-skip" onclick={() => ondone(OnboardingOutcome.Skipped)}>skip</button>
       <div class="dots" aria-hidden="true">
         {#each SLIDES as _, at (at)}<span class="dot" class:on={at === index}></span>{/each}
       </div>

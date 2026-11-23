@@ -44,8 +44,8 @@ describe('usage in the session', () => {
     await session.edit({ at: 'src/Missing.svelte:1:1', prop: LiveProp.Color, value: '#00ff00' });
     await session.stop();
 
-    expect(sent.map((e) => e.event)).toEqual(['session_start', 'edit', 'session_end']);
-    expect(sent[2].edit_count).toBe(1);
+    expect(sent.map((e) => e.event)).toEqual(['opened', 'session_start', 'edit', 'session_end']);
+    expect(sent[3].edit_count).toBe(1);
   });
 
   it('reports nothing when telemetry is off', async () => {

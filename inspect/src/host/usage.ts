@@ -2,24 +2,43 @@ import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
+import type { OnboardingStep } from '../messages';
 import { SettingKey, type Settings } from '../settings';
 import { APP_URL } from './sign-in';
 
 export const USAGE_URL = `${APP_URL}/api/v1/telemetry`;
 
 const FLUSH_INTERVAL_MS = 3 * 60 * 1000;
+const RESUME_AFTER_MS = 30 * 60 * 1000;
 const SEND_TIMEOUT_MS = 5000;
 const GLOBAL_KEY = 'feegaInspect.installId';
 const INSTALL_FILE = join('.config', 'feega', 'install.json');
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export enum UsageKind {
+  Install = 'install',
+  Opened = 'opened',
   SessionStart = 'session_start',
   PreviewReady = 'preview_ready',
   FirstEdit = 'first_edit',
   Edit = 'edit',
-  SessionEnd = 'session_end'
+  SessionEnd = 'session_end',
+  SignIn = 'sign_in',
+  SignOut = 'sign_out',
+  SessionResume = 'session_resume',
+  OnboardingStarted = 'onboarding_started',
+  OnboardingStep = 'onboarding_step',
+  OnboardingFinished = 'onboarding_finished',
+  OnboardingSkipped = 'onboarding_skipped',
+  SetupApplied = 'setup_applied',
+  SetupFailed = 'setup_failed',
+  SkillHintShown = 'skill_hint_shown',
+  SkillInstalled = 'skill_installed',
+  LibraryInsert = 'library_insert',
+  PluginInstalled = 'plugin_installed'
 }
+
+export type LibraryTier = 'free' | 'pro';
 
 export enum EditKind {
   Text = 'text',
@@ -49,7 +68,7 @@ export enum Device {
   Cli = 'cli'
 }
 
-export type Identity = { installId: string; version: string; editor: Editor; os: string; arch: string; device: Device };
+export type Identity = { installId: string; version: string; editor: Editor; os: string; arch: string; device: Device; firstRun?: boolean };
 
 export type UsageEvent = {
   event: UsageKind;
@@ -65,6 +84,8 @@ export type UsageEvent = {
   edit_kind?: EditKind;
   framework?: string;
   signed_in?: boolean;
+  step?: OnboardingStep;
+  tier?: LibraryTier;
 };
 
 export type Send = (events: UsageEvent[]) => Promise<unknown>;
@@ -126,19 +147,21 @@ const intervalEvery = (ms: number, run: () => void) => {
   return () => clearInterval(timer);
 };
 
-export function installIdOf(store: InstallStore, newId: () => string = randomUUID): string {
+export function installOf(store: InstallStore, newId: () => string = randomUUID): { installId: string; firstRun: boolean } {
   const stored = store.get();
   if (stored && UUID.test(stored)) {
-    return stored;
+    return { installId: stored, firstRun: false };
   }
   const created = newId();
   try {
     Promise.resolve(store.set(created)).catch(() => undefined);
   } catch {
-    return created;
+    return { installId: created, firstRun: true };
   }
-  return created;
+  return { installId: created, firstRun: true };
 }
+
+export const installIdOf = (store: InstallStore, newId?: () => string): string => installOf(store, newId).installId;
 
 const EDITORS_BY_APP_NAME: [string, Editor][] = [
   ['cursor', Editor.Cursor],
@@ -176,6 +199,7 @@ export function usageSession({ identity: identityOf, enabled, send = httpSend, n
   let stopTimer: (() => void) | null = null;
   let state: 'idle' | 'running' | 'ended' = 'idle';
   let previewSent = false;
+  let awayAt: number | null = null;
 
   const withFacts = (e: UsageEvent): UsageEvent => {
     const known = facts?.();
@@ -184,6 +208,8 @@ export function usageSession({ identity: identityOf, enabled, send = httpSend, n
     }
     return { ...e, ...(known.framework ? { framework: known.framework } : {}), signed_in: known.signedIn };
   };
+
+  const firstRun = () => identity?.firstRun === true;
 
   const event = (kind: UsageKind, extra: Partial<UsageEvent> = {}): UsageEvent => {
     identity ??= identityOf();
@@ -224,7 +250,11 @@ export function usageSession({ identity: identityOf, enabled, send = httpSend, n
     state = 'running';
     startedAt = now();
     if (enabled()) {
-      queue.push(event(UsageKind.SessionStart));
+      const opened = event(UsageKind.Opened);
+      if (firstRun()) {
+        queue.push(event(UsageKind.Install));
+      }
+      queue.push(opened, event(UsageKind.SessionStart));
     }
     stopTimer = every(FLUSH_INTERVAL_MS, () => void flush());
   }
@@ -254,6 +284,32 @@ export function usageSession({ identity: identityOf, enabled, send = httpSend, n
     queue.push(event(UsageKind.Edit, { edit_kind: kind }));
   }
 
+  function account(kind: UsageKind.SignIn | UsageKind.SignOut) {
+    if (state === 'running' && enabled()) {
+      queue.push(event(kind));
+    }
+  }
+
+  function track(kind: UsageKind, extra: Pick<UsageEvent, 'step' | 'tier'> = {}) {
+    if (state === 'running' && enabled()) {
+      queue.push(event(kind, extra));
+    }
+  }
+
+  const signedIn = () => account(UsageKind.SignIn);
+  const signedOut = () => account(UsageKind.SignOut);
+
+  const away = () => void (awayAt ??= now());
+
+  function back() {
+    const since = awayAt;
+    awayAt = null;
+    if (since === null || state !== 'running' || now() - since < RESUME_AFTER_MS || !enabled()) {
+      return;
+    }
+    queue.push(event(UsageKind.SessionResume));
+  }
+
   async function end() {
     if (state !== 'running') {
       return;
@@ -272,7 +328,7 @@ export function usageSession({ identity: identityOf, enabled, send = httpSend, n
     }
   }
 
-  return { begin, previewReady, edit, end, recheck };
+  return { begin, previewReady, edit, track, signedIn, signedOut, away, back, end, recheck };
 }
 
 export type UsageSession = ReturnType<typeof usageSession>;
