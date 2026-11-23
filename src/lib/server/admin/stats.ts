@@ -14,19 +14,33 @@ const PERCENT = 100;
 
 const percent = (count: number, total: number) => (total === 0 ? 0 : Math.round((count / total) * PERCENT));
 
+async function block<T>(name: string, load: () => Promise<T>): Promise<T | null> {
+  try {
+    return await load();
+  } catch (error) {
+    console.error(`admin stats: ${name} failed`, error);
+    return null;
+  }
+}
+
 export async function loadStats(source: StatsSource) {
-  const [weekly, retention, funnel, signups] = await Promise.all([source.weekly(), source.retention(), source.funnel(), source.signups()]);
+  const [weekly, retention, funnel, signups] = await Promise.all([
+    block('weekly', source.weekly),
+    block('retention', source.retention),
+    block('funnel', source.funnel),
+    block('signups', source.signups)
+  ]);
 
   return {
     weekly,
-    retention: retention.map((row) => ({
+    retention: retention?.map((row) => ({
       cohort: row.cohort,
       installs: row.installs,
       w1: percent(row.w1, row.installs),
       w2: percent(row.w2, row.installs),
       w4: percent(row.w4, row.installs),
       w8: percent(row.w8, row.installs)
-    })),
+    })) ?? null,
     funnel,
     signups
   };

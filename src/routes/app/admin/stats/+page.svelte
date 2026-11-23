@@ -13,10 +13,15 @@
   ] as const;
 </script>
 
+{#snippet failed()}
+  <p>Couldn't load this table.</p>
+{/snippet}
+
 <main>
   <h1>Stats</h1>
 
   <h2>Weekly active installs by editor</h2>
+  {#if data.weekly}
   <div class="scroll"><table>
     <thead><tr><th>Week</th><th>Editor</th><th>Installs</th></tr></thead>
     <tbody>
@@ -25,8 +30,12 @@
       {/each}
     </tbody>
   </table></div>
+  {:else}
+  {@render failed()}
+  {/if}
 
   <h2>Retention by weekly cohort</h2>
+  {#if data.retention}
   <div class="scroll"><table>
     <thead><tr><th>Cohort</th><th>Installs</th><th>+1</th><th>+2</th><th>+4</th><th>+8</th></tr></thead>
     <tbody>
@@ -35,8 +44,12 @@
       {/each}
     </tbody>
   </table></div>
+  {:else}
+  {@render failed()}
+  {/if}
 
   <h2>Sign-ups per week</h2>
+  {#if data.signups}
   <div class="scroll"><table>
     <thead><tr><th>Week</th><th>Total</th><th>Confirmed</th></tr></thead>
     <tbody>
@@ -45,8 +58,12 @@
       {/each}
     </tbody>
   </table></div>
+  {:else}
+  {@render failed()}
+  {/if}
 
   <h2>Funnel, last 30 days</h2>
+  {#if data.funnel}
   <div class="scroll"><table>
     <thead><tr><th>Step</th><th>Installs</th></tr></thead>
     <tbody>
@@ -55,6 +72,9 @@
       {/each}
     </tbody>
   </table></div>
+  {:else}
+  {@render failed()}
+  {/if}
 </main>
 
 <style>
