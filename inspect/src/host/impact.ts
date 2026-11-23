@@ -1,6 +1,8 @@
 import { offsetOf, openTagEnd } from '@feega/live-edit/class-patch';
 import { inside, liveAtOf, reader } from '@feega/live-edit/live-ask';
+import { Scope } from '@feega/live-edit/scoped-rule';
 import { ImpactKind, type Impact, type ImpactAsk } from '../messages';
+import { isEntry, isPage } from './entry-files';
 import type { UsageIndex } from './usages';
 
 export { ImpactKind, type Impact, type ImpactAsk };
@@ -14,6 +16,7 @@ const COMPUTED_CLASS = /\s(?::class|v-bind:class|class:[\w-]+|(?:class|className
 const CSS_VARIABLE = /^\s*var\(\s*--/;
 const MODULE_SHEET = /\.module\.css$/;
 const SHEET = /\.css$/;
+const COMPONENT_TAG = /^<(?:[A-Z]|\w+\.)/;
 const PASCAL_BREAK = /[-_.\s]+(\w)/g;
 
 export const classOpen = (open: string): boolean => COMPUTED_CLASS.test(open.replace(LITERAL_CLASS, ''));
@@ -32,6 +35,8 @@ export function nameOf(file: string): string {
   const camel = base.replace(PASCAL_BREAK, (_, c: string) => c.toUpperCase());
   return camel.charAt(0).toUpperCase() + camel.slice(1);
 }
+
+const ownInstance = ({ file, open, ask, writes }: Facts) => ask.scope === Scope.Element && open !== null && COMPONENT_TAG.test(open) && Boolean(writes?.length) && writes!.every((path) => path === file);
 
 async function openTagOf(root: string, file: string, ask: ImpactAsk): Promise<string | null> {
   const at = liveAtOf(ask.at);
@@ -52,6 +57,9 @@ export async function impactOf(root: string, ask: ImpactAsk, probe: Probe, index
   if (cause) {
     return { kind: ImpactKind.Unknown, reason: cause.reason };
   }
-  const files = await index.usersOf(at.file);
+  if (isPage(at.file) || ownInstance(facts)) {
+    return { kind: ImpactKind.Local };
+  }
+  const files = (await index.usersOf(at.file)).filter((site) => !isEntry(site.file));
   return files.length ? { kind: ImpactKind.Component, name: nameOf(at.file), files } : { kind: ImpactKind.Local };
 }
