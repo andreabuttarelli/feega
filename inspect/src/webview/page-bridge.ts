@@ -22,7 +22,7 @@ export type PageEvents = {
   palette: (palette: Palette) => void;
   settled: (source: string, unapplied: string[]) => void;
   text: (source: string, text: string, was: string) => void;
-  tracked: (slot: string, rect: Pick['rect']) => void;
+  tracked: (slot: string, rect: Pick['rect'] | null) => void;
 };
 
 export function pageBridge(frame: () => HTMLIFrameElement | null, on: PageEvents) {
@@ -59,9 +59,7 @@ export function pageBridge(frame: () => HTMLIFrameElement | null, on: PageEvents
       return;
     }
     if (data?.type === TRACKED) {
-      if (data.rect) {
-        on.tracked(data.slot, data.rect);
-      }
+      on.tracked(data.slot, data.rect ?? null);
       return;
     }
     if (data?.type === TEXT_DONE) {

@@ -187,7 +187,8 @@
   let share = $state<Extract<ViewMessage, { kind: ToView.Share }> | null>(null);
   let cloud = $state<{ enabled: boolean; comments: CloudComment[]; error: string }>({ enabled: false, comments: [], error: '' });
   let composing = $state(false);
-  let pinRects = $state<Record<string, Pick['rect']>>({});
+  let pinRects = $state<Record<string, Pick['rect'] | null>>({});
+  let lostSlots = $state<Record<string, boolean>>({});
   let pinned = new Set<string>();
   const COMMENTS_POLL_MS = 15_000;
   const PIN_SIZE_PX = 20;
@@ -316,8 +317,9 @@
         pinRects[pin] = rect;
         return;
       }
+      lostSlots[slot] = rect === null;
       const target = slot === Slot.Selected ? picked : hover;
-      if (target) {
+      if (target && rect) {
         target.rect = rect;
       }
     },
@@ -1214,7 +1216,7 @@
         {#if restarting}<div class="restarting" data-testid="restarting" role="status"><span class="server-dot-inline amber"></span>Restarting dev server…</div>{/if}
         {#if mode === Mode.Design && bridged && !editing}
           <div class="overlay" role="presentation" onpointerdown={pressOverlay} onpointermove={dragOverlay} onpointerleave={() => (hover = null)} onclick={onPick} oncontextmenu={onMenu} ondragover={overAdd} ondragleave={() => (addSpot = null)} ondrop={dropAdd} ondblclick={onDouble} onwheel={(e) => bridge.scroll(e.deltaX / fit.scale, e.deltaY / fit.scale)}>
-            {#if hover}<div class="outline hover" style={box(hover)}></div>{/if}
+            {#if hover && !lostSlots[Slot.Hovered]}<div class="outline hover" style={box(hover)}></div>{/if}
             {#if addSpot}
               <div class="drop-line box" data-testid="add-outline" style={`left:${addSpot.outline.x * fit.scale - 1}px;top:${addSpot.outline.y * fit.scale - 1}px;width:${Math.max(2, addSpot.outline.w * fit.scale)}px;height:${Math.max(2, addSpot.outline.h * fit.scale)}px`}></div>
               {#if addSpot.place !== AddPlace.Child}<div class="drop-line" data-testid="add-line" style={`left:${addSpot.line.x * fit.scale - 1}px;top:${addSpot.line.y * fit.scale - 1}px;width:${Math.max(2, addSpot.line.w * fit.scale)}px;height:${Math.max(2, addSpot.line.h * fit.scale)}px`}></div>{/if}
@@ -1223,7 +1225,7 @@
           {#if picked && hint}{#each hintBoxes(picked, hint) as area, i (i)}<div class="hint {hint.group}" style={`left:${area.x * fit.scale}px;top:${area.y * fit.scale}px;width:${area.w * fit.scale}px;height:${area.h * fit.scale}px`}></div>{/each}{/if}
           {#if picked}<PluginOverlay {plugins} {picked} scale={fit.scale} />{/if}
           {#each others as other (keyOf(refOf(other.source, other.instanceIndex)))}<div class="outline picked" data-testid="selected-outline" style={box(other)}></div>{/each}
-          {#if picked}<div class="outline picked" style={box(picked)}><span class="label"><Breadcrumb pick={picked} onselect={select} compact state={elementState} /></span></div>{/if}
+          {#if picked && !lostSlots[Slot.Selected]}<div class="outline picked" style={box(picked)}><span class="label"><Breadcrumb pick={picked} onselect={select} compact state={elementState} /></span></div>{/if}
           {#each pins as pin (pin.id)}
             {@const rect = pinRects[pin.id]}
             {#if rect}
