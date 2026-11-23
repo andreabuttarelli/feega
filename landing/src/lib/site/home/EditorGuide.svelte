@@ -66,7 +66,7 @@
 
 <style>
   .guide {
-    padding: var(--site-section) var(--site-gutter) 0;
+    padding: var(--site-section) var(--site-gutter);
     box-sizing: border-box;
     color: var(--site-ink);
   }
@@ -175,8 +175,8 @@
   @media (min-width: 900px) {
     .scroller {
       display: grid;
-      grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-      gap: 48px;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 64px;
       align-items: start;
     }
 
@@ -188,7 +188,7 @@
     .feature {
       position: relative;
       display: flex;
-      min-height: 62vh;
+      min-height: 44vh;
       flex-direction: column;
       justify-content: center;
       opacity: 0.3;
@@ -197,6 +197,17 @@
 
     .feature.on {
       opacity: 1;
+    }
+
+    .feature:first-child {
+      min-height: 0;
+      padding: 40px 0 15vh;
+      justify-content: flex-start;
+    }
+
+    .feature:last-child {
+      min-height: 0;
+      padding: 15vh 0 0;
     }
 
     .inline {
@@ -211,7 +222,7 @@
 
     .stage {
       position: sticky;
-      top: calc(50vh - 260px);
+      top: calc(50vh - 180px);
       display: block;
     }
 
@@ -219,8 +230,9 @@
       display: grid;
       grid-template: minmax(0, 1fr) / minmax(0, 1fr);
       place-items: center;
-      height: 520px;
-      padding: 24px;
+      height: 360px;
+      max-width: 520px;
+      padding: 20px;
       border-radius: 12px;
       background: #0d0d0d;
     }
