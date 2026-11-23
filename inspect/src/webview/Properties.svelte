@@ -24,6 +24,9 @@
   import { Role, roleOf, sectionsOf } from './roles';
   import { paintOf } from './colour';
   import Field from './Field.svelte';
+  import type { Scales } from '@feega/live-edit/theme-scales';
+  import { scaleFor } from './snap';
+  import { colourCheck, tokenPick } from './colour-theme';
   import { OFFSET_SIDES, OffsetSide, flipOffset, initialOffsets, offsetsFromHost, type Offsets } from './position-box';
   import { sourceText } from './page-bridge';
   import { wiringState } from './wiring-state.svelte';
@@ -39,9 +42,9 @@
   import { DEFAULT_BREAKPOINTS, type Breakpoints } from '@feega/live-edit/breakpoints';
   import { overrideTitle, rowOverrides } from './responsive';
 
-  type Props = { pick: Pick; onpreview: (row: Row, value: string) => void; onchange: (row: Row, value: string, token?: string) => void; onsavevar: (row: Row, name: string, css: string) => void; onhint: (hint: Hint | null) => void; onfont: (font: FontChoice) => void; onfontreplace: (from: string, to: FontChoice) => void; onfontload: (family: string) => void; onnotice: (text: string) => void; palette: Palette; elementState?: ElementState; baseline?: Record<string, string> | null; onstate?: (state: ElementState) => void; breakpoints?: Breakpoints };
+  type Props = { pick: Pick; onpreview: (row: Row, value: string) => void; onchange: (row: Row, value: string, token?: string) => void; onsavevar: (row: Row, name: string, css: string) => void; onhint: (hint: Hint | null) => void; onfont: (font: FontChoice) => void; onfontreplace: (from: string, to: FontChoice) => void; onfontload: (family: string) => void; onnotice: (text: string) => void; palette: Palette; elementState?: ElementState; baseline?: Record<string, string> | null; onstate?: (state: ElementState) => void; breakpoints?: Breakpoints; scales?: Scales | null };
 
-  let { pick, onpreview, onchange, onhint, onfont, onfontreplace, onfontload, onnotice, palette, onsavevar, elementState = ElementState.Default, baseline = null, onstate, breakpoints = DEFAULT_BREAKPOINTS }: Props = $props();
+  let { pick, onpreview, onchange, onhint, onfont, onfontreplace, onfontload, onnotice, palette, onsavevar, elementState = ElementState.Default, baseline = null, onstate, breakpoints = DEFAULT_BREAKPOINTS, scales = null }: Props = $props();
 
   const missingHere = $derived(missingIn(pick.styles['font-family'] ?? '', palette.missing));
   const presentFonts = $derived(palette.fonts.filter((name) => !palette.missing.some((m) => m.family === name)));
@@ -182,7 +185,7 @@
 
 {#snippet field(r: NumberRow, prefix = r.label, iconSvg = '', compact = false, twin: NumberRow | null = null)}
   {#snippet glyph()}<Icon svg={iconSvg} />{/snippet}
-  <Field name={r.name} override={overrideOf(r.name)} css={SIZE_LIMITS.includes(r.name) ? (pick.styles[READS[r.name]] ?? '') : ''} {prefix} icon={iconSvg ? glyph : undefined} {compact} px={shared(r)} units={r.units} unit={r.units ? '' : r.unit} {context} min={r.range.min} max={r.range.max} onpreview={(v) => (onpreview(r, v), twin && onpreview(twin, v))} onchange={(v) => (onchange(r, v), twin && onchange(twin, v))} />
+  <Field name={r.name} steps={scaleFor(r.name, scales)} override={overrideOf(r.name)} css={SIZE_LIMITS.includes(r.name) ? (pick.styles[READS[r.name]] ?? '') : ''} {prefix} icon={iconSvg ? glyph : undefined} {compact} px={shared(r)} units={r.units} unit={r.units ? '' : r.unit} {context} min={r.range.min} max={r.range.max} onpreview={(v) => (onpreview(r, v), twin && onpreview(twin, v))} onchange={(v) => (onchange(r, v), twin && onchange(twin, v))} />
 {/snippet}
 
 {#snippet segmented(r: Row, options: { value: string; label: string; icon: IconComponent }[])}
@@ -222,7 +225,7 @@
       {@const r = num(side)}
       {@const on = offsetOn(side)}
       <div class={`slot ${side}`} class:off={!on} data-on={on}>
-        <Field name={r.name} prefix="" px={shared(r)} units={r.units} {context} min={r.range.min} max={r.range.max} title={SIDE_TITLE[side]} onpreview={(v) => onpreview(r, v)} onchange={(v) => (setOffset(side, true), onchange(r, v))} />
+        <Field name={r.name} steps={scaleFor(r.name, scales)} prefix="" px={shared(r)} units={r.units} {context} min={r.range.min} max={r.range.max} title={SIDE_TITLE[side]} onpreview={(v) => onpreview(r, v)} onchange={(v) => (setOffset(side, true), onchange(r, v))} />
       </div>
     {/each}
     <div class="box" role="presentation">
@@ -256,6 +259,11 @@
           </Popover.Content>
         </Popover.Portal>
       </Popover.Root>
+      {@const verdict = colourCheck(readOf(name), palette.tokens)}
+      {#if verdict.off && verdict.nearest}
+        {@const near = verdict.nearest}
+        <button type="button" class="off-theme" data-off-theme title={`Off theme. Nearest: ${near.name} (${near.value}). Click to apply.`} aria-label={`Off theme, apply ${near.name}`} onclick={() => ((p) => (onpreview(r, p.css), onchange(r, p.css, p.token)))(tokenPick(near.name))}></button>
+      {/if}
       <input type="text" class="hex" value={paint} aria-label={`${r.label} hex`} onchange={(e) => onchange(r, e.currentTarget.value)} />
     {:else}
       <span class="none">None</span>
@@ -790,6 +798,17 @@
     padding: 0 6px;
     border-radius: var(--ui-radius-sm);
     background: var(--ui-input);
+  }
+
+  .off-theme {
+    flex: none;
+    width: 6px;
+    height: 6px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--ui-radius-full);
+    background: var(--ui-warning, #d9822b);
+    cursor: pointer;
   }
 
   .swatch {

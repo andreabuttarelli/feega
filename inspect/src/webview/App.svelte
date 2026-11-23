@@ -24,6 +24,7 @@
   import { DEFAULT as DEFAULT_THEME_ENTRY, DEFAULT_THEME, type Theme } from '@feega/live-edit/themes';
   import { activeApply, stillThere, themeBadge, writtenTheme } from './theme-pick';
   import { DEFAULT_BREAKPOINTS, type Breakpoints } from '@feega/live-edit/breakpoints';
+  import type { Scales } from '@feega/live-edit/theme-scales';
   import { FOLLOW, badgeText, reachItems, writeTarget } from './responsive';
   import { badgeOf } from './states';
   import Interactions from './Interactions.svelte';
@@ -91,6 +92,7 @@
   let attachAddress = $state('');
   let styling = $state(Styling.Tailwind);
   let breakpoints = $state<Breakpoints>(DEFAULT_BREAKPOINTS);
+  let scales = $state<Scales | null>(null);
   let themes = $state<Theme[]>([DEFAULT_THEME_ENTRY]);
   let themeName = $state(DEFAULT_THEME);
   const writtenThemeName = $derived(writtenTheme(themeName));
@@ -535,7 +537,7 @@
   }
 
   const handlers: { [K in ToView]: (m: Extract<ViewMessage, { kind: K }>) => void } = {
-    [ToView.App]: (m) => (restore(m.prefs), (route = m.route ?? route), (start = new URL(route, m.url).toString()), (url = m.url), (styling = m.styling), (breakpoints = m.breakpoints), (themes = m.themes), (themeName = stillThere(m.themes.map((t) => t.name), themeName)), showTheme()),
+    [ToView.App]: (m) => (restore(m.prefs), (route = m.route ?? route), (start = new URL(route, m.url).toString()), (url = m.url), (styling = m.styling), (breakpoints = m.breakpoints), (scales = m.scales), (themes = m.themes), (themeName = stillThere(m.themes.map((t) => t.name), themeName)), showTheme()),
     [ToView.History]: (m) => ((changes = m.changes), (canUndo = m.canUndo), (canRedo = m.canRedo)),
     [ToView.Settings]: (m) => {
       settings = m.values;
@@ -1304,7 +1306,7 @@
             <button type="button" class:on={scope === Scope.Class} disabled={!picked.classCount || styling === Styling.Tailwind} onclick={() => (scope = Scope.Class)} title={styling === Styling.Tailwind ? 'Class scope needs CSS rules, not Tailwind' : `Every element with this class: ${picked.classCount}`}>All .{picked.classes.split(' ')[0] || 'class'}{picked.classCount ? ` (${picked.classCount})` : ''}</button>
           </div>
           {#if shared}<SharedBar instances={shared.instances} reason={detachState(picked).reason} ondetach={detach} ondismiss={dismissShared} onmute={muteShared} />{/if}
-          <Properties pick={picked} {breakpoints} {palette} {elementState} {baseline} onstate={chooseState} onpreview={preview} onchange={change} onsavevar={saveVar} onhint={(h) => (hint = h)} onfont={pickFont} onfontreplace={replaceFont} onfontload={loadFont} onnotice={showToast} />
+          <Properties pick={picked} {breakpoints} {scales} {palette} {elementState} {baseline} onstate={chooseState} onpreview={preview} onchange={change} onsavevar={saveVar} onhint={(h) => (hint = h)} onfont={pickFont} onfontreplace={replaceFont} onfontload={loadFont} onnotice={showToast} />
           <Attributes pick={picked} {palette} />
           <PluginSections {plugins} {palette} />
           <Interactions pick={picked} {changes} />

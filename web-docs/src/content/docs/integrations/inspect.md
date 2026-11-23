@@ -59,6 +59,14 @@ Feega Inspect is a small editor extension, separate from the Feega canvas. No ac
    Astro, and refuses, saying why, when the component is imported through a re-export, rendered
    in a loop or a dynamic component, when its usage is not in the file of the nearest parent, or
    when that element holds several usages of it.
+   **Theme snapping.** In a Tailwind project, dragging or typing a padding, margin, gap, width,
+   height, radius or font size snaps to the nearest step of your theme (the Tailwind scale plus
+   `--spacing`, `--radius-*` and `--text-*` from your CSS) when it is within 2px or 8%. Tick marks
+   under the field show the steps while you drag. Hold **Alt** while dragging, or press
+   **Alt+Enter** after typing, to write the exact value. A value that is not on the theme shows a
+   small orange dot; its tooltip names the nearest step and a click applies it. Colour pickers
+   list your project colours first, and a colour that matches none of them gets the same dot,
+   whose click applies the nearest project colour. Projects styled with plain CSS are not snapped.
 8. **Design** (D) selects and edits; **Navigate** (N) uses the app normally. The top bar has
    back/forward/reload, the route, a dev server status dot, and device widths (keys 1–4).
 9. When text uses a font that is not installed on your machine, not loaded by the page and not

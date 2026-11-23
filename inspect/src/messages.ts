@@ -14,6 +14,7 @@ import type { LinkEdit, LinkRead } from '@feega/live-edit/link-edit';
 import type { OffsetSide } from '@feega/live-edit/authored-offsets';
 import type { Breakpoints } from '@feega/live-edit/breakpoints';
 import type { Theme } from '@feega/live-edit/themes';
+import type { Scales } from '@feega/live-edit/theme-scales';
 import type { CloudComment, CommentDraft } from './host/cloud-api';
 import type { Catalog } from '@feega/plugin-api/external';
 import type { Proposal } from '@feega/plugin-api/protocol';
@@ -293,7 +294,7 @@ export type HostMessage =
   | { kind: ToHost.PreviewReady };
 
 export type ViewMessage =
-  | { kind: ToView.App; url: string; styling: Styling; prefs: Prefs | null; route?: string; breakpoints: Breakpoints; themes: Theme[] }
+  | { kind: ToView.App; url: string; styling: Styling; prefs: Prefs | null; route?: string; breakpoints: Breakpoints; themes: Theme[]; scales: Scales | null }
   | { kind: ToView.Server; state: ServerState; reason?: string; info?: ServerInfo }
   | { kind: ToView.Settings; values: Settings; facts: ReportFacts }
   | { kind: ToView.History; changes: ChangeRow[]; canUndo: boolean; canRedo: boolean }
