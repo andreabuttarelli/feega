@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SettingKey } from '../settings';
-import { editorOf, installIdOf, nodeUsageEnabled, usageSession, type Identity, type UsageEvent } from './usage';
+import { automated, editorOf, installIdOf, nodeUsageEnabled, usageSession, type Identity, type UsageEvent } from './usage';
 
 const identity: Identity = { installId: '3f1c9a52-5b0e-4c1d-9a54-0d2f6f1e7a10', version: '0.2.9', editor: 'vscode', os: 'darwin', arch: 'arm64', device: 'desktop' };
 
@@ -167,5 +167,29 @@ describe('nodeUsageEnabled', () => {
 
   it('the setting turns it off', () => {
     expect(nodeUsageEnabled({}, settings(false))).toBe(false);
+  });
+});
+
+describe('automated runs never send usage', () => {
+  const settings = { [SettingKey.Telemetry]: true } as never;
+
+  it.each([
+    ['CI', { CI: 'true' }],
+    ['GITHUB_ACTIONS', { GITHUB_ACTIONS: 'true' }],
+    ['BUILDKITE', { BUILDKITE: 'true' }],
+    ['GITLAB_CI', { GITLAB_CI: 'true' }],
+    ['CIRCLECI', { CIRCLECI: 'true' }],
+    ['JENKINS_URL', { JENKINS_URL: 'https://ci.example.com' }],
+    ['TF_BUILD', { TF_BUILD: 'True' }],
+    ['VITEST', { VITEST: 'true' }],
+    ['NODE_ENV=test', { NODE_ENV: 'test' }],
+    ['Playwright worker', { TEST_WORKER_INDEX: '0' }]
+  ])('%s', (_name, env) => {
+    expect(automated(env)).toBe(true);
+    expect(nodeUsageEnabled(env, settings)).toBe(false);
+  });
+
+  it.each([['CI=false', { CI: 'false' }], ['CI=0', { CI: '0' }], ['CI empty', { CI: '' }], ['nothing', {}]])('%s is not automation', (_name, env) => {
+    expect(automated(env)).toBe(false);
   });
 });
