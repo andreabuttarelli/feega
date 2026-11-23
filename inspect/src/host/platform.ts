@@ -16,7 +16,9 @@ export enum Stored {
   App = 'feegaInspect.app',
   ShareNotice = 'feegaInspect.shareNotice',
   Pids = 'feegaInspect.pids',
-  SkillHint = 'feegaInspect.skillHint'
+  SkillHint = 'feegaInspect.skillHint',
+  SkillHintShown = 'feegaInspect.skillHintShown',
+  SkillInstalledSent = 'feegaInspect.skillInstalledSent'
 }
 
 export type ChosenImage = { name: string; bytes: Uint8Array };

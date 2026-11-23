@@ -13,7 +13,7 @@
   import { untrack } from 'svelte';
   import { MOVES, Shortcut, isMac, needsBareFocus, shortcutOf, typingIn } from './selection-keys';
   import { Click, NONE, Surface, clickOf, contains, extend, keyOf, only, primary, refOf, siblingsOf, toggle, visibleRows, type Selection } from './selection';
-  import { AccountState, Mode, Onboarding, Move, ServerAction, Slot, type ChangeRow, type FontChoice, type LayerNode, type LibraryEntry, type Palette, ServerState, type ServerInfo, Styling, ToHost, ToView, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
+  import { AccountState, Mode, Onboarding, OnboardingOutcome, Move, ServerAction, Slot, type ChangeRow, type FontChoice, type LayerNode, type LibraryEntry, type Palette, ServerState, type ServerInfo, Styling, ToHost, ToView, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
   import { fromHost, inVscode, toHost } from './host';
   import { imageSaved } from './image-file.svelte';
   import { iconDrawn, iconsFound } from './icon-search.svelte';
@@ -255,9 +255,9 @@
   let account = $state<{ state: AccountState; email?: string }>({ state: AccountState.SignedOut });
   let onboarding = $state(Onboarding.Seen);
 
-  function finishOnboarding() {
+  function finishOnboarding(outcome: OnboardingOutcome) {
     onboarding = Onboarding.Seen;
-    toHost({ kind: ToHost.OnboardingDone });
+    toHost({ kind: ToHost.OnboardingDone, outcome });
   }
 
   const history = browseHistory();
@@ -1304,7 +1304,7 @@
 </main>
 
 {#if onboarding === Onboarding.Pending}
-  <OnboardingDialog {account} onaccount={(kind) => toHost({ kind })} ondone={finishOnboarding} />
+  <OnboardingDialog {account} onaccount={(kind) => toHost({ kind })} onstep={(step) => toHost({ kind: ToHost.OnboardingStep, step })} ondone={finishOnboarding} />
 {/if}
 
 <style>

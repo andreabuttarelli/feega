@@ -16,7 +16,7 @@ Each event carries:
 |---|---|
 | Install id | A random UUID, created on first use. Not linked to an account. |
 | Session id | A random UUID per opened panel (or per `npx feega` run). |
-| Event | `install` (the first run on this machine), `opened` (Feega was opened), `session_start`, `preview_ready` (your page loaded in the preview), `first_edit` (your first edit ever), `edit` (a change was written to your source), `sign_in` or `sign_out` (no email or account id is sent), `session_resume` (you came back after 30 minutes away) or `session_end`. |
+| Event | `install` (the first run on this machine), `opened` (Feega was opened), `session_start`, `preview_ready` (your page loaded in the preview), `first_edit` (your first edit ever), `edit` (a change was written to your source), `sign_in` or `sign_out` (no email or account id is sent), `session_resume` (you came back after 30 minutes away) `onboarding_started`, `onboarding_step` (which step), `onboarding_finished`, `onboarding_skipped`, `setup_applied`, `setup_failed`, `skill_hint_shown`, `skill_installed`, `library_insert` (free or pro, never which item), `plugin_installed` or `session_end`. |
 | Edit kind | On `edit`: text, style, image, attribute, structure, template or other. |
 | Context | The detected framework (for example `next` or `sveltekit`) and whether you are signed in to Feega. |
 | Session end | Duration in milliseconds and the number of edits. |

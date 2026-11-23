@@ -45,6 +45,17 @@ describe('pluginsSession', () => {
     expect(lastCatalog().plugins).toMatchObject([{ id: 'me.dev', origin: Origin.Dev }]);
   });
 
+  it('tells the host a plugin was installed, and only then', async () => {
+    const installed: string[] = [];
+    const base = { post: () => undefined, notify: () => undefined, watch: () => () => undefined };
+    const session = pluginsSession({ ...base, host: { root, dev: () => [], approve: async () => true }, fetch: async () => tarball({ 'feega-plugin.json': MANIFEST, 'plugin.js': 'x' }), onInstalled: () => void installed.push('yes') });
+    await session.install('github:acme/hello@v1.0.0');
+    const declined = pluginsSession({ ...base, host: { root, dev: () => [], approve: async () => false }, onInstalled: () => void installed.push('no') });
+    await declined.install('github:acme/other@v1.0.0');
+
+    expect(installed).toEqual(['yes']);
+  });
+
   it('installs after the user approves, then shows the new plugin', async () => {
     const session = setup();
     await session.install('github:acme/hello@v1.0.0');

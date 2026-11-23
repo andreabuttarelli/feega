@@ -49,7 +49,9 @@ const INSTALLED: Rule[] = [
   (fs, { home }) => fs.entries(join(home, PLUGIN_CACHE)).some((marketplace) => marketplace.includes(SKILL_NAME) || fs.entries(join(home, PLUGIN_CACHE, marketplace)).some((plugin) => plugin.includes(SKILL_NAME)))
 ];
 
-export const needsSkillHint = (fs: HintFs, where: Where) => anyAt(fs, where.roots, AGENT_MARKERS) && !INSTALLED.some((rule) => rule(fs, where));
+export const skillInstalled = (fs: HintFs, where: Where) => INSTALLED.some((rule) => rule(fs, where));
+
+export const needsSkillHint = (fs: HintFs, where: Where) => anyAt(fs, where.roots, AGENT_MARKERS) && !skillInstalled(fs, where);
 
 export const nodeHintFs: HintFs = {
   exists: existsSync,
@@ -80,6 +82,11 @@ export function hintDue(platform: Hinting, roots: string[]): boolean {
   }
   return needsSkillHint(host.fs, { roots, home: host.home });
 }
+
+export const installedAfterHint = (platform: Hinting, roots: string[]): boolean => {
+  const host = platform.skillHint;
+  return host !== undefined && platform.stored(Stored.SkillHintShown) === true && platform.stored(Stored.SkillInstalledSent) !== true && skillInstalled(host.fs, { roots, home: host.home });
+};
 
 export async function terminalTip({ platform, roots, interactive }: { platform: Hinting; roots: string[]; interactive: boolean }): Promise<string | null> {
   if (!interactive || platform.skillHint?.surface !== HintSurface.Terminal || !hintDue(platform, roots)) {

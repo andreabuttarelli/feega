@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { OnboardingStep } from '../messages';
 import { SettingKey } from '../settings';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { automated, EditKind, editorOf, fileFirstEdit, installIdOf, installOf, nodeUsageEnabled, usageSession, type Identity, type UsageEvent, type UsageHost } from './usage';
+import { automated, EditKind, editorOf, fileFirstEdit, installIdOf, installOf, UsageKind, nodeUsageEnabled, usageSession, type Identity, type UsageEvent, type UsageHost } from './usage';
 
 const identity: Identity = { installId: '3f1c9a52-5b0e-4c1d-9a54-0d2f6f1e7a10', version: '0.2.9', editor: 'vscode', os: 'darwin', arch: 'arm64', device: 'desktop' };
 
@@ -346,5 +347,19 @@ describe('installOf', () => {
 
     expect(installOf(store, () => 'a0000000-0000-4000-8000-000000000000')).toEqual({ installId: 'a0000000-0000-4000-8000-000000000000', firstRun: true });
     expect(installOf(store, () => 'b0000000-0000-4000-8000-000000000000')).toEqual({ installId: 'a0000000-0000-4000-8000-000000000000', firstRun: false });
+  });
+});
+
+describe('usageSession lifecycle', () => {
+  it('tracks a kind with its step or tier while the session runs', async () => {
+    const t = setup();
+    t.session.track(UsageKind.OnboardingStep, { step: OnboardingStep.SignIn });
+    t.session.begin();
+    t.session.track(UsageKind.OnboardingStep, { step: OnboardingStep.SignIn });
+    t.session.track(UsageKind.LibraryInsert, { tier: 'pro' });
+    await t.session.end();
+
+    expect(t.sent[0].slice(2, 4)).toMatchObject([{ event: 'onboarding_step', step: 'sign_in' }, { event: 'library_insert', tier: 'pro' }]);
+    expect(t.sent[0]).toHaveLength(5);
   });
 });

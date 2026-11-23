@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
+import type { OnboardingStep } from '../messages';
 import { SettingKey, type Settings } from '../settings';
 import { APP_URL } from './sign-in';
 
@@ -24,8 +25,20 @@ export enum UsageKind {
   SessionEnd = 'session_end',
   SignIn = 'sign_in',
   SignOut = 'sign_out',
-  SessionResume = 'session_resume'
+  SessionResume = 'session_resume',
+  OnboardingStarted = 'onboarding_started',
+  OnboardingStep = 'onboarding_step',
+  OnboardingFinished = 'onboarding_finished',
+  OnboardingSkipped = 'onboarding_skipped',
+  SetupApplied = 'setup_applied',
+  SetupFailed = 'setup_failed',
+  SkillHintShown = 'skill_hint_shown',
+  SkillInstalled = 'skill_installed',
+  LibraryInsert = 'library_insert',
+  PluginInstalled = 'plugin_installed'
 }
+
+export type LibraryTier = 'free' | 'pro';
 
 export enum EditKind {
   Text = 'text',
@@ -71,6 +84,8 @@ export type UsageEvent = {
   edit_kind?: EditKind;
   framework?: string;
   signed_in?: boolean;
+  step?: OnboardingStep;
+  tier?: LibraryTier;
 };
 
 export type Send = (events: UsageEvent[]) => Promise<unknown>;
@@ -275,6 +290,12 @@ export function usageSession({ identity: identityOf, enabled, send = httpSend, n
     }
   }
 
+  function track(kind: UsageKind, extra: Pick<UsageEvent, 'step' | 'tier'> = {}) {
+    if (state === 'running' && enabled()) {
+      queue.push(event(kind, extra));
+    }
+  }
+
   const signedIn = () => account(UsageKind.SignIn);
   const signedOut = () => account(UsageKind.SignOut);
 
@@ -307,7 +328,7 @@ export function usageSession({ identity: identityOf, enabled, send = httpSend, n
     }
   }
 
-  return { begin, previewReady, edit, signedIn, signedOut, away, back, end, recheck };
+  return { begin, previewReady, edit, track, signedIn, signedOut, away, back, end, recheck };
 }
 
 export type UsageSession = ReturnType<typeof usageSession>;
