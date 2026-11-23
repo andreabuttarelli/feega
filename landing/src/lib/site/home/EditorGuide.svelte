@@ -76,15 +76,20 @@
   }
 
   .band {
-    padding: 32px 24px;
-    border-radius: 24px;
+    width: 100vw;
+    margin: 0 calc(50% - 50vw) 64px;
+    padding: 200px var(--site-gutter) 72px;
+    box-sizing: border-box;
+    text-align: center;
     background:
-      linear-gradient(90deg, rgb(0 0 0 / 0.72), rgb(0 0 0 / 0.2) 80%),
-      linear-gradient(180deg, rgb(0 0 0 / 0.3), rgb(0 0 0 / 0.5)),
-      url('/img/pixel-band.png') center / cover no-repeat;
-    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08);
+      linear-gradient(180deg, rgb(0 0 0 / 0.1) 0%, rgb(0 0 0 / 0.45) 45%, var(--site-bg) 100%),
+      url('/img/pixel-band.png') center top / cover no-repeat;
     image-rendering: pixelated;
-    text-shadow: 0 1px 8px rgb(0 0 0 / 0.5);
+  }
+
+  .band .lead {
+    max-width: 560px;
+    margin-inline: auto;
   }
 
   .eyebrow {
@@ -179,7 +184,8 @@
     }
 
     .band {
-      padding: 56px 48px;
+      padding: 280px 24px 96px;
+      margin-bottom: 96px;
     }
 
     h2 {
