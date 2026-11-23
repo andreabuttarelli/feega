@@ -29,7 +29,7 @@ export default function Home() {
 `;
 
 const PRICING_SVELTE = `<script>
-  import Button from '$lib/Button.svelte';
+  import Button from '~/lib/Button.svelte';
 </script>
 
 <section>
@@ -113,7 +113,7 @@ describe('detachComponent', () => {
 
     expect(out.ok && out.changes.map((c) => c.path)).toEqual(['src/lib/ButtonPricing.svelte', 'src/routes/pricing/+page.svelte']);
     expect(out.ok && out.changes[1].after).toBe(
-      PRICING_SVELTE.replace("import Button from '$lib/Button.svelte';", "import Button from '$lib/Button.svelte';\n  import ButtonPricing from '$lib/ButtonPricing.svelte';").replace('<Button label="a" />', '<ButtonPricing label="a" />')
+      PRICING_SVELTE.replace("import Button from '~/lib/Button.svelte';", "import Button from '~/lib/Button.svelte';\n  import ButtonPricing from '~/lib/ButtonPricing.svelte';").replace('<Button label="a" />', '<ButtonPricing label="a" />')
     );
   });
 
