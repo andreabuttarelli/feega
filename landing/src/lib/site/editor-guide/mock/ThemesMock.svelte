@@ -1,7 +1,13 @@
 <script lang="ts">
   import Glyph from './Glyph.svelte';
   import { MARK, type Glyph as GlyphName } from '../../editor-mock/glyphs';
+  import { Key, type DemoState } from '../demo/script';
+  import { Target } from '../demo/scripts';
   import './mock.css';
+
+  let { demo }: { demo: DemoState } = $props();
+
+  const light = $derived(demo[Key.Theme] === 'light');
 
   const DEVICES: GlyphName[] = ['full', 'desktop', 'tablet', 'phone'];
 </script>
@@ -13,19 +19,19 @@
     <span class="tool dim"><Glyph name="arrowLeft" size={15} /></span>
     <span class="tool dim"><Glyph name="arrowRight" size={15} /></span>
     <span class="tool"><Glyph name="reload" size={14} /></span>
-    <div class="address"><span class="live"></span><span>/</span></div>
+    <div class="address" data-t={Target.Address}><span class="live"></span><span>/</span></div>
     <div class="devices">
       {#each DEVICES as d, i (d)}<span class="seg" class:on={i === 0}><Glyph name={d} size={16} /></span>{/each}
       <span class="more"><Glyph name="chevronDown" size={12} /></span>
     </div>
     <div class="readout"><span class="num">880</span><span class="by">× 860</span></div>
-    <div class="theme"><Glyph name="sunMoon" size={14} /><span>dark</span><Glyph name="chevronDown" size={12} /></div>
+    <div class="theme" data-t={Target.Theme}><Glyph name="sunMoon" size={14} /><span>{light ? 'light' : 'dark'}</span><Glyph name="chevronDown" size={12} /></div>
     <span class="tool"><Glyph name="external" size={14} /></span>
     <span class="tool on"><Glyph name="panelRight" size={15} /></span>
   </header>
 
   <div class="backdrop">
-    <div class="frame">
+    <div class="frame" class:light>
       <nav class="nav">
         <span class="brand">Northwind</span>
         <span class="links"><span>Features</span><span>Pricing</span><span class="cta">Sign in</span></span>
@@ -183,6 +189,38 @@
     background: #030712;
     color: #ffffff;
     font-family: Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  }
+
+  .frame {
+    transition:
+      background-color 0.5s cubic-bezier(0.87, 0, 0.13, 1),
+      color 0.5s cubic-bezier(0.87, 0, 0.13, 1);
+  }
+
+  .frame.light {
+    background: #ffffff;
+    color: #0b1220;
+  }
+
+  .frame.light h1 {
+    color: #0b1220;
+  }
+
+  .frame.light .nav {
+    border-bottom-color: #e5e7eb;
+  }
+
+  .frame.light .links {
+    color: #475569;
+  }
+
+  .frame.light .cta {
+    background: #2563eb;
+    color: #ffffff;
+  }
+
+  .frame.light .art {
+    background: linear-gradient(135deg, #e0ecff, #bfd7ff);
   }
 
   .nav {

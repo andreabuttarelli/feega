@@ -760,3 +760,79 @@
   color: var(--ui-panel);
   font-size: var(--ui-text-xs);
 }
+
+.gm .dropdown-menu {
+  transition: opacity 0.18s cubic-bezier(0.87, 0, 0.13, 1);
+}
+
+.gm .dropdown-menu.shut {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.gm .shared {
+  transition: opacity 0.3s cubic-bezier(0.87, 0, 0.13, 1);
+}
+
+.gm .shared.shut {
+  opacity: 0;
+}
+
+.gm .off-theme-dot {
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.gm .off-theme-dot.shown {
+  opacity: 1;
+}
+
+.gm .undo-redo {
+  display: flex;
+  gap: 8px;
+  margin-right: 18px;
+  margin-left: auto;
+  color: var(--ui-text-2);
+  font-size: var(--ui-text-xs);
+}
+
+.gm .change {
+  transition: opacity 0.3s cubic-bezier(0.87, 0, 0.13, 1);
+}
+
+.gm .change.gone {
+  opacity: 0;
+}
+
+.gm .diff {
+  display: grid;
+  gap: 2px;
+  margin-top: 6px;
+  padding: 6px 8px;
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-input);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--ui-text-xs);
+  opacity: 0;
+  transition: opacity 0.3s cubic-bezier(0.87, 0, 0.13, 1);
+}
+
+.gm .diff.shown {
+  opacity: 1;
+}
+
+.gm .diff .minus {
+  color: #ff453a;
+}
+
+.gm .diff .plus {
+  color: #30d158;
+}
+
+.gm.library .card {
+  transition: transform 0.4s cubic-bezier(0.87, 0, 0.13, 1);
+}
+
+.gm.library .card.lit .thumb {
+  box-shadow: 0 0 0 2px var(--ui-accent);
+}
