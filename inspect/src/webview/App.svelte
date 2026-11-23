@@ -285,6 +285,7 @@
         showToast('Page reloaded · scroll and selection kept');
       }
       bridged = true;
+      toHost({ kind: ToHost.PreviewReady });
       server = ServerState.Running;
       restarting = false;
       visited(path);

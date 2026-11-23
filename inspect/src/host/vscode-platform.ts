@@ -12,7 +12,7 @@ import { pluginsRoot } from '@feega/plugin-store/registry';
 import { deviceOnboardingStore, globalStateOnboardingStore } from './onboarding';
 import type { Platform } from './platform';
 import { HintSurface, nodeHintFs } from './skill-hint';
-import { Device, editorOf, globalStateInstallStore, installIdOf, type UsageHost } from './usage';
+import { Device, editorOf, globalStateFirstEdit, globalStateInstallStore, installIdOf, type UsageHost } from './usage';
 
 const BEFORE_SCHEME = 'feega-before';
 
@@ -54,7 +54,8 @@ export const vsCodeUsage = (context: vscode.ExtensionContext): UsageHost => ({
     arch: process.arch,
     device: vscode.env.uiKind === vscode.UIKind.Web ? Device.Web : Device.Desktop
   }),
-  enabled: () => vscode.env.isTelemetryEnabled && config().get(SettingKey.Telemetry, true) === true
+  enabled: () => vscode.env.isTelemetryEnabled && config().get(SettingKey.Telemetry, true) === true,
+  firstEdit: globalStateFirstEdit(context.globalState)
 });
 
 export function vsCodePlatform(host: VsCodeHost, panel: PanelLike, befores: Map<string, string>): Platform {

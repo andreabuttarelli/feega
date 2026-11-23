@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { SettingKey, type Settings } from '../settings';
@@ -15,9 +15,25 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export enum UsageKind {
   SessionStart = 'session_start',
+  PreviewReady = 'preview_ready',
+  FirstEdit = 'first_edit',
   Edit = 'edit',
   SessionEnd = 'session_end'
 }
+
+export enum EditKind {
+  Text = 'text',
+  Style = 'style',
+  Image = 'image',
+  Attribute = 'attribute',
+  Structure = 'structure',
+  Template = 'template',
+  Other = 'other'
+}
+
+export type UsageFacts = { framework: string | null; signedIn: boolean };
+
+export type FirstEditFlag = { seen: () => boolean; mark: () => unknown };
 
 export enum Editor {
   VsCode = 'vscode',
@@ -46,6 +62,9 @@ export type UsageEvent = {
   device: Device;
   edit_count?: number;
   duration_ms?: number;
+  edit_kind?: EditKind;
+  framework?: string;
+  signed_in?: boolean;
 };
 
 export type Send = (events: UsageEvent[]) => Promise<unknown>;
@@ -57,6 +76,8 @@ export type UsageHost = {
   now?: () => number;
   every?: (ms: number, run: () => void) => () => void;
   newId?: () => string;
+  facts?: () => UsageFacts;
+  firstEdit?: FirstEditFlag;
 };
 
 export type InstallStore = { get: () => string | undefined; set: (id: string) => PromiseLike<unknown> | unknown };
@@ -77,6 +98,22 @@ export const fileInstallStore = (path: string = join(homedir(), INSTALL_FILE)): 
   set: (id) => {
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, JSON.stringify({ id }));
+  }
+});
+
+const FIRST_EDIT_FILE = join('.config', 'feega', 'first-edit');
+const FIRST_EDIT_KEY = 'feegaInspect.firstEdit';
+
+export const globalStateFirstEdit = (state: { get: (key: string) => unknown; update: (key: string, value: unknown) => PromiseLike<unknown> }): FirstEditFlag => ({
+  seen: () => state.get(FIRST_EDIT_KEY) === true,
+  mark: () => state.update(FIRST_EDIT_KEY, true)
+});
+
+export const fileFirstEdit = (path: string = join(homedir(), FIRST_EDIT_FILE)): FirstEditFlag => ({
+  seen: () => existsSync(path),
+  mark: () => {
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, '');
   }
 });
 
@@ -113,7 +150,7 @@ export const editorOf = (appName: string): Editor => EDITORS_BY_APP_NAME.find(([
 
 export const nodeUsageEnabled = (env: NodeJS.ProcessEnv, settings: Settings): boolean => env.FEEGA_TELEMETRY !== '0' && env.DO_NOT_TRACK !== '1' && settings[SettingKey.Telemetry] !== false;
 
-export function usageSession({ identity: identityOf, enabled, send = httpSend, now = Date.now, every = intervalEvery, newId = randomUUID }: UsageHost) {
+export function usageSession({ identity: identityOf, enabled, send = httpSend, now = Date.now, every = intervalEvery, newId = randomUUID, facts, firstEdit }: UsageHost) {
   const sessionId = newId();
   let identity: Identity | null = null;
   let queue: UsageEvent[] = [];
@@ -121,6 +158,15 @@ export function usageSession({ identity: identityOf, enabled, send = httpSend, n
   let startedAt = 0;
   let stopTimer: (() => void) | null = null;
   let state: 'idle' | 'running' | 'ended' = 'idle';
+  let previewSent = false;
+
+  const withFacts = (e: UsageEvent): UsageEvent => {
+    const known = facts?.();
+    if (!known) {
+      return e;
+    }
+    return { ...e, ...(known.framework ? { framework: known.framework } : {}), signed_in: known.signedIn };
+  };
 
   const event = (kind: UsageKind, extra: Partial<UsageEvent> = {}): UsageEvent => {
     identity ??= identityOf();
@@ -145,7 +191,7 @@ export function usageSession({ identity: identityOf, enabled, send = httpSend, n
     if (queue.length === 0) {
       return;
     }
-    const batch = queue;
+    const batch = queue.map(withFacts);
     queue = [];
     try {
       await send(batch);
@@ -166,14 +212,29 @@ export function usageSession({ identity: identityOf, enabled, send = httpSend, n
     stopTimer = every(FLUSH_INTERVAL_MS, () => void flush());
   }
 
-  function edit() {
+  function previewReady() {
+    if (state !== 'running' || previewSent) {
+      return;
+    }
+    previewSent = true;
+    if (enabled()) {
+      queue.push(event(UsageKind.PreviewReady));
+    }
+  }
+
+  function edit(kind: EditKind = EditKind.Other) {
     if (state !== 'running') {
       return;
     }
     edits++;
-    if (enabled()) {
-      queue.push(event(UsageKind.Edit));
+    if (!enabled()) {
+      return;
     }
+    if (firstEdit && !firstEdit.seen()) {
+      firstEdit.mark();
+      queue.push(event(UsageKind.FirstEdit));
+    }
+    queue.push(event(UsageKind.Edit, { edit_kind: kind }));
   }
 
   async function end() {
@@ -194,7 +255,7 @@ export function usageSession({ identity: identityOf, enabled, send = httpSend, n
     }
   }
 
-  return { begin, edit, end, recheck };
+  return { begin, previewReady, edit, end, recheck };
 }
 
 export type UsageSession = ReturnType<typeof usageSession>;

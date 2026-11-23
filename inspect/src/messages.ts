@@ -181,7 +181,8 @@ export enum ToHost {
   Plugin = 'plugin',
   PluginEnable = 'plugin-enable',
   PluginRemove = 'plugin-remove',
-  PluginInstall = 'plugin-install'
+  PluginInstall = 'plugin-install',
+  PreviewReady = 'preview-ready'
 }
 
 export type ChangeRow = { id: number; at: string; prop: string; value: string; scope: string; files: string[]; time: number };
@@ -286,7 +287,8 @@ export type HostMessage =
   | { kind: ToHost.Plugin; id: number; ask: PluginAsk }
   | { kind: ToHost.PluginEnable; id: string; enabled: boolean }
   | { kind: ToHost.PluginRemove; id: string }
-  | { kind: ToHost.PluginInstall; source: string };
+  | { kind: ToHost.PluginInstall; source: string }
+  | { kind: ToHost.PreviewReady };
 
 export type ViewMessage =
   | { kind: ToView.App; url: string; styling: Styling; prefs: Prefs | null; route?: string; breakpoints: Breakpoints; themes: Theme[] }

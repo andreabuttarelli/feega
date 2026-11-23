@@ -55,8 +55,10 @@ No account needed. Your code never leaves your machine.
 Feega sends anonymous usage counts so we know how many people use it and how. Each event carries:
 
 - a random install id and a random session id (no account, no user id)
-- the event: `session_start`, `edit` (a change was written to your source), `session_end`
+- the event: `session_start`, `preview_ready` (your page loaded in the preview), `first_edit` (your first edit ever), `edit` (a change was written to your source), `session_end`
+- on `edit`: the kind of change (text, style, image, attribute, structure, template or other)
 - on `session_end`: the session duration and the number of edits
+- the detected framework (for example `next` or `sveltekit`) and whether you are signed in to Feega
 - Feega version, editor (VS Code, Cursor, Windsurf, VSCodium or `npx`), operating system, CPU architecture, and device kind (desktop, web, command line)
 
 The server adds country, region and city from the request, and does not store the IP address.

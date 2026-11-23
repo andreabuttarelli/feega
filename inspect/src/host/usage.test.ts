@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { SettingKey } from '../settings';
-import { editorOf, installIdOf, nodeUsageEnabled, usageSession, type Identity, type UsageEvent } from './usage';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { EditKind, editorOf, fileFirstEdit, installIdOf, nodeUsageEnabled, usageSession, type Identity, type UsageEvent, type UsageHost } from './usage';
 
 const identity: Identity = { installId: '3f1c9a52-5b0e-4c1d-9a54-0d2f6f1e7a10', version: '0.2.9', editor: 'vscode', os: 'darwin', arch: 'arm64', device: 'desktop' };
 
-function setup(enabled = () => true) {
+function setup(enabled = () => true, extra: Partial<UsageHost> = {}) {
   const sent: UsageEvent[][] = [];
   let clock = 1_000;
   let tick: (() => void) | null = null;
@@ -15,7 +18,8 @@ function setup(enabled = () => true) {
       send: async (events) => void sent.push(events),
       now: () => clock,
       every: (_ms, run) => ((tick = run), () => (tick = null)),
-      newId: () => '7d9e1c40-2b6a-4f43-8a2e-5c1b9d0e4f77'
+      newId: () => '7d9e1c40-2b6a-4f43-8a2e-5c1b9d0e4f77',
+      ...extra
     }
   );
   return { session, sent, advance: (ms: number) => (clock += ms), tick: () => tick?.(), ticking: () => tick !== null };
@@ -117,6 +121,93 @@ describe('usageSession', () => {
     rejecting.begin();
     await expect(throwing.end()).resolves.toBeUndefined();
     await expect(rejecting.end()).resolves.toBeUndefined();
+  });
+});
+
+const firstEditFlag = () => {
+  let seen = false;
+  return { seen: () => seen, mark: () => void (seen = true) };
+};
+
+describe('usageSession funnel', () => {
+  it('sends preview_ready once per session', async () => {
+    const t = setup();
+    t.session.begin();
+    t.session.previewReady();
+    t.session.previewReady();
+    await t.session.end();
+
+    expect(t.sent[0].map((e) => e.event)).toEqual(['session_start', 'preview_ready', 'session_end']);
+  });
+
+  it('sends first_edit once per install, before the edit', async () => {
+    const firstEdit = firstEditFlag();
+    const t = setup(() => true, { firstEdit });
+    t.session.begin();
+    t.session.edit();
+    t.session.edit();
+    await t.session.end();
+
+    expect(t.sent[0].map((e) => e.event)).toEqual(['session_start', 'first_edit', 'edit', 'edit', 'session_end']);
+
+    const next = setup(() => true, { firstEdit });
+    next.session.begin();
+    next.session.edit();
+    await next.session.end();
+
+    expect(next.sent[0].map((e) => e.event)).toEqual(['session_start', 'edit', 'session_end']);
+  });
+
+  it('edit events carry the edit kind', async () => {
+    const t = setup();
+    t.session.begin();
+    t.session.edit(EditKind.Style);
+    t.session.edit();
+    await t.session.end();
+
+    expect(t.sent[0].filter((e) => e.event === 'edit').map((e) => e.edit_kind)).toEqual(['style', 'other']);
+  });
+
+  it('every event carries framework and signed_in as known at send time', async () => {
+    let facts = { framework: null as string | null, signedIn: false };
+    const t = setup(() => true, { facts: () => facts });
+    t.session.begin();
+    facts = { framework: 'next', signedIn: true };
+    t.session.edit(EditKind.Text);
+    await t.session.end();
+
+    expect(t.sent[0].every((e) => e.framework === 'next' && e.signed_in === true)).toBe(true);
+  });
+
+  it('omits framework while it is unknown', async () => {
+    const t = setup(() => true, { facts: () => ({ framework: null, signedIn: false }) });
+    t.session.begin();
+    await t.session.end();
+
+    expect(t.sent[0][0]).not.toHaveProperty('framework');
+    expect(t.sent[0][0]).toMatchObject({ signed_in: false });
+  });
+
+  it('sends no funnel event while telemetry is off', async () => {
+    const t = setup(() => false, { firstEdit: firstEditFlag() });
+    t.session.begin();
+    t.session.previewReady();
+    t.session.edit();
+    await t.session.end();
+
+    expect(t.sent).toEqual([]);
+  });
+});
+
+describe('fileFirstEdit', () => {
+  it('is unseen until marked, then stays seen', () => {
+    const path = join(mkdtempSync(join(tmpdir(), 'feega-first-')), 'nested', 'first-edit');
+    const flag = fileFirstEdit(path);
+
+    expect(flag.seen()).toBe(false);
+    flag.mark();
+
+    expect(fileFirstEdit(path).seen()).toBe(true);
   });
 });
 

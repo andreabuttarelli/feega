@@ -16,7 +16,9 @@ Each event carries:
 |---|---|
 | Install id | A random UUID, created on first use. Not linked to an account. |
 | Session id | A random UUID per opened panel (or per `npx feega` run). |
-| Event | `session_start`, `edit` (a change was written to your source) or `session_end`. |
+| Event | `session_start`, `preview_ready` (your page loaded in the preview), `first_edit` (your first edit ever), `edit` (a change was written to your source) or `session_end`. |
+| Edit kind | On `edit`: text, style, image, attribute, structure, template or other. |
+| Context | The detected framework (for example `next` or `sveltekit`) and whether you are signed in to Feega. |
 | Session end | Duration in milliseconds and the number of edits. |
 | Environment | Feega version, editor (VS Code, Cursor, Windsurf, VSCodium or `npx`), operating system, CPU architecture, device kind (desktop, web, command line). |
 
