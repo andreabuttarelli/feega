@@ -14,6 +14,7 @@ const CASES: { name: string; files: string[]; matrix: unknown[]; unit: boolean; 
 	{ name: 'solo test: solo unit', files: ['inspect/src/host/ready.test.ts'], matrix: [], unit: true, relay: false },
 	{ name: 'webview: unit e react-css su ubuntu', files: ['inspect/src/webview/Properties.svelte'], matrix: ubuntuOnly(['react-css']), unit: true, relay: false },
 	{ name: 'properties-panel come webview', files: ['packages/properties-panel/src/a.ts'], matrix: ubuntuOnly(['react-css']), unit: true, relay: false },
+	{ name: 'impact e2e: solo react-css', files: ['npx/test/impact.e2e.mjs'], matrix: ubuntuOnly(['react-css']), unit: true, relay: false },
 	{ name: 'library come webview', files: ['packages/library/items/x.json'], matrix: ubuntuOnly(['react-css']), unit: true, relay: false },
 	{ name: 'astro: solo astro-css su ubuntu', files: ['inspect/launcher/astro.mjs'], matrix: ubuntuOnly(['astro-css']), unit: true, relay: false },
 	{ name: 'nuxt layer: solo nuxt-css', files: ['inspect/launcher/nuxt-layer/nuxt.config.ts'], matrix: ubuntuOnly(['nuxt-css']), unit: true, relay: false },

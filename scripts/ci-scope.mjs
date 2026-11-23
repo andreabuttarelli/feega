@@ -47,7 +47,7 @@ const RULES = [
 	[/^inspect\/test\/fixtures\/[^/]+$/, NOTHING],
 	[/^npx\/test\/(editor|editing)\.e2e\.mjs$/, only(EDITOR_FIXTURES)],
 	[/^npx\/test\/frameworks\.e2e\.mjs$/, only(FRAMEWORK_FIXTURES)],
-	[/^npx\/test\/attach\.e2e\.mjs$/, only(REPRESENTATIVE)],
+	[/^npx\/test\/(attach|impact)\.e2e\.mjs$/, only(REPRESENTATIVE)],
 	[/^(inspect\/src\/webview\/|packages\/(properties-panel|library|plugin-[^/]+)\/)/, only(REPRESENTATIVE)],
 	[/^(relay\/|packages\/share-protocol\/)/, { fixtures: [], fullOs: false, unit: true, relay: true }],
 	[/^(inspect|npx|packages\/(source-map|live-edit))\//, CORE],
