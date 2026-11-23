@@ -55,6 +55,29 @@ describe('usageIndex in Vue', () => {
   });
 });
 
+describe('usageIndex through barrels', () => {
+  it('un export star conta solo chi importa quel componente', async () => {
+    expect(await filesOf('barrels', 'src/ui/Button.tsx')).toEqual(['src/A.tsx', 'src/D.tsx', 'src/E.tsx']);
+    expect(await filesOf('barrels', 'src/ui/Link.tsx')).toEqual(['src/B.tsx', 'src/D.tsx', 'src/F.tsx']);
+  });
+
+  it('un barrel con import ed export separati porta al componente', async () => {
+    expect(await filesOf('barrels', 'src/ui/Badge.tsx')).toEqual(['src/C.tsx']);
+  });
+
+  it('un export con nome diverso porta chi usa il nuovo nome', async () => {
+    expect(await filesOf('barrels', 'src/ui/Chip.tsx')).toEqual(['src/D.tsx', 'src/G.tsx']);
+  });
+
+  it('il nome del pacchetto e un alias del suo indice', async () => {
+    expect(await filesOf('barrels', 'src/ui/Button.tsx')).toContain('src/E.tsx');
+  });
+
+  it('un alias esatto dei tsconfig paths porta al barrel', async () => {
+    expect(await filesOf('barrels', 'src/ui/Link.tsx')).toContain('src/F.tsx');
+  });
+});
+
 describe('cache', () => {
   it('rilegge il progetto dopo invalidate', async () => {
     const index = usageIndex(join(FIXTURES, 'react'));
