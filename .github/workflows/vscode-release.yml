@@ -10,6 +10,8 @@ permissions:
   actions: write
 
 env:
+  FEEGA_TELEMETRY: '0'
+  DO_NOT_TRACK: '1'
   TAGGED: ${{ startsWith(github.ref, 'refs/tags/vscode-v') || startsWith(github.ref, 'refs/tags/release-v') }}
 
 jobs:

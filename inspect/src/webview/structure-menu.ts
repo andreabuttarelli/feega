@@ -1,10 +1,12 @@
 import { AddKind, AddPlace } from '@feega/live-edit/add-node';
 import { StructureOp } from '@feega/live-edit/structure';
 import { WrapTag } from '@feega/live-edit/wrap-node';
+import type { DetachState } from './detach';
 
-export type MenuItem = { id: string; label: string; shortcut?: string; items?: MenuItem[]; single?: boolean; still?: boolean };
+export type MenuItem = { id: string; label: string; shortcut?: string; items?: MenuItem[]; single?: boolean; still?: boolean; disabled?: string; detach?: boolean };
 
 export const COPY_FOR_AGENT = 'copy-for-agent';
+export const DETACH_ID = 'detach';
 export const ADD_CHILD_PREFIX = 'add-child:';
 export const WRAP_PREFIX = 'wrap:';
 
@@ -12,10 +14,11 @@ export enum Command {
   Copy = 'copy',
   Structure = 'structure',
   Add = 'add',
-  Wrap = 'wrap'
+  Wrap = 'wrap',
+  Detach = 'detach'
 }
 
-export type Picked = { command: Command.Copy } | { command: Command.Structure; op: StructureOp } | { command: Command.Add; kind: AddKind; place: AddPlace } | { command: Command.Wrap; tag: WrapTag };
+export type Picked = { command: Command.Copy } | { command: Command.Structure; op: StructureOp } | { command: Command.Add; kind: AddKind; place: AddPlace } | { command: Command.Wrap; tag: WrapTag } | { command: Command.Detach };
 
 export const ADD_ITEMS: MenuItem[] = [
   { id: AddKind.Text, label: 'Text' },
@@ -45,16 +48,21 @@ export const MENU_ITEMS: MenuItem[] = [
   { id: 'add-child', label: 'Add as child', items: prefixed(ADD_CHILD_PREFIX, ADD_ITEMS), single: true },
   { id: 'wrap-with', label: 'Wrap with', items: prefixed(WRAP_PREFIX, WRAP_ITEMS) },
   { id: StructureOp.Unwrap, label: 'Unwrap', shortcut: '⇧⌘G' },
+  { id: DETACH_ID, label: 'Detach instance', single: true, detach: true },
   { id: StructureOp.Delete, label: 'Delete', shortcut: '⌫' }
 ];
 
 export const LIBRARY_ID = 'library';
 export const LIBRARY_ITEM: MenuItem = { id: LIBRARY_ID, label: 'Library', still: true };
-export const menuFor = (selected: number): MenuItem[] => MENU_ITEMS.filter((item) => !item.single || selected === 1);
+export const menuFor = (selected: number, detach: DetachState = { show: false }): MenuItem[] =>
+  MENU_ITEMS.filter((item) => (!item.single || selected === 1) && (!item.detach || detach.show)).map((item) => (item.detach ? { ...item, disabled: detach.reason } : item));
 
 export const ADD_LOOP_ITEM: MenuItem = { id: StructureOp.AddItem, label: 'Add item' };
 
 export function pickedOf(id: string): Picked {
+  if (id === DETACH_ID) {
+    return { command: Command.Detach };
+  }
   if (id === COPY_FOR_AGENT) {
     return { command: Command.Copy };
   }

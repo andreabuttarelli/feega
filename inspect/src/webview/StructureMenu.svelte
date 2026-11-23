@@ -37,6 +37,9 @@
   }
 
   function pick(item: MenuItem, row: HTMLElement) {
+    if (item.disabled) {
+      return;
+    }
     if (item.items) {
       void openAndFocus(item, row);
       return;
@@ -99,7 +102,7 @@
 
 <div class="menu" role="menu" tabindex="-1" data-testid={`${label}-menu`} bind:this={root} bind:offsetWidth={width} bind:offsetHeight={height} style={`left:${spot.x}px;top:${spot.y}px`} onpointerdown={(e) => e.stopPropagation()}>
   {#each items as item (item.id)}
-    <button type="button" role="menuitem" data-op={item.id} aria-haspopup={item.items ? 'menu' : undefined} aria-expanded={item.items ? sub?.item.id === item.id : undefined} draggable={draggable && !item.still} onclick={(e) => pick(item, e.currentTarget)} onpointerenter={(e) => hover(item, e.currentTarget)} ondragstart={(e) => drag(e, item)} ondragend={onclose}>
+    <button type="button" role="menuitem" data-op={item.id} aria-disabled={item.disabled ? true : undefined} title={item.disabled} class:disabled={Boolean(item.disabled)} aria-haspopup={item.items ? 'menu' : undefined} aria-expanded={item.items ? sub?.item.id === item.id : undefined} draggable={draggable && !item.still} onclick={(e) => pick(item, e.currentTarget)} onpointerenter={(e) => hover(item, e.currentTarget)} ondragstart={(e) => drag(e, item)} ondragend={onclose}>
       <span>{item.label}</span>
       {#if item.items}<ChevronRight size={12} />{:else if item.shortcut}<kbd>{item.shortcut}</kbd>{/if}
     </button>
@@ -151,6 +154,11 @@
   button:focus-visible,
   button[aria-expanded='true'] {
     background: var(--ui-input-hover);
+  }
+
+  button.disabled {
+    color: var(--ui-text-3);
+    cursor: not-allowed;
   }
 
   kbd {

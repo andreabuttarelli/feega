@@ -549,6 +549,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.SourceControl]: () => platform.sourceControl(),
     [ToHost.Move]: (m) => edits.move(m.from, m.to, m.place).then((out) => edited(out, null)),
     [ToHost.StructureMany]: (m) => edits.structureMany(m).then((out) => edited(out, null)),
+    [ToHost.Detach]: (m) => edits.detach(m).then((out) => edited(out, null)),
     [ToHost.AddImage]: (m) => imageAdded(m.at, m.place),
     [ToHost.Structure]: (m) => edits.structure(m).then((out) => edited(out, null)),
     [ToHost.Setting]: (m) => platform.setSetting(m.key, m.value).then(postSettings),

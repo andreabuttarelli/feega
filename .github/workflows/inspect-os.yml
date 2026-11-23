@@ -47,6 +47,10 @@ concurrency:
   group: inspect-os-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  FEEGA_TELEMETRY: '0'
+  DO_NOT_TRACK: '1'
+
 jobs:
   scope:
     name: what to run
