@@ -4,7 +4,8 @@ export enum SettingKey {
   DevCommand = 'feegaInspect.devCommand',
   DefaultSize = 'feegaInspect.defaultSize',
   KeepServerAlive = 'feegaInspect.keepServerAlive',
-  SyncSelection = 'feegaInspect.syncSelection'
+  SyncSelection = 'feegaInspect.syncSelection',
+  SharedWarning = 'feegaInspect.sharedWarning'
 }
 
 export enum StylingChoice {
@@ -65,6 +66,12 @@ export const SETTINGS: SettingRow[] = [
     key: SettingKey.SyncSelection,
     label: 'Show the selection in the editor',
     hint: 'Selecting an element reveals its source beside Feega with the line selected, so coding agents that read the editor selection see it.',
+    fallback: true
+  },
+  {
+    key: SettingKey.SharedWarning,
+    label: 'Warn when an edit reaches several instances',
+    hint: 'A bar in Properties tells you when the element belongs to a component used more than once, and offers to detach this instance.',
     fallback: true
   }
 ];

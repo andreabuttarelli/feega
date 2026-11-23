@@ -72,7 +72,7 @@ describe('the one menu table', () => {
 
 describe('menuFor', () => {
   it('keeps the whole menu for one element', () => {
-    expect(menuFor(1)).toEqual(MENU_ITEMS);
+    expect(menuFor(1)).toEqual(MENU_ITEMS.filter((item) => !item.detach));
   });
 
   it('drops what only makes sense for one element when several are selected', () => {
