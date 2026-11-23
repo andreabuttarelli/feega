@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.16
+
+A Library item you insert is selected right away, ready to edit. The breakpoint trigger is styled like the other dropdowns.
+
 ## 0.2.15
 
 An impact label in Properties says before you edit whether an edit stays on the element, changes a shared component (and in how many files) or has an unknown impact, with a diff to Apply first for the unknown ones.
