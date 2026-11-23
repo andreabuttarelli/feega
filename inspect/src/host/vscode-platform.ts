@@ -55,7 +55,7 @@ export const vsCodeUsage = (context: vscode.ExtensionContext): UsageHost => ({
     device: vscode.env.uiKind === vscode.UIKind.Web ? Device.Web : Device.Desktop
   }),
   enabled: () =>
-    context.extensionMode !== vscode.ExtensionMode.Test && !automated(process.env) && !optedOut(process.env) && vscode.env.isTelemetryEnabled && config().get(SettingKey.Telemetry, true) === true
+    !automated(process.env) && !optedOut(process.env) && context.extensionMode !== vscode.ExtensionMode.Test && vscode.env.isTelemetryEnabled && config().get(SettingKey.Telemetry, true) === true
 });
 
 export function vsCodePlatform(host: VsCodeHost, panel: PanelLike, befores: Map<string, string>): Platform {
