@@ -3,7 +3,7 @@
   import { MIXED, type Shared } from '@feega/properties-panel/mixed';
   import { heldValue, liveNumber, type Held } from './scrub';
   import type { Step } from '@feega/live-edit/theme-scales';
-  import { Snap, check, snap, ticksAround } from './snap';
+  import { Origin, Snap, check, settled, snap, ticksAround } from './snap';
   import { typedCommit } from './typed-commit';
   import { Unit, convert, cssOf, isKeyword, keywordOf, parseLength, stepOf, type UnitContext } from './units';
 
@@ -37,7 +37,6 @@
   let draft = $state<number | null>(null);
   let held = $state<Held | null>(null);
   let locked = $state<Step | null>(null);
-  let exact = false;
 
   const chosen = $derived(picked ?? keywordOf(css, units) ?? Unit.Px);
   $effect(() => {
@@ -92,13 +91,13 @@
         return;
       }
       picked = parsed.unit;
-      const atPx = parsed.unit === Unit.Px && steps ? snap(parsed.value, steps, modeOf(exact)).px : parsed.value;
+      const atPx = parsed.unit === Unit.Px && steps ? settled(parsed.value, steps, Origin.Typed, Snap.On) : parsed.value;
       onchange(cssOf({ ...parsed, value: clamp(atPx) }));
       return;
     }
     const n = parseFloat(raw);
     if (Number.isFinite(n)) {
-      emit(steps ? snap(n, steps, modeOf(exact)).px : n);
+      emit(steps ? settled(n, steps, Origin.Typed, Snap.On) : n);
     }
   }
 
@@ -114,9 +113,7 @@
   function onKey(e: KeyboardEvent) {
     const input = e.currentTarget as HTMLInputElement;
     if (e.key === 'Enter') {
-      exact = e.altKey;
       typed.commit(input.value);
-      exact = false;
       input.blur();
       return;
     }

@@ -11,6 +11,11 @@ export enum Snap {
   Off = 'off'
 }
 
+export enum Origin {
+  Drag = 'drag',
+  Typed = 'typed'
+}
+
 export const SNAP_PX = 2;
 export const SNAP_RATIO = 0.08;
 const ON_STEP_PX = 0.5;
@@ -45,6 +50,10 @@ export function snap(px: number, steps: Step[], mode: Snap): { px: number; step:
   const found = mode === Snap.On ? nearest(px, steps) : null;
   return found && Math.abs(found.px - px) <= reach(px) ? { px: found.px, step: found } : { px, step: null };
 }
+
+const SNAPS_FROM: Record<Origin, boolean> = { [Origin.Drag]: true, [Origin.Typed]: false };
+
+export const settled = (px: number, steps: Step[], origin: Origin, mode: Snap): number => (SNAPS_FROM[origin] ? snap(px, steps, mode).px : px);
 
 export function check(px: number, steps: Step[]): { on: boolean; nearest: Step | null } {
   const found = nearest(px, steps);

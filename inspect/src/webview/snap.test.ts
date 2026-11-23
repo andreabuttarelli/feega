@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Scales } from '@feega/live-edit/theme-scales';
-import { Snap, SNAPPABLE, ScaleKind, check, scaleFor, snap, ticksAround } from './snap';
+import { Origin, Snap, SNAPPABLE, ScaleKind, check, scaleFor, settled, snap, ticksAround } from './snap';
 
 const SCALES: Scales = {
   spacing: [0, 4, 8, 12, 16, 24, 32, 64].map((px) => ({ px, name: String(px / 4) })),
@@ -100,5 +100,21 @@ describe('ticksAround', () => {
 
   it('is empty without steps in the window', () => {
     expect(ticksAround(40, SCALES.spacing, 4)).toEqual([]);
+  });
+});
+
+describe('settled', () => {
+  const steps = [{ px: 60, name: '6xl' }];
+
+  it('writes a typed value exactly, even next to a step', () => {
+    expect(settled(64, steps, Origin.Typed, Snap.On)).toBe(64);
+  });
+
+  it('snaps a dragged value to a step', () => {
+    expect(settled(64, steps, Origin.Drag, Snap.On)).toBe(60);
+  });
+
+  it('keeps a dragged value exact when snapping is off', () => {
+    expect(settled(64, steps, Origin.Drag, Snap.Off)).toBe(64);
   });
 });
