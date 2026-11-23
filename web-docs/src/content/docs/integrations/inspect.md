@@ -47,6 +47,18 @@ Feega Inspect is a small editor extension, separate from the Feega canvas. No ac
    a state is chosen every edit is written to it: a `hover:` class with Tailwind, a `.name:hover`
    rule next to the base rule in CSS, CSS modules and Svelte/Vue scoped styles; `×` removes only
    that state's value. States set by JavaScript, `:has()` and CSS nesting are not forced.
+
+   **Shared components.** When the element belongs to a component used more than once and the
+   scope is **This element ×N**, a bar in Properties says "Edits N instances". **Dismiss** hides
+   it for that component until you reopen the panel; **Don't show again** turns it off
+   (`feegaInspect.sharedWarning`). **Detach** (also **Detach instance** in the right-click menu of
+   the preview and the Layers tree) copies the component file next to the original, named after
+   the page or route that uses it (`Button.tsx` becomes `ButtonPricing.tsx`), renames the
+   component inside the copy and points only that usage, its import and its tag, at the copy. It
+   is one undo step and shows in the diff. It works on React (`.tsx`, `.jsx`), Svelte, Vue and
+   Astro, and refuses, saying why, when the component is imported through a re-export, rendered
+   in a loop or a dynamic component, when its usage is not in the file of the nearest parent, or
+   when that element holds several usages of it.
 8. **Design** (D) selects and edits; **Navigate** (N) uses the app normally. The top bar has
    back/forward/reload, the route, a dev server status dot, and device widths (keys 1–4).
 9. When text uses a font that is not installed on your machine, not loaded by the page and not

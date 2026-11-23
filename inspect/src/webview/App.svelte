@@ -55,6 +55,8 @@
   import { Place } from '@feega/live-edit/move-node';
   import { StructureOp } from '@feega/live-edit/structure';
   import StructureMenu from './StructureMenu.svelte';
+  import SharedBar from './SharedBar.svelte';
+  import { detachState, sharedWarning } from './detach';
   import LibraryPanel from './LibraryPanel.svelte';
   import { LIBRARY_DRAG_TYPE } from './library';
   import { agentContexts, commentContext } from './agent-context';
@@ -966,6 +968,26 @@
     }
   }
 
+  function detach() {
+    if (picked?.component) {
+      toHost({ kind: ToHost.Detach, at: sourceText(picked.source), usage: sourceText(picked.component) });
+    }
+  }
+
+  let sharedDismissed = $state(new Set<string>());
+
+  const shared = $derived(sharedWarning({ pick: picked, scope, dismissed: sharedDismissed, enabled: settings?.[SettingKey.SharedWarning] !== false }));
+
+  function dismissShared() {
+    if (shared) {
+      sharedDismissed = new Set([...sharedDismissed, shared.component]);
+    }
+  }
+
+  function muteShared() {
+    toHost({ kind: ToHost.Setting, key: SettingKey.SharedWarning, value: false });
+  }
+
   function pickMenu(id: string) {
     if (runPluginItem(id, picked?.source ?? null)) {
       return;
@@ -975,7 +997,8 @@
       [Command.Copy]: copyForAgent,
       [Command.Structure]: () => chosen.command === Command.Structure && restructure(chosen.op),
       [Command.Add]: () => chosen.command === Command.Add && addElement(chosen.kind, chosen.place),
-      [Command.Wrap]: () => chosen.command === Command.Wrap && wrapWith(chosen.tag)
+      [Command.Wrap]: () => chosen.command === Command.Wrap && wrapWith(chosen.tag),
+      [Command.Detach]: detach
     };
     run[chosen.command]();
   }
@@ -1202,7 +1225,7 @@
           <button type="button" class="link" data-action={ServerAction.RestartUnderFeega} onclick={() => toHost({ kind: ToHost.Server, action: ServerAction.RestartUnderFeega })}>Let Feega start the server</button>
         </div>
       {/if}
-      {#if menu}<StructureMenu x={menu.x} y={menu.y} items={contextMenuItems(menuFor(selection.refs.length), plugins.contextMenu, menu.where)} onpick={pickMenu} onclose={() => (menu = null)} />{/if}
+      {#if menu}<StructureMenu x={menu.x} y={menu.y} items={contextMenuItems(menuFor(selection.refs.length, detachState(picked)), plugins.contextMenu, menu.where)} onpick={pickMenu} onclose={() => (menu = null)} />{/if}
       {#if addMenu}<StructureMenu x={addMenu.x} y={addMenu.y} items={addMenuItems(picked && picked.instances > 1 ? [...ADD_ITEMS, ADD_LOOP_ITEM, LIBRARY_ITEM] : [...ADD_ITEMS, LIBRARY_ITEM], plugins.addMenu)} label="add" draggable={true} onpick={pickAdd} onclose={() => (addMenu = null)} />{/if}
       {#if skillHint}
         <div class="notice skillhint" data-testid="skill-hint">
@@ -1279,6 +1302,7 @@
             <button type="button" class:on={scope === Scope.Element} onclick={() => (scope = Scope.Element)} title="Only this element (every instance of its component: {picked.instances})">This element{picked.instances > 1 ? ` ×${picked.instances}` : ''}</button>
             <button type="button" class:on={scope === Scope.Class} disabled={!picked.classCount || styling === Styling.Tailwind} onclick={() => (scope = Scope.Class)} title={styling === Styling.Tailwind ? 'Class scope needs CSS rules, not Tailwind' : `Every element with this class: ${picked.classCount}`}>All .{picked.classes.split(' ')[0] || 'class'}{picked.classCount ? ` (${picked.classCount})` : ''}</button>
           </div>
+          {#if shared}<SharedBar instances={shared.instances} reason={detachState(picked).reason} ondetach={detach} ondismiss={dismissShared} onmute={muteShared} />{/if}
           <Properties pick={picked} {breakpoints} {palette} {elementState} {baseline} onstate={chooseState} onpreview={preview} onchange={change} onsavevar={saveVar} onhint={(h) => (hint = h)} onfont={pickFont} onfontreplace={replaceFont} onfontload={loadFont} onnotice={showToast} />
           <Attributes pick={picked} {palette} />
           <PluginSections {plugins} {palette} />
