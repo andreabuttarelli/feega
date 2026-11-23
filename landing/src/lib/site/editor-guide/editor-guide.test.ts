@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { render } from 'svelte/server';
 import { describe, expect, it } from 'vitest';
 import EditorGuide from '../home/EditorGuide.svelte';
-import { GUIDE_FEATURES, GuideId } from '.';
+import { GUIDE_FEATURES, GuideId, GuideLayout } from '.';
 import { MOCKS } from './mock/registry';
 
 const STATIC_DIR = resolve(import.meta.dirname, '../../../../static');
@@ -55,6 +55,12 @@ describe('editor guide', () => {
     it('draws one hidden pixel icon above each heading', () => {
       expect(body.match(/<span class="icon[^"]*"><svg class="pixel"[^>]*shape-rendering="crispEdges" aria-hidden="true"/g)).toHaveLength(GUIDE_FEATURES.length);
       expect(new Set(GUIDE_FEATURES.map((f) => f.icon)).size).toBe(GUIDE_FEATURES.length);
+    });
+
+    it('lays out the last three features in a grid after three rows', () => {
+      expect(GUIDE_FEATURES.map((f) => f.layout)).toEqual([...Array(3).fill(GuideLayout.Row), ...Array(3).fill(GuideLayout.Grid)]);
+      expect(body.match(/<ul class="features grid[ "]/g)).toHaveLength(1);
+      expect(body.match(/<li class="feature[^"]* cell[ "]/g)).toHaveLength(3);
     });
 
     it('keeps six features', () => {
