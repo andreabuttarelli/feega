@@ -65,7 +65,7 @@
   import { LIBRARY_DRAG_TYPE } from './library';
   import { agentContexts, commentContext } from './agent-context';
   import CommentsList from './CommentsList.svelte';
-  import type { CloudComment, CommentDraft } from '../host/cloud-api';
+  import type { CloudComment, CloudRevisions, CommentDraft } from '../host/cloud-api';
   import { pinIdOf, pinSlot, pinsOf, sourceOfComment, threadsOf } from './comments';
   import { AddKind, AddPlace } from '@feega/live-edit/add-node';
   import { WrapTag } from '@feega/live-edit/wrap-node';
@@ -185,7 +185,7 @@
 
   let tab = $state<string>(Tab.Properties);
   let share = $state<Extract<ViewMessage, { kind: ToView.Share }> | null>(null);
-  let cloud = $state<{ enabled: boolean; comments: CloudComment[]; error: string }>({ enabled: false, comments: [], error: '' });
+  let cloud = $state<{ enabled: boolean; comments: CloudComment[]; review: CloudRevisions; error: string }>({ enabled: false, comments: [], review: { status: 'open', revisions: [] }, error: '' });
   let composing = $state(false);
   let pinRects = $state<Record<string, Pick['rect'] | null>>({});
   let lostSlots = $state<Record<string, boolean>>({});
@@ -601,7 +601,7 @@
     [ToView.Account]: (m) => (account = { state: m.state, email: m.email }),
     [ToView.Share]: (m) => (share = m),
     [ToView.Library]: (m) => (libraryItems = m.items),
-    [ToView.Comments]: (m) => (cloud = { enabled: m.enabled, comments: m.comments, error: m.error ?? '' }),
+    [ToView.Comments]: (m) => (cloud = { enabled: m.enabled, comments: m.comments, review: m.review ?? cloud.review, error: m.error ?? '' }),
     [ToView.Onboarding]: (m) => (onboarding = m.state),
     [ToView.Support]: (m) => (support = m.done),
     [ToView.Agents]: (m) => (agents = m.found),
@@ -1377,7 +1377,7 @@
         </Tabs.Content>
       {/each}
       <Tabs.Content value={Tab.Comments}>
-        <CommentsList {cloud} {picked} {composing} onsubmit={(draft) => (draft.parentId ? toHost({ kind: ToHost.CommentAdd, draft }) : sendComment(draft))} oncancel={() => (composing = false)} onresolve={(id) => toHost({ kind: ToHost.CommentResolve, id })} onselect={select} oncopy={copyComment} />
+        <CommentsList {cloud} {picked} {composing} onsubmit={(draft) => (draft.parentId ? toHost({ kind: ToHost.CommentAdd, draft }) : sendComment(draft))} oncancel={() => (composing = false)} onresolve={(id) => toHost({ kind: ToHost.CommentResolve, id })} onselect={select} oncopy={copyComment} onpublish={(summary) => toHost({ kind: ToHost.RevisionPublish, summary })} />
       </Tabs.Content>
     </Tabs.Root>
   </aside>

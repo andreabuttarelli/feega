@@ -16,7 +16,7 @@ import type { OffsetSide } from '@feega/live-edit/authored-offsets';
 import type { Breakpoints } from '@feega/live-edit/breakpoints';
 import type { Theme } from '@feega/live-edit/themes';
 import type { Scales } from '@feega/live-edit/theme-scales';
-import type { CloudComment, CommentDraft } from './host/cloud-api';
+import type { CloudComment, CloudRevisions, CommentDraft } from './host/cloud-api';
 import type { DiffFile } from './host/diff-preview';
 import type { Catalog } from '@feega/plugin-api/external';
 import type { Proposal } from '@feega/plugin-api/protocol';
@@ -198,6 +198,7 @@ export enum ToHost {
   Comments = 'comments',
   CommentAdd = 'comment-add',
   CommentResolve = 'comment-resolve',
+  RevisionPublish = 'revision-publish',
   ShareStart = 'share-start',
   ShareStop = 'share-stop',
   ShareKick = 'share-kick',
@@ -335,6 +336,7 @@ export type HostMessage =
   | { kind: ToHost.Comments }
   | { kind: ToHost.CommentAdd; draft: CommentDraft }
   | { kind: ToHost.CommentResolve; id: string }
+  | { kind: ToHost.RevisionPublish; summary: string }
   | { kind: ToHost.ShareStart; name: string; canEdit: boolean }
   | { kind: ToHost.ShareStop }
   | { kind: ToHost.ShareKick; userId: string }
@@ -365,7 +367,7 @@ export type ViewMessage =
   | { kind: ToView.SkillHint; command: string }
   | { kind: ToView.ImageSaved; url: string }
   | { kind: ToView.Wiring; at: string; instance?: number; wiring: Wiring }
-  | { kind: ToView.Comments; enabled: boolean; comments: CloudComment[]; error?: string }
+  | { kind: ToView.Comments; enabled: boolean; comments: CloudComment[]; review?: CloudRevisions; error?: string }
   | { kind: ToView.Share; state: ShareState; available: boolean; name: string; canEdit: boolean; url?: string; expiresAt?: string; visitors: Present[]; notice: boolean; error?: string }
   | { kind: ToView.Library; items: LibraryEntry[] }
   | { kind: ToView.Plugin; id: number; result: PluginResult }

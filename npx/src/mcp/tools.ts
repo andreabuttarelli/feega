@@ -91,6 +91,26 @@ export function cloudTools({ api, share, editors, cwd }: CloudDeps): Record<stri
       input: { sessionId: z.string().optional(), openOnly: z.boolean().default(true).describe('Only unresolved comments') },
       run: async ({ sessionId, openOnly = true }: { sessionId?: string; openOnly?: boolean }) => ({ comments: (await listed(sessionId, openOnly)).map(commentView) })
     },
+    feega_review: {
+      description: 'Read the review of a shared session: whether the latest round is open, approved or has changes requested, who decided and why, and the comments still unresolved. Act on the feedback, then resolve the comments.',
+      input: { sessionId: z.string().optional().describe('Id returned by feega_share; defaults to the session shared here') },
+      run: async ({ sessionId }: { sessionId?: string }) => {
+        const [id] = await candidates(sessionId);
+        if (!id) {
+          throw new Error('No shared session to review. Share one with feega_share.');
+        }
+        const review = await api.review(id);
+        review.openComments.forEach((c) => sessionOf.set(c.id, c.sessionId));
+        return {
+          sessionId: id,
+          status: review.status,
+          round: review.revision?.number ?? null,
+          summary: review.revision?.summary ?? null,
+          verdicts: (review.revision?.verdicts ?? []).map((v) => ({ reviewer: v.reviewerName, verdict: v.verdict, note: v.note })),
+          unresolved: review.openComments.map(commentView)
+        };
+      }
+    },
     feega_resolve: {
       description: 'Mark a comment resolved, with an optional note saying what was changed.',
       input: { commentId: z.string(), note: z.string().optional() },

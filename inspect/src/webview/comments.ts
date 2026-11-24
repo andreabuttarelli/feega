@@ -1,4 +1,4 @@
-import type { CloudComment, CommentDraft } from '../host/cloud-api';
+import type { CloudComment, CloudRevisions, CommentDraft, ReviewStatus } from '../host/cloud-api';
 import type { Pick, Source } from '../messages';
 import { selectorOf } from './agent-context';
 
@@ -51,4 +51,19 @@ export function draftOf(pick: Pick | null, text: string, replyTo?: CloudComment)
     return null;
   }
   return { body, selector: selectorOf(pick), sourceFile: pick.source.file, sourceLine: pick.source.line, sourceCol: pick.source.col };
+}
+
+const STATUS_TEXT: Record<ReviewStatus, string> = { open: 'Awaiting review', changes_requested: 'Changes requested', approved: 'Approved' };
+
+export function reviewLine(review: CloudRevisions): string {
+  const latest = review.revisions.at(-1);
+  if (!latest) {
+    return 'No round published yet';
+  }
+
+  return `Round ${latest.number}: ${STATUS_TEXT[review.status]}`;
+}
+
+export function verdictLines(review: CloudRevisions): string[] {
+  return (review.revisions.at(-1)?.verdicts ?? []).map((v) => `${v.reviewerName}: ${STATUS_TEXT[v.verdict]}${v.note ? ` - ${v.note}` : ''}`);
 }

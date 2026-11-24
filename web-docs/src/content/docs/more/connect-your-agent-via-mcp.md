@@ -54,4 +54,12 @@ Feega listens on `127.0.0.1` only. Each editor writes its port and a random toke
 
 ## Cloud tools
 
-`feega_share`, `feega_snapshot`, `feega_comments`, `feega_resolve` and `feega_stop` share the running editor as a live link and read the comments left on it. They need a Feega Cloud plan. Signed out, they say to run `npx feega` and sign in, or to set `FEEGA_API_KEY`. Without a plan, they point to the billing page.
+`feega_share`, `feega_snapshot`, `feega_comments`, `feega_review`, `feega_resolve` and `feega_stop` share the running editor as a live link, read the comments left on it and read the review. They need a Feega Cloud plan. Signed out, they say to run `npx feega` and sign in, or to set `FEEGA_API_KEY`. Without a plan, they point to the billing page.
+
+## Review rounds
+
+A shared session is reviewed in rounds. In the Comments tab, write what changed and choose Publish new round: the round records the edits listed in the Changes tab. Each round starts awaiting review.
+
+Reviewers open the session link after it ends. For each round they choose Approve or Request changes, with an optional note. The status of the session follows its latest round: changes requested if any reviewer asked for changes, approved if at least one approved and none asked, awaiting review otherwise. The host cannot decide on their own round.
+
+The Comments tab shows the status of the latest round and who decided. `feega_review` gives your agent the same: the status, the round, each verdict with its note and the comments still unresolved, so it can act on the feedback and then call `feega_resolve`. Review rounds need a Feega Cloud plan.
