@@ -46,6 +46,9 @@ import { dependenciesOf, offerInstall } from './install-offer';
 import { HintSurface, SKILL_COMMAND, hintDue, installedAfterHint } from './skill-hint';
 import { install } from './dev-server';
 import { SUPPORT_ITEMS } from '../support';
+import { aiChat } from './ai/ai-chat';
+import { openAcpAgent } from './ai/acp-session';
+import { machineEnv } from './agents';
 
 const START_WITH_FEEGA = 'Start with Feega';
 const PICK_TIMEOUT_MS = 3000;
@@ -89,6 +92,20 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   const editsAt = (dir: string) => fileEdits(dir, stylingChoice, platform.stored<Snapshot>(Stored.History));
   let edits = editsAt(root);
   const queue = editQueue();
+  const ai = aiChat({
+    root: () => root,
+    env: platform.ai?.env ?? (() => machineEnv()),
+    open: platform.ai?.open ?? openAcpAgent,
+    confirm: (question, yes) => platform.confirm(question, yes),
+    post: (message) => platform.send(message),
+    write: async (path, content, agent) => {
+      const out = await edits.agentWrite(path, content, agent);
+      if (!out.ok) {
+        throw new Error(out.reason);
+      }
+      await postHistory();
+    }
+  });
   const authors = new Map<number, string>();
   const approvals = new Map<string, Author>();
   let author: Author | undefined;
@@ -670,7 +687,12 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.PluginRemove]: (m) => pluginList?.remove(m.id),
     [ToHost.PluginInstall]: (m) => pluginList?.install(m.source),
     [ToHost.PreviewReady]: () => usage?.previewReady(),
-    [ToHost.Cursor]: (m) => sharing.hostPointed(m.at)
+    [ToHost.Cursor]: (m) => sharing.hostPointed(m.at),
+    [ToHost.AiList]: ai.list,
+    [ToHost.AiStart]: (m) => ai.start(m.agent),
+    [ToHost.AiSend]: (m) => void ai.send(m.text, m.context),
+    [ToHost.AiCancel]: ai.cancel,
+    [ToHost.AiAnswer]: (m) => ai.answer(m.id, m.optionId)
   };
 
   const askKey = (ask: EditAsk) => JSON.stringify(ask);
@@ -731,6 +753,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     addPlugin: installPlugin,
     stop: async () => {
       close();
+      ai.close();
       usages.dispose();
       pluginList?.stop();
       await sharing.stop();
