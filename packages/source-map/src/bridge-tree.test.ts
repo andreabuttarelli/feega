@@ -110,6 +110,49 @@ describe('a tree asked before the app rendered', () => {
   });
 });
 
+describe('a tree asked before the page changed in place', () => {
+  const askTree = (win: JSDOM['window']) => {
+    const replies: { type: string; tree?: unknown }[] = [];
+    const parent = { postMessage: (data: { type: string }) => replies.push(data) };
+    win.dispatchEvent(new win.MessageEvent('message', { data: { type: 'feega:tree' }, source: parent as unknown as Window }));
+    return () => JSON.stringify(replies.filter((r) => r.type === 'feega:tree:result').at(-1)!.tree);
+  };
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 400));
+
+  it('is sent again when a class renames a node', async () => {
+    const win = new JSDOM('<body><main data-feega-src="src/App.jsx:3:5" class="old"></main></body>').window;
+    installBridge(win as unknown as Window);
+    const latest = askTree(win);
+
+    win.document.querySelector('main')!.className = 'fresh';
+    await settle();
+
+    expect(latest()).toContain('main.fresh');
+  });
+
+  it('is sent again when the source position of a node moves', async () => {
+    const win = new JSDOM('<body><main data-feega-src="src/App.jsx:3:5"></main></body>').window;
+    installBridge(win as unknown as Window);
+    const latest = askTree(win);
+
+    win.document.querySelector('main')!.setAttribute('data-feega-src', 'src/App.jsx:9:5');
+    await settle();
+
+    expect(latest()).toContain('"line":9');
+  });
+
+  it('is sent again when an inline style changes the display', async () => {
+    const win = new JSDOM('<body><main data-feega-src="src/App.jsx:3:5"></main></body>').window;
+    installBridge(win as unknown as Window);
+    const latest = askTree(win);
+
+    win.document.querySelector('main')!.style.display = 'flex';
+    await settle();
+
+    expect(latest()).toContain('"display":"flex"');
+  });
+});
+
 describe('layers tree position', () => {
   it('carries the computed position of every node', () => {
     const win = new JSDOM(`<body><main data-feega-src="a.svelte:1:1"><div style="position:absolute" data-feega-src="a.svelte:2:3">a</div><div style="position:sticky" data-feega-src="a.svelte:3:3">b</div><div data-feega-src="a.svelte:4:3">c</div></main></body>`).window;
