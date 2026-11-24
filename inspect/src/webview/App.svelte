@@ -680,6 +680,7 @@
     [ToView.AiAgents]: aiHeard,
     [ToView.AiState]: aiHeard,
     [ToView.AiEvent]: aiHeard,
+    [ToView.AiPolicy]: aiHeard,
     [ToView.SkillHint]: (m) => (skillHint = m.command),
     [ToView.IconResults]: (m) => iconsFound({ id: m.id, library: m.library, hits: m.hits, error: m.error ?? '' }),
     [ToView.IconPreview]: (m) => iconDrawn(m.name, m.svg),

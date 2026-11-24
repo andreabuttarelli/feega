@@ -1,6 +1,7 @@
 import type { SupportItem } from './support';
 import type { AcpAgent, AcpId } from './host/ai/acp-agents';
 import type { AgentEvent } from './host/ai/agent-session';
+import type { Policy } from './host/ai/permission-policy';
 import type { LiveEditAsk } from '@feega/live-edit/live-ask';
 import type { Place } from '@feega/live-edit/move-node';
 import type { AddKind, AddPlace } from '@feega/live-edit/add-node';
@@ -220,6 +221,8 @@ export enum ToHost {
   AiSend = 'ai-send',
   AiCancel = 'ai-cancel',
   AiAnswer = 'ai-answer',
+  AiMode = 'ai-mode',
+  AiPolicy = 'ai-policy',
   Usage = 'usage'
 }
 
@@ -273,7 +276,8 @@ export enum ToView {
   Peers = 'peers',
   AiAgents = 'ai-agents',
   AiState = 'ai-state',
-  AiEvent = 'ai-event'
+  AiEvent = 'ai-event',
+  AiPolicy = 'ai-policy'
 }
 
 export enum ShareState {
@@ -386,7 +390,9 @@ export type HostMessage =
   | { kind: ToHost.AiSend; text: string; context: string | null }
   | { kind: ToHost.AiCancel }
   | { kind: ToHost.Usage; event: WebviewUsage; dims?: WebviewUsageDims }
-  | { kind: ToHost.AiAnswer; id: string; optionId: string | null };
+  | { kind: ToHost.AiAnswer; id: string; optionId: string | null }
+  | { kind: ToHost.AiMode; id: string }
+  | { kind: ToHost.AiPolicy; policy: Policy };
 
 export type Authored = HostMessage & { by?: Author };
 
@@ -419,7 +425,8 @@ export type ViewMessage =
   | { kind: ToView.Peers; peers: Present[] }
   | { kind: ToView.AiAgents; agents: AcpAgent[] }
   | { kind: ToView.AiState; state: AiState; agent?: AcpId }
-  | { kind: ToView.AiEvent; event: AgentEvent };
+  | { kind: ToView.AiEvent; event: AgentEvent }
+  | { kind: ToView.AiPolicy; policy: Policy };
 
 export const INSPECT = 'feega:inspect';
 export const INSPECT_RESULT = 'feega:inspect:result';

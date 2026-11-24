@@ -4,6 +4,7 @@ import { inside } from '@feega/live-edit/live-ask';
 import { AiState, ToView, type ViewMessage } from '../../messages';
 import type { AgentEnv } from '../agents';
 import { AcpId, acpAgents, launchOf } from './acp-agents';
+import { isPolicy, type Policy } from './permission-policy';
 import { AgentEventKind, type AgentEvent, type AgentFiles, type AgentSession, type OpenAgent } from './agent-session';
 
 const OUTSIDE = 'is outside the workspace';
@@ -17,6 +18,7 @@ export type AiChatDeps = {
   confirm: (question: string, yes: string) => Promise<boolean>;
   post: (message: ViewMessage) => unknown;
   write: (path: string, content: string, agent: string) => Promise<void>;
+  policy: { get: () => Policy; set: (policy: Policy) => void };
 };
 
 const adapterPackage = (id: AcpId): string => launchOf(id).args.find((arg) => arg.startsWith('@')) ?? launchOf(id).command;
@@ -84,7 +86,7 @@ export function aiChat(deps: AiChatDeps) {
     closed();
     state(AiState.Starting);
     try {
-      const session = await deps.open(launchOf(id), { cwd: deps.root(), files: files(() => agent.label), emit: heard });
+      const session = await deps.open(launchOf(id), { cwd: deps.root(), files: files(() => agent.label), policy: deps.policy.get, emit: heard });
       current = { id, label: agent.label, session };
       state(AiState.Ready);
     } catch (error) {
@@ -103,7 +105,17 @@ export function aiChat(deps: AiChatDeps) {
   }
 
   return {
-    list: () => post({ kind: ToView.AiAgents, agents: acpAgents(deps.env()) }),
+    list: () => {
+      post({ kind: ToView.AiPolicy, policy: deps.policy.get() });
+      post({ kind: ToView.AiAgents, agents: acpAgents(deps.env()) });
+    },
+    setPolicy: (policy: Policy) => {
+      if (isPolicy(policy)) {
+        deps.policy.set(policy);
+        post({ kind: ToView.AiPolicy, policy });
+      }
+    },
+    setMode: async (id: string) => void (await current?.session.setMode(id)),
     start,
     send,
     cancel: async () => void (await current?.session.cancel()),

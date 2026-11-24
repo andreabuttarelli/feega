@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { AgentEventKind, type AgentEvent, type AgentSession } from './agent-session';
 import { openAcpAgent } from './acp-session';
+import { Policy } from './permission-policy';
 
 const FAKE = fileURLToPath(new URL('./fake-acp-agent.mjs', import.meta.url));
 const WAIT_MS = 5000;
@@ -19,7 +20,7 @@ const eventually = async (check: () => boolean) => {
   }
 };
 
-const open = async () => {
+const open = async (policy = Policy.Ask) => {
   const dir = mkdtempSync(join(tmpdir(), 'acp-'));
   const events: AgentEvent[] = [];
   const written: Record<string, string> = {};
@@ -27,6 +28,7 @@ const open = async () => {
     { command: process.execPath, args: [FAKE] },
     {
       cwd: dir,
+      policy: () => policy,
       emit: (event) => events.push(event),
       files: {
         read: async (path) => readFileSync(path, 'utf8'),
@@ -118,5 +120,43 @@ describe('the ACP session', () => {
     await session.send('plan');
 
     expect(events.find((e) => e.kind === AgentEventKind.Plan)).toEqual({ kind: AgentEventKind.Plan, entries: [{ content: 'step one', status: 'in_progress' }] });
+  });
+
+  it('reports the modes the agent advertises', async () => {
+    const { events, session } = await open();
+    sessions.push(session);
+
+    const modes = events.find((e) => e.kind === AgentEventKind.Modes);
+
+    expect(modes).toMatchObject({ current: 'default', available: [{ id: 'default', name: 'Default' }, { id: 'acceptEdits' }, { id: 'plan', description: 'Plan without editing' }] });
+  });
+
+  it('switches the agent mode and reports it', async () => {
+    const { events, session } = await open();
+    sessions.push(session);
+
+    await session.setMode('plan');
+    await eventually(() => events.filter((e) => e.kind === AgentEventKind.Modes).length > 1);
+
+    expect(events.filter((e) => e.kind === AgentEventKind.Modes).at(-1)).toMatchObject({ current: 'plan' });
+  });
+
+  it('answers a write itself when the policy allows edits', async () => {
+    const { dir, events, written, session } = await open(Policy.Edits);
+    sessions.push(session);
+    const target = join(dir, 'a.txt');
+
+    await session.send(`write ${target}`);
+
+    expect(events.some((e) => e.kind === AgentEventKind.Permission)).toBe(false);
+    expect(written[target]).toBe('written by the agent\n');
+  });
+
+  it('still asks for a write when the policy is Ask every time', async () => {
+    const { dir, events, session } = await open(Policy.Ask);
+    sessions.push(session);
+
+    void session.send(`write ${join(dir, 'a.txt')}`);
+    await eventually(() => events.some((e) => e.kind === AgentEventKind.Permission));
   });
 });

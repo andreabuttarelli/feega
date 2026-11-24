@@ -114,6 +114,16 @@
           ],
           "description": "Minutes the dev server Feega started stays warm after the panel closes. 0: stop on close. Closing the window always stops it."
         },
+        "feegaInspect.aiPermissions": {
+          "type": "string",
+          "default": "ask",
+          "enum": [
+            "ask",
+            "edits",
+            "all"
+          ],
+          "description": "Default for the AI tab: Ask every time, Allow edits and ask for commands, or Allow all. Each project remembers its own choice."
+        },
         "feegaInspect.cloud.enabled": {
           "type": "boolean",
           "default": false,
