@@ -72,16 +72,16 @@ export function deepestAt(doc, x, y) {
   return at;
 }
 
-export function inspectElement(element, { maxHtml = DEFAULT_MAX_HTML } = {}) {
+export function inspectElement(element, { maxHtml = DEFAULT_MAX_HTML, twin = null } = {}) {
   const tagged = element.closest(`[${SOURCE_ATTR}]`);
   if (!tagged) {
     return pageTargetOf(element) ? inspectPage(element, maxHtml) : null;
   }
   const svg = untaggedSvg(element, tagged);
   if (svg) {
-    return { ...inspectTagged(tagged, maxHtml), inner: 'svg', styles: designStyles(svg), html: truncate(svg.outerHTML, maxHtml), rect: rectOf(svg), name: 'icon', ownText: false, inlineText: false, elements: 0, text: null };
+    return { ...inspectTagged(tagged, maxHtml, twin), inner: 'svg', styles: designStyles(svg), html: truncate(svg.outerHTML, maxHtml), rect: rectOf(svg), name: 'icon', ownText: false, inlineText: false, elements: 0, text: null };
   }
-  return inspectTagged(tagged, maxHtml);
+  return inspectTagged(tagged, maxHtml, twin);
 }
 
 export const PAGE_SOURCE = '(page):0:0';
@@ -126,9 +126,9 @@ function inspectPage(body, maxHtml) {
 
 const instancesOf = (tagged) => [...tagged.ownerDocument.querySelectorAll(`[${SOURCE_ATTR}="${tagged.getAttribute(SOURCE_ATTR)}"]`)];
 
-function inspectTagged(tagged, maxHtml) {
-
+function inspectTagged(tagged, maxHtml, twin) {
   const source = parseSource(tagged.getAttribute(SOURCE_ATTR));
+  const onPage = twin?.(tagged) ?? tagged;
   const styles = designStyles(tagged);
   return {
     source,
@@ -140,9 +140,9 @@ function inspectTagged(tagged, maxHtml) {
     classes: tagged.getAttribute('class') ?? '',
     text: tagged.children.length ? null : tagged.textContent,
     name: nameOf(tagged),
-    instances: instancesOf(tagged).length,
+    instances: instancesOf(onPage).length,
     instanceIndex: instancesOf(tagged).indexOf(tagged),
-    usage: usageOf(tagged, source.file),
+    usage: usageOf(onPage, source.file),
     classCount: tagged.classList?.[0] ? tagged.ownerDocument.getElementsByClassName(tagged.classList[0]).length : 0,
     parentWidth: tagged.parentElement?.getBoundingClientRect().width ?? 0,
     ancestors: ancestorsOf(tagged),
@@ -314,7 +314,14 @@ export function settlePreview(doc, source, state) {
 
 const MAX_ANCESTORS = 12;
 
+export const GHOST_ATTR = 'data-feega-ghost';
+
+const isGhost = (element) => element?.hasAttribute(GHOST_ATTR) ?? false;
 const taggedParent = (element) => element.parentElement?.closest(`[${SOURCE_ATTR}]`) ?? null;
+const shownParent = (element) => {
+  const parent = taggedParent(element);
+  return isGhost(parent) ? null : parent;
+};
 const fileOf = (element) => parseSource(element.getAttribute(SOURCE_ATTR))?.file ?? '';
 const componentName = (file) => file.split('/').pop().replace(/\.[^.]+$/, '');
 
@@ -336,7 +343,7 @@ const pageAncestor = (tag) => ({ source: parseSource(PAGE_SOURCES[tag]), name: t
 
 function ancestorsOf(element) {
   const chain = [];
-  for (let node = taggedParent(element); node && chain.length < MAX_ANCESTORS; node = taggedParent(node)) {
+  for (let node = shownParent(element); node && chain.length < MAX_ANCESTORS; node = shownParent(node)) {
     chain.unshift({ source: parseSource(node.getAttribute(SOURCE_ATTR)), name: nameOf(node) });
   }
   const inHead = element.ownerDocument.head?.contains(element);
@@ -354,7 +361,7 @@ function pageParent(element) {
 }
 
 const MOVES = {
-  parent: (element) => taggedParent(element) ?? pageParent(element),
+  parent: (element) => shownParent(element) ?? pageParent(element),
   child: (element) => taggedChildren(element)[0] ?? null,
   next: (element) => sibling(element, 1),
   previous: (element) => sibling(element, -1)
@@ -424,7 +431,7 @@ function pageNode(element, source, children) {
 }
 
 export function treeOf(doc) {
-  const roots = [...doc.querySelectorAll(`[${SOURCE_ATTR}]`)].filter((e) => !taggedParent(e));
+  const roots = [...doc.querySelectorAll(`[${SOURCE_ATTR}]`)].filter((e) => !isGhost(e) && !shownParent(e));
   const budget = { left: MAX_TREE_NODES, instances: instanceIndexes(doc) };
   const inHead = (e) => Boolean(doc.head?.contains(e));
   const head = foldedOf(roots.filter(inHead), 1, budget);

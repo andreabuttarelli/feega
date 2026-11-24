@@ -419,6 +419,12 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     return out.ok ? writtenAll(out.changes, '') : out;
   }
 
+  async function agentWritten(path: string, content: string, agent: string): Promise<Written> {
+    meta = { at: path, prop: 'agent', value: agent, scope: '' };
+    const before = (await reader(root)(path)) ?? '';
+    return writtenAll([{ path, before, after: content }], '');
+  }
+
   const skippedNote = (total: number, skipped: Skipped[]): string | undefined => {
     const reasons = [...new Set(skipped.map((s) => s.reason))].join('; ');
     return skipped.length ? `${total - skipped.length} of ${total} changed · skipped: ${reasons}` : undefined;
@@ -466,6 +472,7 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
 
   return {
     proposal: (proposal: Proposal, appDir: string) => inTurn(() => proposed(proposal, appDir)),
+    agentWrite: (path: string, content: string, agent: string) => inTurn(() => agentWritten(path, content, agent)),
     saveVariable: (ask: EditAsk, name: string) => inTurn(() => variableSaved(ask, name)),
     structure: (ask: StructureAsk) => inTurn(() => restructured(ask)),
     detach: (ask: DetachAsk) => inTurn(() => detached(ask.at, ask.usage, ask.which)),

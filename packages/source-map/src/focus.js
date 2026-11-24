@@ -1,4 +1,4 @@
-import { SOURCE_ATTR } from './runtime.js';
+import { GHOST_ATTR, SOURCE_ATTR } from './runtime.js';
 import { reactMountOf } from './framework-meta.js';
 import { FocusMode, MOUNT_STATUS, Status } from './mount-protocol.js';
 
@@ -21,7 +21,7 @@ export const CANVAS_CSS = `html{min-height:100%;background-color:${CHECKER_LIGHT
 const fileOf = (attr) => attr.slice(0, attr.lastIndexOf(':', attr.lastIndexOf(':') - 1));
 const taggedParent = (element) => element.parentElement?.closest(`[${SOURCE_ATTR}]`) ?? null;
 const bySource = (doc, source) => [...doc.querySelectorAll(`[${SOURCE_ATTR}=${JSON.stringify(source)}]`)];
-const attrsOf = (element) => Object.fromEntries([...element.attributes].map(({ name, value }) => [name, value]));
+const attrsOf = (element) => Object.fromEntries([...element.attributes].filter(({ name }) => name !== SOURCE_ATTR).map(({ name, value }) => [name, value]));
 const attrText = (attrs) => Object.entries(attrs).map(([name, value]) => ` ${name}="${value.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}"`).join('');
 
 function componentRoot(element) {
@@ -33,9 +33,9 @@ function componentRoot(element) {
   return root;
 }
 
-function rootsOf(doc, source) {
-  const [element] = bySource(doc, source);
-  return element ? bySource(doc, componentRoot(element).getAttribute(SOURCE_ATTR)) : [];
+function rootOf(doc, source, index = 0) {
+  const element = bySource(doc, source)[index];
+  return element ? componentRoot(element) : null;
 }
 
 function ruleText(sheet) {
@@ -61,9 +61,9 @@ function headOf(doc) {
   return sheets.join('') + (adopted ? `<style>${adopted}</style>` : '');
 }
 
-function ghostTree(doc, roots) {
+function ghostTree(doc, root) {
   const holder = doc.createElement('div');
-  const kept = new Set(roots.map(taggedParent));
+  const kept = taggedParent(root);
   const ghosts = new Map();
 
   const ghostOf = (element) => {
@@ -74,7 +74,9 @@ function ghostTree(doc, roots) {
       return ghosts.get(element);
     }
     const ghost = element.cloneNode(false);
-    if (!kept.has(element)) {
+    if (element === kept) {
+      ghost.setAttribute(GHOST_ATTR, '');
+    } else {
       ghost.removeAttribute(SOURCE_ATTR);
     }
     ghost.style.setProperty('display', 'contents', 'important');
@@ -83,19 +85,17 @@ function ghostTree(doc, roots) {
     return ghost;
   };
 
-  for (const root of roots) {
-    ghostOf(root.parentElement).append(root.cloneNode(true));
-  }
-  holder.querySelectorAll('script').forEach((script) => script.remove());
+  ghostOf(root.parentElement).append(root.cloneNode(true));
+  holder.querySelectorAll('script').forEach((script) => script.setAttribute('type', 'text/plain'));
   return holder.innerHTML;
 }
 
-export function focusPage(doc, source) {
-  const roots = rootsOf(doc, source);
-  if (!roots.length) {
+export function focusPage(doc, source, index) {
+  const root = rootOf(doc, source, index);
+  if (!root) {
     return { count: 0 };
   }
-  return { count: roots.length, htmlAttrs: attrsOf(doc.documentElement), bodyAttrs: attrsOf(doc.body), head: headOf(doc), body: ghostTree(doc, roots) };
+  return { count: 1, rootAttr: root.getAttribute(SOURCE_ATTR), htmlAttrs: attrsOf(doc.documentElement), bodyAttrs: attrsOf(doc.body), head: headOf(doc), body: ghostTree(doc, root) };
 }
 
 function mountUrlOf(root) {
@@ -106,6 +106,17 @@ function mountUrlOf(root) {
   const file = fileOf(root.getAttribute(SOURCE_ATTR));
   return `${MOUNT_ROUTE}?${new URLSearchParams({ file, name: mount.name, props: JSON.stringify(mount.props) })}`;
 }
+
+const pathFrom = (root, element) => {
+  const path = [];
+  for (let node = element; node !== root; node = node.parentElement) {
+    if (!node?.parentElement) {
+      return null;
+    }
+    path.unshift([...node.parentElement.children].indexOf(node));
+  }
+  return path;
+};
 
 const documentOf = ({ htmlAttrs, bodyAttrs, head, body }) =>
   `<!doctype html><html${attrText(htmlAttrs)}><head><meta charset="utf-8">${head}<style id="${CANVAS_ID}">${CANVAS_CSS}</style></head><body${attrText(bodyAttrs)}>${body}</body></html>`;
@@ -139,6 +150,7 @@ function patch(doc, was, now) {
 export function focusTab(win, { install, prepare, report }) {
   let frame = null;
   let source = null;
+  let index = null;
   let wanted = null;
   let last = null;
   let loaded = false;
@@ -185,24 +197,26 @@ export function focusTab(win, { install, prepare, report }) {
     frame?.remove();
     frame = null;
     source = null;
+    index = null;
     last = null;
     loaded = false;
   }
 
   function open(request) {
     prepare();
-    const parts = focusPage(win.document, request.source);
+    const parts = focusPage(win.document, request.source, request.index);
     if (!parts.count) {
       drop();
       wanted = request;
       return { count: 0, mode: FocusMode.Snapshot };
     }
     wanted = null;
-    if (!frame || source !== request.source) {
+    if (!frame || source !== request.source || index !== request.index) {
       drop();
-      const mountUrl = failed.has(request.source) || request.mount === false ? null : mountUrlOf(rootsOf(win.document, request.source)[0]);
+      const mountUrl = failed.has(request.source) || request.mount === false ? null : mountUrlOf(rootOf(win.document, request.source, request.index));
       create(parts, mountUrl);
       source = request.source;
+      index = request.index;
       last = parts;
     } else if (mode === FocusMode.Snapshot) {
       update(parts);
@@ -212,7 +226,7 @@ export function focusTab(win, { install, prepare, report }) {
   }
 
   function fallBack(reason) {
-    const request = { source, shown: visible };
+    const request = { source, index, shown: visible };
     failed.add(source);
     drop();
     const { count } = open(request);
@@ -232,7 +246,7 @@ export function focusTab(win, { install, prepare, report }) {
       return;
     }
     prepare();
-    const parts = focusPage(win.document, source);
+    const parts = focusPage(win.document, source, index);
     if (parts.count && JSON.stringify(parts) !== JSON.stringify(last)) {
       update(parts);
     }
@@ -243,6 +257,12 @@ export function focusTab(win, { install, prepare, report }) {
     close() {
       drop();
       wanted = null;
+    },
+    twin(element) {
+      const root = frame?.contentDocument?.querySelector(`[${SOURCE_ATTR}=${JSON.stringify(last?.rootAttr)}]`);
+      const path = root && pathFrom(root, element);
+      const onPage = path && rootOf(win.document, source, index);
+      return onPage ? path.reduce((node, at) => node?.children[at], onPage) ?? null : null;
     },
     forward({ focus, ...message }) {
       frame?.contentWindow?.postMessage(message, '*');

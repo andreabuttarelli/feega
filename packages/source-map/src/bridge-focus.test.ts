@@ -15,13 +15,38 @@ function bridged() {
 }
 
 describe('focus tab', () => {
-  it('opens a frame with only the component and says how many instances it found', () => {
+  it('opens a frame with only the instance that was asked for', () => {
     const { up, send, frame } = bridged();
-    send({ type: 'feega:focus', source: 'src/Card.tsx:5:7' });
+    send({ type: 'feega:focus', source: 'src/Card.tsx:5:7', index: 1 });
 
-    expect(up).toContainEqual({ type: 'feega:focused', count: 2, mode: 'snapshot' });
-    expect(frame()!.srcdoc).toContain('One');
+    expect(up).toContainEqual({ type: 'feega:focused', count: 1, mode: 'snapshot' });
+    expect(frame()!.srcdoc).toContain('Two');
+    expect(frame()!.srcdoc).not.toContain('One');
     expect(frame()!.srcdoc).not.toContain('Footer');
+  });
+
+  it('swaps the instance when another one is asked for', () => {
+    const { send, frame } = bridged();
+    send({ type: 'feega:focus', source: 'src/Card.tsx:5:7', index: 0 });
+    send({ type: 'feega:focus', source: 'src/Card.tsx:5:7', index: 1 });
+    send({ type: 'feega:focus', source: 'src/Card.tsx:5:7', index: 1, shown: false });
+
+    expect(frame()!.srcdoc).toContain('Two');
+    expect(frame()!.srcdoc).not.toContain('One');
+  });
+
+  it('answers inspect in the focus tab with what the page knows: how many instances and which usage', async () => {
+    const { win, up, send, frame } = bridged();
+    send({ type: 'feega:focus', source: 'src/Card.tsx:5:7', index: 1 });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    frame()!.contentDocument!.write(frame()!.srcdoc);
+    frame()!.dispatchEvent(new (win as unknown as typeof globalThis).Event('load'));
+    send({ type: 'feega:inspect', id: 7, selector: '[data-feega-src="src/Card.tsx:5:7"]', focus: true });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    const reply = up.find((m) => m.type === 'feega:inspect:result') as { result: { instances: number; usage: { index: number; count: number } } };
+    expect(reply.result.instances).toBe(2);
+    expect(reply.result.usage).toEqual({ index: 1, count: 2 });
   });
 
   it('reports zero and opens nothing for a component that is not on the page', () => {
@@ -120,7 +145,7 @@ describe('focus tab', () => {
       expect(url.searchParams.get('file')).toBe('src/Card.tsx');
       expect(url.searchParams.get('name')).toBe('Card');
       expect(JSON.parse(url.searchParams.get('props')!)).toEqual({ size: 'sm', onClick: { $fn: true } });
-      expect(up).toContainEqual({ type: 'feega:focused', count: 2, mode: 'mount' });
+      expect(up).toContainEqual({ type: 'feega:focused', count: 1, mode: 'mount' });
     });
 
     it('tells the view when the component is up, with what it learned about it', () => {
@@ -138,7 +163,7 @@ describe('focus tab', () => {
 
       expect(frame()!.srcdoc).toContain('One');
       expect(frame()!.getAttribute('src')).toBeNull();
-      expect(up).toContainEqual({ type: 'feega:focused', count: 2, mode: 'snapshot', reason: 'useTheme must be used within a ThemeProvider' });
+      expect(up).toContainEqual({ type: 'feega:focused', count: 1, mode: 'snapshot', reason: 'useTheme must be used within a ThemeProvider' });
     });
 
     it('does not try the real component again for a source that failed', () => {

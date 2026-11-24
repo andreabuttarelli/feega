@@ -19,6 +19,7 @@
     "db:types": "supabase gen types typescript --project-id klnswzhhgrqvbfjzioul > src/lib/database.types.ts"
   },
   "devDependencies": {
+    "@agentclientprotocol/sdk": "^2.12.0",
     "@electric-sql/pglite": "^0.5.16",
     "@lucide/svelte": "^1.21.0",
     "@playwright/test": "^1.65.1",

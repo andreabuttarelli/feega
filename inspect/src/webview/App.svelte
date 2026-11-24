@@ -312,7 +312,7 @@
       server = ServerState.Running;
       restarting = false;
       visited(path);
-      untrack(() => focus && ((reopening = true), bridge.focus(focus.source, viewing === View.Focus)));
+      untrack(() => focus && ((reopening = true), bridge.focus(focus.source, viewing === View.Focus, focus.index)));
       untrack(() => viewing === View.Page && syncView());
     },
     focusReady: () => untrack(() => viewing === View.Focus && syncView()),
@@ -1101,7 +1101,7 @@
     }
     viewing = next;
     bridge.useFocus(next === View.Focus);
-    bridge.focus(focus.source, next === View.Focus);
+    bridge.focus(focus.source, next === View.Focus, focus.index);
     syncView();
   }
 
@@ -1116,7 +1116,7 @@
     showGrid = false;
     snapshotReason = null;
     bridge.useFocus(true);
-    bridge.focus(next.source, true);
+    bridge.focus(next.source, true, next.index);
   }
 
   function exitFocus() {
@@ -1192,7 +1192,7 @@
       [Command.Add]: () => chosen.command === Command.Add && addElement(chosen.kind, chosen.place),
       [Command.Wrap]: () => chosen.command === Command.Wrap && wrapWith(chosen.tag),
       [Command.Detach]: detach,
-      [Command.Focus]: () => picked && enterFocus(focusOf(picked))
+      [Command.Focus]: () => picked && viewing === View.Page && enterFocus(focusOf(picked))
     };
     run[chosen.command]();
   }
@@ -1363,7 +1363,7 @@
     {:else}
     <header class="left-head">Layers<button type="button" class="add" title="Add an element (/)" aria-label="Add" data-testid="add-button" disabled={!picked} onclick={(e) => openAddMenu(e.clientX, e.clientY)}>+ Add</button></header>
     <div class="layers" role="tree" aria-label="Layers" data-testid="layers">
-      <LayersTree nodes={layers} {picked} selected={selectedKeys} badge={badgeOf(elementState)} open={layersOpen} onselect={selectRow} onhover={hoverLayer} onopen={(at) => toHost({ kind: ToHost.Open, at })} onmove={moveLayer} onusage={moveUsage} dragging={layerDrag} hidden={hiddenNow} locked={lockedNow} ontoggle={toggleFlag} oncontext={openLayerMenu} onadd={layerAdd} onfocus={(node) => enterFocus(rowFocus(node))} />
+      <LayersTree nodes={layers} {picked} selected={selectedKeys} badge={badgeOf(elementState)} open={layersOpen} onselect={selectRow} onhover={hoverLayer} onopen={(at) => toHost({ kind: ToHost.Open, at })} onmove={moveLayer} onusage={moveUsage} dragging={layerDrag} hidden={hiddenNow} locked={lockedNow} ontoggle={toggleFlag} oncontext={openLayerMenu} onadd={layerAdd} onfocus={(node) => viewing === View.Page && enterFocus(rowFocus(node))} />
     </div>
     {/if}
     {#if !leftClosed}<span class="edge-right" role="separator" aria-orientation="vertical" aria-label="Resize Layers" title="Drag to resize, double-click to reset" onpointerdown={(e) => ((e.currentTarget as HTMLElement).setPointerCapture(e.pointerId), (leftSizing = { x: e.clientX, width: leftPx }))} onpointermove={(e) => leftSizing && (leftWidth = leftSizing.width + (e.clientX - leftSizing.x))} onpointerup={() => leftSizing && ((leftSizing = null), (leftWidth = leftPx), savePrefs())} ondblclick={() => ((leftWidth = LEFT_DEFAULT_PX), savePrefs())}></span>{/if}

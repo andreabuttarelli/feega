@@ -11,6 +11,8 @@ import type { SupportStore } from './support';
 import type { PluginsHost } from './plugins-session';
 import type { UsageHost } from './usage';
 import type { SkillHintHost } from './skill-hint';
+import type { AgentEnv } from './agents';
+import type { OpenAgent } from './ai/agent-session';
 import type { SettingKey, SettingValue, Settings } from '../settings';
 
 export enum Stored {
@@ -67,4 +69,5 @@ export type Platform = Transport & {
   plugins?: PluginsHost;
   skillHint?: SkillHintHost;
   agents?: () => AgentId[];
+  ai?: { env: () => AgentEnv; open: OpenAgent };
 };

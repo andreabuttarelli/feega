@@ -136,9 +136,10 @@ proceed. Styles stay single-element: the Properties controls apply to one elemen
 
 Select an element inside a component and press **F**, choose **Focus component** in the
 right-click menu, or double-click a component row in Layers. A tab named after the component opens
-next to **Page**. It shows only that component, every instance of it, on a neutral checkerboard,
-with nothing else of the page. Select, edit and undo there exactly as on the page: edits go to
-the component source, and the tab updates when the source changes. **Page** takes you back to
+next to **Page**. It shows only that one instance of the component, the one you selected or the
+row you double-clicked, on a neutral checkerboard, with nothing else of the page. Layers lists
+only that component. Select, edit and undo there exactly as on the page: edits go to
+the component source, so every instance changes, and the tab updates when the source changes. **Page** takes you back to
 the page and the component tab stays open; **×** or **Esc** closes it. One component tab is open
 at a time: focusing another component replaces it.
 
