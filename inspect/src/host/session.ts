@@ -6,7 +6,7 @@ import { liveAtOf } from '@feega/live-edit/live-ask';
 import { LiveProp } from '@feega/live-edit/live-fields';
 import { StructureOp } from '@feega/live-edit/structure';
 import type { SupportItem } from '../support';
-import { AccountState, Gate, ImpactKind, Onboarding, OnboardingOutcome, ServerAction, ServerState, ToHost, ToView, type Author, type Authored, type EditAsk, type ImpactAsk, type HostMessage, type Pick, type Prefs, type ViewMessage } from '../messages';
+import { AccountState, Gate, ImpactKind, Onboarding, OnboardingOutcome, OnboardingStep, ServerAction, ServerState, Styling, ToHost, ToView, WebviewUsage, type Author, type Authored, type EditAsk, type ImpactAsk, type HostMessage, type Pick, type Prefs, type ViewMessage } from '../messages';
 import { SettingKey, StylingChoice } from '../settings';
 import { SignInEnd, signIn } from './sign-in';
 import { addPlugin } from './add-plugin';
@@ -34,7 +34,10 @@ import { stylingOf } from './styling';
 import { breakpointsOf } from './breakpoints';
 import { scalesOf } from './scales';
 import { themesOf } from './themes';
-import { EditKind, UsageKind, usageSession } from './usage';
+import { MCP_COMMAND } from '../webview/onboarding-slides';
+import { EditKind, UsageKind, usageSession, type EditDetails } from './usage';
+import { aiUsage } from './ai/ai-usage';
+import { breakpointOf, fileExtOf, identifierOf, linesOf, propCategoryOf, stateOf, targetOf, webviewDimsOf } from './usage-dims';
 import { editKindOf } from './edit-kind';
 import { selectionSync } from './selection-sync';
 import { wiringOf } from './wiring';
@@ -65,6 +68,31 @@ enum Replay {
   Fresh,
   History
 }
+
+const ONBOARDING_OUTCOME: Record<OnboardingOutcome, string> = {
+  [OnboardingOutcome.Finished]: 'completed',
+  [OnboardingOutcome.Skipped]: 'skipped'
+};
+
+const STRUCTURE_TARGETS: Partial<Record<EditKind, string>> = {
+  [EditKind.Structure]: 'markup',
+  [EditKind.Template]: 'library_insert'
+};
+
+const WEBVIEW_USAGE: Record<WebviewUsage, UsageKind> = {
+  [WebviewUsage.CopyForAgent]: UsageKind.CopyForAgent,
+  [WebviewUsage.FocusOpened]: UsageKind.FocusOpened,
+  [WebviewUsage.StateSwitch]: UsageKind.StateSwitch,
+  [WebviewUsage.BreakpointSwitch]: UsageKind.BreakpointSwitch,
+  [WebviewUsage.ErrorWebview]: UsageKind.ErrorWebview
+};
+
+const IMPACT_CLASS: Partial<Record<ImpactKind, string>> = {
+  [ImpactKind.Local]: 'local',
+  [ImpactKind.Component]: 'shared'
+};
+
+const ONBOARDING_MCP_CHOICE = 'mcp';
 
 const ONBOARDING_END: Record<OnboardingOutcome, UsageKind> = {
   [OnboardingOutcome.Finished]: UsageKind.OnboardingFinished,
@@ -106,12 +134,13 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     env: platform.ai?.env ?? (() => machineEnv()),
     open: platform.ai?.open ?? openAcpAgent,
     confirm: (question, yes) => platform.confirm(question, yes),
-    post: (message) => platform.send(message),
+    post: (message) => (message.kind === ToView.AiEvent && aiStats?.heard(message.event), platform.send(message)),
     write: async (path, content, agent) => {
       const out = await edits.agentWrite(path, content, agent);
       if (!out.ok) {
         throw new Error(out.reason);
       }
+      agentEdited(out);
       await postHistory();
     }
   });
@@ -124,11 +153,21 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   let signedIn = false;
   let editKind = EditKind.Other;
   const usage = platform.usage ? usageSession({ ...platform.usage, facts: () => ({ framework: running?.plan.framework ?? null, signedIn }) }) : null;
+  const aiStats = usage ? aiUsage(usage) : null;
+  const aiWrites = new Set<number>();
+  let aiAgent: string | undefined;
+  let projectSeen = false;
+  let lastImpact: string | undefined;
+  let onboardingStep: string | undefined;
   usage?.begin();
 
   async function postSettings() {
     const framework = running?.plan.framework ?? 'unknown';
     const styling = await stylingOf(root, stylingChoice());
+    if (!projectSeen && framework !== 'unknown') {
+      projectSeen = true;
+      usage?.track(UsageKind.ProjectDetected, { styling: styling === Styling.Tailwind ? 'tailwind' : 'plain_css' });
+    }
     await post({ kind: ToView.Settings, values: platform.settings(), facts: { version: platform.version, framework, styling } });
   }
 
@@ -137,9 +176,42 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     await post({ kind: ToView.History, changes: edits.history().map((change) => ({ ...change, by: authors.get(change.id) })), canUndo: edits.canUndo(), canRedo: edits.canRedo() });
   }
 
+  async function editDetails(out: Written & { ok: true }, ask: EditAsk | null, replay: Replay): Promise<EditDetails> {
+    const styling = await stylingOf(root, stylingChoice());
+    const impactClass = lastImpact;
+    lastImpact = undefined;
+
+    return {
+      ...linesOf(out.touched ?? []),
+      file_ext: fileExtOf(out.path),
+      target: ask ? targetOf(ask, styling) : STRUCTURE_TARGETS[editKind],
+      prop_category: ask ? propCategoryOf(ask.prop, ask.css) : undefined,
+      breakpoint: breakpointOf(ask?.breakpoint),
+      state: stateOf(ask?.state),
+      source: replay === Replay.History ? 'revert' : 'manual',
+      impact: impactClass
+    };
+  }
+
+  function agentEdited(out: Written & { ok: true }) {
+    const id = edits.latest();
+    if (id !== null) {
+      aiWrites.add(id);
+    }
+    usage?.edit(EditKind.Other, { ...linesOf(out.touched ?? []), file_ext: fileExtOf(out.path), source: 'ai', agent: aiAgent });
+  }
+
+  function reverted() {
+    const id = edits.latest();
+    const byAi = id !== null && aiWrites.has(id);
+    usage?.track(UsageKind.EditReverted, byAi ? { source: 'ai', agent: aiAgent } : { source: 'manual' });
+  }
+
+  const undone = () => (reverted(), edits.undo());
+
   async function edited(out: Written, ask: EditAsk | null, replay = Replay.Fresh) {
     if (out.ok) {
-      usage?.edit(editKind);
+      usage?.edit(editKind, usage ? await editDetails(out, ask, replay) : {});
     }
     const written = edits.latest();
     if (out.ok && replay === Replay.Fresh && author && written !== null) {
@@ -223,7 +295,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     const out: Written = ready.ok ? await edits.library(m.at, m.place, ready.item, ask.tokens) : ready;
     await edited(out, null);
     if (out.ok) {
-      usage?.track(UsageKind.LibraryInsert, { tier: ask.pro ? 'pro' : 'free' });
+      usage?.track(UsageKind.LibraryInsert, { tier: ask.pro ? 'pro' : 'free', library_item: identifierOf(m.id) });
     }
     if (!ready.ok && ready.refusal) {
       void proPrompted(ready.refusal);
@@ -281,6 +353,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     if (signing) {
       return;
     }
+    usage?.track(UsageKind.SignInPrompted);
     signing = new AbortController();
     await postAccount(AccountState.Waiting);
     const outcome = await signIn({ openBrowser: platform.openExternal, signal: signing.signal });
@@ -366,7 +439,12 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   let agentContext: string | null = null;
   const published = platform.localBridge?.(workspace, { selection: () => agentContext, changes: () => edits.history() })?.catch(() => null);
 
-  const impact = (ask: ImpactAsk) => impactOf(root, ask, edits.targets, usages);
+  async function impact(ask: ImpactAsk) {
+    const found = await impactOf(root, ask, edits.targets, usages);
+    lastImpact = IMPACT_CLASS[found.kind];
+
+    return found;
+  }
 
   async function impactShown(id: number, ask: ImpactAsk) {
     await post({ kind: ToView.Impact, id, impact: await impact(ask) });
@@ -394,13 +472,13 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     }
     return edits.edit(ask).then((out) => edited(out, ask));
   }
-  const undo = () => edits.undo().then((out) => edited(out, null, Replay.History));
+  const undo = () => undone().then((out) => edited(out, null, Replay.History));
 
   async function revert(id: number | null) {
     if (id === null) {
       let last: Written | null = null;
       while (edits.canUndo()) {
-        last = await edits.undo();
+        last = await undone();
         if (!last.ok) {
           break;
         }
@@ -667,8 +745,8 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.SignIn]: startSignIn,
     [ToHost.CancelSignIn]: () => signing?.abort(),
     [ToHost.SignOut]: signOut,
-    [ToHost.OnboardingStep]: (m) => usage?.track(UsageKind.OnboardingStep, { step: m.step }),
-    [ToHost.OnboardingDone]: (m) => (usage?.track(ONBOARDING_END[m.outcome]), platform.onboarding.markSeen()),
+    [ToHost.OnboardingStep]: (m) => ((onboardingStep = m.step), usage?.track(UsageKind.OnboardingStep, { step: m.step, outcome: 'viewed' })),
+    [ToHost.OnboardingDone]: (m) => (onboardingStep && usage?.track(UsageKind.OnboardingStep, { step: onboardingStep, outcome: ONBOARDING_OUTCOME[m.outcome] }), usage?.track(ONBOARDING_END[m.outcome]), platform.onboarding.markSeen()),
     [ToHost.Support]: (m) => supportAct(m.item),
     [ToHost.SkillHintDismiss]: dismissSkillHint,
     [ToHost.SkillHintNever]: neverSkillHint,
@@ -678,14 +756,15 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.Link]: (m) => edits.link(m.at, m.edit, m.instance).then((out) => edited(out, null)),
     [ToHost.Attribute]: (m) => edits.attribute(m.at, m.name, m.value).then((out) => edited(out, null)),
     [ToHost.Go]: (m) => edits.go(m.at, m.ask).then((out) => edited(out, null)),
-    [ToHost.Selected]: (m) => (void published?.then((bridge) => bridge?.touch()), sharing.hostSelected(m.at), syncSelection(m.at)),
+    [ToHost.Selected]: (m) => (m.at && usage?.track(UsageKind.ElementSelected), void published?.then((bridge) => bridge?.touch()), sharing.hostSelected(m.at), syncSelection(m.at)),
     [ToHost.Context]: (m) => void (agentContext = m.text),
-    [ToHost.Copy]: (m) => platform.copyText?.(m.text),
+    [ToHost.Copy]: (m) => (m.text === MCP_COMMAND && usage?.track(UsageKind.OnboardingStep, { step: OnboardingStep.Agents, outcome: 'completed', choice: ONBOARDING_MCP_CHOICE }), platform.copyText?.(m.text)),
+    [ToHost.Usage]: (m) => usage?.track(WEBVIEW_USAGE[m.event], webviewDimsOf(m.dims)),
     [ToHost.Comments]: comments.show,
-    [ToHost.CommentAdd]: (m) => comments.add(m.draft),
+    [ToHost.CommentAdd]: (m) => (usage?.track(UsageKind.CloudAction, { action: 'comment_add' }), comments.add(m.draft)),
     [ToHost.CommentResolve]: (m) => comments.resolve(m.id),
-    [ToHost.RevisionPublish]: (m) => comments.publish(m.summary),
-    [ToHost.ShareStart]: (m) => sharing.start(m.name, m.canEdit),
+    [ToHost.RevisionPublish]: (m) => (usage?.track(UsageKind.CloudAction, { action: 'revision_publish' }), comments.publish(m.summary)),
+    [ToHost.ShareStart]: (m) => (usage?.track(UsageKind.ShareAction, { action: 'share_start' }), sharing.start(m.name, m.canEdit)),
     [ToHost.ShareStop]: sharing.stop,
     [ToHost.ShareKick]: (m) => sharing.kick(m.userId),
     [ToHost.ShareRole]: (m) => sharing.setRole(m.userId, m.role),
@@ -698,10 +777,10 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.PreviewReady]: () => usage?.previewReady(),
     [ToHost.Cursor]: (m) => sharing.hostPointed(m.at),
     [ToHost.AiList]: ai.list,
-    [ToHost.AiStart]: (m) => ai.start(m.agent),
-    [ToHost.AiSend]: (m) => void ai.send(m.text, m.context),
-    [ToHost.AiCancel]: ai.cancel,
-    [ToHost.AiAnswer]: (m) => ai.answer(m.id, m.optionId)
+    [ToHost.AiStart]: (m) => ((aiAgent = m.agent), aiStats?.started(m.agent), ai.start(m.agent)),
+    [ToHost.AiSend]: (m) => (aiStats?.sent(), void ai.send(m.text, m.context)),
+    [ToHost.AiCancel]: () => (aiStats?.cancelled(), ai.cancel()),
+    [ToHost.AiAnswer]: (m) => (aiStats?.answered(m.id, m.optionId), ai.answer(m.id, m.optionId))
   };
 
   const askKey = (ask: EditAsk) => JSON.stringify(ask);
@@ -767,6 +846,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
       pluginList?.stop();
       await sharing.stop();
       await (await published)?.stop();
+      aiStats?.ended();
       await usage?.end();
     },
     usageChanged: () => usage?.recheck(),

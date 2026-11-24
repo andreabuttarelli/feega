@@ -5,33 +5,78 @@ sidebar:
   order: 4
 ---
 
-The Feega extension and `npx feega` send anonymous usage counts. They tell us how many sessions
-there are, how many edits are made, how long a session lasts, and on what kind of device.
+The Feega extension and `npx feega` send anonymous usage events. They tell us which features are
+used, where people drop off, which agents and frameworks matter, and what breaks. Nothing is tied
+to an account: signed-out use is counted the same way as signed-in use.
 
-## What is sent
-
-Each event carries:
+## What every event carries
 
 | Field | Value |
 |---|---|
-| Install id | A random UUID, created on first use. Not linked to an account. |
-| Session id | A random UUID per opened panel (or per `npx feega` run). |
-| Event | `install` (the first run on this machine), `opened` (Feega was opened), `session_start`, `preview_ready` (your page loaded in the preview), `first_edit` (your first edit ever), `edit` (a change was written to your source), `sign_in` or `sign_out` (no email or account id is sent), `session_resume` (you came back after 30 minutes away), `onboarding_started`, `onboarding_step` (which step), `onboarding_finished`, `onboarding_skipped`, `setup_applied`, `setup_failed`, `skill_hint_shown`, `skill_installed`, `library_insert` (free or pro, never which item), `plugin_installed`, `support_action` (which item) or `session_end`. |
-| Onboarding step | On `onboarding_step`: welcome, agent, agents, sign_in or support. |
-| Support item | On `support_action`: star, follow_x, discord, coffee or share. Sent when you click an item in the optional support checklist, never whether the action was completed. |
-| Edit kind | On `edit`: text, style, image, attribute, structure, template or other. |
-| Context | The detected framework (for example `next` or `sveltekit`) and whether you are signed in to Feega. |
-| Session end | Duration in milliseconds and the number of edits. |
-| Environment | Feega version, editor (VS Code, Cursor, Windsurf, VSCodium or `npx`), operating system, CPU architecture, device kind (desktop, web, command line). |
+| `install_id` | A random UUID created on first use. Not linked to an account. |
+| `session_id` | A random UUID per opened panel (or per `npx feega` run). |
+| `event` | One of the events listed below. |
+| `ext_version` | Feega version. |
+| `editor` | The host: `vscode`, `cursor`, `windsurf`, `vscodium`, `other` (another VS Code fork) or `npx`. |
+| `os`, `arch` | Operating system family and CPU architecture. |
+| `device` | `desktop`, `web` or `cli`. |
+| `signed_in` | Whether an account is signed in. A boolean, never the account. |
+| `framework`, `styling` | The detected framework and styling approach, as a fixed list of names. |
 
 The server adds country, region and city from the request. It does not store the IP address.
 
-Events are batched and sent when the session ends and every few minutes. A failed send is dropped
+## Events
+
+| Event | When | Extra fields |
+|---|---|---|
+| `install` | First run on a machine. | |
+| `opened` (the editor panel opened), `session_start`, `session_resume`, `session_end` | A session starts, resumes after 30 minutes away, ends. | `session_end`: `duration_ms`, `edit_count`, `diff_count`, `lines_added`, `lines_removed`, `files_count` |
+| `project_detected` | A project is recognised. | `framework`, `styling` |
+| `preview_ready` | The preview loaded. | |
+| `element_selected` | An element was selected. | |
+| `edit` | A change was written to your source. | `edit_kind`, `target`, `prop_category`, `file_ext`, `lines_added`, `lines_removed`, `files_count`, `breakpoint`, `state`, `source`, `agent`, `impact` |
+| `first_edit` | The first change on this machine. | |
+| `edit_reverted` | A change was undone or reverted. | `source`, `agent` |
+| `breakpoint_switch`, `state_switch` | You switched breakpoint or state. | `breakpoint`, `state` |
+| `library_insert` | A library item was inserted. | `library_item`, `tier` |
+| `copy_for_agent` | You copied a change for an agent. | |
+| `focus_opened` | Focus mode opened. | `variant` (`focus`) |
+| `ai_agent_chosen`, `ai_session_started`, `ai_session_ended` | An agent was chosen; an AI session started or ended. | `agent`; on end: `message_count`, `tool_count`, `duration_ms` |
+| `ai_message_sent`, `ai_first_response` | A message was sent; the first reply arrived. | `agent`; first response: `duration_ms` |
+| `ai_tool_call`, `ai_permission`, `ai_cancel`, `ai_session_error` | Agent activity. | `agent`; permission: `outcome` (`allow` or `reject`); error: `error_class` |
+| `onboarding_started`, `onboarding_step`, `onboarding_finished`, `onboarding_skipped` | Onboarding progress. | `step` (`welcome`, `agent`, `agents`, `sign_in`, `support`), `outcome` (`viewed`, `completed`, `skipped`), `choice` (`mcp`, when the MCP setup command is copied) |
+| `sign_in_prompted`, `sign_in`, `sign_out` | Account prompts and changes. | |
+| `share_action`, `cloud_action` | Share and Feega Cloud use. | `action` |
+| `mcp_tool_call` | An MCP tool was called. | `tool` (the tool name only) |
+| `setup_applied`, `setup_failed`, `skill_hint_shown`, `skill_installed`, `plugin_installed` | Project setup and skills. | `error_class` on failure |
+| `support_action` | A support link was used. | `item` |
+| `error_host`, `error_webview` | An unhandled exception. | `error_class`, `area` |
+
+## Field values
+
+All values are fixed lists or short identifiers, never free text.
+
+| Field | Values |
+|---|---|
+| `edit_kind` | `text`, `style`, `image`, `attribute`, `structure`, `template`, `other` |
+| `target` | `tailwind_class`, `scoped_css`, `inline_style`, `text`, `markup`, `library_insert`, `detach` |
+| `prop_category` | `spacing`, `typography`, `color`, `layout`, `size`, `border`, `effect`, `text_content` |
+| `file_ext` | The extension only: `tsx`, `jsx`, `ts`, `js`, `vue`, `svelte`, `astro`, `html`, `css`, `scss`, `sass`, `less`, `md`, `mdx`, `other` |
+| `breakpoint` | `base`, `sm`, `md`, `lg`, `xl`, `2xl`, `custom` |
+| `state` | `default`, `hover`, `focus`, `active`, `disabled`, `dark`, `other` |
+| `source` | `manual`, `ai`, `revert` |
+| `impact` | `local`, `shared`, `global` |
+| `styling` | `tailwind`, `css_modules`, `scss`, `styled_components`, `plain_css`, `inline`, `other` |
+| `area` | `host`, `webview`, `ai`, `edit`, `preview`, `library`, `cloud`, `mcp`, `other` |
+| `agent`, `library_item`, `tool`, `error_class`, `action` | A short identifier of letters, digits and `_ . : -`. A path or a sentence is rejected by the server. |
+| `lines_added`, `lines_removed`, `files_count`, `diff_count`, `message_count`, `tool_count` | Numbers only. |
+
+Events are batched, sent every few minutes and when the session ends. A failed send is dropped
 silently and never slows the editor.
 
 ## What is never collected
 
-Code, file names and paths, project names, URLs, the content of an edit, your account or email.
+Code, class names, property values, text, file names and paths (only the extension of a changed file), project names, URLs, prompts and agent replies, your account or email.
 
 ## Turn it off
 

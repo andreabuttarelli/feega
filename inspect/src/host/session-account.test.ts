@@ -123,7 +123,7 @@ describe('account nella sessione', () => {
     await t.until(() => accounts(t.sent).length > 2);
     await t.session.stop();
 
-    expect(t.usageSent.map((e) => e.event)).toEqual(['opened', 'session_start', 'sign_in', 'sign_out', 'session_end']);
+    expect(t.usageSent.map((e) => e.event)).toEqual(['opened', 'session_start', 'sign_in_prompted', 'sign_in', 'sign_out', 'session_end']);
     expect(JSON.stringify(t.usageSent)).not.toContain('a@b.co');
   });
 });

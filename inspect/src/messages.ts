@@ -219,8 +219,19 @@ export enum ToHost {
   AiStart = 'ai-start',
   AiSend = 'ai-send',
   AiCancel = 'ai-cancel',
-  AiAnswer = 'ai-answer'
+  AiAnswer = 'ai-answer',
+  Usage = 'usage'
 }
+
+export enum WebviewUsage {
+  CopyForAgent = 'copy_for_agent',
+  FocusOpened = 'focus_opened',
+  StateSwitch = 'state_switch',
+  BreakpointSwitch = 'breakpoint_switch',
+  ErrorWebview = 'error_webview'
+}
+
+export type WebviewUsageDims = Partial<{ variant: string; state: string; breakpoint: string; error_class: string; area: string }>;
 
 export type ChangeRow = { id: number; at: string; prop: string; value: string; scope: string; files: string[]; time: number; by?: string };
 
@@ -374,6 +385,7 @@ export type HostMessage =
   | { kind: ToHost.AiStart; agent: AcpId }
   | { kind: ToHost.AiSend; text: string; context: string | null }
   | { kind: ToHost.AiCancel }
+  | { kind: ToHost.Usage; event: WebviewUsage; dims?: WebviewUsageDims }
   | { kind: ToHost.AiAnswer; id: string; optionId: string | null };
 
 export type Authored = HostMessage & { by?: Author };
