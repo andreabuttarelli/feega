@@ -14,7 +14,7 @@
   import { MOVES, Shortcut, isMac, needsBareFocus, shortcutOf, typingIn } from './selection-keys';
   import { Click, NONE, Surface, clickOf, contains, extend, keyOf, only, primary, refOf, siblingsOf, toggle, visibleRows, type Selection } from './selection';
   import type { SupportItem } from '../support';
-  import { AccountState, Mode, Onboarding, OnboardingOutcome, Move, ServerAction, Slot, type ChangeRow, type FontChoice, type LayerNode, type LibraryEntry, type Palette, ServerState, type ServerInfo, Styling, ToHost, ToView, type Impact, type ImpactAsk, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
+  import { AccountState, type AgentId, Mode, Onboarding, OnboardingOutcome, Move, ServerAction, Slot, type ChangeRow, type FontChoice, type LayerNode, type LibraryEntry, type Palette, ServerState, type ServerInfo, Styling, ToHost, ToView, type Impact, type ImpactAsk, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
   import { fromHost, inVscode, toHost } from './host';
   import { imageSaved } from './image-file.svelte';
   import { iconDrawn, iconsFound } from './icon-search.svelte';
@@ -263,6 +263,7 @@
   let account = $state<{ state: AccountState; email?: string }>({ state: AccountState.SignedOut });
   let onboarding = $state(Onboarding.Seen);
   let support = $state<SupportItem[]>([]);
+  let agents = $state<AgentId[]>([]);
 
   function finishOnboarding(outcome: OnboardingOutcome) {
     onboarding = Onboarding.Seen;
@@ -603,6 +604,7 @@
     [ToView.Comments]: (m) => (cloud = { enabled: m.enabled, comments: m.comments, error: m.error ?? '' }),
     [ToView.Onboarding]: (m) => (onboarding = m.state),
     [ToView.Support]: (m) => (support = m.done),
+    [ToView.Agents]: (m) => (agents = m.found),
     [ToView.SkillHint]: (m) => (skillHint = m.command),
     [ToView.IconResults]: (m) => iconsFound({ id: m.id, library: m.library, hits: m.hits, error: m.error ?? '' }),
     [ToView.IconPreview]: (m) => iconDrawn(m.name, m.svg),
@@ -1382,7 +1384,7 @@
 </main>
 
 {#if onboarding === Onboarding.Pending}
-  <OnboardingDialog {account} {support} onaccount={(kind) => toHost({ kind })} onsupport={(item) => toHost({ kind: ToHost.Support, item })} onstep={(step) => toHost({ kind: ToHost.OnboardingStep, step })} ondone={finishOnboarding} />
+  <OnboardingDialog {account} {support} {agents} oncopy={(text) => toHost({ kind: ToHost.Copy, text })} onlink={(url) => toHost({ kind: ToHost.External, url })} onaccount={(kind) => toHost({ kind })} onsupport={(item) => toHost({ kind: ToHost.Support, item })} onstep={(step) => toHost({ kind: ToHost.OnboardingStep, step })} ondone={finishOnboarding} />
 {/if}
 
 <style>
