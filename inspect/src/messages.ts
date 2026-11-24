@@ -228,6 +228,7 @@ export enum ToView {
   Account = 'account',
   Onboarding = 'onboarding',
   Support = 'support',
+  Agents = 'agents',
   SkillHint = 'skill-hint',
   ImageSaved = 'image-saved',
   Wiring = 'wiring',
@@ -250,8 +251,18 @@ export enum ShareState {
 export enum OnboardingStep {
   Welcome = 'welcome',
   Agent = 'agent',
+  Agents = 'agents',
   SignIn = 'sign_in',
   Support = 'support'
+}
+
+export enum AgentId {
+  ClaudeCode = 'claude-code',
+  Cursor = 'cursor',
+  Codex = 'codex',
+  Windsurf = 'windsurf',
+  Copilot = 'copilot',
+  Gemini = 'gemini'
 }
 
 export enum OnboardingOutcome {
@@ -348,6 +359,7 @@ export type ViewMessage =
   | { kind: ToView.Account; state: AccountState; email?: string }
   | { kind: ToView.Onboarding; state: Onboarding }
   | { kind: ToView.Support; done: SupportItem[] }
+  | { kind: ToView.Agents; found: AgentId[] }
   | { kind: ToView.SkillHint; command: string }
   | { kind: ToView.ImageSaved; url: string }
   | { kind: ToView.Wiring; at: string; instance?: number; wiring: Wiring }

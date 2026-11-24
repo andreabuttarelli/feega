@@ -3,7 +3,7 @@ import { Where, type Contribution } from '@feega/plugin-api/manifest';
 import { AddPlace } from '@feega/live-edit/add-node';
 import { Place } from '@feega/plugin-api/protocol';
 import { addMenuItems, contextMenuItems, itemId, parseItemId, pluginDrop } from './plugin-menus';
-import type { MenuItem } from './structure-menu';
+import { COPY_FOR_AGENT, menuFor, type MenuItem } from './structure-menu';
 
 const BASE: MenuItem[] = [{ id: 'text', label: 'Text' }];
 
@@ -70,5 +70,11 @@ describe('pluginDrop', () => {
 
   it('leaves built-in items alone', () => {
     expect(pluginDrop('text', { target, place: AddPlace.After })).toBeNull();
+  });
+});
+
+describe('the Copy for agent entry', () => {
+  it.each([Where.Layers, Where.Preview])('is in the %s context menu', (where) => {
+    expect(contextMenuItems(menuFor(1), [], where).map((item) => item.id)).toContain(COPY_FOR_AGENT);
   });
 });

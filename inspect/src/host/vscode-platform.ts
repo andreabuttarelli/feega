@@ -9,6 +9,7 @@ import { cloudApi } from './cloud-api';
 import { IMAGE_EXTENSIONS } from './image-copy';
 import { catalogFile } from './library';
 import { pluginsRoot } from '@feega/plugin-store/registry';
+import { machineAgents } from './agents';
 import { deviceOnboardingStore, globalStateOnboardingStore } from './onboarding';
 import { globalStateSupportStore } from './support';
 import { WATCHED, relativeOf, type Watch } from './file-watch';
@@ -148,6 +149,7 @@ export function vsCodePlatform(host: VsCodeHost, panel: PanelLike, befores: Map<
     account,
     onboarding: deviceOnboardingStore(globalStateOnboardingStore(context.globalState)),
     support: globalStateSupportStore(context.globalState),
+    agents: () => machineAgents(vscode.env.appName, vscode.extensions.all.map((extension) => extension.id.toLowerCase())),
     usage: vsCodeUsage(context),
     skillHint: { fs: nodeHintFs, home: homedir(), surface: HintSurface.Panel, never: () => context.globalState.get(SKILL_HINT_NEVER) === true, setNever: async () => context.globalState.update(SKILL_HINT_NEVER, true) },
     plugins: { root: pluginsRoot(), dev: () => config().get<string[]>(DEV_PLUGINS_SETTING, []), approve: approveInModal }

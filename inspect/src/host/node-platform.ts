@@ -7,6 +7,7 @@ import { basename, dirname, join } from 'node:path';
 import { settingsWith, type SettingValue } from '../settings';
 import { pluginsRoot } from '@feega/plugin-store/registry';
 import { fileAccountStore, type AccountStore } from './account';
+import { machineAgents } from './agents';
 import { fileOnboardingStore, type OnboardingStore } from './onboarding';
 import { fileSupportStore, type SupportStore } from './support';
 import { catalogFile } from './library';
@@ -134,6 +135,7 @@ export function nodePlatform({ root, launcher, version, transport, print, launch
     onboarding,
     support,
     skillHint: nodeSkillHint(HintSurface.Terminal),
+    agents: () => machineAgents(),
     usage: {
       identity: () => ({ ...installOf(install), version, editor: Editor.Npx, os: process.platform, arch: process.arch, device: Device.Cli }),
       enabled: () => nodeUsageEnabled(env, settingsWith((row) => settings[row.key])),
