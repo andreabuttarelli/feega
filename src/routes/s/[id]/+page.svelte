@@ -20,7 +20,11 @@
     <a class="lockup" href="/" aria-label="feega"><FeegaMark size={24} /><Wordmark /></a>
     <div class="title">
       <h1>{data.projectName}</h1>
-      <p>Session ended {endedOn}. Read only. <span class="status {data.status}" data-testid="review-status">{STATUS_LABEL[data.status]}</span></p>
+      {#if data.hostOffline}
+        <p data-testid="host-offline">Host offline. Read only. <a href="/s/{data.sid}">Try again</a></p>
+      {:else}
+        <p>Session ended {endedOn}. Read only. <span class="status {data.status}" data-testid="review-status">{STATUS_LABEL[data.status]}</span></p>
+      {/if}
     </div>
   </header>
 
@@ -29,7 +33,7 @@
       {#if data.snapshot}
         <iframe title="Snapshot of {data.projectName}" src="/s/{data.sid}/snapshot/index.html" sandbox=""></iframe>
       {:else}
-        <p class="empty">No snapshot was saved for this session.</p>
+        <p class="empty">{data.hostOffline ? 'No snapshot yet. The host has to come back online.' : 'No snapshot was saved for this session.'}</p>
       {/if}
     </section>
 

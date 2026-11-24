@@ -17,6 +17,8 @@ const SERVER_ERROR = 500;
 const UNAUTHORIZED = 401;
 const BAD_REQUEST = 400;
 const LOGIN_PATH = '/login';
+const OFFLINE_PARAM = 'offline';
+const OFFLINE_ON = '1';
 
 export const load: PageServerLoad = async ({ params, url, cookies, locals: { safeGetSession, db } }) => {
   const here = `${url.pathname}${url.search}`;
@@ -42,7 +44,8 @@ export const load: PageServerLoad = async ({ params, url, cookies, locals: { saf
     userId: user.id,
     next: url.searchParams.get('next'),
     secret,
-    now: new Date()
+    now: new Date(),
+    hostOffline: url.searchParams.get(OFFLINE_PARAM) === OFFLINE_ON
   });
 
   if (outcome.kind === VisitKind.NotFound) {

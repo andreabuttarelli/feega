@@ -98,6 +98,12 @@ describe('/s/[id] load', () => {
     expect(await run(db)).toMatchObject({ sid: SID, projectName: 'Landing', snapshot: true, comments: [], revisions: [], status: 'open', mayDecide: true });
   });
 
+  it('shows a live session as host offline, read only, when the relay sends the visitor here', async () => {
+    const result = await run(fakeDb({ share_sessions: [sessionRow()] }), '?offline=1');
+
+    expect(result).toMatchObject({ sid: SID, projectName: 'Landing', hostOffline: true, snapshot: false });
+  });
+
   it('lists the revisions with their verdicts and tells the host they cannot decide', async () => {
     const db = fakeDb({
       share_sessions: [sessionRow({ status: 'closed', closed_at: '2026-11-21T09:50:00Z', host_user_id: 'ada' })],

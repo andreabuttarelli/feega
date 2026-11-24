@@ -28,7 +28,7 @@ function session(over: Record<string, unknown> = {}) {
   };
 }
 
-const run = (db: ReturnType<typeof fakeDb>, userId: string, next: string | null = '/dashboard') => visit(db, { sid: SID, userId, next, secret: SECRET, now: NOW });
+const run = (db: ReturnType<typeof fakeDb>, userId: string, next: string | null = '/dashboard', hostOffline = false) => visit(db, { sid: SID, userId, next, secret: SECRET, now: NOW, hostOffline });
 
 describe('visit', () => {
   it('sends a member to the session origin with a signed visitor token and the path to open', async () => {
@@ -122,6 +122,27 @@ describe('visit', () => {
     expect(result).toMatchObject({ kind: VisitKind.Ended, ended: { projectName: 'Landing', endedAt: '2026-11-21T09:50:00Z', snapshot: true } });
     expect((result as { ended: { comments: unknown[] } }).ended.comments).toHaveLength(1);
     expect(db.tables.share_members ?? []).toHaveLength(0);
+  });
+
+  it('shows a live session whose host is offline as read only, without joining it', async () => {
+    const db = fakeDb({ share_sessions: [session({ snapshot_path: 'org-1/abcdefghij.zip' })] });
+
+    const result = await run(db, 'ada', '/', true);
+
+    expect(result).toMatchObject({ kind: VisitKind.Ended, ended: { projectName: 'Landing', hostOffline: true, snapshot: true, mayDecide: true } });
+    expect(db.tables.share_members ?? []).toHaveLength(0);
+  });
+
+  it('still refuses a removed member when the host is offline', async () => {
+    const db = fakeDb({ share_sessions: [session()], share_members: [{ session_id: SID, org_id: 'org-1', user_id: 'ada', role: 'editor', removed_at: '2026-11-21T09:30:00Z' }] });
+
+    expect(await run(db, 'ada', '/', true)).toEqual({ kind: VisitKind.Removed });
+  });
+
+  it('marks an ended session as not offline', async () => {
+    const db = fakeDb({ share_sessions: [session({ status: 'closed', closed_at: '2026-11-21T09:50:00Z' })] });
+
+    expect(await run(db, 'ada')).toMatchObject({ ended: { hostOffline: false } });
   });
 
   it('treats an expired live session as ended', async () => {
