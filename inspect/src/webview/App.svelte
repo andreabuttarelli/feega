@@ -67,6 +67,9 @@
   import { LIBRARY_DRAG_TYPE } from './library';
   import { agentContexts, commentContext } from './agent-context';
   import CommentsList from './CommentsList.svelte';
+  import AiPanel from './AiPanel.svelte';
+  import { aiHeard } from './ai-state.svelte';
+  import { withImpact } from './ai-context';
   import type { CloudComment, CloudRevisions, CommentDraft } from '../host/cloud-api';
   import { pinIdOf, pinSlot, pinsOf, sourceOfComment, threadsOf } from './comments';
   import { HOST_PEER, type Point, type Present } from '../../../packages/share-protocol/src/frame';
@@ -661,6 +664,9 @@
     [ToView.Onboarding]: (m) => (onboarding = m.state),
     [ToView.Support]: (m) => (support = m.done),
     [ToView.Agents]: (m) => (agents = m.found),
+    [ToView.AiAgents]: aiHeard,
+    [ToView.AiState]: aiHeard,
+    [ToView.AiEvent]: aiHeard,
     [ToView.SkillHint]: (m) => (skillHint = m.command),
     [ToView.IconResults]: (m) => iconsFound({ id: m.id, library: m.library, hits: m.hits, error: m.error ?? '' }),
     [ToView.IconPreview]: (m) => iconDrawn(m.name, m.svg),
@@ -1155,6 +1161,8 @@
     run[chosen.command]();
   }
 
+  let aiContext = $state<string | null>(null);
+
   async function agentText(): Promise<string | null> {
     if (!picked) {
       return null;
@@ -1182,7 +1190,7 @@
     size;
     themeName;
     elementState;
-    void agentText().then((text) => toHost({ kind: ToHost.Context, text }));
+    void agentText().then((text) => (toHost({ kind: ToHost.Context, text }), (aiContext = text)));
   });
 
   function restructure(op: StructureOp) {
@@ -1452,6 +1460,7 @@
         <Tabs.Trigger value={Tab.Properties} class="tab">Properties</Tabs.Trigger>
         <Tabs.Trigger value={Tab.Changes} class="tab" data-testid="changes-tab">Changes{changes.length ? ` ${changes.length}` : ''}</Tabs.Trigger>
         {#if cloudOn}<Tabs.Trigger value={Tab.Comments} class="tab" data-testid="comments-tab">Comments{openComments ? ` ${openComments}` : ''}</Tabs.Trigger>{/if}
+        <Tabs.Trigger value={Tab.Ai} class="tab" data-testid="ai-tab">AI</Tabs.Trigger>
         {#each plugins.sidePanel as panel (panel.plugin + panel.entry.id)}<Tabs.Trigger value={`plugin:${panel.plugin}/${panel.entry.id}`} class="tab" data-testid="plugin-tab">{panel.entry.title}</Tabs.Trigger>{/each}
       </Tabs.List>
       <Tabs.Content value={Tab.Properties}>
@@ -1496,6 +1505,9 @@
           <iframe class="plugin-panel" title={panel.entry.title} sandbox="allow-scripts" srcdoc={panel.entry.html}></iframe>
         </Tabs.Content>
       {/each}
+      <Tabs.Content value={Tab.Ai}>
+        <AiPanel context={aiContext === null ? null : withImpact(aiContext, impact)} tohost={toHost} />
+      </Tabs.Content>
       <Tabs.Content value={Tab.Comments}>
         <CommentsList {cloud} {picked} {composing} onsubmit={(draft) => (draft.parentId ? toHost({ kind: ToHost.CommentAdd, draft }) : sendComment(draft))} oncancel={() => (composing = false)} onresolve={(id) => toHost({ kind: ToHost.CommentResolve, id })} onselect={select} oncopy={copyComment} onpublish={(summary) => toHost({ kind: ToHost.RevisionPublish, summary })} />
       </Tabs.Content>

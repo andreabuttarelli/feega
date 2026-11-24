@@ -21,6 +21,10 @@ import type { CommentDraft } from '../src/host/cloud-api.ts';
 import { entriesOf, insertAskOf } from '../src/host/library.ts';
 import { buildCatalog } from '../../packages/library/src/catalog.ts';
 import type { AddPlace } from '@feega/live-edit/add-node';
+import type { AcpId } from '../src/host/ai/acp-agents.ts';
+import { aiChat } from '../src/host/ai/ai-chat.ts';
+import type { AgentEnv } from '../src/host/agents.ts';
+import type { OpenAgent } from '../src/host/ai/agent-session.ts';
 
 const catalog = buildCatalog();
 const PANEL_PORT = Number(process.env.PANEL_PORT ?? 5999);
@@ -35,7 +39,9 @@ const pageHtml = (theme: string) => `<!doctype html><html><head><meta charset="u
 export const DARK = ':root{--vscode-editor-background:#1f1f1f;--vscode-foreground:#cccccc;--vscode-sideBar-background:#181818;--vscode-focusBorder:#0078d4;--vscode-font-family:-apple-system,system-ui,sans-serif}';
 export const LIGHT = ':root{--vscode-editor-background:#ffffff;--vscode-foreground:#1f1f1f;--vscode-sideBar-background:#f8f8f8;--vscode-focusBorder:#0078d4;--vscode-font-family:-apple-system,system-ui,sans-serif}';
 
-export async function openPanel(appRoot: string, theme = DARK, cloud?: CommentsCloud) {
+export type AiOverride = { env: () => AgentEnv; open: OpenAgent };
+
+export async function openPanel(appRoot: string, theme = DARK, cloud?: CommentsCloud, aiOverride?: AiOverride) {
   const running = await startDev(appRoot, launcher, { log: () => undefined, installing: () => undefined, spawned: () => undefined, signal: new AbortController().signal }, '', Attach.Never);
   if ('refused' in running) {
     throw new Error(running.refused);
@@ -77,6 +83,18 @@ export async function openPanel(appRoot: string, theme = DARK, cloud?: CommentsC
       return out;
     }
   });
+  const ai = aiOverride
+    ? aiChat({
+        ...aiOverride,
+        root: () => appRoot,
+        confirm: async () => true,
+        post: reply,
+        write: async (path, content, agent) => {
+          await edits.agentWrite(path, content, agent);
+          await history();
+        }
+      })
+    : null;
   const previewIcons = previewQueue(fetch, (name, svg) => reply({ kind: ToView.IconPreview, name, svg }));
 
   await page.exposeFunction('toHost', async (m: { kind: ToHost; from?: string; to?: string; google?: boolean; family?: string; ask?: EditAsk; id?: number | string; pick?: Pick | null; query?: string; names?: string[]; text?: string; draft?: CommentDraft; at?: string; place?: string }) => {
@@ -85,6 +103,21 @@ export async function openPanel(appRoot: string, theme = DARK, cloud?: CommentsC
       await reply({ kind: ToView.Server, state: ServerState.Running });
       await comments.show();
       await reply({ kind: ToView.Settings, values: Object.fromEntries(SETTINGS.map((r) => [r.key, r.fallback])), facts: { version: '0.1.0', framework: 'sveltekit', styling } });
+    }
+    if (m.kind === ToHost.AiList) {
+      ai?.list();
+    }
+    if (m.kind === ToHost.AiStart) {
+      await ai?.start((m as unknown as { agent: AcpId }).agent);
+    }
+    if (m.kind === ToHost.AiSend) {
+      void ai?.send(m.text!, (m as unknown as { context: string | null }).context);
+    }
+    if (m.kind === ToHost.AiAnswer) {
+      ai?.answer(m.id as string, (m as unknown as { optionId: string | null }).optionId);
+    }
+    if (m.kind === ToHost.AiCancel) {
+      await ai?.cancel();
     }
     if (m.kind === ToHost.Picked) {
       picks.get(m.id as number)?.(m.pick ?? null);
