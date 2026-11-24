@@ -54,7 +54,7 @@ describe('feega mcp tools', () => {
 
     const { tools } = await client.listTools();
 
-    expect(tools.map((t) => t.name).sort()).toEqual(['feega_changes', 'feega_comments', 'feega_editors', 'feega_resolve', 'feega_selection', 'feega_share', 'feega_snapshot', 'feega_stop']);
+    expect(tools.map((t) => t.name).sort()).toEqual(['feega_changes', 'feega_comments', 'feega_editors', 'feega_resolve', 'feega_review', 'feega_selection', 'feega_share', 'feega_snapshot', 'feega_stop']);
     expect(tools.find((t) => t.name === 'feega_share')!.inputSchema.properties).toHaveProperty('visitorsCanEdit');
     expect(tools.find((t) => t.name === 'feega_snapshot')!.inputSchema.required).toEqual(['sessionId', 'name']);
   });
@@ -167,6 +167,21 @@ describe('feega mcp tools', () => {
 
     expect(result.isError).toBe(true);
     expect(textOf(result)).toContain('nope');
+  });
+
+  it('tells the agent the latest verdict and what is still unresolved', async () => {
+    const review = { status: 'changes_requested', revision: { number: 2, summary: 'Round two', verdicts: [{ reviewerName: 'Vera', verdict: 'changes_requested', note: 'Tighter' }] }, openComments: [comment({ id: 'c9', revisionId: 'r2' })] };
+    const client = await rig({ api: { review: async () => review } as unknown as Partial<CloudApi> }).connect;
+
+    const result = jsonOf(await call(client, 'feega_review', { sessionId: 's1' }));
+
+    expect(result).toMatchObject({ status: 'changes_requested', round: 2, summary: 'Round two', verdicts: [{ reviewer: 'Vera', verdict: 'changes_requested', note: 'Tighter' }], unresolved: [{ id: 'c9', place: 'src/Card.svelte:4:2' }] });
+  });
+
+  it('says nothing is under review before the first round', async () => {
+    const client = await rig({ api: { review: async () => ({ status: 'open', revision: null, openComments: [] }) } as unknown as Partial<CloudApi> }).connect;
+
+    expect(jsonOf(await call(client, 'feega_review', { sessionId: 's1' }))).toMatchObject({ status: 'open', round: null, unresolved: [] });
   });
 
   it('saves a named snapshot', async () => {

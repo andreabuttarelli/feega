@@ -25,6 +25,28 @@ describe('cloud api client', () => {
     expect(calls).toEqual([{ url: 'https://oh.test/api/v1/sessions', method: 'POST', auth: 'Bearer jwt-1', body: { projectName: 'shop', visitorRole: 'editor' } }]);
   });
 
+  it('publishes a revision of the editor changes', async () => {
+    const { api, calls } = recorder(201, { id: 'r1', number: 1 });
+
+    await api.publishRevision('s1', 'Round one', [{ file: 'src/Card.svelte', prop: 'padding', value: '24px' }]);
+
+    expect(calls).toEqual([{ url: 'https://oh.test/api/v1/sessions/s1/revisions', method: 'POST', auth: 'Bearer jwt-1', body: { summary: 'Round one', changes: [{ file: 'src/Card.svelte', prop: 'padding', value: '24px' }] } }]);
+  });
+
+  it('reads the review state of a session', async () => {
+    const { api, calls } = recorder(200, { status: 'approved', revision: null, openComments: [] });
+
+    expect(await api.review('s1')).toEqual({ status: 'approved', revision: null, openComments: [] });
+    expect(calls[0]).toMatchObject({ url: 'https://oh.test/api/v1/sessions/s1/review', method: 'GET' });
+  });
+
+  it('lists the revisions with their status', async () => {
+    const { api, calls } = recorder(200, { status: 'open', revisions: [{ id: 'r1', number: 1 }] });
+
+    expect((await api.revisions('s1')).status).toBe('open');
+    expect(calls[0].url).toBe('https://oh.test/api/v1/sessions/s1/revisions');
+  });
+
   it('closes a session and returns the snapshot upload url', async () => {
     const { api, calls } = recorder(200, { snapshotUploadUrl: 'https://store/up' });
 

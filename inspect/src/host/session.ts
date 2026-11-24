@@ -229,7 +229,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     ? pluginsSession({ host: { root: platform.plugins.root, dev: () => platform.plugins!.dev().map((folder) => resolve(root, folder)) }, post, notify: platform.notify, onInstalled: () => usage?.track(UsageKind.PluginInstalled) })
     : null;
 
-  const comments = commentsHost(platform.cloud, post);
+  const comments = commentsHost(platform.cloud, post, () => edits.history());
   const sharing = shareSession({ platform, workspace, appUrl: () => running?.url ?? null, post });
 
   const postAccount = (state: AccountState, email?: string) => {
@@ -648,6 +648,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.Comments]: comments.show,
     [ToHost.CommentAdd]: (m) => comments.add(m.draft),
     [ToHost.CommentResolve]: (m) => comments.resolve(m.id),
+    [ToHost.RevisionPublish]: (m) => comments.publish(m.summary),
     [ToHost.ShareStart]: (m) => sharing.start(m.name, m.canEdit),
     [ToHost.ShareStop]: sharing.stop,
     [ToHost.ShareKick]: (m) => sharing.kick(m.userId),
