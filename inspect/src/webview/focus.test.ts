@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Pick, Source } from '../messages';
-import { FocusKey, focusKeyOf, focusLabel, focusOf, rowFocus } from './focus';
+import { FocusKey, focusKeyOf, focusOf, rowFocus } from './focus';
 
 const CARD: Source = { file: 'src/components/ProductCard.tsx', line: 4, col: 5 };
 
@@ -23,23 +23,13 @@ describe('focusOf', () => {
 describe('rowFocus', () => {
   const node = { name: 'ProductCard', source: CARD, component: true, count: 1, instance: 2 };
 
-  it('narrows a double-click on a single row to its instance', () => {
-    expect(rowFocus(node)).toEqual({ name: 'ProductCard', source: CARD, index: 2 });
-  });
-
-  it('keeps every instance when the row folds several', () => {
+  it('names the focus after the row, whatever number of instances it folds', () => {
+    expect(rowFocus(node)).toEqual({ name: 'ProductCard', source: CARD });
     expect(rowFocus({ ...node, count: 3 })).toEqual({ name: 'ProductCard', source: CARD });
   });
 
   it('is nothing for a row that is not a component', () => {
     expect(rowFocus({ ...node, component: false })).toBeNull();
-  });
-});
-
-describe('focusLabel', () => {
-  it('says how many instances are shown', () => {
-    expect(focusLabel({ name: 'Card', source: CARD }, 3)).toBe('Card · 3 instances');
-    expect(focusLabel({ name: 'Card', source: CARD, index: 0 }, 1)).toBe('Card · 1 instance');
   });
 });
 
@@ -52,8 +42,8 @@ describe('focusKeyOf', () => {
     expect(focusKeyOf('Escape', { focused: true, available: true })).toBe(FocusKey.Exit);
   });
 
-  it('leaves on F too while focused', () => {
-    expect(focusKeyOf('F', { focused: true, available: true })).toBe(FocusKey.Exit);
+  it('leaves F alone while focused, so the tab is not closed by a stray key', () => {
+    expect(focusKeyOf('F', { focused: true, available: true })).toBeNull();
   });
 
   it('leaves Escape alone when not focused', () => {

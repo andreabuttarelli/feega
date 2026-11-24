@@ -129,17 +129,22 @@ proceed. Styles stay single-element: the Properties controls apply to one elemen
 | Cmd/Ctrl+C | Copy for agent |
 | Enter / Shift+Enter | Select the child / the parent |
 | Tab / Shift+Tab | Select the next / the previous sibling |
-| F | Focus the component of the selection, again to exit |
-| Esc | Exit focus, otherwise select the parent |
+| F | Open the component of the selection in its own tab |
+| Esc | Close the component tab, otherwise select the parent |
 
 ## Focus a component
 
 Select an element inside a component and press **F**, choose **Focus component** in the
-right-click menu, or double-click a component row in Layers. The preview dims everything except
-the instances of that component and scrolls to the first one; the bar at the top shows the
-component name and how many instances are lit. Double-clicking a row that stands for one
-instance lights only that instance. Edits keep going to the component source as usual. **Exit
-focus**, **Esc** or **F** leaves it. It works on React, Vue, Svelte and Astro components.
+right-click menu, or double-click a component row in Layers. A tab named after the component opens
+next to **Page**. It shows only that component, every instance of it, on a neutral checkerboard,
+with nothing else of the page. Select, edit and undo there exactly as on the page: edits go to
+the component source, and the tab updates when the source changes. **Page** takes you back to
+the page and the component tab stays open; **×** or **Esc** closes it. One component tab is open
+at a time: focusing another component replaces it.
+
+The tab is a copy of the rendered component with the page stylesheets, so it works on React,
+Vue, Svelte and Astro without any setup. It is not a running component: scripts and event
+handlers do not run in it, and state changes such as an opened menu do not show.
 
 ## In the browser: `npx feega`
 

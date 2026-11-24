@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { FOCUSED, TRACKED } from '../messages';
+import { BRIDGE_READY, FOCUSED, TRACKED, TREE_RESULT } from '../messages';
 import { pageBridge } from './page-bridge';
 
 const ORIGIN = 'http://localhost:5173';
@@ -29,7 +29,9 @@ describe('tracked rects reach the view', () => {
   });
 });
 
-describe('focus replies reach the view', () => {
+describe('the page tab and the focus tab share one frame', () => {
+  const frameWith = (posted: unknown[]) => ({ src: `${ORIGIN}/`, contentWindow: { postMessage: (message: unknown) => posted.push(message) } }) as unknown as HTMLIFrameElement;
+
   it('reports how many instances the page found', () => {
     const post = pageWindow();
     const counts: number[] = [];
@@ -38,5 +40,43 @@ describe('focus replies reach the view', () => {
     post({ type: FOCUSED, count: 3 });
 
     expect(counts).toEqual([3]);
+  });
+
+  it('marks what it sends to the focus tab, and nothing it sends to the page', () => {
+    const posted: unknown[] = [];
+    pageWindow();
+    const bridge = pageBridge(() => frameWith(posted), {} as never);
+
+    bridge.tree();
+    bridge.useFocus(true);
+    bridge.tree();
+    bridge.focus(null);
+
+    expect(posted).toEqual([{ type: 'feega:tree' }, { type: 'feega:tree', focus: true }, { type: 'feega:focus', source: null, shown: true }]);
+  });
+
+  it('listens only to the tab that is showing', () => {
+    const post = pageWindow();
+    const trees: string[] = [];
+    const bridge = pageBridge(() => null, { tree: (tree: unknown) => trees.push(String(tree)) } as never);
+
+    post({ type: TREE_RESULT, tree: 'page' });
+    post({ type: TREE_RESULT, tree: 'focus', focus: true });
+    bridge.useFocus(true);
+    post({ type: TREE_RESULT, tree: 'page again' });
+    post({ type: TREE_RESULT, tree: 'focus again', focus: true });
+
+    expect(trees).toEqual(['page', 'focus again']);
+  });
+
+  it('tells a page that is ready from a focus tab that is ready', () => {
+    const post = pageWindow();
+    const ready: string[] = [];
+    pageBridge(() => null, { ready: () => ready.push('page'), focusReady: () => ready.push('focus') } as never);
+
+    post({ type: BRIDGE_READY, path: '/' });
+    post({ type: BRIDGE_READY, focus: true });
+
+    expect(ready).toEqual(['page', 'focus']);
   });
 });

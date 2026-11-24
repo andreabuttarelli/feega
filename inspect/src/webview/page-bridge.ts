@@ -24,11 +24,18 @@ export type PageEvents = {
   text: (source: string, text: string, was: string) => void;
   tracked: (slot: string, rect: Pick['rect'] | null) => void;
   focused: (count: number) => void;
+  focusReady: () => void;
 };
+
+enum Target {
+  Page,
+  Focus
+}
 
 export function pageBridge(frame: () => HTMLIFrameElement | null, on: PageEvents) {
   const waiting = new Map<number, (pick: Pick | null) => void>();
   let next = 0;
+  let inFocus = false;
 
   window.addEventListener('message', (event) => {
     if (!LOCAL_ORIGIN.test(event.origin) && event.origin !== location.origin) {
@@ -36,7 +43,14 @@ export function pageBridge(frame: () => HTMLIFrameElement | null, on: PageEvents
     }
     const data = event.data;
     if (data?.type === BRIDGE_READY) {
-      on.ready(data.path ?? '/', Boolean(data.restored));
+      data.focus ? on.focusReady() : on.ready(data.path ?? '/', Boolean(data.restored));
+      return;
+    }
+    if (data?.type === FOCUSED) {
+      on.focused(data.count);
+      return;
+    }
+    if (Boolean(data?.focus) !== inFocus) {
       return;
     }
     if (data?.type === PALETTE_RESULT) {
@@ -63,10 +77,6 @@ export function pageBridge(frame: () => HTMLIFrameElement | null, on: PageEvents
       on.tracked(data.slot, data.rect ?? null);
       return;
     }
-    if (data?.type === FOCUSED) {
-      on.focused(data.count);
-      return;
-    }
     if (data?.type === TEXT_DONE) {
       on.text(data.source, data.text, data.was);
       return;
@@ -78,11 +88,11 @@ export function pageBridge(frame: () => HTMLIFrameElement | null, on: PageEvents
     waiting.delete(event.data.id);
   });
 
-  function send(message: Record<string, unknown>) {
+  function send(message: Record<string, unknown>, to: Target = inFocus ? Target.Focus : Target.Page) {
     const target = frame();
     const origin = target?.src ? new URL(target.src).origin : null;
     if (target?.contentWindow && origin) {
-      target.contentWindow.postMessage(message, origin);
+      target.contentWindow.postMessage(to === Target.Focus ? { ...message, focus: true } : message, origin);
     }
   }
 
@@ -109,7 +119,8 @@ export function pageBridge(frame: () => HTMLIFrameElement | null, on: PageEvents
     hide: (source: Source, hidden: boolean) => send({ type: HIDE, source: sourceText(source), hidden }),
     mode: (mode: Mode) => send({ type: MODE, mode }),
     reveal: (source: Source, index = 0) => send({ type: REVEAL, source: sourceText(source), index }),
-    focus: (source: Source | null, index?: number) => send({ type: FOCUS, source: source ? sourceText(source) : null, index }),
+    focus: (source: Source | null, shown = true) => send({ type: FOCUS, source: source ? sourceText(source) : null, shown }, Target.Page),
+    useFocus: (on: boolean) => (inFocus = on),
     scroll: (dx: number, dy: number) => send({ type: SCROLL, dx, dy }),
     leave: () => send({ type: LEAVE }),
     track: (slot: string, source: Source | null, index = 0) => send({ type: TRACK, slot, source: source ? sourceText(source) : null, index }),
