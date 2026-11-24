@@ -2,7 +2,7 @@ import { OnboardingStep } from '../messages';
 
 export type Slide = { step: OnboardingStep; title: string; body: string; more?: string };
 
-export const MCP_COMMAND = 'claude mcp add feega -- npx feega mcp';
+export const MCP_COMMAND = 'claude mcp add feega -- npx -y feega mcp';
 export const MCP_DOCS_URL = 'https://docs.feega.app/more/connect-your-agent-via-mcp/';
 
 export const SLIDES: Slide[] = [

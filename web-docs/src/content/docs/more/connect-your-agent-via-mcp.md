@@ -12,7 +12,7 @@ sidebar:
 Claude Code:
 
 ```bash
-claude mcp add feega -- npx feega mcp
+claude mcp add feega -- npx -y feega mcp
 ```
 
 Cursor, in `.cursor/mcp.json` of the project (or `~/.cursor/mcp.json` for every project):
@@ -22,7 +22,7 @@ Cursor, in `.cursor/mcp.json` of the project (or `~/.cursor/mcp.json` for every 
   "mcpServers": {
     "feega": {
       "command": "npx",
-      "args": ["feega", "mcp"]
+      "args": ["-y", "feega", "mcp"]
     }
   }
 }
@@ -33,7 +33,7 @@ Codex, in `~/.codex/config.toml`:
 ```toml
 [mcp_servers.feega]
 command = "npx"
-args = ["feega", "mcp"]
+args = ["-y", "feega", "mcp"]
 ```
 
 Start the agent from your project folder: Feega picks the editor that has that project open.
