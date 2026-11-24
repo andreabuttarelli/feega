@@ -1391,3 +1391,7 @@ non solo con la build.
 ## Astro dev keeps the old CSS after an edit that adds a class and its rule
 
 **Signal:** on an `.astro` component the rule is in the file, the served HTML has it, yet the browser shows the old value even after reload. The `?astro&type=style` module Vite serves to the browser lacks the rule and overwrites the server-rendered `<style>`. **Move:** Astro refreshes that module only when the change is style-only against the last compiled copy; a markup change plus a style change in one write is not. Write the markup first, let the page compile, then write the style (`markupFirst`, `settle` in `fileEdits`).
+
+## The focus tab is blank on Next.js and React Router
+
+**Signal:** the focus tab opens empty and Layers lists nothing. Next has no `/__feega/mount` route (404 page loads, no status ever arrives); React Router's Vite plugin throws "can't detect preamble" before the mount runtime starts. **Move:** a mount that never reports must still fall back: the mount page posts `failed` from a capturing `error` listener installed before the module, and the tab falls back when the loaded page lacks the `feega.nested-host` marker. Check each framework in `inspect/test/focus-shots.mts`.

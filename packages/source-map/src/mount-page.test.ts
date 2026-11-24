@@ -34,6 +34,14 @@ describe('mountHtml', () => {
     expect(mountHtml('file=a')).toContain('<div id="root">');
   });
 
+  it('reports a failure before the component starts, such as a framework plugin that cannot serve the page', () => {
+    const html = mountHtml('file=a');
+
+    expect(html).toContain("addEventListener('error'");
+    expect(html).toContain('feega:mount:status');
+    expect(html.indexOf("addEventListener('error'")).toBeLessThan(html.indexOf('type="module"'));
+  });
+
   it('tells the bridge in the page not to install itself in this document', () => {
     expect(mountHtml('file=a')).toContain("Symbol.for('feega.nested-host')");
   });
