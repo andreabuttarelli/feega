@@ -51,8 +51,9 @@ describe('the page tab and the focus tab share one frame', () => {
     bridge.useFocus(true);
     bridge.tree();
     bridge.focus(null);
+    bridge.focus({ file: 'a.tsx', line: 1, col: 2 }, false, 3);
 
-    expect(posted).toEqual([{ type: 'feega:tree' }, { type: 'feega:tree', focus: true }, { type: 'feega:focus', source: null, shown: true }]);
+    expect(posted).toEqual([{ type: 'feega:tree' }, { type: 'feega:tree', focus: true }, { type: 'feega:focus', source: null, shown: true }, { type: 'feega:focus', source: 'a.tsx:1:2', shown: false, index: 3 }]);
   });
 
   it('listens only to the tab that is showing', () => {

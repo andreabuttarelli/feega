@@ -44,7 +44,7 @@ const TREE_REFRESH_MS = 150;
 const TREE_ATTRIBUTES = ['class', 'id', 'style', SOURCE_ATTR];
 const THEME_REBUILD_MS = 100;
 
-export function installBridge(win, { nested = false, emit = null } = {}) {
+export function installBridge(win, { nested = false, emit = null, twin = null } = {}) {
   if (win[INSTALLED]) {
     return;
   }
@@ -62,7 +62,7 @@ export function installBridge(win, { nested = false, emit = null } = {}) {
   const toParent = (message) => (emit ? emit(message) : win.parent?.postMessage(message, '*'));
   let reply = toParent;
   const scroll = nested ? { restored: false, leave: () => undefined } : keepScroll(win);
-  const tab = focusTab(win, { install: (inner) => installBridge(inner, { nested: true, emit: (message) => win.parent?.postMessage({ ...message, focus: true }, '*') }), prepare: () => stampSources(doc), found: (count) => win.parent?.postMessage({ type: FOCUSED, count }, '*') });
+  const tab = focusTab(win, { install: (inner) => installBridge(inner, { nested: true, twin: (element) => tab.twin(element), emit: (message) => win.parent?.postMessage({ ...message, focus: true }, '*') }), prepare: () => stampSources(doc), found: (count) => win.parent?.postMessage({ type: FOCUSED, count }, '*') });
   const tracker = trackRects(win, (slot, rect) => reply({ type: TRACKED, slot, rect }));
 
   function sendTree() {
@@ -133,7 +133,7 @@ export function installBridge(win, { nested = false, emit = null } = {}) {
       stampSources(doc);
       const target = targetOf(doc, request);
       settleForced(doc);
-      const inspected = target ? inspectElement(target, { maxHtml: request.maxHtml }) : null;
+      const inspected = target ? inspectElement(target, { maxHtml: request.maxHtml, twin }) : null;
       const tagged = target?.closest(`[${SOURCE_ATTR}]`);
       reply({ type: INSPECT_RESULT, id: request.id, result: inspected && { ...inspected, states: tagged ? statesOf(tagged) : [] } });
     }

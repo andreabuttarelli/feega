@@ -8,7 +8,7 @@ const pick = (over: Partial<Pick> = {}) => ({ source: CARD, component: { file: '
 
 describe('focusOf', () => {
   it('names the focus after the file of the component', () => {
-    expect(focusOf(pick())).toEqual({ name: 'ProductCard', source: CARD });
+    expect(focusOf(pick())).toEqual({ name: 'ProductCard', source: CARD, index: 1 });
   });
 
   it('is nothing for an element that is not inside a component', () => {
@@ -23,9 +23,9 @@ describe('focusOf', () => {
 describe('rowFocus', () => {
   const node = { name: 'ProductCard', source: CARD, component: true, count: 1, instance: 2 };
 
-  it('names the focus after the row, whatever number of instances it folds', () => {
-    expect(rowFocus(node)).toEqual({ name: 'ProductCard', source: CARD });
-    expect(rowFocus({ ...node, count: 3 })).toEqual({ name: 'ProductCard', source: CARD });
+  it('focuses the instance the row stands for, the first one when it folds several', () => {
+    expect(rowFocus(node)).toEqual({ name: 'ProductCard', source: CARD, index: 2 });
+    expect(rowFocus({ ...node, count: 3 })).toEqual({ name: 'ProductCard', source: CARD, index: 2 });
   });
 
   it('is nothing for a row that is not a component', () => {
