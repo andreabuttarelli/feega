@@ -138,7 +138,15 @@ describe('handleUsage', () => {
     expect(rows[0]).toMatchObject({ target: 'tailwind_class', prop_category: 'spacing', file_ext: 'tsx', breakpoint: 'md', state: 'hover', source: 'ai', agent: 'claude-code', impact: 'shared', lines_added: 2, lines_removed: 1, files_count: 1 });
   });
 
-  it.each(['project_detected', 'editor_opened', 'element_selected', 'edit_reverted', 'breakpoint_switch', 'state_switch', 'copy_for_agent', 'focus_opened', 'ai_agent_chosen', 'ai_message_sent', 'ai_permission', 'ai_session_error', 'share_action', 'cloud_action', 'mcp_tool_call', 'error_host', 'error_webview'])('accepts the %s event', async (name) => {
+  it('accepts the agents onboarding step the extension sends', async () => {
+    const { rows, sink } = recorder();
+    const res = await handleUsage(post({ events: [event({ event: 'onboarding_step', step: 'agents', outcome: 'completed', choice: 'mcp' })] }), freshClient(), sink);
+
+    expect(res.status).toBe(204);
+    expect(rows[0]).toMatchObject({ step: 'agents', choice: 'mcp' });
+  });
+
+  it.each(['project_detected', 'element_selected', 'edit_reverted', 'breakpoint_switch', 'state_switch', 'copy_for_agent', 'focus_opened', 'ai_agent_chosen', 'ai_message_sent', 'ai_permission', 'ai_session_error', 'share_action', 'cloud_action', 'mcp_tool_call', 'error_host', 'error_webview'])('accepts the %s event', async (name) => {
     const { rows, sink } = recorder();
     const res = await handleUsage(post({ events: [event({ event: name })] }), freshClient(), sink);
 

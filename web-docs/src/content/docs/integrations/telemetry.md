@@ -30,10 +30,9 @@ The server adds country, region and city from the request. It does not store the
 | Event | When | Extra fields |
 |---|---|---|
 | `install` | First run on a machine. | |
-| `opened`, `session_start`, `session_resume`, `session_end` | A session starts, resumes after 30 minutes away, ends. | `session_end`: `duration_ms`, `edit_count`, `diff_count`, `lines_added`, `lines_removed`, `files_count` |
+| `opened` (the editor panel opened), `session_start`, `session_resume`, `session_end` | A session starts, resumes after 30 minutes away, ends. | `session_end`: `duration_ms`, `edit_count`, `diff_count`, `lines_added`, `lines_removed`, `files_count` |
 | `project_detected` | A project is recognised. | `framework`, `styling` |
 | `preview_ready` | The preview loaded. | |
-| `editor_opened` | The editor panel opened. | |
 | `element_selected` | An element was selected. | |
 | `edit` | A change was written to your source. | `edit_kind`, `target`, `prop_category`, `file_ext`, `lines_added`, `lines_removed`, `files_count`, `breakpoint`, `state`, `source`, `agent`, `impact` |
 | `first_edit` | The first change on this machine. | |
@@ -41,11 +40,11 @@ The server adds country, region and city from the request. It does not store the
 | `breakpoint_switch`, `state_switch` | You switched breakpoint or state. | `breakpoint`, `state` |
 | `library_insert` | A library item was inserted. | `library_item`, `tier` |
 | `copy_for_agent` | You copied a change for an agent. | |
-| `focus_opened` | Focus mode opened. | `variant` (`focus` or `variant`) |
+| `focus_opened` | Focus mode opened. | `variant` (`focus`) |
 | `ai_agent_chosen`, `ai_session_started`, `ai_session_ended` | An agent was chosen; an AI session started or ended. | `agent`; on end: `message_count`, `tool_count`, `duration_ms` |
 | `ai_message_sent`, `ai_first_response` | A message was sent; the first reply arrived. | `agent`; first response: `duration_ms` |
 | `ai_tool_call`, `ai_permission`, `ai_cancel`, `ai_session_error` | Agent activity. | `agent`; permission: `outcome` (`allow` or `reject`); error: `error_class` |
-| `onboarding_started`, `onboarding_step`, `onboarding_finished`, `onboarding_skipped` | Onboarding progress. | `step` (`welcome`, `agent`, `connect_agents`, `sign_in`, `support`), `outcome` (`viewed`, `completed`, `skipped`), `choice` (`mcp`, `extension`, `copy_for_agent`) |
+| `onboarding_started`, `onboarding_step`, `onboarding_finished`, `onboarding_skipped` | Onboarding progress. | `step` (`welcome`, `agent`, `agents`, `sign_in`, `support`), `outcome` (`viewed`, `completed`, `skipped`), `choice` (`mcp`, when the MCP setup command is copied) |
 | `sign_in_prompted`, `sign_in`, `sign_out` | Account prompts and changes. | |
 | `share_action`, `cloud_action` | Share and Feega Cloud use. | `action` |
 | `mcp_tool_call` | An MCP tool was called. | `tool` (the tool name only) |

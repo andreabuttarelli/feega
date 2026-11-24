@@ -16,7 +16,7 @@ insert into public.usage_event_kinds (event) values
   ('onboarding_started'), ('onboarding_step'), ('onboarding_finished'), ('onboarding_skipped'),
   ('setup_applied'), ('setup_failed'), ('skill_hint_shown'), ('skill_installed'), ('library_insert'),
   ('plugin_installed'), ('support_action'),
-  ('project_detected'), ('editor_opened'), ('element_selected'), ('edit_reverted'),
+  ('project_detected'), ('element_selected'), ('edit_reverted'),
   ('breakpoint_switch'), ('state_switch'), ('copy_for_agent'), ('focus_opened'),
   ('ai_agent_chosen'), ('ai_session_started'), ('ai_message_sent'), ('ai_first_response'),
   ('ai_tool_call'), ('ai_permission'), ('ai_cancel'), ('ai_session_error'), ('ai_session_ended'),
@@ -160,9 +160,9 @@ as $$
   where s.event = 'onboarding_step' and s.step is not null
   group by s.step
   union all
-  select 'connect_agents:' || s.choice, 0, count(distinct s.install_id), 0
+  select 'agents:' || s.choice, 0, count(distinct s.install_id), 0
   from window_events s
-  where s.event = 'onboarding_step' and s.step = 'connect_agents' and s.choice is not null
+  where s.event = 'onboarding_step' and s.step = 'agents' and s.choice is not null
   group by s.choice
   union all
   select 'sign_in_prompt',
