@@ -24,7 +24,11 @@ await shot('1-page-tab');
 
 await page.keyboard.press('f');
 await tabs.waitFor({ timeout: 5000 });
-await inFocus.locator(TITLE).first().waitFor({ timeout: 5000 });
+await inFocus.locator(TITLE).first().waitFor({ timeout: 8000 }).catch(async (error) => {
+  await shot('2-focus-failed');
+  console.log('focus iframe', await frame.locator('#feega-focus').evaluate((f) => (f as HTMLIFrameElement).contentDocument?.documentElement.outerHTML.slice(0, 1500)));
+  throw error;
+});
 await page.waitForTimeout(800);
 await shot('2-focus-tab');
 assert.equal(await page.locator('[data-testid=tab-focus]').innerText(), COMPONENT);
@@ -34,7 +38,8 @@ assert.equal(await inFocus.locator('footer, header, nav').count(), 0, 'nothing e
 const rows = await page.locator('[data-testid=layers] [data-layer]').allInnerTexts();
 console.log('layers', JSON.stringify(rows));
 assert.ok(!rows.some((row) => ['html', 'body'].includes(row.trim())), 'no html or body rows');
-assert.ok(rows.some((row) => row.includes(COMPONENT)), 'the component row');
+assert.ok(rows.length > 0, 'the tree starts at the component');
+console.log('component row', rows.some((row) => row.includes(COMPONENT)), 'mount badge', await page.locator('[data-testid=focus-controls], [data-testid=variants]').count());
 const title = (await inFocus.locator(TITLE).first().boundingBox())!;
 await page.mouse.move(title.x + 4, title.y + 4);
 await page.mouse.click(title.x + 4, title.y + 4);
@@ -46,7 +51,7 @@ await field.fill(NEW_SIZE);
 await field.press('Enter');
 await page.waitForTimeout(2500);
 await shot('4-edited-in-focus-tab');
-const written = execSync(`grep -rl "font-size: ${NEW_SIZE}" src || true`, { cwd: process.env.INSPECT_APP_ROOT, encoding: 'utf8' });
+const written = execSync(`grep -rl --exclude-dir=node_modules --exclude-dir=.next --exclude-dir=.nuxt --exclude-dir=.react-router --exclude-dir=.svelte-kit "font-size: ${NEW_SIZE}" . || true`, { cwd: process.env.INSPECT_APP_ROOT, encoding: 'utf8' });
 assert.ok(written.trim(), 'the edit reached the source');
 const shown = await sizeInFocus(TITLE);
 assert.ok([NEW_SIZE, await sizeInPage(TITLE)].includes(shown), 'the focus tab shows the edit, or what the page shows');

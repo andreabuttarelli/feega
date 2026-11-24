@@ -4,6 +4,8 @@ import { FocusMode, MOUNT_STATUS, Status } from './mount-protocol.js';
 
 export const FOCUSED = 'feega:focused';
 const MOUNT_ROUTE = '/__feega/mount';
+const NESTED_HOST = Symbol.for('feega.nested-host');
+const NO_MOUNT_PAGE = 'The dev server has no mount page';
 
 const FRAME_ID = 'feega-focus';
 export const CANVAS_ID = 'feega-focus-canvas';
@@ -185,6 +187,10 @@ export function focusTab(win, { install, prepare, report }) {
       mine.srcdoc = documentOf(parts);
     }
     mine.addEventListener('load', () => {
+      if (frame === mine && mode === FocusMode.Mount && !mine.contentWindow[NESTED_HOST]) {
+        fallBack(NO_MOUNT_PAGE);
+        return;
+      }
       if (frame === mine) {
         loaded = true;
         install(mine.contentWindow);
