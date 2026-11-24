@@ -430,12 +430,15 @@ function pageNode(element, source, children) {
   return { name: tag, tag, display: style.display, direction: 'row', position: style.position || 'static', source: parseSource(source), component: false, count: 1, children };
 }
 
-export function treeOf(doc) {
+export function treeOf(doc, { bare = false } = {}) {
   const roots = [...doc.querySelectorAll(`[${SOURCE_ATTR}]`)].filter((e) => !isGhost(e) && !shownParent(e));
   const budget = { left: MAX_TREE_NODES, instances: instanceIndexes(doc) };
   const inHead = (e) => Boolean(doc.head?.contains(e));
   const head = foldedOf(roots.filter(inHead), 1, budget);
   const body = foldedOf(roots.filter((e) => !inHead(e)), 0, budget);
+  if (bare) {
+    return body;
+  }
   const group = { name: HEAD_GROUP, tag: 'head', display: 'none', direction: 'row', position: 'static', source: null, component: false, count: head.length, children: head };
   return [pageNode(doc.documentElement, HTML_SOURCE, [...(head.length ? [group] : []), pageNode(doc.body, PAGE_SOURCE, body)])];
 }

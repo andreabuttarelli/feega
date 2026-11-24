@@ -114,6 +114,19 @@ describe('focus tab', () => {
     expect(up.some((m) => m.type === 'feega:palette:result')).toBe(false);
   });
 
+  it('sends the tree of the focus tab without html and body', async () => {
+    const { win, up, send, frame } = bridged();
+    send({ type: 'feega:focus', source: 'src/Card.tsx:5:7', index: 1 });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    frame()!.contentDocument!.write(frame()!.srcdoc);
+    frame()!.dispatchEvent(new (win as unknown as typeof globalThis).Event('load'));
+    send({ type: 'feega:tree', focus: true });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    const reply = up.find((m) => m.type === 'feega:tree:result' && m.focus) as { tree: { name: string }[] };
+    expect(reply.tree.map((node) => node.name)).toEqual(['Card']);
+  });
+
   it('marks what comes back from the focus tab so the view can tell the tabs apart', async () => {
     const { send, up, frame } = bridged();
     send({ type: 'feega:focus', source: CARD });
