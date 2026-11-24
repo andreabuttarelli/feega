@@ -132,12 +132,8 @@ export function pageBridge(frame: () => HTMLIFrameElement | null, on: PageEvents
     hide: (source: Source, hidden: boolean) => send({ type: HIDE, source: sourceText(source), hidden }),
     mode: (mode: Mode) => send({ type: MODE, mode }),
     reveal: (source: Source, index = 0) => send({ type: REVEAL, source: sourceText(source), index }),
-<<<<<<< HEAD
-    focus: (source: Source | null, shown = true) => send({ type: FOCUS, source: source ? sourceText(source) : null, shown }, Target.Page),
-    mountProps: (props: Record<string, unknown>, variants: Variant[] | null) => send({ type: MOUNT_PROPS, props, variants }, Target.Focus),
-=======
     focus: (source: Source | null, shown = true, index?: number) => send({ type: FOCUS, source: source ? sourceText(source) : null, shown, index }, Target.Page),
->>>>>>> origin/feat/feega-inspect
+    mountProps: (props: Record<string, unknown>, variants: Variant[] | null) => send({ type: MOUNT_PROPS, props, variants }, Target.Focus),
     useFocus: (on: boolean) => (inFocus = on),
     scroll: (dx: number, dy: number) => send({ type: SCROLL, dx, dy }),
     leave: () => send({ type: LEAVE }),
