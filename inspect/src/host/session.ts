@@ -328,6 +328,9 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     delayMs: SYNC_SELECTION_DELAY_MS
   });
 
+  let agentContext: string | null = null;
+  const published = platform.localBridge?.(workspace, { selection: () => agentContext, changes: () => edits.history() })?.catch(() => null);
+
   const impact = (ask: ImpactAsk) => impactOf(root, ask, edits.targets, usages);
 
   async function impactShown(id: number, ask: ImpactAsk) {
@@ -639,7 +642,8 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.Link]: (m) => edits.link(m.at, m.edit, m.instance).then((out) => edited(out, null)),
     [ToHost.Attribute]: (m) => edits.attribute(m.at, m.name, m.value).then((out) => edited(out, null)),
     [ToHost.Go]: (m) => edits.go(m.at, m.ask).then((out) => edited(out, null)),
-    [ToHost.Selected]: (m) => syncSelection(m.at),
+    [ToHost.Selected]: (m) => (void published?.then((bridge) => bridge?.touch()), syncSelection(m.at)),
+    [ToHost.Context]: (m) => void (agentContext = m.text),
     [ToHost.Copy]: (m) => platform.copyText?.(m.text),
     [ToHost.Comments]: comments.show,
     [ToHost.CommentAdd]: (m) => comments.add(m.draft),
@@ -692,6 +696,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
       usages.dispose();
       pluginList?.stop();
       await sharing.stop();
+      await (await published)?.stop();
       await usage?.end();
     },
     usageChanged: () => usage?.recheck(),

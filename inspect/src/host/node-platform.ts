@@ -1,3 +1,4 @@
+import { publishLocal } from './local-bridge/publish';
 import { spawn } from 'node:child_process';
 import { mkdirSync, readFileSync } from 'node:fs';
 import { mkdtemp, writeFile } from 'node:fs/promises';
@@ -135,6 +136,7 @@ export function nodePlatform({ root, launcher, version, transport, print, launch
     onboarding,
     support,
     skillHint: nodeSkillHint(HintSurface.Terminal),
+    localBridge: publishLocal,
     agents: () => machineAgents(),
     usage: {
       identity: () => ({ ...installOf(install), version, editor: Editor.Npx, os: process.platform, arch: process.arch, device: Device.Cli }),

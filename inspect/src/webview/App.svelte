@@ -1043,12 +1043,19 @@
     run[chosen.command]();
   }
 
-  async function copyForAgent() {
+  async function agentText(): Promise<string | null> {
     if (!picked) {
-      return;
+      return null;
     }
     const picks = several ? (await Promise.all(selection.refs.map((r) => bridge.again(r.source, r.instance)))).filter((p): p is Pick => p !== null) : [picked];
-    const text = agentContexts(picks, { route, width: Math.round(fit.width), breakpoint: size === Size.Full ? undefined : reachBadge, theme: themeName === DEFAULT_THEME ? undefined : themeName, state: elementState === ElementState.Default ? undefined : elementState });
+    return agentContexts(picks, { route, width: Math.round(fit.width), breakpoint: size === Size.Full ? undefined : reachBadge, theme: themeName === DEFAULT_THEME ? undefined : themeName, state: elementState === ElementState.Default ? undefined : elementState });
+  }
+
+  async function copyForAgent() {
+    const text = await agentText();
+    if (text === null) {
+      return;
+    }
     if (inVscode) {
       toHost({ kind: ToHost.Copy, text });
     } else {
@@ -1056,6 +1063,15 @@
     }
     showToast('Copied for your agent');
   }
+
+  $effect(() => {
+    pickedAt;
+    route;
+    size;
+    themeName;
+    elementState;
+    void agentText().then((text) => toHost({ kind: ToHost.Context, text }));
+  });
 
   function restructure(op: StructureOp) {
     if (several) {
