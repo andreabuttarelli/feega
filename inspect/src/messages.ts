@@ -1,4 +1,6 @@
 import type { SupportItem } from './support';
+import type { AcpAgent, AcpId } from './host/ai/acp-agents';
+import type { AgentEvent } from './host/ai/agent-session';
 import type { LiveEditAsk } from '@feega/live-edit/live-ask';
 import type { Place } from '@feega/live-edit/move-node';
 import type { AddKind, AddPlace } from '@feega/live-edit/add-node';
@@ -212,12 +214,24 @@ export enum ToHost {
   PluginRemove = 'plugin-remove',
   PluginInstall = 'plugin-install',
   PreviewReady = 'preview-ready',
-  Cursor = 'cursor'
+  Cursor = 'cursor',
+  AiList = 'ai-list',
+  AiStart = 'ai-start',
+  AiSend = 'ai-send',
+  AiCancel = 'ai-cancel',
+  AiAnswer = 'ai-answer'
 }
 
 export type ChangeRow = { id: number; at: string; prop: string; value: string; scope: string; files: string[]; time: number; by?: string };
 
 export type Prefs = { size: string; custom: number | null; barClosed: boolean; route?: string; anchor?: string; barWidth?: number; leftWidth?: number; leftClosed?: boolean; layers?: Record<string, { hidden: string[]; locked: string[] }> };
+
+export enum AiState {
+  Idle = 'idle',
+  Starting = 'starting',
+  Ready = 'ready',
+  Busy = 'busy'
+}
 
 export enum ToView {
   App = 'app',
@@ -245,7 +259,10 @@ export enum ToView {
   Reload = 'reload',
   Impact = 'impact',
   Preview = 'preview',
-  Peers = 'peers'
+  Peers = 'peers',
+  AiAgents = 'ai-agents',
+  AiState = 'ai-state',
+  AiEvent = 'ai-event'
 }
 
 export enum ShareState {
@@ -352,7 +369,12 @@ export type HostMessage =
   | { kind: ToHost.PluginRemove; id: string }
   | { kind: ToHost.PluginInstall; source: string }
   | { kind: ToHost.PreviewReady }
-  | { kind: ToHost.Cursor; at: Point | null };
+  | { kind: ToHost.Cursor; at: Point | null }
+  | { kind: ToHost.AiList }
+  | { kind: ToHost.AiStart; agent: AcpId }
+  | { kind: ToHost.AiSend; text: string; context: string | null }
+  | { kind: ToHost.AiCancel }
+  | { kind: ToHost.AiAnswer; id: string; optionId: string | null };
 
 export type Authored = HostMessage & { by?: Author };
 
@@ -382,7 +404,10 @@ export type ViewMessage =
   | { kind: ToView.Reload }
   | { kind: ToView.Impact; id: number; impact: Impact }
   | { kind: ToView.Preview; ask: EditAsk; reason: string; files: DiffFile[]; by?: Author }
-  | { kind: ToView.Peers; peers: Present[] };
+  | { kind: ToView.Peers; peers: Present[] }
+  | { kind: ToView.AiAgents; agents: AcpAgent[] }
+  | { kind: ToView.AiState; state: AiState; agent?: AcpId }
+  | { kind: ToView.AiEvent; event: AgentEvent };
 
 export const INSPECT = 'feega:inspect';
 export const INSPECT_RESULT = 'feega:inspect:result';

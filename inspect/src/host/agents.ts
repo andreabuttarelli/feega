@@ -3,14 +3,14 @@ import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { AgentId } from '../messages';
 
-enum Probe {
+export enum Probe {
   Binary = 'binary',
   Dir = 'dir',
   App = 'app',
   Extension = 'extension'
 }
 
-type Clue = { probe: Probe; value: string };
+export type Clue = { probe: Probe; value: string };
 
 export type AgentEnv = {
   path: string[];
@@ -20,7 +20,7 @@ export type AgentEnv = {
   extensions: string[];
 };
 
-const AGENT_CLUES: Record<AgentId, Clue[]> = {
+export const AGENT_CLUES: Record<AgentId, Clue[]> = {
   [AgentId.ClaudeCode]: [{ probe: Probe.Binary, value: 'claude' }, { probe: Probe.Dir, value: '.claude' }],
   [AgentId.Cursor]: [{ probe: Probe.App, value: 'cursor' }, { probe: Probe.Binary, value: 'cursor' }],
   [AgentId.Codex]: [{ probe: Probe.Binary, value: 'codex' }, { probe: Probe.Dir, value: '.codex' }],
@@ -36,7 +36,7 @@ const PROBES: Record<Probe, (env: AgentEnv, value: string) => boolean> = {
   [Probe.Extension]: (env, value) => env.extensions.includes(value)
 };
 
-const seen = (env: AgentEnv, { probe, value }: Clue): boolean => {
+export const seen = (env: AgentEnv, { probe, value }: Clue): boolean => {
   try {
     return PROBES[probe](env, value);
   } catch {
@@ -46,5 +46,6 @@ const seen = (env: AgentEnv, { probe, value }: Clue): boolean => {
 
 export const detectAgents = (env: AgentEnv): AgentId[] => (Object.values(AgentId) as AgentId[]).filter((id) => AGENT_CLUES[id].some((clue) => seen(env, clue)));
 
-export const machineAgents = (appName = '', extensions: string[] = []): AgentId[] =>
-  detectAgents({ path: (process.env.PATH ?? '').split(delimiter), home: homedir(), exists: existsSync, appName, extensions });
+export const machineEnv = (appName = '', extensions: string[] = []): AgentEnv => ({ path: (process.env.PATH ?? '').split(delimiter), home: homedir(), exists: existsSync, appName, extensions });
+
+export const machineAgents = (appName = '', extensions: string[] = []): AgentId[] => detectAgents(machineEnv(appName, extensions));
