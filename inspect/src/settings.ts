@@ -85,8 +85,20 @@ export const LINKS = {
   docs: 'https://docs.feega.app/integrations/inspect/',
   changelog: 'https://feega.app/changelog',
   dashboard: 'https://feega.app/',
-  issues: 'https://github.com/andreabuttarelli/feega/issues/new'
+  issues: 'https://github.com/andreabuttarelli/feega/issues/new',
+  discord: 'https://discord.gg/PUp37DG6vr'
 };
+
+export type HelpLink = { label: string; url: string };
+
+export function helpLinks(facts: ReportFacts | null): HelpLink[] {
+  return [
+    { label: 'Documentation', url: LINKS.docs },
+    { label: "What's new", url: LINKS.changelog },
+    { label: 'Send feedback', url: LINKS.discord },
+    { label: 'Report a problem', url: facts ? issueUrl(facts) : LINKS.issues }
+  ];
+}
 
 export type ReportFacts = { version: string; framework: string; styling: string };
 
