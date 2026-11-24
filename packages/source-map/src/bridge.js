@@ -67,7 +67,7 @@ export function installBridge(win, { nested = false, emit = null, twin = null } 
 
   function sendTree() {
     stampSources(doc);
-    const tree = treeOf(doc);
+    const tree = treeOf(doc, { bare: nested });
     treeSent = JSON.stringify(tree);
     reply({ type: TREE_RESULT, tree });
   }
@@ -79,7 +79,7 @@ export function installBridge(win, { nested = false, emit = null, twin = null } 
     treeTimer = win.setTimeout(() => {
       treeTimer = null;
       stampSources(doc);
-      if (JSON.stringify(treeOf(doc)) !== treeSent) {
+      if (JSON.stringify(treeOf(doc, { bare: nested })) !== treeSent) {
         sendTree();
       }
     }, TREE_REFRESH_MS);

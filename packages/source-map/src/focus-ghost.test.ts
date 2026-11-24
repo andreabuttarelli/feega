@@ -14,6 +14,13 @@ describe('the parent a focus tab keeps only to know where the component is used'
     expect(body.children[0]).toEqual(expect.objectContaining({ name: 'Card', component: true }));
   });
 
+  it('leaves the component as the root of the tree when asked for a bare one', () => {
+    const tree = treeOf(doc(), { bare: true });
+
+    expect(tree).toHaveLength(1);
+    expect(tree[0]).toEqual(expect.objectContaining({ name: 'Card', component: true }));
+  });
+
   it('is not in the crumbs', () => {
     const info = inspectElement(doc().querySelector('h2')!)!;
 

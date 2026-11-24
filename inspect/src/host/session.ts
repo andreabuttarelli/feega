@@ -58,6 +58,8 @@ const CACHE_DIRS = ['.svelte-kit', 'node_modules/.vite', '.next', '.nuxt', '.ast
 const ERROR_LINES = 6;
 const MINUTE_MS = 60_000;
 const ERROR = /error|failed|cannot|exception/i;
+const COMPILE_TIMEOUT_MS = 5000;
+const WATCHER_SEES_WRITE_MS = 400;
 
 enum Replay {
   Fresh,
@@ -89,7 +91,14 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   let nextPick = 0;
   const picks = new Map<number, (pick: Pick | null) => void>();
   const stylingChoice = () => platform.settings()[SettingKey.Styling] as StylingChoice;
-  const editsAt = (dir: string) => fileEdits(dir, stylingChoice, platform.stored<Snapshot>(Stored.History));
+  const pageCompiled = async () => {
+    if (!running) {
+      return;
+    }
+    await new Promise((done) => setTimeout(done, WATCHER_SEES_WRITE_MS));
+    await fetch(new URL(route ?? '/', running.upstream), { signal: AbortSignal.timeout(COMPILE_TIMEOUT_MS) }).catch(() => undefined);
+  };
+  const editsAt = (dir: string) => fileEdits(dir, stylingChoice, platform.stored<Snapshot>(Stored.History), pageCompiled);
   let edits = editsAt(root);
   const queue = editQueue();
   const ai = aiChat({
