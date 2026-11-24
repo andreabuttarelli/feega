@@ -1,22 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { ImpactKind, type Impact } from '../messages';
-import { chipOf, withImpact } from './ai-context';
+import { withImpact } from './ai-context';
 
 const CONTEXT = ['Feega selection', 'source: src/Hero.svelte:12:3', 'selector: h1.title', 'page: /'].join('\n');
-
-describe('the selection chip', () => {
-  it('shows the file, line and selector', () => {
-    expect(chipOf(CONTEXT)).toBe('src/Hero.svelte:12 h1.title');
-  });
-
-  it('shows the count when several elements are selected', () => {
-    expect(chipOf('Feega selection: 3 elements\npage: /')).toBe('3 elements');
-  });
-
-  it('has no chip without a selection', () => {
-    expect(chipOf(null)).toBeNull();
-  });
-});
 
 describe('the impact in the context', () => {
   it('adds how widely the element is shared', () => {

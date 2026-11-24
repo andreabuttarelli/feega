@@ -20,15 +20,32 @@ const { page } = panel;
 await panel.pickAt('h1');
 await page.waitForTimeout(400);
 await page.locator('[data-testid=ai-tab]').click();
-await page.locator('[data-testid=ai-agent]').selectOption('opencode');
-await page.locator('[data-testid=ai-state]', { hasText: 'Ready' }).waitFor({ timeout: 15_000 });
+await page.locator('[data-testid=ai-agent]').click();
+assert.equal(await page.locator('[data-testid=ai-agent-missing]').count(), 7, 'agents that are not installed sit dimmed inside the menu');
+await page.screenshot({ path: join(SHOTS, '2-dropdown.png') });
+await page.locator('[data-testid=ai-agent-option][data-agent=opencode]').click();
+await page.locator('[data-testid=ai-state][aria-label=Ready]').waitFor({ timeout: 15_000 });
+assert.equal(await page.locator('[data-testid=ai-suggestion]').count(), 3, 'the empty state offers three suggestions');
 assert.ok(await page.locator('[data-testid=ai-chip]').count(), 'the selection is attached as a chip');
-await page.screenshot({ path: join(SHOTS, '1-chip.png') });
+await page.screenshot({ path: join(SHOTS, '1-empty.png') });
 
+await page.locator('[data-testid=ai-suggestion]').first().click();
+assert.equal(await page.locator('[data-testid=ai-input]').inputValue(), 'Make this more spacious');
 await page.locator('[data-testid=ai-input]').fill('hello');
-await page.locator('[data-testid=ai-send]').click();
+await page.locator('[data-testid=ai-input]').press('Shift+Enter');
+await page.locator('[data-testid=ai-input]').pressSequentially('again');
+await page.screenshot({ path: join(SHOTS, '3-chip.png') });
+await page.locator('[data-testid=ai-input]').fill('hello');
+await page.locator('[data-testid=ai-input]').press('Enter');
 await page.locator('.agent', { hasText: 'Hello' }).waitFor({ timeout: 10_000 });
-await page.screenshot({ path: join(SHOTS, '2-reply.png') });
+await page.screenshot({ path: join(SHOTS, '4-reply.png') });
+
+await page.locator('[data-testid=ai-input]').fill('wait');
+await page.locator('[data-testid=ai-send]').click();
+await page.locator('[data-testid=ai-thinking]').waitFor({ timeout: 10_000 });
+await page.screenshot({ path: join(SHOTS, '5-streaming.png') });
+await page.locator('[data-testid=ai-cancel]').click();
+await page.locator('[data-testid=ai-send]').waitFor({ timeout: 10_000 });
 
 await page.locator('[data-testid=ai-chip] button').click();
 assert.equal(await page.locator('[data-testid=ai-chip]').count(), 0, 'the chip can be removed');
@@ -36,14 +53,15 @@ assert.equal(await page.locator('[data-testid=ai-chip]').count(), 0, 'the chip c
 await page.locator('[data-testid=ai-input]').fill(`write ${TARGET}`);
 await page.locator('[data-testid=ai-send]').click();
 await page.locator('[data-testid=ai-permission]').waitFor({ timeout: 10_000 });
-await page.screenshot({ path: join(SHOTS, '3-permission.png') });
+await page.screenshot({ path: join(SHOTS, '6-permission.png') });
 await page.locator('[data-testid=ai-option]', { hasText: 'Allow' }).click();
 await page.locator('.agent', { hasText: 'done' }).waitFor({ timeout: 10_000 });
 assert.equal(readFileSync(join(APP, TARGET), 'utf8'), 'written by the agent\n');
-await page.screenshot({ path: join(SHOTS, '4-written.png') });
+await page.locator('[data-testid=ai-tool]').last().locator('summary').click();
+await page.screenshot({ path: join(SHOTS, '7-tool-done.png') });
 
 await page.locator('[data-testid=changes-tab]').click();
 await page.waitForTimeout(300);
 assert.match(await page.locator('[data-testid=changes-tab]').innerText(), /Changes 1/);
-await page.screenshot({ path: join(SHOTS, '5-changes.png') });
 await panel.close();
+process.exit(0);
