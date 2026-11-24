@@ -12,7 +12,7 @@ vi.mock('$lib/server/onboarding/onboarding', () => ({ onboardingPathFor: (...arg
 vi.mock('$lib/server/cloud/return-path', () => ({ stashReturn: (...args: unknown[]) => mocks.stash(...args) }));
 
 import { fakeDb, type FakeDb } from '$lib/server/cloud/testing/fake-db';
-import { load } from './+page.server';
+import { actions, load } from './+page.server';
 
 const SID = 'abcdefghij';
 
@@ -95,6 +95,59 @@ describe('/s/[id] load', () => {
   it('returns the read-only page data for a closed session', async () => {
     const db = fakeDb({ share_sessions: [sessionRow({ status: 'closed', closed_at: '2026-11-21T09:50:00Z', snapshot_path: 'org-1/abcdefghij.zip' })] });
 
-    expect(await run(db)).toMatchObject({ sid: SID, projectName: 'Landing', snapshot: true, comments: [] });
+    expect(await run(db)).toMatchObject({ sid: SID, projectName: 'Landing', snapshot: true, comments: [], revisions: [], status: 'open', mayDecide: true });
+  });
+
+  it('lists the revisions with their verdicts and tells the host they cannot decide', async () => {
+    const db = fakeDb({
+      share_sessions: [sessionRow({ status: 'closed', closed_at: '2026-11-21T09:50:00Z', host_user_id: 'ada' })],
+      share_revisions: [{ id: 'r1', session_id: SID, org_id: 'org-1', number: 1, author_id: 'ada', summary: 'Round one', changes: [], created_at: '2026-11-21T09:10:00Z' }],
+      share_verdicts: [{ revision_id: 'r1', session_id: SID, org_id: 'org-1', reviewer_id: 'vera', reviewer_name: 'Vera', verdict: 'approved', note: null, decided_at: '2026-11-21T09:20:00Z' }]
+    });
+
+    expect(await run(db)).toMatchObject({ status: 'approved', mayDecide: false, revisions: [{ id: 'r1', summary: 'Round one', status: 'approved' }] });
+  });
+});
+
+describe('/s/[id] verdict action', () => {
+  const decide = (db: FakeDb | null, fields: Record<string, string>) => {
+    const form = new FormData();
+    Object.entries(fields).forEach(([key, value]) => form.set(key, value));
+
+    return (actions.verdict as never as (event: unknown) => Promise<unknown>)({
+      params: { id: SID },
+      request: new Request('https://oh.feega.app', { method: 'POST', body: form }),
+      locals: { safeGetSession: async () => ({ user: db ? { id: 'ada' } : null }), db: async () => db }
+    });
+  };
+
+  const seeded = () =>
+    fakeDb(
+      {
+        share_sessions: [sessionRow({ status: 'closed', closed_at: '2026-11-21T09:50:00Z' })],
+        share_revisions: [{ id: 'r1', session_id: SID, org_id: 'org-1', number: 1, author_id: 'host-1', summary: 'Round one', changes: [], created_at: '2026-11-21T09:10:00Z' }],
+        profiles: [{ id: 'ada', name: 'Ada', email: 'a@x.co' }]
+      },
+      { unique: { share_verdicts: ['revision_id', 'reviewer_id'] } }
+    );
+
+  it('records the verdict of the signed-in reviewer', async () => {
+    const db = seeded();
+
+    await decide(db, { revisionId: 'r1', verdict: 'changes_requested', note: 'Tighter' });
+
+    expect(db.tables.share_verdicts).toMatchObject([{ revision_id: 'r1', reviewer_id: 'ada', reviewer_name: 'Ada', verdict: 'changes_requested', note: 'Tighter' }]);
+  });
+
+  it('answers 400 to a verdict nobody knows', async () => {
+    const result = (await decide(seeded(), { revisionId: 'r1', verdict: 'maybe' })) as { status: number };
+
+    expect(result.status).toBe(400);
+  });
+
+  it('answers 401 when signed out', async () => {
+    const result = (await decide(null, { revisionId: 'r1', verdict: 'approved' })) as { status: number };
+
+    expect(result.status).toBe(401);
   });
 });

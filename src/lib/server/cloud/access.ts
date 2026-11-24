@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { json } from '@sveltejs/kit';
 import { can, OrgAction, type OrgRole } from '$lib/org-roles';
 import { openOrg, type OrgCall } from '$lib/server/cli-auth';
+import { cloudEntitled } from './entitlement';
 import { isSid } from './sid';
 import { roleIn, sessionFor, type SessionRole, type SessionRow } from './sessions';
 
@@ -53,4 +54,17 @@ export async function openSessionCall(request: Request, id: string): Promise<Ses
   }
 
   return { call, session, role };
+}
+
+export async function openCloudSessionCall(request: Request, id: string): Promise<SessionCall | Response> {
+  const opened = await openSessionCall(request, id);
+  if (opened instanceof Response) {
+    return opened;
+  }
+
+  if (!(await cloudEntitled(opened.call.supabase, opened.session.org_id))) {
+    return reject('plan_required', Http.PaymentRequired);
+  }
+
+  return opened;
 }

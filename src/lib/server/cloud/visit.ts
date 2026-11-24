@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { visitorAuthUrl } from './hosts';
 import { listComments, type Comment } from './comments';
+import { listRevisions, ReviewStatus, type Revision } from './revisions';
 import { isSid } from './sid';
 import { joinSession, namesOf, roleIn, sessionById, SESSION_MAX_MS, type SessionRow } from './sessions';
 import { signToken } from './token';
@@ -17,6 +18,9 @@ export type Ended = {
   endedAt: string;
   snapshot: boolean;
   comments: Comment[];
+  revisions: Revision[];
+  status: ReviewStatus;
+  mayDecide: boolean;
 };
 
 export type Visit =
@@ -55,13 +59,18 @@ export async function visit(
   }
 
   if (isEnded(session, input.now)) {
+    const revisions = await listRevisions(db, session.id);
+
     return {
       kind: VisitKind.Ended,
       ended: {
         projectName: session.project_name,
         endedAt: session.closed_at ?? session.expires_at,
         snapshot: Boolean(session.snapshot_path),
-        comments: await listComments(db, session.id, false)
+        comments: await listComments(db, session.id, false),
+        revisions,
+        status: revisions.at(-1)?.status ?? ReviewStatus.Open,
+        mayDecide: input.userId !== session.host_user_id
       }
     };
   }

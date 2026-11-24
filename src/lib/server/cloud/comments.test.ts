@@ -41,7 +41,7 @@ function stored(over: Record<string, unknown> = {}) {
 
 describe('readCommentInput', () => {
   it('trims the body and accepts a relative source file', () => {
-    expect(readCommentInput(VALID)).toEqual({ check: CommentCheck.Valid, input: { ...VALID, body: 'Tighten this', parentId: null } });
+    expect(readCommentInput(VALID)).toEqual({ check: CommentCheck.Valid, input: { ...VALID, body: 'Tighten this', parentId: null, revisionId: null } });
   });
 
   it.each([
