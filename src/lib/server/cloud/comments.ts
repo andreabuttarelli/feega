@@ -12,6 +12,7 @@ export type Comment = {
   sourceLine: number;
   sourceCol: number;
   parentId: string | null;
+  revisionId: string | null;
   createdAt: string;
   resolvedAt: string | null;
   resolvedBy: string | null;
@@ -24,6 +25,7 @@ export type CommentInput = {
   sourceLine: number;
   sourceCol: number;
   parentId: string | null;
+  revisionId: string | null;
 };
 
 export enum CommentCheck {
@@ -58,6 +60,7 @@ type Row = {
   source_line: number;
   source_col: number;
   parent_id: string | null;
+  revision_id?: string | null;
   created_at: string;
   resolved_at: string | null;
   resolved_by: string | null;
@@ -83,6 +86,7 @@ export function toComment(row: Row): Comment {
     sourceLine: row.source_line,
     sourceCol: row.source_col,
     parentId: row.parent_id,
+    revisionId: row.revision_id ?? null,
     createdAt: row.created_at,
     resolvedAt: row.resolved_at ?? null,
     resolvedBy: row.resolved_by ?? null
@@ -116,7 +120,8 @@ export function readCommentInput(raw: unknown): { check: CommentCheck.Valid; inp
       sourceFile,
       sourceLine: body.sourceLine as number,
       sourceCol: body.sourceCol as number,
-      parentId: typeof body.parentId === 'string' && body.parentId ? body.parentId : null
+      parentId: typeof body.parentId === 'string' && body.parentId ? body.parentId : null,
+      revisionId: typeof body.revisionId === 'string' && body.revisionId ? body.revisionId : null
     }
   };
 }
@@ -144,7 +149,8 @@ export async function addComment(db: SupabaseClient, session: SessionRow, author
       source_file: input.sourceFile,
       source_line: input.sourceLine,
       source_col: input.sourceCol,
-      parent_id: input.parentId
+      parent_id: input.parentId,
+      revision_id: input.revisionId
     })
     .select('*')
     .single();

@@ -1,8 +1,11 @@
 <script lang="ts">
+  import { enhance } from '$app/forms';
   import FeegaMark from '$lib/components/FeegaMark.svelte';
   import Wordmark from '$lib/components/app/Wordmark.svelte';
 
   let { data } = $props();
+
+  const STATUS_LABEL: Record<string, string> = { open: 'Awaiting review', changes_requested: 'Changes requested', approved: 'Approved' };
 
   const endedOn = $derived(new Date(data.endedAt).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }));
 </script>
@@ -17,7 +20,7 @@
     <a class="lockup" href="/" aria-label="feega"><FeegaMark size={24} /><Wordmark /></a>
     <div class="title">
       <h1>{data.projectName}</h1>
-      <p>Session ended {endedOn}. Read only.</p>
+      <p>Session ended {endedOn}. Read only. <span class="status {data.status}" data-testid="review-status">{STATUS_LABEL[data.status]}</span></p>
     </div>
   </header>
 
@@ -31,6 +34,37 @@
     </section>
 
     <aside class="comments">
+      <h2>Revisions</h2>
+      {#if data.revisions.length === 0}
+        <p class="empty">No revisions published.</p>
+      {:else}
+        <ul class="revisions">
+          {#each data.revisions as revision (revision.id)}
+            <li data-testid="revision">
+              <div class="meta">
+                <strong>Round {revision.number}</strong>
+                <span class="status {revision.status}">{STATUS_LABEL[revision.status]}</span>
+              </div>
+              <p>{revision.summary}</p>
+              {#each revision.changes as change}
+                <code>{change.file} {change.prop}: {change.value}</code>
+              {/each}
+              {#each revision.verdicts as verdict (verdict.reviewerId)}
+                <p class="verdict">{verdict.reviewerName}: {STATUS_LABEL[verdict.verdict]}{verdict.note ? ` - ${verdict.note}` : ''}</p>
+              {/each}
+              {#if data.mayDecide}
+                <form method="POST" action="?/verdict" use:enhance>
+                  <input type="hidden" name="revisionId" value={revision.id} />
+                  <input name="note" placeholder="Note" maxlength="2000" />
+                  <button name="verdict" value="approved">Approve</button>
+                  <button name="verdict" value="changes_requested">Request changes</button>
+                </form>
+              {/if}
+            </li>
+          {/each}
+        </ul>
+      {/if}
+
       <h2>Comments</h2>
       {#if data.comments.length === 0}
         <p class="empty">No comments.</p>
@@ -153,6 +187,27 @@
     font-size: 12px;
     color: var(--ui-text-secondary);
     word-break: break-all;
+  }
+  .status.approved {
+    color: var(--ui-success, #1a7f37);
+  }
+  .status.changes_requested {
+    color: var(--ui-danger, #cf222e);
+  }
+  .revisions {
+    margin-bottom: var(--ui-space-4);
+  }
+  .verdict {
+    font-size: 13px;
+    color: var(--ui-text-secondary);
+  }
+  form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--ui-space-2);
+  }
+  form input {
+    flex: 1 1 100%;
   }
   .empty {
     margin: auto;

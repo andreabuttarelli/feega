@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { addComment, CommentCheck, listComments, readCommentInput } from '$lib/server/cloud/comments';
 import { bodyOf, Http, openSessionCall, reject } from '$lib/server/cloud/access';
+import { revisionIn } from '$lib/server/cloud/revisions';
 import { namesOf } from '$lib/server/cloud/sessions';
 
 const OPEN_FLAG = '1';
@@ -29,6 +30,10 @@ export const POST: RequestHandler = async ({ request, params }) => {
   }
 
   const { supabase, user } = opened.call;
+  if (read.input.revisionId && !(await revisionIn(supabase, opened.session.id, read.input.revisionId))) {
+    return reject('revision_not_found', Http.NotFound);
+  }
+
   const name = (await namesOf(supabase, [user.id])).get(user.id) ?? 'Someone';
   const comment = await addComment(supabase, opened.session, { id: user.id, name }, read.input);
 
