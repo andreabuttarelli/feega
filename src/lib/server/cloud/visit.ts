@@ -21,6 +21,7 @@ export type Ended = {
   revisions: Revision[];
   status: ReviewStatus;
   mayDecide: boolean;
+  hostOffline: boolean;
 };
 
 export type Visit =
@@ -46,7 +47,7 @@ function isEnded(session: SessionRow, now: Date): boolean {
 
 export async function visit(
   db: SupabaseClient,
-  input: { sid: string; userId: string; next: string | null; secret: string; now: Date }
+  input: { sid: string; userId: string; next: string | null; secret: string; now: Date; hostOffline?: boolean }
 ): Promise<Visit> {
   const session = isSid(input.sid) ? await sessionById(db, input.sid) : null;
   if (!session) {
@@ -58,19 +59,22 @@ export async function visit(
     return { kind: VisitKind.Removed };
   }
 
-  if (isEnded(session, input.now)) {
+  const hostOffline = !isEnded(session, input.now) && input.hostOffline === true;
+
+  if (isEnded(session, input.now) || hostOffline) {
     const revisions = await listRevisions(db, session.id);
 
     return {
       kind: VisitKind.Ended,
       ended: {
         projectName: session.project_name,
-        endedAt: session.closed_at ?? session.expires_at,
+        endedAt: session.closed_at ?? (hostOffline ? input.now.toISOString() : session.expires_at),
         snapshot: Boolean(session.snapshot_path),
         comments: await listComments(db, session.id, false),
         revisions,
         status: revisions.at(-1)?.status ?? ReviewStatus.Open,
-        mayDecide: input.userId !== session.host_user_id
+        mayDecide: input.userId !== session.host_user_id,
+        hostOffline
       }
     };
   }
