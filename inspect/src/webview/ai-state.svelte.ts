@@ -2,7 +2,7 @@ import { AiState, ToView, type ViewMessage } from '../messages';
 import type { AcpAgent } from '../host/ai/acp-agents';
 import { AgentEventKind, type ModeView } from '../host/ai/agent-session';
 import { Policy } from '../host/ai/permission-policy';
-import { answered, heard, said, type Item } from './ai-transcript';
+import { answered, heard, said, type Item } from '../host/ai/transcript';
 
 export const ai = $state<{ agents: AcpAgent[]; state: AiState; agent: string | null; items: Item[]; modes: ModeView[]; mode: string | null; policy: Policy }>({ agents: [], state: AiState.Idle, agent: null, items: [], modes: [], mode: null, policy: Policy.Ask });
 

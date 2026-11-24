@@ -3,7 +3,7 @@ import { AiState } from '../messages';
 import { ToolStatus } from '../host/ai/agent-session';
 import { Policy } from '../host/ai/permission-policy';
 import { Dot, isDanger, isThinking, markOf, pickerLabel, placeholderOf, statusOf } from './ai-view';
-import { ItemKind } from './ai-transcript';
+import { ItemKind } from '../host/ai/transcript';
 
 describe('the agent status', () => {
   it('is green when ready and amber while working', () => {

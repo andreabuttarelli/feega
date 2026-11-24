@@ -23,7 +23,7 @@
   import { sendsOnKey } from './ai-keys';
   import { SUGGESTIONS, isDanger, isThinking, markOf, pickerLabel, placeholderOf, statusOf } from './ai-view';
   import { POLICY_ROWS, type Policy } from '../host/ai/permission-policy';
-  import { ItemKind } from './ai-transcript';
+  import { ItemKind } from '../host/ai/transcript';
   import { lineDiff } from './ai-diff';
   import { markdown } from './ai-markdown';
   import { ToolStatus } from '../host/ai/agent-session';

@@ -2,7 +2,7 @@ import { AgentId, AiState } from '../messages';
 import { AGENT_LOGOS, type AgentLogo } from './agent-logos';
 import { POLICY_ROWS, type Policy } from '../host/ai/permission-policy';
 import type { ModeView } from '../host/ai/agent-session';
-import { ItemKind, type Item } from './ai-transcript';
+import { ItemKind, type Item } from '../host/ai/transcript';
 
 export enum Dot {
   Grey = 'grey',
