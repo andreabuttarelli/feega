@@ -19,7 +19,7 @@ describe('focus tab', () => {
     const { up, send, frame } = bridged();
     send({ type: 'feega:focus', source: 'src/Card.tsx:5:7' });
 
-    expect(up).toContainEqual({ type: 'feega:focused', count: 2 });
+    expect(up).toContainEqual({ type: 'feega:focused', count: 2, mode: 'snapshot' });
     expect(frame()!.srcdoc).toContain('One');
     expect(frame()!.srcdoc).not.toContain('Footer');
   });
@@ -28,7 +28,7 @@ describe('focus tab', () => {
     const { up, send, frame } = bridged();
     send({ type: 'feega:focus', source: 'src/Gone.tsx:1:1' });
 
-    expect(up).toContainEqual({ type: 'feega:focused', count: 0 });
+    expect(up).toContainEqual({ type: 'feega:focused', count: 0, mode: 'snapshot' });
     expect(frame()).toBeNull();
   });
 
@@ -38,7 +38,7 @@ describe('focus tab', () => {
     win.document.body.insertAdjacentHTML('beforeend', '<aside data-feega-src="src/Late.tsx:1:1"><b data-feega-src="src/Late.tsx:2:3">late</b></aside>');
     await new Promise((resolve) => setTimeout(resolve, 400));
 
-    expect(up).toContainEqual({ type: 'feega:focused', count: 1 });
+    expect(up).toContainEqual({ type: 'feega:focused', count: 1, mode: 'snapshot' });
     expect(frame()!.srcdoc).toContain('late');
   });
 
@@ -98,5 +98,75 @@ describe('focus tab', () => {
     await new Promise((resolve) => setTimeout(resolve, 100));
 
     expect(up).toContainEqual(expect.objectContaining({ type: 'feega:palette:result', focus: true }));
+  });
+
+  describe('a React component', () => {
+    const MOUNT_STATUS = 'feega:mount:status';
+    const reactive = () => {
+      const made = bridged();
+      const article = made.win.document.querySelector('article') as unknown as Record<string, unknown>;
+      const component = { tag: 0, type: function Card() {}, memoizedProps: { size: 'sm', onClick: () => undefined }, return: null };
+      article['__reactFiber$k'] = { tag: 5, type: 'article', memoizedProps: {}, return: component };
+      const status = (data: Record<string, unknown>) => made.win.dispatchEvent(new made.win.MessageEvent('message', { data: { type: MOUNT_STATUS, ...data }, source: made.frame()!.contentWindow as unknown as Window }));
+      return { ...made, status };
+    };
+
+    it('opens the real component from the dev server, with the props it has on the page', () => {
+      const { up, send, frame } = reactive();
+      send({ type: 'feega:focus', source: 'src/Card.tsx:5:7' });
+
+      const url = new URL(frame()!.getAttribute('src')!, 'http://localhost');
+      expect(url.pathname).toBe('/__feega/mount');
+      expect(url.searchParams.get('file')).toBe('src/Card.tsx');
+      expect(url.searchParams.get('name')).toBe('Card');
+      expect(JSON.parse(url.searchParams.get('props')!)).toEqual({ size: 'sm', onClick: { $fn: true } });
+      expect(up).toContainEqual({ type: 'feega:focused', count: 2, mode: 'mount' });
+    });
+
+    it('tells the view when the component is up, with what it learned about it', () => {
+      const { up, send, status } = reactive();
+      send({ type: 'feega:focus', source: 'src/Card.tsx:5:7' });
+      status({ status: 'ready', controls: [], props: { size: 'sm' } });
+
+      expect(up).toContainEqual({ type: MOUNT_STATUS, status: 'ready', controls: [], props: { size: 'sm' } });
+    });
+
+    it('falls back to the snapshot when the component cannot render alone, and says why', () => {
+      const { up, send, status, frame } = reactive();
+      send({ type: 'feega:focus', source: 'src/Card.tsx:5:7' });
+      status({ status: 'failed', reason: 'useTheme must be used within a ThemeProvider' });
+
+      expect(frame()!.srcdoc).toContain('One');
+      expect(frame()!.getAttribute('src')).toBeNull();
+      expect(up).toContainEqual({ type: 'feega:focused', count: 2, mode: 'snapshot', reason: 'useTheme must be used within a ThemeProvider' });
+    });
+
+    it('does not try the real component again for a source that failed', () => {
+      const { send, status, frame } = reactive();
+      send({ type: 'feega:focus', source: 'src/Card.tsx:5:7' });
+      status({ status: 'failed', reason: 'x' });
+      send({ type: 'feega:focus', source: 'src/Card.tsx:5:7' });
+
+      expect(frame()!.getAttribute('src')).toBeNull();
+    });
+
+    it('leaves the real component alone when the page changes', async () => {
+      const { win, send, frame } = reactive();
+      send({ type: 'feega:focus', source: 'src/Card.tsx:5:7' });
+      const before = frame()!.getAttribute('src');
+      win.document.querySelector('h2')!.textContent = 'Edited';
+      await new Promise((resolve) => setTimeout(resolve, 400));
+
+      expect(frame()!.getAttribute('src')).toBe(before);
+      expect(frame()!.srcdoc).toBe('');
+    });
+
+    it('ignores a status from anything but the focus tab', () => {
+      const { up, send, win } = reactive();
+      send({ type: 'feega:focus', source: 'src/Card.tsx:5:7' });
+      win.dispatchEvent(new win.MessageEvent('message', { data: { type: MOUNT_STATUS, status: 'failed', reason: 'x' }, source: win as unknown as Window }));
+
+      expect(up.some((m) => m.mode === 'snapshot')).toBe(false);
+    });
   });
 });

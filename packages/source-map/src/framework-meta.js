@@ -16,6 +16,63 @@ function fiberOf(element) {
   return key ? element[key] : null;
 }
 
+const COMPONENT_TAGS = new Set([0, 1, 11, 14, 15]);
+const FUNCTION_MARK = { $fn: true };
+const MAX_PROP_DEPTH = 4;
+
+function componentName(type) {
+  return typeof type === 'function' ? type.displayName || type.name : type?.displayName || type?.render?.name || componentName(type?.type) || '';
+}
+
+function plain(value, depth) {
+  if (typeof value === 'function') {
+    return FUNCTION_MARK;
+  }
+  if (value === null || ['string', 'number', 'boolean'].includes(typeof value)) {
+    return value;
+  }
+  if (typeof value !== 'object' || value.$$typeof || value.nodeType) {
+    return undefined;
+  }
+  if (depth >= MAX_PROP_DEPTH) {
+    throw new RangeError('too deep');
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => plain(item, depth + 1) ?? null);
+  }
+  const proto = Object.getPrototypeOf(value);
+  if (proto !== Object.prototype && proto !== null) {
+    return undefined;
+  }
+  return Object.fromEntries(Object.entries(value).flatMap(([key, item]) => {
+    const kept = plain(item, depth + 1);
+    return kept === undefined ? [] : [[key, kept]];
+  }));
+}
+
+function plainProp(value) {
+  try {
+    return plain(value, 0);
+  } catch {
+    return undefined;
+  }
+}
+
+export function reactMountOf(element) {
+  let fiber = fiberOf(element);
+  while (fiber && !COMPONENT_TAGS.has(fiber.tag)) {
+    fiber = fiber.return;
+  }
+  if (!fiber) {
+    return null;
+  }
+  const props = Object.fromEntries(Object.entries(fiber.memoizedProps ?? {}).flatMap(([name, value]) => {
+    const kept = plainProp(value);
+    return kept === undefined ? [] : [[name, kept]];
+  }));
+  return { name: componentName(fiber.type), props };
+}
+
 function stackSource(stack) {
   for (const frame of String(stack).split('\n').slice(1)) {
     const match = STACK_FRAME.exec(frame);

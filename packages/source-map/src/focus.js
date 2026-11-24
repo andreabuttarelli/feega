@@ -1,7 +1,12 @@
 import { SOURCE_ATTR } from './runtime.js';
+import { reactMountOf } from './framework-meta.js';
+import { FocusMode, MOUNT_STATUS, Status } from './mount-protocol.js';
+
+export const FOCUSED = 'feega:focused';
+const MOUNT_ROUTE = '/__feega/mount';
 
 const FRAME_ID = 'feega-focus';
-const CANVAS_ID = 'feega-focus-canvas';
+export const CANVAS_ID = 'feega-focus-canvas';
 const LAYER = '2147483646';
 const REFRESH_MS = 150;
 const PADDING_PX = 48;
@@ -11,7 +16,7 @@ const CHECKER_LIGHT = '#f4f4f6';
 const CHECKER_DARK = '#e6e6ea';
 const STYLESHEETS = 'link[rel~="stylesheet"], style';
 
-const CANVAS_CSS = `html{min-height:100%;background-color:${CHECKER_LIGHT}!important;background-image:conic-gradient(${CHECKER_DARK} 25%,transparent 0 50%,${CHECKER_DARK} 0 75%,transparent 0)!important;background-size:${CHECKER_PX * 2}px ${CHECKER_PX * 2}px!important}body{display:flex!important;flex-wrap:wrap;align-items:center;align-content:center;justify-content:center;gap:${GAP_PX}px;box-sizing:border-box;min-height:100vh;margin:0!important;padding:${PADDING_PX}px!important;background:transparent!important}`;
+export const CANVAS_CSS = `html{min-height:100%;background-color:${CHECKER_LIGHT}!important;background-image:conic-gradient(${CHECKER_DARK} 25%,transparent 0 50%,${CHECKER_DARK} 0 75%,transparent 0)!important;background-size:${CHECKER_PX * 2}px ${CHECKER_PX * 2}px!important}body{display:flex!important;flex-wrap:wrap;align-items:center;align-content:center;justify-content:center;gap:${GAP_PX}px;box-sizing:border-box;min-height:100vh;margin:0!important;padding:${PADDING_PX}px!important;background:transparent!important}`;
 
 const fileOf = (attr) => attr.slice(0, attr.lastIndexOf(':', attr.lastIndexOf(':') - 1));
 const taggedParent = (element) => element.parentElement?.closest(`[${SOURCE_ATTR}]`) ?? null;
@@ -93,6 +98,15 @@ export function focusPage(doc, source) {
   return { count: roots.length, htmlAttrs: attrsOf(doc.documentElement), bodyAttrs: attrsOf(doc.body), head: headOf(doc), body: ghostTree(doc, roots) };
 }
 
+function mountUrlOf(root) {
+  const mount = reactMountOf(root);
+  if (!mount?.name) {
+    return null;
+  }
+  const file = fileOf(root.getAttribute(SOURCE_ATTR));
+  return `${MOUNT_ROUTE}?${new URLSearchParams({ file, name: mount.name, props: JSON.stringify(mount.props) })}`;
+}
+
 const documentOf = ({ htmlAttrs, bodyAttrs, head, body }) =>
   `<!doctype html><html${attrText(htmlAttrs)}><head><meta charset="utf-8">${head}<style id="${CANVAS_ID}">${CANVAS_CSS}</style></head><body${attrText(bodyAttrs)}>${body}</body></html>`;
 
@@ -122,16 +136,20 @@ function patch(doc, was, now) {
   }
 }
 
-export function focusTab(win, { install, prepare, found }) {
+export function focusTab(win, { install, prepare, report }) {
   let frame = null;
   let source = null;
   let wanted = null;
   let last = null;
   let loaded = false;
   let timer = null;
+  let mode = FocusMode.Snapshot;
+  let visible = true;
+  const failed = new Set();
 
-  const show = (visible) => {
-    frame.style.display = visible ? 'block' : 'none';
+  const show = (on) => {
+    visible = on;
+    frame.style.display = on ? 'block' : 'none';
   };
 
   function update(parts) {
@@ -143,12 +161,17 @@ export function focusTab(win, { install, prepare, found }) {
     last = parts;
   }
 
-  function create(parts) {
+  function create(parts, mountUrl) {
     frame = win.document.createElement('iframe');
     frame.id = FRAME_ID;
     frame.style.cssText = `position:fixed;inset:0;width:100%;height:100%;border:0;z-index:${LAYER};background:${CHECKER_LIGHT}`;
     const mine = frame;
-    mine.srcdoc = documentOf(parts);
+    mode = mountUrl ? FocusMode.Mount : FocusMode.Snapshot;
+    if (mountUrl) {
+      mine.setAttribute('src', mountUrl);
+    } else {
+      mine.srcdoc = documentOf(parts);
+    }
     mine.addEventListener('load', () => {
       if (frame === mine) {
         loaded = true;
@@ -172,28 +195,40 @@ export function focusTab(win, { install, prepare, found }) {
     if (!parts.count) {
       drop();
       wanted = request;
-      return 0;
+      return { count: 0, mode: FocusMode.Snapshot };
     }
     wanted = null;
     if (!frame || source !== request.source) {
       drop();
-      create(parts);
+      const mountUrl = failed.has(request.source) || request.mount === false ? null : mountUrlOf(rootsOf(win.document, request.source)[0]);
+      create(parts, mountUrl);
       source = request.source;
       last = parts;
-    } else {
+    } else if (mode === FocusMode.Snapshot) {
       update(parts);
     }
     show(request.shown !== false);
-    return parts.count;
+    return { count: parts.count, mode };
+  }
+
+  function fallBack(reason) {
+    const request = { source, shown: visible };
+    failed.add(source);
+    drop();
+    const { count } = open(request);
+    report({ type: FOCUSED, count, mode, reason });
   }
 
   function refresh() {
     timer = null;
     if (!frame) {
-      const count = wanted ? open(wanted) : 0;
+      const { count } = wanted ? open(wanted) : { count: 0 };
       if (count) {
-        found(count);
+        report({ type: FOCUSED, count, mode });
       }
+      return;
+    }
+    if (mode === FocusMode.Mount) {
       return;
     }
     prepare();
@@ -211,6 +246,18 @@ export function focusTab(win, { install, prepare, found }) {
     },
     forward({ focus, ...message }) {
       frame?.contentWindow?.postMessage(message, '*');
+    },
+    status(event) {
+      const message = event.data;
+      if (message?.type !== MOUNT_STATUS || !frame || event.source !== frame.contentWindow) {
+        return false;
+      }
+      if (message.status === Status.Failed) {
+        fallBack(message.reason);
+      } else {
+        report(message);
+      }
+      return true;
     },
     changed() {
       if ((frame || wanted) && !timer) {
