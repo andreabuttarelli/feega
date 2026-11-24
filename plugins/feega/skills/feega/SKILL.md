@@ -92,7 +92,7 @@ Plugins add controls to the editor. Built in: Mesh gradient and 3D object (`3d` 
 
 ## 6. Read the user's selection over MCP
 
-When the user says "this element", "the card I picked" or "what I just changed", ask Feega instead of guessing. Add the server once: `claude mcp add feega -- npx feega mcp` (Cursor: `.cursor/mcp.json`; Codex: `~/.codex/config.toml`; see docs.feega.app, "Connect your agent via MCP").
+When the user says "this element", "the card I picked" or "what I just changed", ask Feega instead of guessing. Add the server once: `claude mcp add feega -- npx -y feega mcp` (Cursor: `.cursor/mcp.json`; Codex: `~/.codex/config.toml`; see docs.feega.app, "Connect your agent via MCP").
 
 Local tools, no sign-in, need Feega open in the project (`npx feega` or the VS Code panel):
 - `feega_selection`: the selected element's file, line, selector and view, the same text as "Copy for agent". Edit that location.
