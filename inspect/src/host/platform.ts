@@ -1,3 +1,5 @@
+import type { PublishedBridge } from './local-bridge/publish';
+import type { BridgeState } from './local-bridge/server';
 import type { HostMessage, Source, ViewMessage } from '../messages';
 import type { Catalog } from '../../../packages/library/src/catalog';
 import type { ProFetch } from './pro-insert';
@@ -56,6 +58,7 @@ export type Platform = Transport & {
   proFiles?: ProFetch;
   watchFiles?: Watch;
   usage?: UsageHost;
+  localBridge?: (projectRoot: string, state: BridgeState) => Promise<PublishedBridge>;
   account: AccountStore;
   cloud?: CommentsCloud;
   share?: SharePort;

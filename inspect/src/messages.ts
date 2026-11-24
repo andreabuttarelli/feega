@@ -193,6 +193,7 @@ export enum ToHost {
   Attribute = 'attribute',
   Go = 'go',
   Selected = 'selected',
+  Context = 'context',
   Copy = 'copy',
   Comments = 'comments',
   CommentAdd = 'comment-add',
@@ -318,6 +319,7 @@ export type HostMessage =
   | { kind: ToHost.Attribute; at: string; name: string; value: string }
   | { kind: ToHost.Go; at: string; ask: GoAsk }
   | { kind: ToHost.Selected; at: Source | null }
+  | { kind: ToHost.Context; text: string | null }
   | { kind: ToHost.Copy; text: string }
   | { kind: ToHost.Comments }
   | { kind: ToHost.CommentAdd; draft: CommentDraft }

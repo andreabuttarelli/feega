@@ -48,9 +48,9 @@ async function main(): Promise<number> {
     return 1;
   }
   const cloud = cloudEnabled({ setting: undefined, env: process.env });
-  const args = argsOf(process.argv.slice(2), process.cwd(), cloud);
+  const args = argsOf(process.argv.slice(2), process.cwd());
   if (args.run === Run.Help) {
-    say(usageOf(cloud));
+    say(usageOf());
     return 0;
   }
   if (args.run === Run.Version) {
@@ -65,7 +65,7 @@ async function main(): Promise<number> {
     return runPlugin(terminalIo(pluginsRoot(), say), args.action, args.value);
   }
   if (args.run === Run.Error) {
-    say(`feega: ${args.reason}\n\n${usageOf(cloud)}`);
+    say(`feega: ${args.reason}\n\n${usageOf()}`);
     return 1;
   }
 

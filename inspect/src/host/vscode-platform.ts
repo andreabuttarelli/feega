@@ -1,3 +1,4 @@
+import { publishLocal } from './local-bridge/publish';
 import { homedir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import * as vscode from 'vscode';
@@ -148,6 +149,7 @@ export function vsCodePlatform(host: VsCodeHost, panel: PanelLike, befores: Map<
     account,
     onboarding: deviceOnboardingStore(globalStateOnboardingStore(context.globalState)),
     support: globalStateSupportStore(context.globalState),
+    localBridge: publishLocal,
     usage: vsCodeUsage(context),
     skillHint: { fs: nodeHintFs, home: homedir(), surface: HintSurface.Panel, never: () => context.globalState.get(SKILL_HINT_NEVER) === true, setNever: async () => context.globalState.update(SKILL_HINT_NEVER, true) },
     plugins: { root: pluginsRoot(), dev: () => config().get<string[]>(DEV_PLUGINS_SETTING, []), approve: approveInModal }
