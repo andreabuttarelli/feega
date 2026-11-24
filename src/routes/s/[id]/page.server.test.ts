@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('$env/dynamic/private', () => ({ env: mocks.env }));
 vi.mock('$lib/server/onboarding/onboarding', () => ({ onboardingPathFor: (...args: unknown[]) => mocks.onboardingPathFor(...args) }));
-vi.mock('$lib/server/oauth', () => ({ stashOAuthReturn: (...args: unknown[]) => mocks.stash(...args) }));
+vi.mock('$lib/server/cloud/return-path', () => ({ stashReturn: (...args: unknown[]) => mocks.stash(...args) }));
 
 import { fakeDb, type FakeDb } from '$lib/server/cloud/testing/fake-db';
 import { load } from './+page.server';

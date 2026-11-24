@@ -2,9 +2,9 @@ import { error, redirect } from '@sveltejs/kit';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { env } from '$env/dynamic/private';
 import type { PageServerLoad } from './$types';
+import { stashReturn } from '$lib/server/cloud/return-path';
 import { VisitKind, visit } from '$lib/server/cloud/visit';
 import { onboardingPathFor } from '$lib/server/onboarding/onboarding';
-import { stashOAuthReturn } from '$lib/server/oauth';
 import { ORG_COOKIE } from '$lib/server/tenancy/context';
 
 const SEE_OTHER = 303;
@@ -18,7 +18,7 @@ export const load: PageServerLoad = async ({ params, url, cookies, locals: { saf
   const { user } = await safeGetSession();
   const client = user ? await db() : null;
   if (!user || !client) {
-    stashOAuthReturn(cookies, here);
+    stashReturn(cookies, here);
     throw redirect(SEE_OTHER, LOGIN_PATH);
   }
 
