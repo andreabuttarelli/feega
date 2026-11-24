@@ -8,6 +8,7 @@ import { ORG_COOKIE } from '$lib/server/tenancy/context';
 import { CURRENT_TERMS_VERSION } from '$lib/legal-links';
 import { ProductEvent, track } from '$lib/server/product-events/track';
 import { markSignedUp } from '$lib/server/core-usage';
+import { takeReturn } from '$lib/server/cloud/return-path';
 import { onboardingPathFor } from '$lib/server/onboarding/onboarding';
 
 export const INVITE_PARAM = 'invite_token';
@@ -49,6 +50,11 @@ export async function landingPath(
   await recordFirstAcceptance(db, deps, user.id, profile.termsAcceptedAt);
 
   if (!inviteToken) {
+    const returnPath = takeReturn(cookies);
+    if (returnPath) {
+      return returnPath;
+    }
+
     const chosenOrgId = cookies.get(ORG_COOKIE) ?? null;
     const home = await deps.homePathFor(db, ENTRY_DEPS, user, chosenOrgId);
     return (await deps.onboardingPathFor(db, user, chosenOrgId, home)) ?? home;
