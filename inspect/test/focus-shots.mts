@@ -33,7 +33,7 @@ assert.equal(await inFocus.locator('footer, header, nav').count(), 0, 'nothing e
 
 const rows = await page.locator('[data-testid=layers] [data-layer]').allInnerTexts();
 console.log('layers', JSON.stringify(rows));
-assert.equal(rows.filter((row) => row.trim() === 'body').length, 1, 'one body row');
+assert.ok(!rows.some((row) => ['html', 'body'].includes(row.trim())), 'no html or body rows');
 assert.ok(rows.some((row) => row.includes(COMPONENT)), 'the component row');
 const title = (await inFocus.locator(TITLE).first().boundingBox())!;
 await page.mouse.move(title.x + 4, title.y + 4);
