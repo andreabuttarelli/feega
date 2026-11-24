@@ -179,7 +179,7 @@ describe('shareClient', () => {
 
     const local = await waitFor(() => editor.sockets[0], 'local editor socket');
     await waitFor(() => local.messages[0], 'forwarded ready');
-    expect(JSON.parse(local.messages[0])).toEqual({ kind: ToHost.Ready });
+    expect(JSON.parse(local.messages[0])).toEqual({ kind: ToHost.Ready, by: { userId: 'ada', name: 'Ada' } });
     expect(local.origin).toBe(new URL(editor.url).origin);
   });
 
@@ -227,7 +227,7 @@ describe('shareClient', () => {
     await relay.send(textFrame(4, JSON.stringify({ kind: ToHost.Ready })));
 
     await waitFor(() => editor.sockets[0].messages.length > 0, 'ready');
-    expect(editor.sockets[0].messages).toEqual([JSON.stringify({ kind: ToHost.Ready })]);
+    expect(editor.sockets[0].messages).toEqual([JSON.stringify({ kind: ToHost.Ready, by: { userId: 'ada', name: 'Ada' } })]);
     expect(relay.frames.filter((f) => f.type === FrameType.WsText)).toEqual([]);
   });
 
@@ -248,6 +248,52 @@ describe('shareClient', () => {
     expect(editor.sockets[1].messages).toEqual([]);
   });
 
+  it('stamps what a visitor sends with who sent it, whatever the visitor claims', async () => {
+    const { relay, editor } = await rig();
+    await relay.send(jsonFrame(5, FrameType.WsOpen, { path: '/feega-host', headers: { 'x-feega-visitor': encodeVisitor(ada) }, protocols: [] }));
+    await waitFor(() => editor.sockets[0], 'local editor socket');
+
+    await relay.send(textFrame(5, JSON.stringify({ kind: ToHost.Edit, ask: { at: 'a.svelte:1:1', prop: 'color', value: 'red' }, by: { userId: 'host', name: 'Host' } })));
+
+    await waitFor(() => editor.sockets[0].messages.length === 1, 'the edit');
+    expect(JSON.parse(editor.sockets[0].messages[0]).by).toEqual({ userId: 'ada', name: 'Ada' });
+  });
+
+  it('shows where a visitor points and what they selected, without sending it to the editor', async () => {
+    const seen: Present[][] = [];
+    const { relay, editor } = await rig({ onPresence: (v) => seen.push(v) });
+    await relay.send(jsonFrame(0, FrameType.Presence, { visitors: [{ ...ada }, { ...vera }] }));
+    await relay.send(jsonFrame(5, FrameType.WsOpen, { path: '/feega-host', headers: { 'x-feega-visitor': encodeVisitor(ada) }, protocols: [] }));
+    await waitFor(() => editor.sockets[0], 'local editor socket');
+
+    await relay.send(textFrame(5, JSON.stringify({ kind: ToHost.Selected, at: { file: 'a.svelte', line: 3, col: 4 } })));
+    await relay.send(textFrame(5, JSON.stringify({ kind: ToHost.Cursor, at: { x: 10, y: 20 } })));
+
+    await waitFor(() => seen.at(-1)?.[0]?.cursor, 'the cursor');
+    expect(seen.at(-1)).toEqual([{ ...ada, selection: 'a.svelte:3:4', cursor: { x: 10, y: 20 } }, vera]);
+    expect(editor.sockets[0].messages).toEqual([]);
+  });
+
+  it('forgets the pointer and selection when the visitor clears them or leaves', async () => {
+    const seen: Present[][] = [];
+    const { relay, editor, client } = await rig({ onPresence: (v) => seen.push(v) });
+    await relay.send(jsonFrame(0, FrameType.Presence, { visitors: [{ ...ada }] }));
+    await relay.send(jsonFrame(5, FrameType.WsOpen, { path: '/feega-host', headers: { 'x-feega-visitor': encodeVisitor(ada) }, protocols: [] }));
+    await waitFor(() => editor.sockets[0], 'local editor socket');
+    await relay.send(textFrame(5, JSON.stringify({ kind: ToHost.Cursor, at: { x: 1, y: 2 } })));
+    await waitFor(() => client.visitors()[0]?.cursor, 'the cursor');
+
+    await relay.send(textFrame(5, JSON.stringify({ kind: ToHost.Cursor, at: null })));
+    await waitFor(() => !client.visitors()[0]?.cursor, 'the cursor gone');
+    await relay.send(textFrame(5, JSON.stringify({ kind: ToHost.Selected, at: { file: 'a.svelte', line: 1, col: 1 } })));
+    await waitFor(() => client.visitors()[0]?.selection, 'the selection');
+    await relay.send(jsonFrame(0, FrameType.Presence, { visitors: [] }));
+    await relay.send(jsonFrame(0, FrameType.Presence, { visitors: [{ ...ada }] }));
+
+    await waitFor(() => seen.length >= 6, 'updates');
+    expect(client.visitors()).toEqual([ada]);
+  });
+
   it('refuses a message that is not json from a visitor', async () => {
     const { relay, editor } = await rig();
     await relay.send(jsonFrame(3, FrameType.WsOpen, { path: '/feega-host', headers: { 'x-feega-visitor': encodeVisitor(ada) }, protocols: [] }));
@@ -257,7 +303,7 @@ describe('shareClient', () => {
     await relay.send(textFrame(3, JSON.stringify({ kind: ToHost.Ready })));
 
     await waitFor(() => editor.sockets[0].messages.length > 0, 'ready');
-    expect(editor.sockets[0].messages).toEqual([JSON.stringify({ kind: ToHost.Ready })]);
+    expect(editor.sockets[0].messages).toEqual([JSON.stringify({ kind: ToHost.Ready, by: { userId: 'ada', name: 'Ada' } })]);
   });
 
   it('tunnels an app websocket untouched, protocols included', async () => {

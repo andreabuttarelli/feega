@@ -56,3 +56,7 @@ export function forwardHeaders(headers: Headers): Record<string, string> {
 export const loginUrl = (webOrigin: string, sid: string, path: string) => `${webOrigin}/s/${sid}?next=${encodeURIComponent(path)}`;
 
 export const snapshotUrl = (webOrigin: string, sid: string) => `${webOrigin}/s/${sid}`;
+
+export const offlineUrl = (webOrigin: string, sid: string) => `${snapshotUrl(webOrigin, sid)}?offline=1`;
+
+export const isPageVisit = (headers: Headers) => (headers.get('accept') ?? '').includes('text/html');
