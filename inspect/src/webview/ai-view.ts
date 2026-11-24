@@ -1,5 +1,7 @@
 import { AgentId, AiState } from '../messages';
 import { AGENT_LOGOS, type AgentLogo } from './agent-logos';
+import { POLICY_ROWS, type Policy } from '../host/ai/permission-policy';
+import type { ModeView } from '../host/ai/agent-session';
 import { ItemKind, type Item } from './ai-transcript';
 
 export enum Dot {
@@ -36,3 +38,12 @@ export const isThinking = (busy: boolean, items: Item[]): boolean => {
   const last = items.at(-1);
   return busy && (last === undefined || last.kind === ItemKind.User || last.kind === ItemKind.Thought || last.kind === ItemKind.Tool);
 };
+
+const POLICY_SHORT: Record<Policy, string> = { ask: 'Ask', edits: 'Edits', all: 'All' };
+
+export const pickerLabel = (modes: ModeView[], mode: string | null, policy: Policy): string => {
+  const agentMode = modes.find((m) => m.id === mode)?.name;
+  return [agentMode, POLICY_SHORT[policy]].filter(Boolean).join(' · ');
+};
+
+export const isDanger = (policy: Policy): boolean => POLICY_ROWS.find((row) => row.id === policy)?.danger ?? false;

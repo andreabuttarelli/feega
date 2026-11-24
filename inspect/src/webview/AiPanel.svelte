@@ -14,12 +14,15 @@
   import ShieldQuestion from '@lucide/svelte/icons/shield-question';
   import Square from '@lucide/svelte/icons/square';
   import Type from '@lucide/svelte/icons/type';
+  import ShieldCheck from '@lucide/svelte/icons/shield-check';
+  import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
   import X from '@lucide/svelte/icons/x';
   import { AiState, ToHost, type HostMessage } from '../messages';
   import { ai, aiAnswered, aiCleared, aiSaid } from './ai-state.svelte';
   import { ChipIcon, chipView } from './ai-chip';
   import { sendsOnKey } from './ai-keys';
-  import { SUGGESTIONS, isThinking, markOf, placeholderOf, statusOf } from './ai-view';
+  import { SUGGESTIONS, isDanger, isThinking, markOf, pickerLabel, placeholderOf, statusOf } from './ai-view';
+  import { POLICY_ROWS, type Policy } from '../host/ai/permission-policy';
   import { ItemKind } from './ai-transcript';
   import { lineDiff } from './ai-diff';
   import { markdown } from './ai-markdown';
@@ -36,6 +39,7 @@
   let dropped = $state<string | null>(null);
   let menu = $state(false);
   let input = $state<HTMLTextAreaElement>();
+  let permissions = $state(false);
 
   const chip = $derived(context !== null && dropped !== context ? chipView(context) : null);
   const busy = $derived(ai.state === AiState.Busy);
@@ -46,6 +50,7 @@
   const status = $derived(statusOf(ai.state));
   const mark = $derived(current ? markOf(current.id, current.label) : null);
   const thinking = $derived(isThinking(busy, ai.items));
+  const danger = $derived(isDanger(ai.policy));
 
   $effect(() => {
     tohost({ kind: ToHost.AiList });
@@ -82,6 +87,16 @@
   function suggest(suggestion: string) {
     text = suggestion;
     input?.focus();
+  }
+
+  function setPolicy(policy: Policy) {
+    tohost({ kind: ToHost.AiPolicy, policy });
+    permissions = false;
+  }
+
+  function setMode(id: string) {
+    tohost({ kind: ToHost.AiMode, id });
+    permissions = false;
   }
 
   function onkey(e: KeyboardEvent) {
@@ -215,6 +230,32 @@
     {/if}
     <textarea rows="1" placeholder={placeholderOf(current?.label ?? null)} aria-label="Message" data-testid="ai-input" disabled={!ready} bind:this={input} bind:value={text} onkeydown={onkey}></textarea>
     <div class="send">
+      <Popover.Root bind:open={permissions}>
+        <Popover.Trigger class="perm-trigger {danger ? 'danger' : ''}" data-testid="ai-permissions" aria-label="Permissions">
+          {#if danger}<TriangleAlert size={12} />{:else}<ShieldCheck size={12} />{/if}
+          <span>{pickerLabel(ai.modes, ai.mode, ai.policy)}</span>
+        </Popover.Trigger>
+        <Popover.Portal>
+          <Popover.Content class="agent-menu" align="start" side="top" sideOffset={4} data-testid="ai-permissions-menu">
+            {#if ai.modes.length}
+              <p class="menu-label">{current?.label ?? 'Agent'} mode</p>
+              {#each ai.modes as mode (mode.id)}
+                <button type="button" class="agent-option stacked" data-testid="ai-mode-option" data-mode={mode.id} onclick={() => setMode(mode.id)}>
+                  <span class="check">{#if mode.id === ai.mode}<Check size={12} />{/if}</span>
+                  <span class="stack"><span>{mode.name}</span>{#if mode.description}<span class="hint">{mode.description}</span>{/if}</span>
+                </button>
+              {/each}
+            {/if}
+            <p class="menu-label">Feega approvals</p>
+            {#each POLICY_ROWS as row (row.id)}
+              <button type="button" class="agent-option stacked" class:danger={row.danger} data-testid="ai-policy-option" data-policy={row.id} onclick={() => setPolicy(row.id)}>
+                <span class="check">{#if row.id === ai.policy}<Check size={12} />{/if}</span>
+                <span class="stack"><span>{row.name}</span><span class="hint">{row.hint}</span></span>
+              </button>
+            {/each}
+          </Popover.Content>
+        </Popover.Portal>
+      </Popover.Root>
       {#if busy}
         <button type="button" class="round" aria-label="Stop" data-testid="ai-cancel" onclick={() => tohost({ kind: ToHost.AiCancel })}><Square size={10} fill="currentColor" /></button>
       {:else}
@@ -268,6 +309,7 @@
     flex-direction: column;
     gap: 2px;
     min-width: 220px;
+    max-width: 280px;
     padding: 4px;
     border-radius: var(--ui-radius-md);
     background: var(--ui-panel);
@@ -771,7 +813,64 @@
 
   .send {
     display: flex;
-    justify-content: flex-end;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  :global(.perm-trigger) {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 20px;
+    padding: 0 6px;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: none;
+    color: var(--ui-text-2);
+    font: inherit;
+    font-size: var(--ui-text-xs);
+    cursor: pointer;
+  }
+
+  :global(.perm-trigger:hover),
+  :global(.perm-trigger[data-state='open']) {
+    background: var(--ui-input-hover);
+    color: var(--ui-text);
+  }
+
+  :global(.perm-trigger.danger) {
+    background: color-mix(in srgb, #ff9f0a 18%, transparent);
+    color: #ff9f0a;
+  }
+
+  .agent-option.stacked {
+    align-items: flex-start;
+    height: auto;
+    padding: 6px 8px;
+  }
+
+  .stack {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    text-align: left;
+  }
+
+  .hint {
+    color: var(--ui-text-3);
+    font-size: var(--ui-text-xs);
+  }
+
+  .check {
+    display: grid;
+    place-items: center;
+    width: 12px;
+    height: 16px;
+    flex: none;
+  }
+
+  .agent-option.danger .stack > span:first-child {
+    color: #ff9f0a;
   }
 
   .round {

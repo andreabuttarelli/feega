@@ -1,3 +1,5 @@
+import type { Policy } from './permission-policy';
+
 export enum ToolStatus {
   Pending = 'pending',
   Running = 'running',
@@ -11,6 +13,7 @@ export enum AgentEventKind {
   Tool = 'tool',
   Plan = 'plan',
   Permission = 'permission',
+  Modes = 'modes',
   Done = 'done',
   Failed = 'failed'
 }
@@ -21,6 +24,8 @@ export type ToolView = { id: string; title: string; kind: string; status: ToolSt
 
 export type PlanEntryView = { content: string; status: string };
 
+export type ModeView = { id: string; name: string; description: string };
+
 export type OptionView = { id: string; name: string; allows: boolean };
 
 export type AgentEvent =
@@ -29,6 +34,7 @@ export type AgentEvent =
   | { kind: AgentEventKind.Tool; tool: ToolView }
   | { kind: AgentEventKind.Plan; entries: PlanEntryView[] }
   | { kind: AgentEventKind.Permission; id: string; tool: ToolView; options: OptionView[] }
+  | { kind: AgentEventKind.Modes; available: ModeView[]; current: string }
   | { kind: AgentEventKind.Done; reason: string }
   | { kind: AgentEventKind.Failed; reason: string };
 
@@ -36,6 +42,7 @@ export type AgentSession = {
   send: (prompt: string) => Promise<void>;
   cancel: () => Promise<void>;
   answer: (id: string, optionId: string | null) => void;
+  setMode: (id: string) => Promise<void>;
   close: () => void;
 };
 
@@ -46,6 +53,6 @@ export type AgentFiles = {
 
 export type Launch = { command: string; args: string[] };
 
-export type AgentDeps = { cwd: string; files: AgentFiles; emit: (event: AgentEvent) => void };
+export type AgentDeps = { cwd: string; files: AgentFiles; policy: () => Policy; emit: (event: AgentEvent) => void };
 
 export type OpenAgent = (launch: Launch, deps: AgentDeps) => Promise<AgentSession>;

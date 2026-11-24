@@ -23,7 +23,8 @@ export enum Stored {
   Pids = 'feegaInspect.pids',
   SkillHint = 'feegaInspect.skillHint',
   SkillHintShown = 'feegaInspect.skillHintShown',
-  SkillInstalledSent = 'feegaInspect.skillInstalledSent'
+  SkillInstalledSent = 'feegaInspect.skillInstalledSent',
+  AiPolicy = 'feegaInspect.aiPolicy'
 }
 
 import type { Watch } from './file-watch';

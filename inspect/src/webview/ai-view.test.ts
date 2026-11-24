@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { AiState } from '../messages';
 import { ToolStatus } from '../host/ai/agent-session';
-import { Dot, isThinking, markOf, placeholderOf, statusOf } from './ai-view';
+import { Policy } from '../host/ai/permission-policy';
+import { Dot, isDanger, isThinking, markOf, pickerLabel, placeholderOf, statusOf } from './ai-view';
 import { ItemKind } from './ai-transcript';
 
 describe('the agent status', () => {
@@ -42,5 +43,22 @@ describe('the thinking indicator', () => {
   it('hides while text streams and when idle', () => {
     expect(isThinking(true, [{ kind: ItemKind.Agent, text: 'Hel' }])).toBe(false);
     expect(isThinking(false, [])).toBe(false);
+  });
+});
+
+describe('the permission picker', () => {
+  const modes = [{ id: 'plan', name: 'Plan', description: '' }];
+
+  it('shows the agent mode and the Feega policy', () => {
+    expect(pickerLabel(modes, 'plan', Policy.Edits)).toBe('Plan · Edits');
+  });
+
+  it('shows only the policy when the agent has no modes', () => {
+    expect(pickerLabel([], null, Policy.Ask)).toBe('Ask');
+  });
+
+  it('warns only for Allow all', () => {
+    expect(isDanger(Policy.All)).toBe(true);
+    expect(isDanger(Policy.Edits)).toBe(false);
   });
 });

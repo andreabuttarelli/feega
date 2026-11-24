@@ -2,6 +2,11 @@ import { Readable, Writable } from 'node:stream';
 import { agent, methods, ndJsonStream, PROTOCOL_VERSION } from '@agentclientprotocol/sdk';
 
 const SESSION = 'fake-session';
+const MODES = [
+  { id: 'default', name: 'Default', description: 'Ask before changes' },
+  { id: 'acceptEdits', name: 'Accept edits', description: 'Apply file edits without asking' },
+  { id: 'plan', name: 'Plan', description: 'Plan without editing' }
+];
 const WRITTEN = 'written by the agent\n';
 
 const chunk = (text) => ({ sessionId: SESSION, update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text } } });
@@ -50,7 +55,11 @@ const textOf = (prompt) => prompt.map((block) => (block.type === 'text' ? block.
 
 const app = agent({ name: 'fake' })
   .onRequest(methods.agent.initialize, () => ({ protocolVersion: PROTOCOL_VERSION, agentCapabilities: {} }))
-  .onRequest(methods.agent.session.new, () => ({ sessionId: SESSION }))
+  .onRequest(methods.agent.session.new, () => ({ sessionId: SESSION, modes: { currentModeId: 'default', availableModes: MODES } }))
+  .onRequest(methods.agent.session.setMode, async (cx) => {
+    await cx.client.notify(methods.client.session.update, { sessionId: SESSION, update: { sessionUpdate: 'current_mode_update', currentModeId: cx.params.modeId } });
+    return {};
+  })
   .onRequest(methods.agent.session.prompt, async (cx) => {
     const text = textOf(cx.params.prompt);
     const [name, arg] = text.split('\n').pop().split(' ');

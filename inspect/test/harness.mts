@@ -23,6 +23,7 @@ import { buildCatalog } from '../../packages/library/src/catalog.ts';
 import type { AddPlace } from '@feega/live-edit/add-node';
 import type { AcpId } from '../src/host/ai/acp-agents.ts';
 import { aiChat } from '../src/host/ai/ai-chat.ts';
+import { Policy } from '../src/host/ai/permission-policy.ts';
 import type { AgentEnv } from '../src/host/agents.ts';
 import type { OpenAgent } from '../src/host/ai/agent-session.ts';
 
@@ -83,12 +84,14 @@ export async function openPanel(appRoot: string, theme = DARK, cloud?: CommentsC
       return out;
     }
   });
+  let aiPolicy = Policy.Ask;
   const ai = aiOverride
     ? aiChat({
         ...aiOverride,
         root: () => appRoot,
         confirm: async () => true,
         post: reply,
+        policy: { get: () => aiPolicy, set: (next) => (aiPolicy = next) },
         write: async (path, content, agent) => {
           await edits.agentWrite(path, content, agent);
           await history();
@@ -115,6 +118,12 @@ export async function openPanel(appRoot: string, theme = DARK, cloud?: CommentsC
     }
     if (m.kind === ToHost.AiAnswer) {
       ai?.answer(m.id as string, (m as unknown as { optionId: string | null }).optionId);
+    }
+    if (m.kind === ToHost.AiMode) {
+      await ai?.setMode(m.id as string);
+    }
+    if (m.kind === ToHost.AiPolicy) {
+      ai?.setPolicy((m as unknown as { policy: Policy }).policy);
     }
     if (m.kind === ToHost.AiCancel) {
       await ai?.cancel();

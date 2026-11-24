@@ -47,6 +47,7 @@ import { HintSurface, SKILL_COMMAND, hintDue, installedAfterHint } from './skill
 import { install } from './dev-server';
 import { SUPPORT_ITEMS } from '../support';
 import { aiChat } from './ai/ai-chat';
+import { policyOf } from './ai/permission-policy';
 import { openAcpAgent } from './ai/acp-session';
 import { machineEnv } from './agents';
 
@@ -107,6 +108,10 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     open: platform.ai?.open ?? openAcpAgent,
     confirm: (question, yes) => platform.confirm(question, yes),
     post: (message) => platform.send(message),
+    policy: {
+      get: () => policyOf(platform.stored(Stored.AiPolicy), platform.settings()[SettingKey.AiPermissions]),
+      set: (policy) => void platform.store(Stored.AiPolicy, policy)
+    },
     write: async (path, content, agent) => {
       const out = await edits.agentWrite(path, content, agent);
       if (!out.ok) {
@@ -701,7 +706,9 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.AiStart]: (m) => ai.start(m.agent),
     [ToHost.AiSend]: (m) => void ai.send(m.text, m.context),
     [ToHost.AiCancel]: ai.cancel,
-    [ToHost.AiAnswer]: (m) => ai.answer(m.id, m.optionId)
+    [ToHost.AiAnswer]: (m) => ai.answer(m.id, m.optionId),
+    [ToHost.AiMode]: (m) => void ai.setMode(m.id),
+    [ToHost.AiPolicy]: (m) => ai.setPolicy(m.policy)
   };
 
   const askKey = (ask: EditAsk) => JSON.stringify(ask);

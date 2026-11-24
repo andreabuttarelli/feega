@@ -29,6 +29,20 @@ assert.equal(await page.locator('[data-testid=ai-suggestion]').count(), 3, 'the 
 assert.ok(await page.locator('[data-testid=ai-chip]').count(), 'the selection is attached as a chip');
 await page.screenshot({ path: join(SHOTS, '1-empty.png') });
 
+await page.locator('[data-testid=ai-permissions]').click();
+assert.equal(await page.locator('[data-testid=ai-mode-option]').count(), 3, 'the agent modes are listed');
+assert.equal(await page.locator('[data-testid=ai-policy-option]').count(), 3, 'the Feega policies are listed');
+await page.screenshot({ path: join(SHOTS, '8-permissions.png') });
+await page.locator('[data-testid=ai-mode-option][data-mode=plan]').click();
+await page.locator('[data-testid=ai-permissions]', { hasText: 'Plan' }).waitFor({ timeout: 10_000 });
+await page.locator('[data-testid=ai-permissions]').click();
+await page.locator('[data-testid=ai-policy-option][data-policy=all]').click();
+await page.locator('[data-testid=ai-permissions].danger').waitFor({ timeout: 10_000 });
+await page.screenshot({ path: join(SHOTS, '9-allow-all.png') });
+await page.locator('[data-testid=ai-permissions]').click();
+await page.locator('[data-testid=ai-policy-option][data-policy=ask]').click();
+await page.locator('[data-testid=ai-permissions]', { hasText: 'Plan · Ask' }).waitFor({ timeout: 10_000 });
+
 await page.locator('[data-testid=ai-suggestion]').first().click();
 assert.equal(await page.locator('[data-testid=ai-input]').inputValue(), 'Make this more spacious');
 await page.locator('[data-testid=ai-input]').fill('hello');

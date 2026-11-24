@@ -11,7 +11,7 @@ It works in the VS Code extension and in `npx feega`.
 
 ## Supported agents
 
-Feega talks to agents over the [Agent Client Protocol](https://agentclientprotocol.com). The agent picker lists the ones it finds on your machine; the others appear under **Not installed** with the command to install them.
+Feega talks to agents over the [Agent Client Protocol](https://agentclientprotocol.com). The agent picker lists the ones it finds on your machine; the others appear dimmed under **Not installed** inside the picker, with the command to install them.
 
 | Agent | Started as |
 | --- | --- |
@@ -35,6 +35,7 @@ Select an element in the preview, then write. The element is attached to your me
 
 - Replies stream in as the agent writes them, with its plan and tool calls.
 - Before a tool that changes something, the agent asks: **Allow** or **Reject**. A file write shows its diff first.
+- The picker at the bottom left of the message box sets how much it may do without asking. It lists the modes the agent itself offers (for Claude Code: Default, Accept edits, Plan and so on), and Feega's own choice: **Ask every time**, **Allow edits, ask for commands** or **Allow all**. Each project remembers its choice, and the `feegaInspect.aiPermissions` setting sets the default. **Allow all** is tinted as a warning.
 - **Stop** cancels the current turn.
 - Files the agent writes land in the **Changes** tab as one change each, marked with the agent's name. [Undo them](/editing/undo-and-changes/) like any other change.
 
