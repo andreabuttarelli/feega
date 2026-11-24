@@ -19,7 +19,7 @@ const SESSION: SessionRow = {
 const HOST = { id: 'host-1', name: 'Grace' };
 const ADA = { id: 'ada', name: 'Ada', role: 'viewer' as const };
 const VERA = { id: 'vera', name: 'Vera', role: 'editor' as const };
-const CHANGES = [{ file: 'src/Hero.tsx', added: 3, removed: 1 }];
+const CHANGES = [{ file: 'src/Hero.tsx', prop: 'padding', value: '24px' }];
 const UNIQUE = { unique: { share_revisions: ['session_id', 'number'], share_verdicts: ['revision_id', 'reviewer_id'] } };
 
 describe('statusOf', () => {
@@ -44,7 +44,7 @@ describe('readRevisionInput', () => {
     [{ summary: 'x'.repeat(2001), changes: CHANGES }, RevisionCheck.BadSummary],
     [{ summary: 'ok', changes: 'nope' }, RevisionCheck.BadChanges],
     [{ summary: 'ok', changes: [{ file: 1 }] }, RevisionCheck.BadChanges],
-    [{ summary: 'ok', changes: [{ file: '/etc/passwd', added: 0, removed: 0 }] }, RevisionCheck.BadChanges],
+    [{ summary: 'ok', changes: [{ file: '/etc/passwd', prop: 'padding', value: '0' }] }, RevisionCheck.BadChanges],
     [null, RevisionCheck.BadSummary]
   ])('rejects %j', (input, check) => {
     expect(readRevisionInput(input)).toEqual({ check });

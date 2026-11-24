@@ -46,8 +46,8 @@
                 <span class="status {revision.status}">{STATUS_LABEL[revision.status]}</span>
               </div>
               <p>{revision.summary}</p>
-              {#each revision.changes as change (change.file)}
-                <code>{change.file} +{change.added} -{change.removed}</code>
+              {#each revision.changes as change}
+                <code>{change.file} {change.prop}: {change.value}</code>
               {/each}
               {#each revision.verdicts as verdict (verdict.reviewerId)}
                 <p class="verdict">{verdict.reviewerName}: {STATUS_LABEL[verdict.verdict]}{verdict.note ? ` - ${verdict.note}` : ''}</p>

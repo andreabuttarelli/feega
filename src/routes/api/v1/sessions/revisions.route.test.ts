@@ -21,7 +21,7 @@ import { POST as ADD_COMMENT } from './[id]/comments/+server';
 const ORG = 'org-1';
 const SID = 'abcdefghij';
 const FUTURE = new Date(Date.now() + 3_600_000).toISOString();
-const CHANGES = [{ file: 'src/Hero.tsx', added: 2, removed: 1 }];
+const CHANGES = [{ file: 'src/Hero.tsx', prop: 'padding', value: '24px' }];
 const COMMENT = { body: 'Tighten', selector: 'h1', sourceFile: 'src/Hero.tsx', sourceLine: 3, sourceCol: 1 };
 
 function seedDb(): FakeDb {
@@ -90,7 +90,7 @@ describe('session revisions', () => {
     as('host-1', seedDb());
 
     expect((await publish({ summary: ' ', changes: CHANGES })).status).toBe(400);
-    expect((await publish({ summary: 'R1', changes: [{ file: '/etc/passwd', added: 0, removed: 0 }] })).status).toBe(400);
+    expect((await publish({ summary: 'R1', changes: [{ file: '/etc/passwd', prop: 'padding', value: '0' }] })).status).toBe(400);
   });
 
   it('publishes round one, a reviewer requests changes, the host publishes round two', async () => {

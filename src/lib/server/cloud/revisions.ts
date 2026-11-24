@@ -34,7 +34,7 @@ export enum VerdictOutcome {
   OwnRevision = 'own_revision'
 }
 
-export type Change = { file: string; added: number; removed: number };
+export type Change = { file: string; prop: string; value: string };
 
 export type RevisionInput = { summary: string; changes: Change[] };
 
@@ -73,10 +73,6 @@ function failure(error: { message: string }): Error {
   return new Error(`cloud revisions: ${error.message}`);
 }
 
-function isCount(value: unknown): boolean {
-  return Number.isInteger(value) && (value as number) >= 0;
-}
-
 function isChange(value: unknown): value is Change {
   const change = value as Change | null;
   if (!change || typeof change.file !== 'string') {
@@ -85,7 +81,7 @@ function isChange(value: unknown): value is Change {
 
   const safeFile = change.file.length > 0 && change.file.length <= FILE_MAX_CHARS && !ABSOLUTE_PATH.test(change.file) && !PARENT_SEGMENT.test(change.file);
 
-  return safeFile && isCount(change.added) && isCount(change.removed);
+  return safeFile && typeof change.prop === 'string' && typeof change.value === 'string';
 }
 
 export function readRevisionInput(raw: unknown): { check: RevisionCheck.Valid; input: RevisionInput } | { check: Exclude<RevisionCheck, RevisionCheck.Valid> } {
@@ -100,7 +96,7 @@ export function readRevisionInput(raw: unknown): { check: RevisionCheck.Valid; i
     return { check: RevisionCheck.BadChanges };
   }
 
-  return { check: RevisionCheck.Valid, input: { summary, changes: changes.map(({ file, added, removed }) => ({ file, added, removed })) } };
+  return { check: RevisionCheck.Valid, input: { summary, changes: changes.map(({ file, prop, value }) => ({ file, prop, value })) } };
 }
 
 export function readVerdictInput(raw: unknown): VerdictInput | null {
