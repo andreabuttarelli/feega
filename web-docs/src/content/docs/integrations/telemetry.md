@@ -68,6 +68,9 @@ All values are fixed lists or short identifiers, never free text.
 | `impact` | `local`, `shared`, `global` |
 | `styling` | `tailwind`, `css_modules`, `scss`, `styled_components`, `plain_css`, `inline`, `other` |
 | `area` | `host`, `webview`, `ai`, `edit`, `preview`, `library`, `cloud`, `mcp`, `other` |
+| `item` | `star`, `follow_x`, `discord`, `coffee`, `share` |
+| `tier` | `free`, `pro` |
+| `framework` | `sveltekit`, `nuxt`, `astro`, `react-router`, `next`, `gatsby`, `angular`, `cra`, `vite`, `generic` |
 | `agent`, `library_item`, `tool`, `error_class`, `action` | A short identifier of letters, digits and `_ . : -`. A path or a sentence is rejected by the server. |
 | `lines_added`, `lines_removed`, `files_count`, `diff_count`, `message_count`, `tool_count` | Numbers only. |
 
