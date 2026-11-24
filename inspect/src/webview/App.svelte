@@ -38,7 +38,10 @@
   import SharePanel from './SharePanel.svelte';
   import LayersTree from './LayersTree.svelte';
   import FocusTabs from './FocusTabs.svelte';
-  import { FocusKey, View, focusKeyOf, focusOf, rowFocus, type Focus } from './focus';
+  import ComponentProps from './ComponentProps.svelte';
+  import { controlsOf, variantsOf, type PropControl, type PropValue } from './prop-controls';
+  import { FocusMode } from './page-bridge';
+  import { FocusKey, SNAPSHOT_NOTICE, View, focusKeyOf, focusOf, rowFocus, type Focus } from './focus';
   import { hasSourceInfo } from './source-info';
   import ChangesList from './ChangesList.svelte';
   import DeviceBar from './DeviceBar.svelte';
@@ -315,7 +318,15 @@
     focusReady: () => untrack(() => viewing === View.Focus && syncView()),
     moved: (path) => (visited(path), bridge.tree()),
     tree: (tree) => ((layers = tree), askPalette()),
-    focused: (count) => {
+    mounted: (status) => {
+      mount = { controls: controlsOf(status.controls, status.props), values: status.props };
+      sendProps();
+    },
+    focused: (count, mode, reason) => {
+      snapshotReason = mode === FocusMode.Snapshot ? (reason ?? null) : null;
+      if (mode === FocusMode.Snapshot) {
+        mount = null;
+      }
       if (count > 0) {
         reopening = false;
         return;
@@ -1039,6 +1050,31 @@
     }
   }
 
+  let mount = $state<{ controls: PropControl[]; values: Record<string, unknown> } | null>(null);
+  let showGrid = $state(false);
+  let snapshotReason = $state<string | null>(null);
+  const variants = $derived(variantsOf(mount?.controls ?? []));
+
+  function sendProps() {
+    if (mount) {
+      bridge.mountProps($state.snapshot(mount.values), showGrid ? $state.snapshot(variants.variants) : null);
+    }
+  }
+
+  function setProp(name: string, value: PropValue | undefined) {
+    if (!mount) {
+      return;
+    }
+    const { [name]: _, ...rest } = mount.values;
+    mount = { ...mount, values: value === undefined ? rest : { ...rest, [name]: value } };
+    sendProps();
+  }
+
+  function setGrid(on: boolean) {
+    showGrid = on;
+    sendProps();
+  }
+
   let focus = $state<Focus | null>(null);
   let viewing = $state(View.Page);
   let reopening = false;
@@ -1076,6 +1112,9 @@
     focus = next;
     viewing = View.Focus;
     reopening = false;
+    mount = null;
+    showGrid = false;
+    snapshotReason = null;
     bridge.useFocus(true);
     bridge.focus(next.source, true);
   }
@@ -1086,6 +1125,9 @@
     }
     const wasFocused = viewing === View.Focus;
     focus = null;
+    mount = null;
+    showGrid = false;
+    snapshotReason = null;
     viewing = View.Page;
     bridge.useFocus(false);
     bridge.focus(null);
@@ -1345,7 +1387,7 @@
       {#if share?.available}<SharePanel view={share} onstart={(name, canEdit) => toHost({ kind: ToHost.ShareStart, name, canEdit })} onstop={() => toHost({ kind: ToHost.ShareStop })} onkick={(userId) => toHost({ kind: ToHost.ShareKick, userId })} onrole={(userId, role) => toHost({ kind: ToHost.ShareRole, userId, role })} />{/if}
       <button type="button" class="icon" class:on={!barClosed} title="Properties (⌘\)" onclick={toggleBar} data-testid="bar-toggle"><PanelRight size={15} /></button>
     </header>
-    {#if focus}<FocusTabs name={focus.name} active={viewing} onselect={showTab} onclose={exitFocus} bind:height={tabsH} />{/if}
+    {#if focus}<FocusTabs name={focus.name} active={viewing} notice={snapshotReason === null ? null : SNAPSHOT_NOTICE} reason={snapshotReason} onselect={showTab} onclose={exitFocus} bind:height={tabsH} />{/if}
 
     <div class="backdrop" role="presentation" bind:clientWidth={stage.w} bind:clientHeight={stage.h} onpointermove={resizeFrame} onpointerup={endDrag}>
       <div class="frame" class:framed={size !== Size.Full} style={`width:${fit.width * fit.scale}px;height:${fit.height * fit.scale}px`}>
@@ -1455,6 +1497,9 @@
         {#each plugins.sidePanel as panel (panel.plugin + panel.entry.id)}<Tabs.Trigger value={`plugin:${panel.plugin}/${panel.entry.id}`} class="tab" data-testid="plugin-tab">{panel.entry.title}</Tabs.Trigger>{/each}
       </Tabs.List>
       <Tabs.Content value={Tab.Properties}>
+        {#if mount && viewing === View.Focus && mount.controls.length}
+          <ComponentProps controls={mount.controls} values={mount.values} grid={showGrid} {variants} onchange={setProp} ongrid={setGrid} />
+        {/if}
         {#if several}
           <div class="what" data-testid="multi-selection">
             <strong>{selection.refs.length} elements selected</strong>

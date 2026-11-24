@@ -1381,3 +1381,9 @@ Signal: a test of code under `packages/` hangs or ignores your edit in a worktre
 ## The selection box floats after a Library insert
 
 **Signal:** after inserting a section, the old selection outline stays fixed on screen while the preview scrolls. The insert adds an import above the markup, the selected element's `data-feega-src` line shifts, the tracker finds nothing and sends a null rect, and the page bridge dropped null rects. **Move:** a null rect is a message, not noise: forward it and hide the outline (`page-bridge.test.ts`).
+
+### Un bundle ESM con dentro Babel muore al primo `require` dinamico
+Segnale: `Dynamic require of "x" is not supported` quando il launcher carica `vite.js` appena
+`react-docgen` entra nel bundle. Mossa: banner esbuild con `createRequire(import.meta.url)` e i
+`@babel/preset-*` esterni (non servono a runtime). Provare il bundle con un `import()` vero,
+non solo con la build.

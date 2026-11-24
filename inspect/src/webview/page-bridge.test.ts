@@ -80,3 +80,36 @@ describe('the page tab and the focus tab share one frame', () => {
     expect(ready).toEqual(['page', 'focus']);
   });
 });
+
+describe('the real component in the focus tab', () => {
+  it('says whether the focus tab shows the real component or a snapshot, and why', () => {
+    const post = pageWindow();
+    const seen: unknown[] = [];
+    pageBridge(() => null, { focused: (...args: unknown[]) => seen.push(args) } as never);
+
+    post({ type: FOCUSED, count: 1, mode: 'mount' });
+    post({ type: FOCUSED, count: 1, mode: 'snapshot', reason: 'no provider' });
+
+    expect(seen).toEqual([[1, 'mount', undefined], [1, 'snapshot', 'no provider']]);
+  });
+
+  it('hands over what the mounted component reports', () => {
+    const post = pageWindow();
+    const seen: unknown[] = [];
+    pageBridge(() => null, { mounted: (status: unknown) => seen.push(status) } as never);
+
+    post({ type: 'feega:mount:status', status: 'ready', controls: [{ name: 'size', kind: 'select' }], props: { size: 'sm' } });
+
+    expect(seen).toEqual([{ status: 'ready', reason: undefined, controls: [{ name: 'size', kind: 'select' }], props: { size: 'sm' } }]);
+  });
+
+  it('sends props and variants to the focus tab only', () => {
+    const posted: unknown[] = [];
+    pageWindow();
+    const bridge = pageBridge(() => ({ src: `${ORIGIN}/`, contentWindow: { postMessage: (m: unknown) => posted.push(m) } }) as unknown as HTMLIFrameElement, {} as never);
+
+    bridge.mountProps({ size: 'lg' }, null);
+
+    expect(posted).toEqual([{ type: 'feega:mount:props', props: { size: 'lg' }, variants: null, focus: true }]);
+  });
+});
