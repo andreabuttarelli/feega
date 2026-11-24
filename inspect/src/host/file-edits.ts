@@ -48,7 +48,7 @@ export type DetachAsk = { at: string; usage: string; which: Which };
 
 export type ManyAsk = { op: StructureOp; targets: { at: string; instance?: number }[]; wrap?: WrapTag };
 
-export type Written = { ok: true; path: string; written: string; note?: string; selected?: LiveAt; changes?: FileChange[] } | { ok: false; reason: string; at?: LiveAt };
+export type Written = { ok: true; path: string; written: string; note?: string; selected?: LiveAt; changes?: FileChange[]; touched?: FileChange[] } | { ok: false; reason: string; at?: LiveAt };
 
 type Changes = { ok: true; changes: FileChange[] } | { ok: false; reason: string; at?: LiveAt };
 
@@ -165,7 +165,7 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     const change = { ...meta, id: ++nextId, files: moving.map((c) => c.path), time: Date.now() };
     log.unshift(change);
     paths.set(step, change);
-    return { ok: true, path: changes[0]?.path ?? '', written: token, note };
+    return { ok: true, path: changes[0]?.path ?? '', written: token, note, touched: moving };
   }
 
   async function edited(ask: EditAsk, extra: FileChange[] = [], mode = Commit.Write): Promise<Written> {

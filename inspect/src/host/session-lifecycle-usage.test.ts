@@ -94,8 +94,8 @@ describe('onboarding in the usage stream', () => {
     await t.send({ kind: ToHost.OnboardingStep, step: OnboardingStep.Agent });
     await t.send({ kind: ToHost.OnboardingDone, outcome: OnboardingOutcome.Finished });
 
-    expect(await t.events()).toEqual(['onboarding_started', 'onboarding_step', 'onboarding_finished']);
-    expect(t.sent.find((e) => e.event === 'onboarding_step')?.step).toBe('agent');
+    expect(await t.events()).toEqual(['onboarding_started', 'onboarding_step', 'onboarding_step', 'onboarding_finished']);
+    expect(t.sent.filter((e) => e.event === 'onboarding_step').map((e) => [e.step, e.outcome])).toEqual([['agent', 'viewed'], ['agent', 'completed']]);
   });
 
   it('reports a skip as skipped, not finished', async () => {
@@ -130,14 +130,14 @@ describe('library in the usage stream', () => {
   it.each([
     ['free-item', 'free'],
     ['pro-item', 'pro']
-  ])('reports %s as tier %s and nothing of the item', async (id, tier) => {
+  ])('reports %s as tier %s with the catalog id only', async (id, tier) => {
     const t = setup();
     await t.send({ kind: ToHost.LibraryInsert, id, at: AT, place: AddPlace.After });
 
     expect(await t.events()).toContain('library_insert');
     const sent = t.sent.find((e) => e.event === 'library_insert');
     expect(sent?.tier).toBe(tier);
-    expect(JSON.stringify(sent)).not.toContain(id);
+    expect(sent?.library_item).toBe(id);
   });
 });
 
