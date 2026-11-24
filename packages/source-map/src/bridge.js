@@ -1,6 +1,6 @@
 import { stampSources } from './framework-meta.js';
 import { SOURCE_ATTR, rectOf, deepestAt, clearPreview, clearPreviews, hidePreview, paletteOf, relativeOf, treeOf, inspectElement, keepPreviews, previewEdit, settlePreview } from './runtime.js';
-import { focusTab } from './focus.js';
+import { FOCUSED, focusTab } from './focus.js';
 import { missingFontsOf } from './missing-fonts.js';
 import { trackRects } from './track.js';
 import { keepScroll } from './reload-restore.js';
@@ -23,7 +23,7 @@ export const TREE = 'feega:tree';
 export const TREE_RESULT = 'feega:tree:result';
 export const HIDE = 'feega:hide';
 export const FOCUS = 'feega:focus';
-export const FOCUSED = 'feega:focused';
+export { FOCUSED };
 export const PALETTE = 'feega:palette';
 export const PALETTE_RESULT = 'feega:palette:result';
 export const MODE = 'feega:mode';
@@ -62,7 +62,7 @@ export function installBridge(win, { nested = false, emit = null, twin = null } 
   const toParent = (message) => (emit ? emit(message) : win.parent?.postMessage(message, '*'));
   let reply = toParent;
   const scroll = nested ? { restored: false, leave: () => undefined } : keepScroll(win);
-  const tab = focusTab(win, { install: (inner) => installBridge(inner, { nested: true, twin: (element) => tab.twin(element), emit: (message) => win.parent?.postMessage({ ...message, focus: true }, '*') }), prepare: () => stampSources(doc), found: (count) => win.parent?.postMessage({ type: FOCUSED, count }, '*') });
+  const tab = focusTab(win, { install: (inner) => installBridge(inner, { nested: true, twin: (element) => tab.twin(element), emit: (message) => win.parent?.postMessage({ ...message, focus: true }, '*') }), prepare: () => stampSources(doc), report: (message) => win.parent?.postMessage(message, '*') });
   const tracker = trackRects(win, (slot, rect) => reply({ type: TRACKED, slot, rect }));
 
   function sendTree() {
@@ -115,7 +115,7 @@ export function installBridge(win, { nested = false, emit = null, twin = null } 
     [MODE]: (request) => (mode = request.mode),
     [PALETTE]: () => reply({ type: PALETTE_RESULT, ...paletteOf(doc), missing: missingFontsOf(doc) }),
     [HIDE]: (request) => hidePreview(doc, request.source, request.hidden),
-    [FOCUS]: (request) => (request.source === null ? tab.close() : reply({ type: FOCUSED, count: tab.open(request) })),
+    [FOCUS]: (request) => (request.source === null ? tab.close() : reply({ type: FOCUSED, ...tab.open(request) })),
     [LEAVE]: () => scroll.leave(),
     [TRACK]: (request) => tracker.follow(request.slot, request.source, request.index),
     [TREE]: () => {
@@ -140,6 +140,9 @@ export function installBridge(win, { nested = false, emit = null, twin = null } 
   };
 
   win.addEventListener('message', (event) => {
+    if (tab.status(event)) {
+      return;
+    }
     if (event.data?.focus) {
       tab.forward(event.data);
       return;
@@ -257,6 +260,6 @@ export function targetOf(doc, request) {
   return deepestAt(doc, request.x, request.y);
 }
 
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && !window[Symbol.for('feega.nested-host')]) {
   installBridge(window);
 }

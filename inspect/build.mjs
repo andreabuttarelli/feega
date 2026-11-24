@@ -42,7 +42,8 @@ await esbuild({
   platform: 'node',
   format: 'esm',
   target: 'node20',
-  external: ['vite', 'svelte', 'svelte/*', '@vue/compiler-sfc', '@astrojs/compiler/sync', './bridge.js']
+  external: ['vite', 'svelte', 'svelte/*', '@vue/compiler-sfc', '@astrojs/compiler/sync', './bridge.js', '@babel/preset-*'],
+  banner: { js: "import { createRequire as bundledRequire } from 'node:module'; const require = bundledRequire(import.meta.url);" }
 });
 await Promise.all(BRIDGE_FILES.map((f) => cp(`${SOURCE_MAP}${f}`, `${LAUNCHER}${f}`)));
 await cp(here('launcher/launch.mjs'), `${LAUNCHER}launch.mjs`);

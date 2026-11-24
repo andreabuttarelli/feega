@@ -14,6 +14,8 @@ export enum FocusKey {
   Exit = 'exit'
 }
 
+export const SNAPSHOT_NOTICE = "Couldn't render in isolation: showing a snapshot";
+
 const FOCUS_LETTER = 'f';
 const ESCAPE = 'escape';
 
