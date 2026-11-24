@@ -20,12 +20,12 @@ const eventually = async (check: () => boolean) => {
   }
 };
 
-const open = async (policy = Policy.Ask) => {
+const open = async (policy = Policy.Ask, ...flags: string[]) => {
   const dir = mkdtempSync(join(tmpdir(), 'acp-'));
   const events: AgentEvent[] = [];
   const written: Record<string, string> = {};
   const session = await openAcpAgent(
-    { command: process.execPath, args: [FAKE] },
+    { command: process.execPath, args: [FAKE, ...flags] },
     {
       cwd: dir,
       policy: () => policy,
@@ -158,5 +158,14 @@ describe('the ACP session', () => {
 
     void session.send(`write ${join(dir, 'a.txt')}`);
     await eventually(() => events.some((e) => e.kind === AgentEventKind.Permission));
+  });
+
+  it('signs in with the login method the agent offers when it asks for authentication', async () => {
+    const { events, session } = await open(Policy.Ask, 'login');
+    sessions.push(session);
+
+    await session.send('hello');
+
+    expect(events.at(-1)).toEqual({ kind: AgentEventKind.Done, reason: 'end_turn' });
   });
 });
