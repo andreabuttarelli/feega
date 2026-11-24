@@ -1,5 +1,6 @@
 import { stampSources } from './framework-meta.js';
 import { SOURCE_ATTR, rectOf, deepestAt, clearPreview, clearPreviews, hidePreview, paletteOf, relativeOf, treeOf, inspectElement, keepPreviews, previewEdit, settlePreview } from './runtime.js';
+import { clearFocus, focusComponent } from './focus.js';
 import { missingFontsOf } from './missing-fonts.js';
 import { trackRects } from './track.js';
 import { keepScroll } from './reload-restore.js';
@@ -21,6 +22,8 @@ export const REVEAL = 'feega:reveal';
 export const TREE = 'feega:tree';
 export const TREE_RESULT = 'feega:tree:result';
 export const HIDE = 'feega:hide';
+export const FOCUS = 'feega:focus';
+export const FOCUSED = 'feega:focused';
 export const PALETTE = 'feega:palette';
 export const PALETTE_RESULT = 'feega:palette:result';
 export const MODE = 'feega:mode';
@@ -110,6 +113,7 @@ export function installBridge(win) {
     [MODE]: (request) => (mode = request.mode),
     [PALETTE]: () => reply({ type: PALETTE_RESULT, ...paletteOf(doc), missing: missingFontsOf(doc) }),
     [HIDE]: (request) => hidePreview(doc, request.source, request.hidden),
+    [FOCUS]: (request) => (request.source === null ? clearFocus(win) : reply({ type: FOCUSED, count: focusComponent(win, request) })),
     [LEAVE]: () => scroll.leave(),
     [TRACK]: (request) => tracker.follow(request.slot, request.source, request.index),
     [TREE]: () => {

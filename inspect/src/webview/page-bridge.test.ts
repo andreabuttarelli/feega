@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { TRACKED } from '../messages';
+import { FOCUSED, TRACKED } from '../messages';
 import { pageBridge } from './page-bridge';
 
 const ORIGIN = 'http://localhost:5173';
@@ -26,5 +26,17 @@ describe('tracked rects reach the view', () => {
       ['selected', { x: 0, y: 0, width: 10, height: 10 }],
       ['selected', null]
     ]);
+  });
+});
+
+describe('focus replies reach the view', () => {
+  it('reports how many instances the page found', () => {
+    const post = pageWindow();
+    const counts: number[] = [];
+    pageBridge(() => null, { focused: (count: number) => counts.push(count) } as never);
+
+    post({ type: FOCUSED, count: 3 });
+
+    expect(counts).toEqual([3]);
   });
 });

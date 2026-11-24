@@ -37,6 +37,8 @@
   import ServerPopover from './ServerPopover.svelte';
   import SharePanel from './SharePanel.svelte';
   import LayersTree from './LayersTree.svelte';
+  import FocusBar from './FocusBar.svelte';
+  import { FocusKey, focusKeyOf, focusLabel, focusOf, rowFocus, type Focus } from './focus';
   import { hasSourceInfo } from './source-info';
   import ChangesList from './ChangesList.svelte';
   import DeviceBar from './DeviceBar.svelte';
@@ -311,6 +313,7 @@
       showTheme();
       bridge.tree();
       bridge.palette();
+      untrack(() => focus && bridge.focus(focus.source, focus.index));
       untrack(() => picked && elementState !== ElementState.Default && bridge.force(picked.source, elementState));
       refresh();
       bridge.track(Slot.Selected, untrack(() => picked?.source) ?? null, untrack(() => picked?.instanceIndex));
@@ -322,6 +325,12 @@
     },
     moved: (path) => (visited(path), bridge.tree()),
     tree: (tree) => ((layers = tree), askPalette()),
+    focused: (count) => {
+      focusFound = count;
+      if (count === 0) {
+        exitFocus();
+      }
+    },
     tracked: (slot, rect) => {
       const peer = peerIdOf(slot);
       if (peer) {
@@ -1037,6 +1046,23 @@
     }
   }
 
+  let focus = $state<Focus | null>(null);
+  let focusFound = $state(0);
+
+  function enterFocus(next: Focus | null) {
+    if (!next) {
+      return;
+    }
+    focus = next;
+    bridge.focus(next.source, next.index);
+  }
+
+  function exitFocus() {
+    focus = null;
+    focusFound = 0;
+    bridge.focus(null);
+  }
+
   function detach() {
     if (picked?.component) {
       toHost({ kind: ToHost.Detach, at: sourceText(picked.source), usage: sourceText(picked.component), which: picked.usage });
@@ -1092,7 +1118,8 @@
       [Command.Structure]: () => chosen.command === Command.Structure && restructure(chosen.op),
       [Command.Add]: () => chosen.command === Command.Add && addElement(chosen.kind, chosen.place),
       [Command.Wrap]: () => chosen.command === Command.Wrap && wrapWith(chosen.tag),
-      [Command.Detach]: detach
+      [Command.Detach]: detach,
+      [Command.Focus]: () => picked && enterFocus(focusOf(picked))
     };
     run[chosen.command]();
   }
@@ -1200,6 +1227,12 @@
 
   function onKey(e: KeyboardEvent) {
     const cmd = e.metaKey || e.ctrlKey;
+    const focusKey = cmd || typing(e) || editing ? null : focusKeyOf(e.key, { focused: focus !== null, available: Boolean(picked?.component) && mode === Mode.Design && !several });
+    if (focusKey) {
+      e.preventDefault();
+      focusKey === FocusKey.Exit ? exitFocus() : picked && enterFocus(focusOf(picked));
+      return;
+    }
     if (runShortcut(e, shortcutOf(e, isMac))) {
       return;
     }
@@ -1257,7 +1290,7 @@
     {:else}
     <header class="left-head">Layers<button type="button" class="add" title="Add an element (/)" aria-label="Add" data-testid="add-button" disabled={!picked} onclick={(e) => openAddMenu(e.clientX, e.clientY)}>+ Add</button></header>
     <div class="layers" role="tree" aria-label="Layers" data-testid="layers">
-      <LayersTree nodes={layers} {picked} selected={selectedKeys} badge={badgeOf(elementState)} open={layersOpen} onselect={selectRow} onhover={hoverLayer} onopen={(at) => toHost({ kind: ToHost.Open, at })} onmove={moveLayer} onusage={moveUsage} dragging={layerDrag} hidden={hiddenNow} locked={lockedNow} ontoggle={toggleFlag} oncontext={openLayerMenu} onadd={layerAdd} />
+      <LayersTree nodes={layers} {picked} selected={selectedKeys} badge={badgeOf(elementState)} open={layersOpen} onselect={selectRow} onhover={hoverLayer} onopen={(at) => toHost({ kind: ToHost.Open, at })} onmove={moveLayer} onusage={moveUsage} dragging={layerDrag} hidden={hiddenNow} locked={lockedNow} ontoggle={toggleFlag} oncontext={openLayerMenu} onadd={layerAdd} onfocus={(node) => enterFocus(rowFocus(node))} />
     </div>
     {/if}
     {#if !leftClosed}<span class="edge-right" role="separator" aria-orientation="vertical" aria-label="Resize Layers" title="Drag to resize, double-click to reset" onpointerdown={(e) => ((e.currentTarget as HTMLElement).setPointerCapture(e.pointerId), (leftSizing = { x: e.clientX, width: leftPx }))} onpointermove={(e) => leftSizing && (leftWidth = leftSizing.width + (e.clientX - leftSizing.x))} onpointerup={() => leftSizing && ((leftSizing = null), (leftWidth = leftPx), savePrefs())} ondblclick={() => ((leftWidth = LEFT_DEFAULT_PX), savePrefs())}></span>{/if}
@@ -1352,6 +1385,7 @@
           <button type="button" class="link" onclick={() => dismissedFonts.add(fontNotice!.family)}>Dismiss</button>
         </div>
       {/if}
+      {#if focus}<FocusBar label={focusLabel(focus, focusFound)} onexit={exitFocus} />{/if}
       {#if toast}<div class="toast" role="status">{toast}</div>{/if}
       <div class="float" class:moving bind:clientWidth={bar.w} bind:clientHeight={bar.h} style={`left:${barAt.x}px;top:${barAt.y}px`} data-anchor={anchor}>
         <button type="button" class="grip" title="Drag to move (arrow keys)" aria-label="Move the bar" onpointerdown={grabBar} onpointermove={dragBar} onpointerup={dropBar} onkeydown={onHandleKey}>

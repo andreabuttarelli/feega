@@ -33,9 +33,10 @@
     hidden: Set<string>;
     locked: Set<string>;
     ontoggle: (flag: 'hidden' | 'locked', source: Source) => void;
+    onfocus: (node: LayerNode) => void;
   };
 
-  let { nodes, picked, selected, badge = '', depth = 0, open, onselect, onhover, onopen, onmove, dragging, parentFile = null, onusage, hidden, locked, ontoggle, oncontext, onadd }: Props = $props();
+  let { nodes, picked, selected, badge = '', depth = 0, open, onselect, onhover, onopen, onmove, dragging, parentFile = null, onusage, hidden, locked, ontoggle, oncontext, onadd, onfocus }: Props = $props();
 
   const INDENT_PX = 12;
   const EDGE_BAND = 0.25;
@@ -123,6 +124,7 @@
     style={`padding-left:${8 + depth * INDENT_PX}px`}
     data-layer={id}
     onclick={(e) => choose(node, e)}
+    ondblclick={() => node.component && onfocus(node)}
     onkeydown={(e) => onKey(e, node)}
     onpointerenter={() => onhover(visual(node) ? node.source : null, node.instance)}
     onpointerleave={() => onhover(null, 0)}
@@ -148,7 +150,7 @@
     </span>{/if}
   </div>
   {#if node.children.length && open[id]}
-    <Self nodes={node.children} {picked} {selected} {badge} depth={depth + 1} {open} {onselect} {onhover} {onopen} {onmove} {dragging} parentFile={node.source?.file ?? null} {onusage} {hidden} {locked} {ontoggle} {oncontext} {onadd} />
+    <Self nodes={node.children} {picked} {selected} {badge} depth={depth + 1} {open} {onselect} {onhover} {onopen} {onmove} {dragging} parentFile={node.source?.file ?? null} {onusage} {hidden} {locked} {ontoggle} {oncontext} {onadd} {onfocus} />
   {/if}
 {/each}
 
