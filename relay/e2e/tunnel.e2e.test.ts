@@ -7,6 +7,7 @@ import { newSid } from '../../packages/share-protocol/src/sid';
 import { signToken, type Claims } from '../../packages/share-protocol/src/token';
 import { VISIT_COOKIE } from '../../packages/share-protocol/src/visitor';
 import { shareClient, type ShareClient } from '../../inspect/src/host/share/client';
+import { shareHost, type ShareApi } from '../../inspect/src/host/share/share-host';
 import { SOCKET_PATH, ToHost, ToView } from '../../inspect/src/messages';
 import { MAX_VISITORS } from '../src/limits';
 
@@ -288,5 +289,51 @@ describe('a session the host stopped', () => {
     expect(redirected.headers.location).toBe(`${WEB_ORIGIN}/s/${sid}`);
     const deep = await get(relay, sid, '/a/b?c=1', { cookie });
     expect(deep.headers.location).toBe(`${WEB_ORIGIN}/s/${sid}`);
+  });
+});
+
+describe('a share started and stopped through the host and the sessions API', () => {
+  let relay: Relay;
+  let app: Server;
+  let editor: Server;
+  const sid = newSid();
+
+  beforeAll(async () => {
+    relay = await bootRelay();
+    app = localApp();
+    editor = localEditor();
+    await Promise.all([listening(app), listening(editor)]);
+  }, BOOT_MS);
+
+  afterAll(() => {
+    relay?.stop();
+    app?.close();
+    editor?.close();
+  });
+
+  const sessionsApi = (closed: string[]): ShareApi => ({
+    startSession: async () => ({ id: sid, url: `http://${sid}.localhost:${relay.port}`, hostToken: await token(sid, 'host', 'host-1', 'Host'), expiresAt: new Date(Date.now() + HOUR_S * 1000).toISOString() }),
+    closeSession: async (id) => (closed.push(id), { snapshotUploadUrl: '' }),
+    setMember: async () => undefined
+  });
+
+  it('serves the link while shared and sends visitors to the session page once stopped', async () => {
+    const closed: string[] = [];
+    const share = shareHost({ api: sessionsApi(closed), relayUrl: `ws://${LOOPBACK}:${relay.port}/host`, send: fetch });
+
+    const info = await share.start({
+      dir: '/work/landing',
+      editorUrl: `http://${LOOPBACK}:${(editor.address() as AddressInfo).port}`,
+      appUrl: `http://${LOOPBACK}:${(app.address() as AddressInfo).port}`,
+      visitorsCanEdit: false
+    });
+    const cookie = await cookieOf(info.id, 'viewer');
+    expect((await get(relay, info.id, '/page', { cookie })).status).toBe(HTTP_OK);
+
+    await share.stop(info.id);
+
+    const redirected = await replyWhere(() => get(relay, info.id, '/page', { cookie }), HTTP_FOUND);
+    expect(redirected.headers.location).toBe(`${WEB_ORIGIN}/s/${info.id}`);
+    expect(closed).toEqual([info.id]);
   });
 });
