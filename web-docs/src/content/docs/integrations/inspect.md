@@ -176,7 +176,7 @@ code --install-extension feega-inspect-0.1.0.vsix
   (Claude Code, Cursor, Copilot, Cline, Codex, Gemini CLI) see what you selected. Turn it off with
   the `feegaInspect.syncSelection` setting.
 - **Copy for agent.** Right-click the selected element and choose **Copy for agent**, or use the
-  link next to the file name in the bar. The clipboard gets `file:line`, selector, component, page,
+  link next to the file name in the bar, or right-click a row in Layers. The clipboard gets `file:line`, selector, component, page,
   preview width, and the breakpoint, theme and state when set. Paste it into your agent.
 - **Skill tip.** In a project with agent files (`CLAUDE.md`, `AGENTS.md`, `.claude/`, `.cursor/`,
   `.codex/` or `.agents/`) and no Feega skill, Feega shows a one-time tip with

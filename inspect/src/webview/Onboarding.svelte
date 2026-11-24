@@ -1,18 +1,20 @@
 <script lang="ts">
   import X from '@lucide/svelte/icons/x';
   import { onMount } from 'svelte';
-  import { AccountState, OnboardingOutcome, OnboardingStep, ToHost } from '../messages';
+  import { AccountState, AgentId, OnboardingOutcome, OnboardingStep, ToHost } from '../messages';
   import type { SupportItem } from '../support';
-  import { SLIDES } from './onboarding-slides';
+  import { AGENT_LOGOS } from './agent-logos';
+  import { MCP_COMMAND, MCP_DOCS_URL, SLIDES } from './onboarding-slides';
   import SupportList from './SupportList.svelte';
 
-  let { account, support, onaccount, onsupport, onstep, ondone }: { account: { state: AccountState; email?: string }; support: SupportItem[]; onaccount: (kind: ToHost.SignIn | ToHost.CancelSignIn) => void; onsupport: (item: SupportItem) => void; onstep: (step: OnboardingStep) => void; ondone: (outcome: OnboardingOutcome) => void } = $props();
+  let { account, support, agents, onaccount, onsupport, oncopy, onlink, onstep, ondone }: { account: { state: AccountState; email?: string }; support: SupportItem[]; agents: AgentId[]; onaccount: (kind: ToHost.SignIn | ToHost.CancelSignIn) => void; onsupport: (item: SupportItem) => void; oncopy: (text: string) => void; onlink: (url: string) => void; onstep: (step: OnboardingStep) => void; ondone: (outcome: OnboardingOutcome) => void } = $props();
 
   let index = $state(0);
   let dialog = $state<HTMLDivElement | null>(null);
 
   const slide = $derived(SLIDES[index]);
   const last = $derived(index === SLIDES.length - 1);
+  const connecting = $derived(slide.step === OnboardingStep.Agents);
   const signing = $derived(slide.step === OnboardingStep.SignIn);
 
   function focusables() {
@@ -61,6 +63,30 @@
       <h2 id="onb-title">{slide.title}</h2>
       <p id="onb-body">{slide.body}</p>
       {#if slide.more}<p class="more">{slide.more}</p>{/if}
+
+      {#if connecting}
+        <ul class="agents" data-testid="onboarding-agents">
+          {#each Object.values(AgentId) as id (id)}
+            {@const found = agents.includes(id)}
+            <li class="agent" class:muted={!found} data-testid="onboarding-agent-{id}" data-found={found}>
+              <svg viewBox={AGENT_LOGOS[id].viewBox} width="22" height="22" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d={AGENT_LOGOS[id].path} /></svg>
+              <span class="name">{AGENT_LOGOS[id].label}</span>
+              <span class="state">{found ? '✓ found' : 'not found'}</span>
+            </li>
+          {/each}
+        </ul>
+        <ul class="ways">
+          <li><strong>Copy for agent</strong> Right-click an element, then paste its file, selector and view into your agent.</li>
+          <li><strong>This extension</strong> Your agent edits the same files. Feega shows every change as a diff.</li>
+          <li>
+            <strong>MCP</strong> Let your agent read your selection and changes: <code>npx feega mcp</code>.
+            <span class="row">
+              <button type="button" class="ghost" data-testid="onboarding-mcp-copy" onclick={() => oncopy(MCP_COMMAND)}>Copy command</button>
+              <button type="button" class="ghost" data-testid="onboarding-mcp-docs" onclick={() => onlink(MCP_DOCS_URL)}>Connect your agent via MCP</button>
+            </span>
+          </li>
+        </ul>
+      {/if}
 
       {#if signing}
         <div class="account">
@@ -174,6 +200,61 @@
   .more {
     color: var(--ui-text-3);
     font-size: var(--ui-text-xs);
+  }
+
+  .agents {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin: 12px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .agent {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    color: var(--ui-text);
+    font-size: var(--ui-text-xs);
+  }
+
+  .agent.muted {
+    color: var(--ui-text-3);
+    opacity: 0.6;
+  }
+
+  .state {
+    color: var(--ui-text-3);
+  }
+
+  .agent:not(.muted) .state {
+    color: var(--ui-text-2);
+  }
+
+  .ways {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 12px 0 0;
+    padding: 0;
+    list-style: none;
+    color: var(--ui-text-2);
+    font-size: var(--ui-text-xs);
+    line-height: 1.5;
+    text-align: left;
+  }
+
+  .row {
+    display: flex;
+    gap: 4px;
+    margin-top: 4px;
+  }
+
+  .ways strong {
+    color: var(--ui-text);
+    font-weight: 500;
   }
 
   .account {

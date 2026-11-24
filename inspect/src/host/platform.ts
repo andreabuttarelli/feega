@@ -1,4 +1,4 @@
-import type { HostMessage, Source, ViewMessage } from '../messages';
+import type { AgentId, HostMessage, Source, ViewMessage } from '../messages';
 import type { Catalog } from '../../../packages/library/src/catalog';
 import type { ProFetch } from './pro-insert';
 import type { AccountStore } from './account';
@@ -63,4 +63,5 @@ export type Platform = Transport & {
   support?: SupportStore;
   plugins?: PluginsHost;
   skillHint?: SkillHintHost;
+  agents?: () => AgentId[];
 };

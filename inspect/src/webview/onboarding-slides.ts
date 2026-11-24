@@ -2,6 +2,9 @@ import { OnboardingStep } from '../messages';
 
 export type Slide = { step: OnboardingStep; title: string; body: string; more?: string };
 
+export const MCP_COMMAND = 'claude mcp add feega -- npx feega mcp';
+export const MCP_DOCS_URL = 'https://docs.feega.app/integrations/inspect/';
+
 export const SLIDES: Slide[] = [
   {
     step: OnboardingStep.Welcome,
@@ -13,6 +16,11 @@ export const SLIDES: Slide[] = [
     title: 'you design, your agent codes',
     body: 'Same files, your styling: CSS or Tailwind. Undo anything. No AI, no tokens.',
     more: 'Design mode picks and edits. Navigate mode lets you use your app.'
+  },
+  {
+    step: OnboardingStep.Agents,
+    title: 'Connect Feega to your agents',
+    body: 'Feega works with the coding agent you already use.'
   },
   {
     step: OnboardingStep.SignIn,
