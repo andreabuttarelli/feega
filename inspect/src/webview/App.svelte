@@ -14,7 +14,7 @@
   import { MOVES, Shortcut, isMac, needsBareFocus, shortcutOf, typingIn } from './selection-keys';
   import { Click, NONE, Surface, clickOf, contains, extend, keyOf, only, primary, refOf, siblingsOf, toggle, visibleRows, type Selection } from './selection';
   import type { SupportItem } from '../support';
-  import { AccountState, type AgentId, Mode, Onboarding, OnboardingOutcome, Move, ServerAction, Slot, type ChangeRow, type FontChoice, type LayerNode, type LibraryEntry, type Palette, ServerState, type ServerInfo, Styling, ToHost, ToView, type Impact, type ImpactAsk, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
+  import { AccountState, type AgentId, Mode, Onboarding, OnboardingOutcome, Move, ServerAction, Slot, type ChangeRow, type FontChoice, type LayerNode, type LibraryEntry, type Palette, ServerState, type ServerInfo, Styling, ToHost, ToView, WebviewUsage, type Impact, type ImpactAsk, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
   import { fromHost, inVscode, toHost } from './host';
   import { imageSaved } from './image-file.svelte';
   import { iconDrawn, iconsFound } from './icon-search.svelte';
@@ -83,6 +83,7 @@
   import { browseHistory } from './history';
   import { DEFAULT_ANCHOR, anchorBox, isAnchor, nearestAnchor, nextAnchor, type Anchor } from './anchors';
   import { PRESETS, SIZES, Size, Snap, fitOf, sizeForKey, snapped } from './sizes';
+  import { breakpointOfSize } from './usage-report';
   import { Where } from '@feega/plugin-api/manifest';
   import type { Place as PluginPlace } from '@feega/plugin-api/protocol';
   import PluginSections from './PluginSections.svelte';
@@ -543,6 +544,7 @@
     if (!picked || next === elementState) {
       return;
     }
+    toHost({ kind: ToHost.Usage, event: WebviewUsage.StateSwitch, dims: { state: next } });
     baseline = elementState === ElementState.Default ? { ...picked.styles } : baseline;
     elementState = next;
     bridge.force(picked.source, next);
@@ -835,6 +837,7 @@
   }
 
   function pickSize(next: Size) {
+    toHost({ kind: ToHost.Usage, event: WebviewUsage.BreakpointSwitch, dims: { breakpoint: breakpointOfSize(next) } });
     size = next;
     savePrefs();
   }
@@ -1080,6 +1083,7 @@
     if (!next) {
       return;
     }
+    toHost({ kind: ToHost.Usage, event: WebviewUsage.FocusOpened, dims: { variant: 'focus' } });
     focus = next;
     viewing = View.Focus;
     reopening = false;
@@ -1173,6 +1177,7 @@
   }
 
   async function copyForAgent() {
+    toHost({ kind: ToHost.Usage, event: WebviewUsage.CopyForAgent });
     const text = await agentText();
     if (text === null) {
       return;
