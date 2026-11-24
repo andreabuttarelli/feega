@@ -21,6 +21,7 @@ import { StructureOp, structure } from '@feega/live-edit/structure';
 import { structureMany, type Skipped, type Target } from '@feega/live-edit/structure-many';
 import { pageRule } from '@feega/live-edit/page-rule';
 import { ElementState } from '@feega/live-edit/element-state';
+import { markupFirst } from '@feega/live-edit/markup-first';
 import { scopedRule, type Scope } from '@feega/live-edit/scoped-rule';
 import { styleAttr, type Css } from '@feega/live-edit/style-attr';
 import { targetOf } from '@feega/live-edit/breakpoints';
@@ -80,6 +81,12 @@ const CSS_WRITERS: Record<string, CssWriter> = {
   tsx: MODULE
 };
 
+const STAGED_WRITES: Record<string, (from: string, to: string) => string | null> = { astro: markupFirst };
+
+const stagedOf = (file: string) => STAGED_WRITES[file.slice(file.lastIndexOf('.') + 1)];
+
+export type Settle = () => Promise<void>;
+
 const cssWriterOf = (file: string): CssWriter => CSS_WRITERS[file.slice(file.lastIndexOf('.') + 1)] ?? INLINE;
 
 const afterChanges = (read: ReadFile, changes: FileChange[]): ReadFile => async (path) => changes.find((c) => c.path === path)?.after ?? read(path);
@@ -118,7 +125,7 @@ const FONT_CONFIGS = ['tailwind.config.mjs', 'tailwind.config.cjs'];
 
 export type Snapshot = { steps: { step: Step; change: Change }[]; undone: { step: Step; change: Change }[] };
 
-export function fileEdits(root: string, choice: () => StylingChoice = () => StylingChoice.Auto, saved?: Snapshot) {
+export function fileEdits(root: string, choice: () => StylingChoice = () => StylingChoice.Auto, saved?: Snapshot, settle: Settle = async () => undefined) {
   const paths = new Map<Step, Change>();
   const restore = (list: Snapshot['steps']) => list.map(({ step, change }) => (paths.set(step, change), step));
   const steps: Step[] = restore(saved?.steps ?? []);
@@ -151,6 +158,7 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
       step.push({ full, before: change.before, after: change.after, encoding: change.encoding });
     }
     await Promise.all(step.map((s) => mkdir(dirname(s.full), { recursive: true })));
+    await Promise.all(step.map((s) => staged(s.full, s.before, s.after, s.encoding)));
     await Promise.all(step.map((s) => writeFile(s.full, s.after, s.encoding)));
     steps.push(step);
     undone.length = 0;
@@ -324,6 +332,14 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
 
   const put = (full: string, text: string, encoding?: 'base64') => (text === '' ? rm(full, { force: true }) : writeFile(full, text, encoding));
 
+  async function staged(full: string, from: string, to: string, encoding?: 'base64') {
+    const first = encoding || !from || !to ? null : stagedOf(full)?.(from, to);
+    if (typeof first === 'string') {
+      await put(full, first);
+      await settle();
+    }
+  }
+
   async function replay(from: Step[], to: Step[], expect: 'before' | 'after', write: 'before' | 'after', empty: string): Promise<Written> {
     const step = from.at(-1);
     if (!step) {
@@ -334,6 +350,7 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
       return { ok: false, reason: CHANGED_SINCE };
     }
     from.pop();
+    await Promise.all(step.map((s) => staged(s.full, s[expect], s[write], s.encoding)));
     await Promise.all(step.map((s) => put(s.full, s[write], s.encoding)));
     to.push(step);
     return { ok: true, path: step[0]?.full ?? '', written: '' };

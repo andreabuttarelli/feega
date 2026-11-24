@@ -1381,3 +1381,7 @@ Signal: a test of code under `packages/` hangs or ignores your edit in a worktre
 ## The selection box floats after a Library insert
 
 **Signal:** after inserting a section, the old selection outline stays fixed on screen while the preview scrolls. The insert adds an import above the markup, the selected element's `data-feega-src` line shifts, the tracker finds nothing and sends a null rect, and the page bridge dropped null rects. **Move:** a null rect is a message, not noise: forward it and hide the outline (`page-bridge.test.ts`).
+
+## Astro dev keeps the old CSS after an edit that adds a class and its rule
+
+**Signal:** on an `.astro` component the rule is in the file, the served HTML has it, yet the browser shows the old value even after reload. The `?astro&type=style` module Vite serves to the browser lacks the rule and overwrites the server-rendered `<style>`. **Move:** Astro refreshes that module only when the change is style-only against the last compiled copy; a markup change plus a style change in one write is not. Write the markup first, let the page compile, then write the style (`markupFirst`, `settle` in `fileEdits`).
