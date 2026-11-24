@@ -7,7 +7,7 @@
 </script>
 
 <div class="preview" role="alertdialog" aria-label="Preview of the edit" data-testid="impact-preview">
-  <span class="why">Impact unknown: {held.reason}</span>
+  <span class="why">{#if held.by}{held.by} wants to change this. {/if}Impact unknown: {held.reason}</span>
   {#each held.files as file (file.path)}
     <div class="file">{file.path}:{file.line}</div>
     <pre class="diff">{#each file.removed as line, i (i)}<span class="del">- {line}</span>{'\n'}{/each}{#each file.added as line, i (i)}<span class="add">+ {line}</span>{'\n'}{/each}{#if file.more}<span class="more">… {file.more} more lines</span>{/if}</pre>

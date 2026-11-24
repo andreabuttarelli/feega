@@ -20,7 +20,7 @@ import type { CloudComment, CloudRevisions, CommentDraft } from './host/cloud-ap
 import type { DiffFile } from './host/diff-preview';
 import type { Catalog } from '@feega/plugin-api/external';
 import type { Proposal } from '@feega/plugin-api/protocol';
-import type { Present, VisitorRole } from '../../packages/share-protocol/src/frame';
+import type { Point, Present, VisitorRole } from '../../packages/share-protocol/src/frame';
 import type { ReportFacts, SettingKey, SettingValue, Settings } from './settings';
 
 export enum IconSource {
@@ -33,6 +33,8 @@ export type IconHit = { name: string; label?: string; source: IconSource; svg?: 
 export type Rect = { x: number; y: number; width: number; height: number };
 
 export type Source = { file: string; line: number; col: number };
+
+export type Author = { userId: string; name: string };
 
 export enum ImpactKind {
   Local = 'local',
@@ -209,10 +211,11 @@ export enum ToHost {
   PluginEnable = 'plugin-enable',
   PluginRemove = 'plugin-remove',
   PluginInstall = 'plugin-install',
-  PreviewReady = 'preview-ready'
+  PreviewReady = 'preview-ready',
+  Cursor = 'cursor'
 }
 
-export type ChangeRow = { id: number; at: string; prop: string; value: string; scope: string; files: string[]; time: number };
+export type ChangeRow = { id: number; at: string; prop: string; value: string; scope: string; files: string[]; time: number; by?: string };
 
 export type Prefs = { size: string; custom: number | null; barClosed: boolean; route?: string; anchor?: string; barWidth?: number; leftWidth?: number; leftClosed?: boolean; layers?: Record<string, { hidden: string[]; locked: string[] }> };
 
@@ -241,7 +244,8 @@ export enum ToView {
   Plugins = 'plugins',
   Reload = 'reload',
   Impact = 'impact',
-  Preview = 'preview'
+  Preview = 'preview',
+  Peers = 'peers'
 }
 
 export enum ShareState {
@@ -347,7 +351,10 @@ export type HostMessage =
   | { kind: ToHost.PluginEnable; id: string; enabled: boolean }
   | { kind: ToHost.PluginRemove; id: string }
   | { kind: ToHost.PluginInstall; source: string }
-  | { kind: ToHost.PreviewReady };
+  | { kind: ToHost.PreviewReady }
+  | { kind: ToHost.Cursor; at: Point | null };
+
+export type Authored = HostMessage & { by?: Author };
 
 export type ViewMessage =
   | { kind: ToView.App; url: string; styling: Styling; prefs: Prefs | null; route?: string; breakpoints: Breakpoints; themes: Theme[]; scales: Scales | null }
@@ -374,7 +381,8 @@ export type ViewMessage =
   | { kind: ToView.Plugins; catalog: Catalog; canInstall: boolean }
   | { kind: ToView.Reload }
   | { kind: ToView.Impact; id: number; impact: Impact }
-  | { kind: ToView.Preview; ask: EditAsk; reason: string; files: DiffFile[] };
+  | { kind: ToView.Preview; ask: EditAsk; reason: string; files: DiffFile[]; by?: Author }
+  | { kind: ToView.Peers; peers: Present[] };
 
 export const INSPECT = 'feega:inspect';
 export const INSPECT_RESULT = 'feega:inspect:result';

@@ -67,6 +67,9 @@
   import CommentsList from './CommentsList.svelte';
   import type { CloudComment, CloudRevisions, CommentDraft } from '../host/cloud-api';
   import { pinIdOf, pinSlot, pinsOf, sourceOfComment, threadsOf } from './comments';
+  import { HOST_PEER, type Point, type Present } from '../../../packages/share-protocol/src/frame';
+  import PeerLayer from './PeerLayer.svelte';
+  import { peerIdOf, peerSlot, peerSourceOf, strangersOf } from './peers';
   import { AddKind, AddPlace } from '@feega/live-edit/add-node';
   import { WrapTag } from '@feega/live-edit/wrap-node';
   import { ADD_DRAG_TYPE, insertSpot, type InsertSpot } from './insert-drop';
@@ -190,7 +193,12 @@
   let pinRects = $state<Record<string, Pick['rect'] | null>>({});
   let lostSlots = $state<Record<string, boolean>>({});
   let pinned = new Set<string>();
+  let peers = $state<Present[]>([]);
+  let peerRects = $state<Record<string, Pick['rect'] | null>>({});
+  let tracking = new Map<string, string>();
+  let lastPointAt = 0;
   const COMMENTS_POLL_MS = 15_000;
+  const CURSOR_THROTTLE_MS = 50;
   const PIN_SIZE_PX = 20;
   const PIN_STACK_PX = 22;
   const pins = $derived(pinsOf(threadsOf(cloud.comments, false)));
@@ -309,10 +317,17 @@
       bridge.track(Slot.Hovered, untrack(() => hover?.source) ?? null, untrack(() => hover?.instanceIndex));
       pinned.clear();
       trackPins();
+      tracking.clear();
+      trackPeers();
     },
     moved: (path) => (visited(path), bridge.tree()),
     tree: (tree) => ((layers = tree), askPalette()),
     tracked: (slot, rect) => {
+      const peer = peerIdOf(slot);
+      if (peer) {
+        peerRects[peer] = rect;
+        return;
+      }
       const pin = pinIdOf(slot);
       if (pin) {
         pinRects[pin] = rect;
@@ -383,6 +398,44 @@
       untrack(trackPins);
     }
   });
+
+  function trackPeers() {
+    const wanted = new Map(peers.filter((peer) => peer.selection).map((peer) => [peer.userId, peer.selection!]));
+    for (const [id, selection] of wanted) {
+      const source = peerSourceOf(selection);
+      if (source && tracking.get(id) !== selection) {
+        bridge.track(peerSlot(id), source);
+      }
+    }
+    for (const id of tracking.keys()) {
+      if (!wanted.has(id)) {
+        bridge.track(peerSlot(id), null);
+        delete peerRects[id];
+      }
+    }
+    tracking = wanted;
+  }
+
+  $effect(() => {
+    peers;
+    if (bridged) {
+      untrack(trackPeers);
+    }
+  });
+
+  function point(e: PointerEvent): Point | null {
+    const now = Date.now();
+    if (now - lastPointAt < CURSOR_THROTTLE_MS) {
+      return null;
+    }
+    lastPointAt = now;
+    return pagePoint(e);
+  }
+
+  function pointed(e: PointerEvent) {
+    const at = point(e);
+    at && toHost({ kind: ToHost.Cursor, at });
+  }
 
   $effect(() => {
     if (!cloud.enabled) {
@@ -600,6 +653,7 @@
     [ToView.Plugins]: (m) => plugins.sync(m.catalog, m.canInstall),
     [ToView.Account]: (m) => (account = { state: m.state, email: m.email }),
     [ToView.Share]: (m) => (share = m),
+    [ToView.Peers]: (m) => (peers = share ? strangersOf(m.peers, HOST_PEER) : m.peers),
     [ToView.Library]: (m) => (libraryItems = m.items),
     [ToView.Comments]: (m) => (cloud = { enabled: m.enabled, comments: m.comments, review: m.review ?? cloud.review, error: m.error ?? '' }),
     [ToView.Onboarding]: (m) => (onboarding = m.state),
@@ -1233,7 +1287,7 @@
         {#if url}<iframe bind:this={frame} src={start} title="App" data-testid="app-frame" style={`width:${fit.width}px;height:${fit.height}px;transform:scale(${fit.scale})`}></iframe>{/if}
         {#if restarting}<div class="restarting" data-testid="restarting" role="status"><span class="server-dot-inline amber"></span>Restarting dev server…</div>{/if}
         {#if mode === Mode.Design && bridged && !editing}
-          <div class="overlay" role="presentation" onpointerdown={pressOverlay} onpointermove={dragOverlay} onpointerleave={() => (hover = null)} onclick={onPick} oncontextmenu={onMenu} ondragover={overAdd} ondragleave={() => (addSpot = null)} ondrop={dropAdd} ondblclick={onDouble} onwheel={(e) => bridge.scroll(e.deltaX / fit.scale, e.deltaY / fit.scale)}>
+          <div class="overlay" role="presentation" onpointerdown={pressOverlay} onpointermove={(e) => (pointed(e), dragOverlay(e))} onpointerleave={() => ((hover = null), toHost({ kind: ToHost.Cursor, at: null }))} onclick={onPick} oncontextmenu={onMenu} ondragover={overAdd} ondragleave={() => (addSpot = null)} ondrop={dropAdd} ondblclick={onDouble} onwheel={(e) => bridge.scroll(e.deltaX / fit.scale, e.deltaY / fit.scale)}>
             {#if hover && !lostSlots[Slot.Hovered]}<div class="outline hover" style={box(hover)}></div>{/if}
             {#if addSpot}
               <div class="drop-line box" data-testid="add-outline" style={`left:${addSpot.outline.x * fit.scale - 1}px;top:${addSpot.outline.y * fit.scale - 1}px;width:${Math.max(2, addSpot.outline.w * fit.scale)}px;height:${Math.max(2, addSpot.outline.h * fit.scale)}px`}></div>
@@ -1243,6 +1297,7 @@
           {#if picked && hint}{#each hintBoxes(picked, hint) as area, i (i)}<div class="hint {hint.group}" style={`left:${area.x * fit.scale}px;top:${area.y * fit.scale}px;width:${area.w * fit.scale}px;height:${area.h * fit.scale}px`}></div>{/each}{/if}
           {#if picked}<PluginOverlay {plugins} {picked} scale={fit.scale} />{/if}
           {#each others as other (keyOf(refOf(other.source, other.instanceIndex)))}<div class="outline picked" data-testid="selected-outline" style={box(other)}></div>{/each}
+          <PeerLayer {peers} rects={peerRects} scale={fit.scale} />
           {#if picked && !lostSlots[Slot.Selected]}<div class="outline picked" style={box(picked)}><span class="label"><Breadcrumb pick={picked} onselect={select} compact state={elementState} /></span></div>{/if}
           {#each pins as pin (pin.id)}
             {@const rect = pinRects[pin.id]}

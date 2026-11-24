@@ -6,7 +6,7 @@ import { liveAtOf } from '@feega/live-edit/live-ask';
 import { LiveProp } from '@feega/live-edit/live-fields';
 import { StructureOp } from '@feega/live-edit/structure';
 import type { SupportItem } from '../support';
-import { AccountState, Gate, ImpactKind, Onboarding, OnboardingOutcome, ServerAction, ServerState, ToHost, ToView, type EditAsk, type ImpactAsk, type HostMessage, type Pick, type Prefs, type ViewMessage } from '../messages';
+import { AccountState, Gate, ImpactKind, Onboarding, OnboardingOutcome, ServerAction, ServerState, ToHost, ToView, type Author, type Authored, type EditAsk, type ImpactAsk, type HostMessage, type Pick, type Prefs, type ViewMessage } from '../messages';
 import { SettingKey, StylingChoice } from '../settings';
 import { SignInEnd, signIn } from './sign-in';
 import { addPlugin } from './add-plugin';
@@ -22,6 +22,7 @@ import { commentsHost } from './comments';
 import { shareSession } from './share/share-session';
 import { copyImage } from './image-copy';
 import { fileEdits, type Snapshot, type Written } from './file-edits';
+import { editQueue } from './edit-queue';
 import { impactOf } from './impact';
 import { usageIndex } from './usages';
 import { fsWatch } from './file-watch';
@@ -87,6 +88,10 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   const stylingChoice = () => platform.settings()[SettingKey.Styling] as StylingChoice;
   const editsAt = (dir: string) => fileEdits(dir, stylingChoice, platform.stored<Snapshot>(Stored.History));
   let edits = editsAt(root);
+  const queue = editQueue();
+  const authors = new Map<number, string>();
+  const approvals = new Map<string, Author>();
+  let author: Author | undefined;
   const usagesOf = (dir: string) => usageIndex(dir, { watch: platform.watchFiles ?? fsWatch });
   let usages = usagesOf(root);
   const post = (message: ViewMessage) => platform.send(message);
@@ -103,12 +108,16 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
 
   async function postHistory() {
     await platform.store(Stored.History, edits.snapshot());
-    await post({ kind: ToView.History, changes: edits.history(), canUndo: edits.canUndo(), canRedo: edits.canRedo() });
+    await post({ kind: ToView.History, changes: edits.history().map((change) => ({ ...change, by: authors.get(change.id) })), canUndo: edits.canUndo(), canRedo: edits.canRedo() });
   }
 
   async function edited(out: Written, ask: EditAsk | null, replay = Replay.Fresh) {
     if (out.ok) {
       usage?.edit(editKind);
+    }
+    const written = edits.latest();
+    if (out.ok && replay === Replay.Fresh && author && written !== null) {
+      authors.set(written, author.name);
     }
     usages.invalidate();
     await postHistory();
@@ -348,7 +357,8 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     if (!files.length) {
       return false;
     }
-    await post({ kind: ToView.Preview, ask, reason: found.reason, files });
+    author && approvals.set(askKey(ask), author);
+    await post({ kind: ToView.Preview, ask, reason: found.reason, files, by: author });
     return true;
   }
 
@@ -642,7 +652,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.Link]: (m) => edits.link(m.at, m.edit, m.instance).then((out) => edited(out, null)),
     [ToHost.Attribute]: (m) => edits.attribute(m.at, m.name, m.value).then((out) => edited(out, null)),
     [ToHost.Go]: (m) => edits.go(m.at, m.ask).then((out) => edited(out, null)),
-    [ToHost.Selected]: (m) => (void published?.then((bridge) => bridge?.touch()), syncSelection(m.at)),
+    [ToHost.Selected]: (m) => (void published?.then((bridge) => bridge?.touch()), sharing.hostSelected(m.at), syncSelection(m.at)),
     [ToHost.Context]: (m) => void (agentContext = m.text),
     [ToHost.Copy]: (m) => platform.copyText?.(m.text),
     [ToHost.Comments]: comments.show,
@@ -659,15 +669,42 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.PluginEnable]: (m) => pluginList?.enable(m.id, m.enabled),
     [ToHost.PluginRemove]: (m) => pluginList?.remove(m.id),
     [ToHost.PluginInstall]: (m) => pluginList?.install(m.source),
-    [ToHost.PreviewReady]: () => usage?.previewReady()
+    [ToHost.PreviewReady]: () => usage?.previewReady(),
+    [ToHost.Cursor]: (m) => sharing.hostPointed(m.at)
   };
 
-  platform.receive((message) => {
-    const kind = editKindOf(message);
-    if (kind !== EditKind.Other) {
-      editKind = kind;
+  const askKey = (ask: EditAsk) => JSON.stringify(ask);
+
+  const approvedAsk = (message: Authored) => (message.kind === ToHost.Edit && message.gate === Gate.Apply ? message.ask : null);
+
+  function authorOf(message: Authored): Author | undefined {
+    const ask = approvedAsk(message);
+    if (!ask) {
+      return message.by;
     }
-    return (handlers[message.kind] as (m: HostMessage) => unknown)(message);
+    const approved = approvals.get(askKey(ask));
+    approvals.delete(askKey(ask));
+    return approved;
+  }
+
+  async function apply(message: Authored) {
+    if (message.by && approvedAsk(message)) {
+      return;
+    }
+    author = authorOf(message);
+    try {
+      return await (handlers[message.kind] as (m: HostMessage) => unknown)(message);
+    } finally {
+      author = undefined;
+    }
+  }
+
+  platform.receive((message: Authored) => {
+    const kind = editKindOf(message);
+    if (kind === EditKind.Other && !message.by) {
+      return (handlers[message.kind] as (m: HostMessage) => unknown)(message);
+    }
+    return queue.run(() => (kind === EditKind.Other || (editKind = kind), apply(message)));
   });
 
   function pick(x: number, y: number): Promise<Pick | null> {

@@ -12,6 +12,10 @@ describe('preview gate', () => {
     expect(heldOf({ kind: ToView.Preview, ask, reason: 'a CSS variable can reach other elements', files })).toEqual({ ask, reason: 'a CSS variable can reach other elements', files });
   });
 
+  it('un edit di un ospite dice chi lo chiede', () => {
+    expect(heldOf({ kind: ToView.Preview, ask, reason: 'x', files, by: { userId: 'ada', name: 'Ada' } }).by).toBe('Ada');
+  });
+
   it('Apply rimanda lo stesso edit saltando il controllo', () => {
     expect(applyMessage({ ask, reason: '', files })).toEqual({ kind: ToHost.Edit, ask, gate: Gate.Apply });
   });

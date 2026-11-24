@@ -28,6 +28,7 @@ const RULES: Partial<Record<string, Rule>> = {
   [ToHost.Ready]: READ,
   [ToHost.Picked]: READ,
   [ToHost.Selected]: READ,
+  [ToHost.Cursor]: READ,
   [ToHost.Wiring]: READ,
   [ToHost.Comments]: READ,
   [ToHost.IconSearch]: READ,

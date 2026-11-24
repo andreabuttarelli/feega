@@ -2,9 +2,9 @@ import { Gate, ToHost, type EditAsk, type HostMessage, type ToView, type ViewMes
 import { SettingKey } from '../settings';
 import type { DiffFile } from '../host/diff-preview';
 
-export type Held = { ask: EditAsk; reason: string; files: DiffFile[] };
+export type Held = { ask: EditAsk; reason: string; files: DiffFile[]; by?: string };
 
-export const heldOf = ({ ask, reason, files }: Extract<ViewMessage, { kind: ToView.Preview }>): Held => ({ ask, reason, files });
+export const heldOf = ({ ask, reason, files, by }: Extract<ViewMessage, { kind: ToView.Preview }>): Held => ({ ask, reason, files, by: by?.name });
 
 export const applyMessage = (held: Held): HostMessage => ({ kind: ToHost.Edit, ask: held.ask, gate: Gate.Apply });
 
