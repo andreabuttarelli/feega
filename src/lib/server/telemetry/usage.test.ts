@@ -126,6 +126,47 @@ describe('handleUsage', () => {
     expect(rows).toHaveLength(1);
   });
 
+  it('stores a product event with its dimensions and no content', async () => {
+    const { rows, sink } = recorder();
+    const res = await handleUsage(
+      post({ events: [event({ event: 'edit', edit_kind: 'style', target: 'tailwind_class', prop_category: 'spacing', file_ext: 'tsx', breakpoint: 'md', state: 'hover', source: 'ai', agent: 'claude-code', impact: 'shared', lines_added: 2, lines_removed: 1, files_count: 1 })] }),
+      freshClient(),
+      sink
+    );
+
+    expect(res.status).toBe(204);
+    expect(rows[0]).toMatchObject({ target: 'tailwind_class', prop_category: 'spacing', file_ext: 'tsx', breakpoint: 'md', state: 'hover', source: 'ai', agent: 'claude-code', impact: 'shared', lines_added: 2, lines_removed: 1, files_count: 1 });
+  });
+
+  it('accepts the agents onboarding step the extension sends', async () => {
+    const { rows, sink } = recorder();
+    const res = await handleUsage(post({ events: [event({ event: 'onboarding_step', step: 'agents', outcome: 'completed', choice: 'mcp' })] }), freshClient(), sink);
+
+    expect(res.status).toBe(204);
+    expect(rows[0]).toMatchObject({ step: 'agents', choice: 'mcp' });
+  });
+
+  it.each(['project_detected', 'element_selected', 'edit_reverted', 'breakpoint_switch', 'state_switch', 'copy_for_agent', 'focus_opened', 'ai_agent_chosen', 'ai_message_sent', 'ai_permission', 'ai_session_error', 'share_action', 'cloud_action', 'mcp_tool_call', 'error_host', 'error_webview'])('accepts the %s event', async (name) => {
+    const { rows, sink } = recorder();
+    const res = await handleUsage(post({ events: [event({ event: name })] }), freshClient(), sink);
+
+    expect(res.status).toBe(204);
+    expect(rows).toHaveLength(1);
+  });
+
+  it.each([
+    ['a path as a tool name', { event: 'mcp_tool_call', tool: '/Users/me/app/page.tsx' }],
+    ['a class name as a property category', { event: 'edit', prop_category: 'px-4' }],
+    ['an unknown file extension', { event: 'edit', file_ext: 'secret' }],
+    ['a sentence as an error class', { event: 'error_host', error_class: 'Cannot read file /a/b' }]
+  ])('rejects %s', async (_name, over) => {
+    const { rows, sink } = recorder();
+    const res = await handleUsage(post({ events: [event(over)] }), freshClient(), sink);
+
+    expect(res.status).toBe(400);
+    expect(rows).toEqual([]);
+  });
+
   it('drops a batch from a client that declares CI', async () => {
     const { rows, sink } = recorder();
     const res = await handleUsage(post({ events: [event()] }, { 'x-feega-ci': '1' }), freshClient(), sink);
