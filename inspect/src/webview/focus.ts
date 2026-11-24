@@ -1,6 +1,11 @@
 import type { LayerNode, Pick, Source } from '../messages';
 
-export type Focus = { name: string; source: Source; index?: number };
+export enum View {
+  Page = 'page',
+  Focus = 'focus'
+}
+
+export type Focus = { name: string; source: Source };
 
 type Row = Omit<LayerNode, 'tag' | 'display' | 'direction' | 'position' | 'children'>;
 
@@ -20,15 +25,13 @@ export function rowFocus(node: Row): Focus | null {
   if (!node.component || !node.source) {
     return null;
   }
-  return node.count > 1 ? { name: node.name, source: node.source } : { name: node.name, source: node.source, index: node.instance };
+  return { name: node.name, source: node.source };
 }
-
-export const focusLabel = (focus: Focus, count: number): string => `${focus.name} · ${count} ${count === 1 ? 'instance' : 'instances'}`;
 
 export function focusKeyOf(key: string, state: { focused: boolean; available: boolean }): FocusKey | null {
   const pressed = key.toLowerCase();
   if (state.focused) {
-    return pressed === ESCAPE || pressed === FOCUS_LETTER ? FocusKey.Exit : null;
+    return pressed === ESCAPE ? FocusKey.Exit : null;
   }
   return pressed === FOCUS_LETTER && state.available ? FocusKey.Enter : null;
 }

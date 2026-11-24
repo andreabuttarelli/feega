@@ -37,8 +37,8 @@
   import ServerPopover from './ServerPopover.svelte';
   import SharePanel from './SharePanel.svelte';
   import LayersTree from './LayersTree.svelte';
-  import FocusBar from './FocusBar.svelte';
-  import { FocusKey, focusKeyOf, focusLabel, focusOf, rowFocus, type Focus } from './focus';
+  import FocusTabs from './FocusTabs.svelte';
+  import { FocusKey, View, focusKeyOf, focusOf, rowFocus, type Focus } from './focus';
   import { hasSourceInfo } from './source-info';
   import ChangesList from './ChangesList.svelte';
   import DeviceBar from './DeviceBar.svelte';
@@ -294,7 +294,7 @@
       }
     });
   });
-  const area = $derived({ x: leftPx, y: toolbarH, w: stage.w, h: stage.h });
+  const area = $derived({ x: leftPx, y: toolbarH + (focus ? tabsH : 0), w: stage.w, h: stage.h });
   const barAt = $derived(moving ? { x: moving.x, y: moving.y } : anchorBox(anchor, area, bar));
   const canBack = $derived((navTick, history.canBack()));
   const canForward = $derived((navTick, history.canForward()));
@@ -309,25 +309,18 @@
       server = ServerState.Running;
       restarting = false;
       visited(path);
-      bridge.mode(mode);
-      showTheme();
-      bridge.tree();
-      bridge.palette();
-      untrack(() => focus && bridge.focus(focus.source, focus.index));
-      untrack(() => picked && elementState !== ElementState.Default && bridge.force(picked.source, elementState));
-      refresh();
-      bridge.track(Slot.Selected, untrack(() => picked?.source) ?? null, untrack(() => picked?.instanceIndex));
-      bridge.track(Slot.Hovered, untrack(() => hover?.source) ?? null, untrack(() => hover?.instanceIndex));
-      pinned.clear();
-      trackPins();
-      tracking.clear();
-      trackPeers();
+      untrack(() => focus && ((reopening = true), bridge.focus(focus.source, viewing === View.Focus)));
+      untrack(() => viewing === View.Page && syncView());
     },
+    focusReady: () => untrack(() => viewing === View.Focus && syncView()),
     moved: (path) => (visited(path), bridge.tree()),
     tree: (tree) => ((layers = tree), askPalette()),
     focused: (count) => {
-      focusFound = count;
-      if (count === 0) {
+      if (count > 0) {
+        reopening = false;
+        return;
+      }
+      if (!reopening) {
         exitFocus();
       }
     },
@@ -1047,20 +1040,58 @@
   }
 
   let focus = $state<Focus | null>(null);
-  let focusFound = $state(0);
+  let viewing = $state(View.Page);
+  let reopening = false;
+  let tabsH = $state(0);
+
+  function syncView() {
+    bridge.mode(mode);
+    showTheme();
+    bridge.tree();
+    bridge.palette();
+    untrack(() => picked && elementState !== ElementState.Default && bridge.force(picked.source, elementState));
+    refresh();
+    bridge.track(Slot.Selected, untrack(() => picked?.source) ?? null, untrack(() => picked?.instanceIndex));
+    bridge.track(Slot.Hovered, untrack(() => hover?.source) ?? null, untrack(() => hover?.instanceIndex));
+    pinned.clear();
+    trackPins();
+    tracking.clear();
+    trackPeers();
+  }
+
+  function showTab(next: View) {
+    if (!focus || next === viewing) {
+      return;
+    }
+    viewing = next;
+    bridge.useFocus(next === View.Focus);
+    bridge.focus(focus.source, next === View.Focus);
+    syncView();
+  }
 
   function enterFocus(next: Focus | null) {
     if (!next) {
       return;
     }
     focus = next;
-    bridge.focus(next.source, next.index);
+    viewing = View.Focus;
+    reopening = false;
+    bridge.useFocus(true);
+    bridge.focus(next.source, true);
   }
 
   function exitFocus() {
+    if (!focus) {
+      return;
+    }
+    const wasFocused = viewing === View.Focus;
     focus = null;
-    focusFound = 0;
+    viewing = View.Page;
+    bridge.useFocus(false);
     bridge.focus(null);
+    if (wasFocused) {
+      syncView();
+    }
   }
 
   function detach() {
@@ -1227,7 +1258,7 @@
 
   function onKey(e: KeyboardEvent) {
     const cmd = e.metaKey || e.ctrlKey;
-    const focusKey = cmd || typing(e) || editing ? null : focusKeyOf(e.key, { focused: focus !== null, available: Boolean(picked?.component) && mode === Mode.Design && !several });
+    const focusKey = cmd || typing(e) || editing ? null : focusKeyOf(e.key, { focused: viewing === View.Focus, available: Boolean(picked?.component) && mode === Mode.Design && !several });
     if (focusKey) {
       e.preventDefault();
       focusKey === FocusKey.Exit ? exitFocus() : picked && enterFocus(focusOf(picked));
@@ -1314,6 +1345,7 @@
       {#if share?.available}<SharePanel view={share} onstart={(name, canEdit) => toHost({ kind: ToHost.ShareStart, name, canEdit })} onstop={() => toHost({ kind: ToHost.ShareStop })} onkick={(userId) => toHost({ kind: ToHost.ShareKick, userId })} onrole={(userId, role) => toHost({ kind: ToHost.ShareRole, userId, role })} />{/if}
       <button type="button" class="icon" class:on={!barClosed} title="Properties (⌘\)" onclick={toggleBar} data-testid="bar-toggle"><PanelRight size={15} /></button>
     </header>
+    {#if focus}<FocusTabs name={focus.name} active={viewing} onselect={showTab} onclose={exitFocus} bind:height={tabsH} />{/if}
 
     <div class="backdrop" role="presentation" bind:clientWidth={stage.w} bind:clientHeight={stage.h} onpointermove={resizeFrame} onpointerup={endDrag}>
       <div class="frame" class:framed={size !== Size.Full} style={`width:${fit.width * fit.scale}px;height:${fit.height * fit.scale}px`}>
@@ -1385,7 +1417,6 @@
           <button type="button" class="link" onclick={() => dismissedFonts.add(fontNotice!.family)}>Dismiss</button>
         </div>
       {/if}
-      {#if focus}<FocusBar label={focusLabel(focus, focusFound)} onexit={exitFocus} />{/if}
       {#if toast}<div class="toast" role="status">{toast}</div>{/if}
       <div class="float" class:moving bind:clientWidth={bar.w} bind:clientHeight={bar.h} style={`left:${barAt.x}px;top:${barAt.y}px`} data-anchor={anchor}>
         <button type="button" class="grip" title="Drag to move (arrow keys)" aria-label="Move the bar" onpointerdown={grabBar} onpointermove={dragBar} onpointerup={dropBar} onkeydown={onHandleKey}>

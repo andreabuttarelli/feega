@@ -1,6 +1,6 @@
 import { stampSources } from './framework-meta.js';
 import { SOURCE_ATTR, rectOf, deepestAt, clearPreview, clearPreviews, hidePreview, paletteOf, relativeOf, treeOf, inspectElement, keepPreviews, previewEdit, settlePreview } from './runtime.js';
-import { clearFocus, focusComponent } from './focus.js';
+import { focusTab } from './focus.js';
 import { missingFontsOf } from './missing-fonts.js';
 import { trackRects } from './track.js';
 import { keepScroll } from './reload-restore.js';
@@ -44,7 +44,7 @@ const TREE_REFRESH_MS = 150;
 const TREE_ATTRIBUTES = ['class', 'id', 'style', SOURCE_ATTR];
 const THEME_REBUILD_MS = 100;
 
-export function installBridge(win) {
+export function installBridge(win, { nested = false, emit = null } = {}) {
   if (win[INSTALLED]) {
     return;
   }
@@ -59,8 +59,10 @@ export function installBridge(win) {
   let forcedTimer = null;
   let themeTimer = null;
   let treeSent = '';
-  let reply = (message) => win.parent?.postMessage(message, '*');
-  const scroll = keepScroll(win);
+  const toParent = (message) => (emit ? emit(message) : win.parent?.postMessage(message, '*'));
+  let reply = toParent;
+  const scroll = nested ? { restored: false, leave: () => undefined } : keepScroll(win);
+  const tab = focusTab(win, { install: (inner) => installBridge(inner, { nested: true, emit: (message) => win.parent?.postMessage({ ...message, focus: true }, '*') }), prepare: () => stampSources(doc), found: (count) => win.parent?.postMessage({ type: FOCUSED, count }, '*') });
   const tracker = trackRects(win, (slot, rect) => reply({ type: TRACKED, slot, rect }));
 
   function sendTree() {
@@ -113,7 +115,7 @@ export function installBridge(win) {
     [MODE]: (request) => (mode = request.mode),
     [PALETTE]: () => reply({ type: PALETTE_RESULT, ...paletteOf(doc), missing: missingFontsOf(doc) }),
     [HIDE]: (request) => hidePreview(doc, request.source, request.hidden),
-    [FOCUS]: (request) => (request.source === null ? clearFocus(win) : reply({ type: FOCUSED, count: focusComponent(win, request) })),
+    [FOCUS]: (request) => (request.source === null ? tab.close() : reply({ type: FOCUSED, count: tab.open(request) })),
     [LEAVE]: () => scroll.leave(),
     [TRACK]: (request) => tracker.follow(request.slot, request.source, request.index),
     [TREE]: () => {
@@ -138,20 +140,26 @@ export function installBridge(win) {
   };
 
   win.addEventListener('message', (event) => {
+    if (event.data?.focus) {
+      tab.forward(event.data);
+      return;
+    }
     const handle = handlers[event.data?.type];
     if (!handle) {
       return;
     }
     const source = event.source;
-    reply = source ? (message) => source.postMessage(message, { targetOrigin: '*' }) : reply;
+    reply = source && !emit ? (message) => source.postMessage(message, { targetOrigin: '*' }) : reply;
     handle(event.data);
   });
 
-  new win.MutationObserver(() => (keepPreviews(doc), refreshTree(), refreshForced(), refreshTheme())).observe(doc.documentElement, { childList: true, subtree: true });
-  new win.MutationObserver(refreshTree).observe(doc.documentElement, { subtree: true, attributes: true, attributeFilter: TREE_ATTRIBUTES });
+  new win.MutationObserver(() => (keepPreviews(doc), refreshTree(), refreshForced(), refreshTheme(), tab.changed())).observe(doc.documentElement, { childList: true, subtree: true });
+  new win.MutationObserver(() => (refreshTree(), tab.changed())).observe(doc.documentElement, { subtree: true, attributes: true, attributeFilter: TREE_ATTRIBUTES });
 
-  reportRoutes(win);
-  win.parent?.postMessage({ type: READY, path: win.location.pathname + win.location.search, restored: scroll.restored }, '*');
+  if (!nested) {
+    reportRoutes(win);
+  }
+  toParent({ type: READY, path: win.location.pathname + win.location.search, restored: scroll.restored });
 }
 
 function reportRoutes(win) {
