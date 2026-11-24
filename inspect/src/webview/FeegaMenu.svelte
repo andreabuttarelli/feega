@@ -7,7 +7,7 @@
   import type { Row } from './plugin-manager';
   import { AccountState, ToHost } from '../messages';
   import type { SupportItem } from '../support';
-  import { LINKS, SETTINGS, issueUrl, type ReportFacts, type SettingKey, type SettingValue, type Settings } from '../settings';
+  import { SETTINGS, helpLinks, type ReportFacts, type SettingKey, type SettingValue, type Settings } from '../settings';
 
   let { commands = [], oncommand = () => undefined, rows = [], problems = [], canInstall = false, onenable = () => undefined, onremove = () => undefined, oninstall = () => undefined, values, facts, account, support = [], onaccount, onsupport = () => undefined, onsetting, onlink }: { commands?: Contributed[]; oncommand?: (plugin: string, command: string) => void; rows?: Row[]; problems?: string[]; canInstall?: boolean; onenable?: (id: string, enabled: boolean) => void; onremove?: (id: string) => void; oninstall?: (source: string) => void; values: Settings | null; facts: ReportFacts | null; account: { state: AccountState; email?: string }; support?: SupportItem[]; onaccount: (kind: ToHost.SignIn | ToHost.CancelSignIn | ToHost.SignOut) => void; onsupport?: (item: SupportItem) => void; onsetting: (key: SettingKey, value: SettingValue) => void; onlink: (url: string) => void } = $props();
 
@@ -35,11 +35,7 @@
     }
   }
 
-  const help = $derived([
-    { label: 'Documentation', url: LINKS.docs },
-    { label: "What's new", url: LINKS.changelog },
-    { label: 'Report a problem', url: facts ? issueUrl(facts) : LINKS.issues }
-  ]);
+  const help = $derived(helpLinks(facts));
 </script>
 
 <div class="menu">

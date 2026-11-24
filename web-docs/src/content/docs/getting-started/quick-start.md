@@ -11,6 +11,7 @@ sidebar:
 4. In **Design** mode, click an element. Its properties open in the right bar.
 5. Change something: a colour, a padding, a font size. Double-click text to edit it in place.
 6. Open **Changes** to see the edit as a diff in your source. Undo it, or keep it.
+7. Something off? **Help** in the Feega menu has **Send feedback** (opens the Discord) and **Report a problem** (opens a GitHub issue with your Feega version, framework and styling filled in).
 
 Check that your framework is in [Supported frameworks](/frameworks/supported-frameworks/). Astro and Nuxt need Feega to start the dev server.
 
