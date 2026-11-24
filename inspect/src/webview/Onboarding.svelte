@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Check from '@lucide/svelte/icons/check';
   import X from '@lucide/svelte/icons/x';
   import { onMount } from 'svelte';
   import { AccountState, AgentId, OnboardingOutcome, OnboardingStep, ToHost } from '../messages';
@@ -68,21 +69,19 @@
         <ul class="agents" data-testid="onboarding-agents">
           {#each Object.values(AgentId) as id (id)}
             {@const found = agents.includes(id)}
-            <li class="agent" class:muted={!found} data-testid="onboarding-agent-{id}" data-found={found}>
-              <svg viewBox={AGENT_LOGOS[id].viewBox} width="22" height="22" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d={AGENT_LOGOS[id].path} /></svg>
-              <span class="name">{AGENT_LOGOS[id].label}</span>
-              <span class="state">{found ? '✓ found' : 'not found'}</span>
+            <li class="agent" class:muted={!found} data-testid="onboarding-agent-{id}" data-found={found} title={AGENT_LOGOS[id].label} aria-label={AGENT_LOGOS[id].label}>
+              <svg viewBox={AGENT_LOGOS[id].viewBox} width="28" height="28" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d={AGENT_LOGOS[id].path} /></svg>
+              {#if found}<span class="badge"><Check size={8} strokeWidth={3} /></span>{/if}
             </li>
           {/each}
         </ul>
         <ul class="ways">
-          <li><strong>Copy for agent</strong> Right-click an element, then paste its file, selector and view into your agent.</li>
-          <li><strong>This extension</strong> Your agent edits the same files. Feega shows every change as a diff.</li>
+          <li><span class="text"><span class="label">Copy for agent</span><span class="detail">Right-click any element</span></span></li>
           <li>
-            <strong>MCP</strong> Let your agent read your selection and changes: <code>npx feega mcp</code>.
-            <span class="row">
-              <button type="button" class="ghost" data-testid="onboarding-mcp-copy" onclick={() => oncopy(MCP_COMMAND)}>Copy command</button>
-              <button type="button" class="ghost" data-testid="onboarding-mcp-docs" onclick={() => onlink(MCP_DOCS_URL)}>Connect your agent via MCP</button>
+            <span class="text"><span class="label">MCP</span><span class="detail">Your agent reads your selection</span></span>
+            <span class="actions">
+              <button type="button" class="ghost" data-testid="onboarding-mcp-docs" onclick={() => onlink(MCP_DOCS_URL)}>docs</button>
+              <button type="button" class="action" data-testid="onboarding-mcp-copy" onclick={() => oncopy(MCP_COMMAND)}>Copy setup</button>
             </span>
           </li>
         </ul>
@@ -203,58 +202,93 @@
   }
 
   .agents {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
+    display: flex;
+    justify-content: center;
+    gap: 16px;
     margin: 12px 0 0;
     padding: 0;
     list-style: none;
   }
 
   .agent {
+    position: relative;
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
     color: var(--ui-text);
-    font-size: var(--ui-text-xs);
   }
 
   .agent.muted {
-    color: var(--ui-text-3);
-    opacity: 0.6;
+    opacity: 0.3;
   }
 
-  .state {
-    color: var(--ui-text-3);
-  }
-
-  .agent:not(.muted) .state {
-    color: var(--ui-text-2);
+  .badge {
+    position: absolute;
+    right: -4px;
+    bottom: -4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 12px;
+    height: 12px;
+    border-radius: var(--ui-radius-full);
+    background: var(--ui-text);
+    color: var(--ui-panel);
   }
 
   .ways {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 4px;
     margin: 12px 0 0;
     padding: 0;
     list-style: none;
-    color: var(--ui-text-2);
     font-size: var(--ui-text-xs);
-    line-height: 1.5;
     text-align: left;
   }
 
-  .row {
+  .ways li {
     display: flex;
-    gap: 4px;
-    margin-top: 4px;
+    align-items: center;
+    gap: 8px;
+    min-height: 36px;
   }
 
-  .ways strong {
+  .label {
     color: var(--ui-text);
-    font-weight: 500;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .text {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .detail {
+    color: var(--ui-text-3);
+  }
+
+  .actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+    white-space: nowrap;
+  }
+
+  .action {
+    height: 24px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-input);
+    color: var(--ui-text);
+    font: inherit;
+    font-size: var(--ui-text-xs);
+    cursor: pointer;
+  }
+
+  .action:hover {
+    filter: brightness(1.15);
   }
 
   .account {
