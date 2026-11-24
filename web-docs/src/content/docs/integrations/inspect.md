@@ -129,7 +129,17 @@ proceed. Styles stay single-element: the Properties controls apply to one elemen
 | Cmd/Ctrl+C | Copy for agent |
 | Enter / Shift+Enter | Select the child / the parent |
 | Tab / Shift+Tab | Select the next / the previous sibling |
-| Esc | Clear the selection |
+| F | Focus the component of the selection, again to exit |
+| Esc | Exit focus, otherwise select the parent |
+
+## Focus a component
+
+Select an element inside a component and press **F**, choose **Focus component** in the
+right-click menu, or double-click a component row in Layers. The preview dims everything except
+the instances of that component and scrolls to the first one; the bar at the top shows the
+component name and how many instances are lit. Double-clicking a row that stands for one
+instance lights only that instance. Edits keep going to the component source as usual. **Exit
+focus**, **Esc** or **F** leaves it. It works on React, Vue, Svelte and Astro components.
 
 ## In the browser: `npx feega`
 
