@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.17
+
+Local MCP tools let Claude Code, Cursor and Codex read the element you selected and your changes. An agents step in onboarding sets them up. Copy for agent in Layers copies an element for your agent. Fixed a race in the launcher copy.
+
 ## 0.2.16
 
 A Library item you insert is selected right away, ready to edit. The breakpoint trigger is styled like the other dropdowns.
