@@ -90,4 +90,15 @@ Plugins add controls to the editor. Built in: Mesh gradient and 3D object (`3d` 
 - A font that is not installed or loaded shows a notice offering to load it from Google Fonts or replace it.
 - The preview reloads itself after the dev server restarts, for example after a dependency install.
 
+## 6. Read the user's selection over MCP
+
+When the user says "this element", "the card I picked" or "what I just changed", ask Feega instead of guessing. Add the server once: `claude mcp add feega -- npx -y feega mcp` (Cursor: `.cursor/mcp.json`; Codex: `~/.codex/config.toml`; see docs.feega.app, "Connect your agent via MCP").
+
+Local tools, no sign-in, need Feega open in the project (`npx feega` or the VS Code panel):
+- `feega_selection`: the selected element's file, line, selector and view, the same text as "Copy for agent". Edit that location.
+- `feega_changes`: the visual edits made this session, with the files each touched.
+- `feega_editors`: the editors running on this machine. Pass `project` (a folder) to `feega_selection` or `feega_changes` to ask another one.
+
+If a tool answers that no editor is running, tell the user to open Feega in the project first; do not start one for them. The Cloud tools (`feega_share`, `feega_snapshot`, `feega_comments`, `feega_resolve`, `feega_stop`) need `npx feega` sign-in or `FEEGA_API_KEY`, and a Feega Cloud plan.
+
 After editing, tell the user what changed and that Feega shows the same edits under Changes, where each is undoable.
