@@ -35,6 +35,25 @@ assert.equal(await page.locator('[data-testid=tab-focus]').innerText(), COMPONEN
 assert.equal(await inFocus.locator(TITLE).count(), 1, 'one instance, nothing else');
 assert.equal(await inFocus.locator('footer, header, nav').count(), 0, 'nothing else of the page');
 
+const mounted = (await page.locator('[data-testid=component-props]').count()) > 0;
+console.log('mode', mounted ? 'mount' : 'snapshot');
+if (process.env.FOCUS_EXPECT) {
+  assert.equal(mounted ? 'mount' : 'snapshot', process.env.FOCUS_EXPECT);
+}
+if (mounted && process.env.FOCUS_PROP) {
+  const prop = page.locator(`[data-field=${process.env.FOCUS_PROP}]`);
+  await prop.fill('Edited name');
+  await prop.press('Enter');
+  await page.waitForTimeout(600);
+  assert.ok((await inFocus.locator(TITLE).first().innerText()).includes('Edited name'), 'a prop control changes the component');
+  await page.locator('[data-testid=variants-toggle]').click();
+  await page.waitForTimeout(800);
+  await shot('2b-variants');
+  assert.ok((await inFocus.locator('[data-feega-variant]').count()) > 1, 'variants render');
+  await page.locator('[data-testid=variants-toggle]').click();
+  await page.waitForTimeout(600);
+}
+
 const rows = await page.locator('[data-testid=layers] [data-layer]').allInnerTexts();
 console.log('layers', JSON.stringify(rows));
 assert.ok(!rows.some((row) => ['html', 'body'].includes(row.trim())), 'no html or body rows');

@@ -3,15 +3,17 @@ import { readFile } from 'node:fs/promises';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { join, resolve, sep } from 'node:path';
 import type { ViteDevServer } from 'vite';
-import { controlsOf } from './component-props.ts';
-import { MODULE_ROUTE, MOUNT_ROUTE, PROPS_ROUTE, PROVIDERS_QUERY, mountHtml, mountModule, mountRequestOf } from './mount-page.ts';
+import { adapterOf, seededProps } from './mount-adapters.ts';
+import { MODULE_ROUTE, MOUNT_ROUTE, PROPS_ROUTE, PROVIDERS_QUERY, mountHtml, mountRequestOf } from './mount-page.ts';
 import { fsUrl } from './source-id.ts';
 
 const BAD_REQUEST = 400;
+const RUNTIME_FILE = 'mount-runtime.js';
+const DOM_RUNTIME_FILE = 'mount-dom.js';
 const ENTRY_SCRIPT = /<script\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi;
 const MODULE_TYPE = /\btype=["']module["']/i;
 
-type Routes = { root: () => string; runtimePath: string };
+type Routes = { root: () => string; runtimeDir: string };
 
 export async function entryOf(root: string): Promise<string | null> {
   const html = await readFile(join(root, 'index.html'), 'utf8').catch(() => '');
@@ -27,7 +29,7 @@ function reply(res: ServerResponse, status: number, type: string, body: string) 
   res.end(body);
 }
 
-export function mountRoutes(server: ViteDevServer, { root, runtimePath }: Routes) {
+export function mountRoutes(server: ViteDevServer, { root, runtimeDir }: Routes) {
   const urlOf = (req: IncomingMessage) => new URL(req.url ?? '/', 'http://localhost');
 
   async function props(req: IncomingMessage, res: ServerResponse) {
@@ -38,7 +40,7 @@ export function mountRoutes(server: ViteDevServer, { root, runtimePath }: Routes
     }
     const file = resolve(root(), request.file);
     const code = await readFile(file, 'utf8').catch(() => null);
-    const controls = code === null ? null : controlsOf(code, file, request.name);
+    const controls = code === null ? null : adapterOf(request.file).controls(code, file, request.name, root());
     reply(res, 200, 'application/json', JSON.stringify({ controls }));
   }
 
@@ -48,11 +50,19 @@ export function mountRoutes(server: ViteDevServer, { root, runtimePath }: Routes
     return {
       request,
       page: {
-        runtimeUrl: fsUrl(runtimePath),
+        runtimeUrl: fsUrl(join(runtimeDir, RUNTIME_FILE)),
+        domRuntimeUrl: fsUrl(join(runtimeDir, DOM_RUNTIME_FILE)),
         componentUrl: sameRoot ? `/${request.file}` : fsUrl(resolve(root(), request.file)),
         providersUrl: entry && existsSync(join(root(), entry)) ? `/${entry}?${PROVIDERS_QUERY}` : null
       }
     };
+  }
+
+  async function seeded(request: NonNullable<ReturnType<typeof mountRequestOf>>, adapter: ReturnType<typeof adapterOf>) {
+    const file = resolve(root(), request.file);
+    const code = await readFile(file, 'utf8').catch(() => null);
+    const controls = code === null ? null : adapter.controls(code, file, request.name, root());
+    return { ...request, props: seededProps(controls, request.props) };
   }
 
   async function mount(req: IncomingMessage, res: ServerResponse) {
@@ -74,8 +84,9 @@ export function mountRoutes(server: ViteDevServer, { root, runtimePath }: Routes
       if (!request || !inside(root(), request.file)) {
         return null;
       }
-      const resolved = await page(request);
-      return mountModule(resolved.request, resolved.page);
+      const adapter = adapterOf(request.file);
+      const resolved = await page(adapter.seedsProps ? await seeded(request, adapter) : request);
+      return adapter.module(resolved.request, resolved.page);
     }
   };
 }

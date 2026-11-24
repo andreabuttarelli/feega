@@ -1,6 +1,6 @@
 import { JSDOM } from 'jsdom';
 import { describe, expect, it } from 'vitest';
-import { reactMountOf } from './framework-meta.js';
+import { mountOf, reactMountOf } from './framework-meta.js';
 
 const FUNCTION = 0;
 const MEMO = 15;
@@ -81,5 +81,25 @@ describe('reactMountOf', () => {
 
   it('returns null when no component sits above the element', () => {
     expect(reactMountOf(element({ tag: HOST, type: 'div', memoizedProps: {}, return: null }))).toBeNull();
+  });
+});
+
+describe('mountOf', () => {
+  it('reads the props of the Vue component that renders the element', () => {
+    const node = element(null) as unknown as Record<string, unknown>;
+    node.__vueParentComponent = { props: { name: 'Starter', onPick: () => undefined } };
+
+    expect(mountOf(node as unknown as Element)).toEqual({ name: '', props: { name: 'Starter', onPick: { $fn: true } } });
+  });
+
+  it('recognises a Svelte element but has no props to read', () => {
+    const node = element(null) as unknown as Record<string, unknown>;
+    node.__svelte_meta = { loc: { file: 'a.svelte', line: 1, column: 0 } };
+
+    expect(mountOf(node as unknown as Element)).toEqual({ name: '', props: {} });
+  });
+
+  it('is null for an element no component framework made', () => {
+    expect(mountOf(element(null))).toBeNull();
   });
 });

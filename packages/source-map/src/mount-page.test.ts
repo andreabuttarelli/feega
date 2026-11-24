@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PROPS_ROUTE, mountHtml, mountModule, mountRequestOf } from './mount-page.ts';
+import { PROPS_ROUTE, mountHtml, reactModule, mountRequestOf } from './mount-page.ts';
 
 const RUNTIME = '/@fs/x/mount-runtime.js';
 
@@ -47,12 +47,12 @@ describe('mountHtml', () => {
   });
 });
 
-describe('mountModule', () => {
+describe('reactModule', () => {
   const request = { file: 'src/Card.tsx', name: 'Card', props: { size: 'sm' } };
   const page = { runtimeUrl: RUNTIME, componentUrl: '/src/Card.tsx', providersUrl: null };
 
   it('imports the component from the project and starts the runtime', () => {
-    const code = mountModule(request, page);
+    const code = reactModule(request, page);
 
     expect(code).toContain('import * as mod from "/src/Card.tsx"');
     expect(code).toContain(`from "${RUNTIME}"`);
@@ -61,13 +61,13 @@ describe('mountModule', () => {
   });
 
   it('loads the providers module when there is one, and survives it failing', () => {
-    const code = mountModule(request, { ...page, providersUrl: '/src/main.tsx?feega-providers' });
+    const code = reactModule(request, { ...page, providersUrl: '/src/main.tsx?feega-providers' });
 
     expect(code).toContain('import("/src/main.tsx?feega-providers")');
     expect(code).toContain('.catch(');
   });
 
   it('starts with no providers when the project has none', () => {
-    expect(mountModule(request, page)).toContain('const providers = null;');
+    expect(reactModule(request, page)).toContain('const providers = null;');
   });
 });
