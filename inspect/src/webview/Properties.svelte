@@ -300,7 +300,7 @@
         {@render row('Align', al, 'align')}
         {#snippet ju()}{@render choice(byName('justify'))}{/snippet}
         {@render row('Justify', ju, 'justify')}
-        {#snippet gp()}<div class="pair">{@render field(num('gap'), 'G')}</div>{/snippet}
+        {#snippet gp()}<div class="solo">{@render field(num('gap'), 'G')}</div>{/snippet}
         {@render row('Gap', gp, 'gap')}
       {/if}
     </section>
@@ -326,14 +326,17 @@
 
   {#if has(Section.Size)}
     <section data-section={Section.Size}>
-      {#snippet wh()}
+      {#snippet wd()}
         {@const icon = !has(Section.Object) && has(Section.Icon) && sizeLinked}
-        <div class="pair">
-          {@render field(num('width'), 'W', '', false, icon ? num('height') : null)}{@render field(num('height'), 'H', '', false, icon ? num('width') : null)}
-          {#if has(Section.Icon)}<button type="button" class="icon" class:on={sizeLinked} title="Link width and height" aria-label="Link width and height" aria-pressed={sizeLinked} data-field="icon-size-link" onclick={() => (sizeLinked = !sizeLinked)}><Link size={12} /></button>{/if}
-        </div>
+        <div class="solo">{@render field(num('width'), 'W', '', false, icon ? num('height') : null)}</div>
+        {#if has(Section.Icon)}<button type="button" class="icon" class:on={sizeLinked} title="Link width and height" aria-label="Link width and height" aria-pressed={sizeLinked} data-field="icon-size-link" onclick={() => (sizeLinked = !sizeLinked)}><Link size={12} /></button>{/if}
       {/snippet}
-      {@render header(Section.Size, wh, true)}
+      {#snippet ht()}
+        {@const icon = !has(Section.Object) && has(Section.Icon) && sizeLinked}
+        <div class="solo">{@render field(num('height'), 'H', '', false, icon ? num('width') : null)}</div>
+      {/snippet}
+      {@render header(Section.Size, wd, true)}
+      {@render row('Height', ht, 'height')}
       {#if limitsOpen}
         {#each SIZE_LIMITS as name (name)}
           {@const r = num(name)}
@@ -371,16 +374,17 @@
     <section data-section={Section.Typography}>
       {@render header(Section.Typography)}
       {#if !closed[Section.Typography]}
-        {#snippet font()}
-          <div class="pair wide-first">
-            <FontPicker family={readOf('font-family')} project={palette.fonts} onpick={(font) => onfont(font)} />
-            {@render choice(byName('font-weight'))}
-          </div>
-        {/snippet}
-        {@render row('Font', font, 'font')}
+        {#snippet font()}<FontPicker family={readOf('font-family')} project={palette.fonts} onpick={(font) => onfont(font)} />{/snippet}
+        {@render row('Font', font, 'font-family')}
         {#if missingHere}<div class="font-warning"><MissingFont missing={missingHere} project={presentFonts} onreplace={onfontreplace} onload={onfontload} /></div>{/if}
-        {#snippet metrics()}<div class="triple">{@render field(num('font-size'), 'Aa', '', true)}{@render field(num('line-height'), '↕', '', true)}{@render field(num('letter-spacing'), '↔', '', true)}</div>{/snippet}
-        {@render row('Size', metrics, 'type-size')}
+        {#snippet weight()}{@render choice(byName('font-weight'))}{/snippet}
+        {@render row('Weight', weight, 'font-weight')}
+        {#snippet size()}{@render field(num('font-size'), '', '', true)}{/snippet}
+        {@render row('Size', size, 'font-size')}
+        {#snippet lh()}{@render field(num('line-height'), '', '', true)}{/snippet}
+        {@render row('Line height', lh, 'line-height')}
+        {#snippet ls()}{@render field(num('letter-spacing'), '', '', true)}{/snippet}
+        {@render row('Letter spacing', ls, 'letter-spacing')}
         {#snippet ta()}{@render segmented(byName('text-align'), TEXT_ALIGN)}{/snippet}
         {@render row('Align', ta, 'text-align')}
         <FillList scope="text-fill" inline parse={() => textFillsOf(pick.styles)} css={textFillCss} guard={(next) => textFillRefusal(pick.styles, next)} onrefuse={onnotice} {palette} {header} {row} onchange={writeText} onpreview={previewText} />
@@ -403,14 +407,14 @@
 
   {#if has(Section.Border)}
     <section data-section={Section.Border}>
-      {#snippet bw()}<div class="pair">{@render field(num('border'), 'W')}</div>{/snippet}
+      {#snippet bw()}<div class="solo">{@render field(num('border'), 'W')}</div>{/snippet}
       {@render header(Section.Border, bw, true)}
     </section>
   {/if}
 
   {#if has(Section.Effects)}
     <section data-section={Section.Effects}>
-      {#snippet op()}<div class="pair">{@render field(num('opacity'), '◐')}</div>{/snippet}
+      {#snippet op()}<div class="solo">{@render field(num('opacity'), '◐')}</div>{/snippet}
       <ShadowList {palette} css={readOf('shadow')} text={pick.ownText ? readOf('text-shadow') : null} {header} {row} onchange={(css) => onchange(byName('shadow'), css)} ontext={(css) => onchange(byName('text-shadow'), css)} onpreview={(css) => onpreview(byName('shadow'), css)} onpreviewtext={(css) => onpreview(byName('text-shadow'), css)} />
       {@render row('Opacity', op, 'opacity')}
     </section>
@@ -459,7 +463,7 @@
   }
 
   .properties {
-    --label-w: 72px;
+    --label-w: 96px;
     font-size: var(--ui-text-sm);
   }
 
@@ -715,7 +719,6 @@
   }
 
   .pair,
-  .triple,
   .sides {
     display: grid;
     flex: 1;
@@ -727,12 +730,10 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .pair.wide-first {
-    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
-  }
-
-  .triple {
-    grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  .solo {
+    display: block;
+    flex: 1;
+    min-width: 0;
   }
 
   .font-warning {
