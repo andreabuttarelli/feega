@@ -125,6 +125,11 @@ const toggleMenu = (open: boolean) => {
   }
 };
 
+const goHome = () => {
+  showRoute(Route.Home);
+  void bridge.activate(null);
+};
+
 const showRoute = (next: Route) => {
   route = next;
   menuOpen = false;
@@ -243,7 +248,7 @@ const settingsView = (state: ShellState): View => ({
 const renderBar = (state: ShellState) => {
   const known = rendered;
   rendered = new Set(state.tabs.map((t) => t.id));
-  const home = el('button', { class: `home${state.active === null ? ' on' : ''}`, html: mark(), title: 'projects', on: run(() => bridge.activate(null)) });
+  const home = el('button', { class: `home${state.active === null ? ' on' : ''}`, html: mark(), title: 'projects', on: goHome });
   const add = el('button', { class: 'add', html: PLUS, title: 'new project or open folder', on: run(() => bridge.activate(null)) });
   bar.replaceChildren(home, ...state.tabs.map((tab) => tabChip(tab, tab.id === state.active, !known.has(tab.id))), add, el('span', { class: 'grow' }), ...invitePill(state), ...updatePill(state), accountChip(state));
   document.querySelector('.menu')?.remove();
