@@ -1,7 +1,9 @@
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
+import { astroControlsOf } from './astro-props.ts';
 import { controlsOf, type PropControl } from './component-props.ts';
 import { astroModule, reactModule, svelteModule, vueModule, type MountPage, type MountRequest } from './mount-page.ts';
+import { NOOP, PropKind } from './prop-model.ts';
 import { svelteControlsOf } from './svelte-props.ts';
 import { vueControlsOf } from './vue-props.ts';
 
@@ -44,7 +46,7 @@ export const ADAPTERS: Record<MountFramework, MountAdapter> = {
     },
     seedsProps: true
   },
-  [MountFramework.Astro]: { module: astroModule, controls: () => null, seedsProps: false }
+  [MountFramework.Astro]: { module: astroModule, controls: (code) => astroControlsOf(code), seedsProps: false }
 };
 
 const BY_EXTENSION: [RegExp, MountFramework][] = [
@@ -60,10 +62,20 @@ export function seededProps(controls: PropControl[] | null, props: Record<string
   return { ...Object.fromEntries(seeds.filter(([, value]) => value !== undefined)), ...props };
 }
 
-function seedOf({ name, kind, options, default: fallback }: PropControl): unknown {
-  if (fallback !== undefined) {
-    return fallback;
-  }
-  const byKind: Record<string, unknown> = { select: options?.[0], toggle: false, number: 0, text: name };
-  return byKind[kind];
-}
+const SEED_COLOR = '#808080';
+const SEED_DATE = { $date: '2026-01-01T00:00:00.000Z' };
+
+const SEEDS: Record<PropKind, (control: PropControl) => unknown> = {
+  [PropKind.Select]: ({ options }) => options?.[0],
+  [PropKind.Toggle]: () => false,
+  [PropKind.Number]: () => 0,
+  [PropKind.Text]: ({ name }) => name,
+  [PropKind.Children]: () => undefined,
+  [PropKind.Array]: () => [],
+  [PropKind.Object]: () => ({}),
+  [PropKind.Callback]: () => NOOP,
+  [PropKind.Color]: () => SEED_COLOR,
+  [PropKind.Date]: () => SEED_DATE
+};
+
+const seedOf = (control: PropControl): unknown => control.default ?? SEEDS[control.kind](control);

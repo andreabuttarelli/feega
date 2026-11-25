@@ -25,6 +25,12 @@ describe('reviveProps', () => {
     expect(props.size).toBe('sm');
     expect((props.onClick as () => unknown)()).toBeUndefined();
   });
+
+  it('turns the date marks back into dates', () => {
+    const props = reviveProps({ when: { $date: '2026-01-02T00:00:00.000Z' } });
+
+    expect(props.when).toEqual(new Date('2026-01-02T00:00:00.000Z'));
+  });
 });
 
 describe('rendersNothing', () => {

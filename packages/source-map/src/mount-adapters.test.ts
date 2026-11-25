@@ -10,8 +10,14 @@ describe('adapterOf', () => {
     expect(adapterOf('src/components/Card.astro')).toBe(ADAPTERS[MountFramework.Astro]);
   });
 
-  it('describes no props for an Astro component', () => {
+  it('describes no props for an Astro component that reads none', () => {
     expect(ADAPTERS[MountFramework.Astro].controls('---\n---\n<p />', 'Card.astro', 'Card', '/')).toBeNull();
+  });
+
+  it('reads the Props of an Astro component', () => {
+    const code = '---\ninterface Props { title: string }\nconst { title } = Astro.props;\n---\n<h1>{title}</h1>';
+
+    expect(ADAPTERS[MountFramework.Astro].controls(code, 'Card.astro', 'Card', '/')).toEqual([{ name: 'title', kind: PropKind.Text, required: true }]);
   });
 });
 
@@ -26,6 +32,18 @@ describe('seededProps', () => {
 
   it('fills what the page could not tell with a value of the right kind', () => {
     expect(seededProps(controls, {})).toEqual({ name: 'name', size: 'sm', big: false, count: 3 });
+  });
+
+  it('seeds every kind with a value the component can render', () => {
+    const kinds = [
+      { name: 'list', kind: PropKind.Array, required: false },
+      { name: 'bag', kind: PropKind.Object, required: false },
+      { name: 'onPick', kind: PropKind.Callback, required: false },
+      { name: 'tint', kind: PropKind.Color, required: false },
+      { name: 'when', kind: PropKind.Date, required: false }
+    ];
+
+    expect(seededProps(kinds, {})).toEqual({ list: [], bag: {}, onPick: { $fn: true }, tint: '#808080', when: { $date: '2026-01-01T00:00:00.000Z' } });
   });
 
   it('keeps what the page already has', () => {

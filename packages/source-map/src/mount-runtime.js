@@ -1,6 +1,6 @@
 import { CANVAS_CSS, CANVAS_ID } from './focus.js';
 
-import { FUNCTION_MARK, MOUNT_PROPS, MOUNT_STATUS, Status } from './mount-protocol.js';
+import { DATE_MARK, FUNCTION_MARK, MOUNT_PROPS, MOUNT_STATUS, Status } from './mount-protocol.js';
 
 export const Reason = { NoExport: 'The component is not exported', Empty: 'It rendered nothing' };
 
@@ -8,10 +8,21 @@ const SETTLE_MS = 350;
 const GAP_PX = 24;
 const CAPTION_PX = 11;
 
-const isMarkedFunction = (value) => value !== null && typeof value === 'object' && value[FUNCTION_MARK] === true;
+const MARKS = [
+  { mark: FUNCTION_MARK, matches: (value) => value === true, revive: () => () => undefined },
+  { mark: DATE_MARK, matches: (value) => typeof value === 'string', revive: (value) => new Date(value) }
+];
+
+function reviveValue(value) {
+  if (value === null || typeof value !== 'object') {
+    return value;
+  }
+  const marked = MARKS.find(({ mark, matches }) => matches(value[mark]));
+  return marked ? marked.revive(value[marked.mark]) : value;
+}
 
 export function reviveProps(props) {
-  return Object.fromEntries(Object.entries(props ?? {}).map(([name, value]) => [name, isMarkedFunction(value) ? () => undefined : value]));
+  return Object.fromEntries(Object.entries(props ?? {}).map(([name, value]) => [name, reviveValue(value)]));
 }
 
 export const rendersNothing = (container) => container.querySelector('*') === null && container.textContent.trim() === '';
