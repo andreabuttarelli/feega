@@ -1,12 +1,15 @@
+import { randomUUID } from 'node:crypto';
 import { readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join, relative, resolve } from 'node:path';
 import { appsIn } from '@feega/dev-run/run-plan';
 import { AddKind, type AddPlace } from '@feega/live-edit/add-node';
-import { liveAtOf } from '@feega/live-edit/live-ask';
+import { inside, liveAtOf, reader } from '@feega/live-edit/live-ask';
+import { readProps } from '@feega/live-edit/read-props';
 import { LiveProp } from '@feega/live-edit/live-fields';
 import { StructureOp } from '@feega/live-edit/structure';
 import type { SupportItem } from '../support';
-import { AccountState, Gate, ImpactKind, Onboarding, OnboardingOutcome, ServerAction, ServerState, ToHost, ToView, type EditAsk, type ImpactAsk, type HostMessage, type Pick, type Prefs, type ViewMessage } from '../messages';
+import { AccountState, AgentAsk, Gate, ImpactKind, Onboarding, OnboardingOutcome, OnboardingStep, ServerAction, ServerState, Styling, ToHost, ToView, WebviewUsage, type Author, type Authored, type EditAsk, type ApplyAsk, type ImpactAsk, type ReadAsk, type HostMessage, type Pick, type Prefs, type ViewMessage } from '../messages';
 import { SettingKey, StylingChoice } from '../settings';
 import { SignInEnd, signIn } from './sign-in';
 import { addPlugin } from './add-plugin';
@@ -22,7 +25,9 @@ import { commentsHost } from './comments';
 import { shareSession } from './share/share-session';
 import { copyImage } from './image-copy';
 import { fileEdits, type Snapshot, type Written } from './file-edits';
-import { impactOf } from './impact';
+import { editQueue } from './edit-queue';
+import { classOf, classesAt, classIndex } from './classes';
+import { classImpactOf, holdReason, impactOf } from './impact';
 import { usageIndex } from './usages';
 import { fsWatch } from './file-watch';
 import { diffOf } from './diff-preview';
@@ -33,11 +38,15 @@ import { stylingOf } from './styling';
 import { breakpointsOf } from './breakpoints';
 import { scalesOf } from './scales';
 import { themesOf } from './themes';
-import { EditKind, UsageKind, usageSession } from './usage';
+import { MCP_COMMAND } from '../webview/onboarding-slides';
+import { EditKind, UsageKind, usageSession, type EditDetails } from './usage';
+import { aiUsage } from './ai/ai-usage';
+import { breakpointOf, fileExtOf, identifierOf, linesOf, propCategoryOf, stateOf, targetOf, webviewDimsOf } from './usage-dims';
 import { editKindOf } from './edit-kind';
 import { selectionSync } from './selection-sync';
 import { wiringOf } from './wiring';
 import { INCLUDED_IN_CLOUD, entriesOf, insertAskOf } from './library';
+import { newPage } from './new-page';
 import { PRICING_URL, ProRefusal, SEE_PRICING, SIGN_IN, SIGN_IN_FOR_PRO, proItemFor } from './pro-insert';
 import { pluginCalls } from './plugin-calls';
 import { pluginsSession } from './plugins-session';
@@ -45,7 +54,15 @@ import { dependenciesOf, offerInstall } from './install-offer';
 import { HintSurface, SKILL_COMMAND, hintDue, installedAfterHint } from './skill-hint';
 import { install } from './dev-server';
 import { SUPPORT_ITEMS } from '../support';
+import { adapters, runNpm } from './ai/adapters';
+import { aiChat, type ChatRecord } from './ai/ai-chat';
+import { policyOf } from './ai/permission-policy';
+import { openAcpAgent } from './ai/acp-session';
+import { editorMcp } from './ai/editor-mcp';
+import { viewAsker } from './view-ask';
+import { machineEnv } from './agents';
 
+const ADAPTER_DIR = 'feega-adapters';
 const START_WITH_FEEGA = 'Start with Feega';
 const PICK_TIMEOUT_MS = 3000;
 const SYNC_SELECTION_DELAY_MS = 200;
@@ -54,11 +71,41 @@ const CACHE_DIRS = ['.svelte-kit', 'node_modules/.vite', '.next', '.nuxt', '.ast
 const ERROR_LINES = 6;
 const MINUTE_MS = 60_000;
 const ERROR = /error|failed|cannot|exception/i;
+const COMPILE_TIMEOUT_MS = 5000;
+const WATCHER_SEES_WRITE_MS = 400;
 
 enum Replay {
   Fresh,
   History
 }
+
+const ONBOARDING_OUTCOME: Record<OnboardingOutcome, string> = {
+  [OnboardingOutcome.Finished]: 'completed',
+  [OnboardingOutcome.Skipped]: 'skipped'
+};
+
+const STRUCTURE_TARGETS: Partial<Record<EditKind, string>> = {
+  [EditKind.Structure]: 'markup',
+  [EditKind.Template]: 'library_insert'
+};
+
+const WEBVIEW_USAGE: Record<WebviewUsage, UsageKind> = {
+  [WebviewUsage.CopyForAgent]: UsageKind.CopyForAgent,
+  [WebviewUsage.FocusOpened]: UsageKind.FocusOpened,
+  [WebviewUsage.FocusPropsChanged]: UsageKind.FocusPropsChanged,
+  [WebviewUsage.FocusVariantsShown]: UsageKind.FocusVariantsShown,
+  [WebviewUsage.StateSwitch]: UsageKind.StateSwitch,
+  [WebviewUsage.BreakpointSwitch]: UsageKind.BreakpointSwitch,
+  [WebviewUsage.ErrorWebview]: UsageKind.ErrorWebview
+};
+
+const IMPACT_CLASS: Partial<Record<ImpactKind, string>> = {
+  [ImpactKind.Local]: 'local',
+  [ImpactKind.Component]: 'shared',
+  [ImpactKind.Class]: 'class'
+};
+
+const ONBOARDING_MCP_CHOICE = 'mcp';
 
 const ONBOARDING_END: Record<OnboardingOutcome, UsageKind> = {
   [OnboardingOutcome.Finished]: UsageKind.OnboardingFinished,
@@ -85,35 +132,132 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   let nextPick = 0;
   const picks = new Map<number, (pick: Pick | null) => void>();
   const stylingChoice = () => platform.settings()[SettingKey.Styling] as StylingChoice;
-  const editsAt = (dir: string) => fileEdits(dir, stylingChoice, platform.stored<Snapshot>(Stored.History));
+  const pageCompiled = async () => {
+    if (!running) {
+      return;
+    }
+    await new Promise((done) => setTimeout(done, WATCHER_SEES_WRITE_MS));
+    await fetch(new URL(route ?? '/', running.upstream), { signal: AbortSignal.timeout(COMPILE_TIMEOUT_MS) }).catch(() => undefined);
+  };
+  const editsAt = (dir: string) => fileEdits(dir, stylingChoice, platform.stored<Snapshot>(Stored.History), pageCompiled);
   let edits = editsAt(root);
+  const queue = editQueue();
+  const ai = aiChat({
+    root: () => root,
+    env: platform.ai?.env ?? (() => machineEnv()),
+    open: platform.ai?.open ?? openAcpAgent,
+    confirm: (question, yes) => platform.confirm(question, yes),
+    where: () => [`project: ${root}`, running ? `dev server: ${running.url}` : null].filter(Boolean).join('\n'),
+    adapters: platform.ai?.adapters ?? adapters({ dir: platform.adapterDir ?? join(tmpdir(), ADAPTER_DIR), node: { command: process.execPath, env: { ELECTRON_RUN_AS_NODE: '1' } }, npm: runNpm }),
+    post: (message) => (message.kind === ToView.AiEvent && aiStats?.heard(message.event), platform.send(message)),
+    store: { load: () => platform.stored<ChatRecord[]>(Stored.AiChats) ?? [], save: (records) => void platform.store(Stored.AiChats, records) },
+    now: Date.now,
+    newId: randomUUID,
+    created: (chats, liveCount) => usage?.track(UsageKind.AiChatCreated, { chat_count: chats, live_count: liveCount }),
+    configured: (category, value) => aiStats?.configured(category, value),
+    mcp: () => [editorMcp(platform.launcher, root)],
+    policy: {
+      get: () => policyOf(platform.stored(Stored.AiPolicy), platform.settings()[SettingKey.AiPermissions]),
+      set: (policy) => void platform.store(Stored.AiPolicy, policy)
+    },
+    write: async (path, content, agent) => {
+      const out = await edits.agentWrite(path, content, agent);
+      if (!out.ok) {
+        throw new Error(out.reason);
+      }
+      agentEdited(out);
+      await postHistory();
+    },
+    record: async (path, before, after, agent) => {
+      const out = await edits.agentRecord(path, before, after, agent);
+      if (!out.ok) {
+        throw new Error(out.reason);
+      }
+      agentEdited(out);
+      await postHistory();
+    }
+  });
+  const authors = new Map<number, string>();
+  const approvals = new Map<string, Author>();
+  let author: Author | undefined;
   const usagesOf = (dir: string) => usageIndex(dir, { watch: platform.watchFiles ?? fsWatch });
   let usages = usagesOf(root);
+  const classesOf = (dir: string) => classIndex(dir, { watch: platform.watchFiles ?? fsWatch });
+  let classes = classesOf(root);
   const post = (message: ViewMessage) => platform.send(message);
+  const viewAsks = viewAsker(post);
   let signedIn = false;
   let editKind = EditKind.Other;
   const usage = platform.usage ? usageSession({ ...platform.usage, facts: () => ({ framework: running?.plan.framework ?? null, signedIn }) }) : null;
+  const aiStats = usage ? aiUsage(usage) : null;
+  const aiWrites = new Set<number>();
+  let aiAgent: string | undefined;
+  let projectSeen = false;
+  let lastImpact: string | undefined;
+  let onboardingStep: string | undefined;
   usage?.begin();
 
   async function postSettings() {
     const framework = running?.plan.framework ?? 'unknown';
     const styling = await stylingOf(root, stylingChoice());
+    if (!projectSeen && framework !== 'unknown') {
+      projectSeen = true;
+      usage?.track(UsageKind.ProjectDetected, { styling: styling === Styling.Tailwind ? 'tailwind' : 'plain_css' });
+    }
     await post({ kind: ToView.Settings, values: platform.settings(), facts: { version: platform.version, framework, styling } });
   }
 
   async function postHistory() {
     await platform.store(Stored.History, edits.snapshot());
-    await post({ kind: ToView.History, changes: edits.history(), canUndo: edits.canUndo(), canRedo: edits.canRedo() });
+    await post({ kind: ToView.History, changes: edits.history().map((change) => ({ ...change, by: authors.get(change.id) })), canUndo: edits.canUndo(), canRedo: edits.canRedo() });
   }
+
+  async function editDetails(out: Written & { ok: true }, ask: EditAsk | null, replay: Replay): Promise<EditDetails> {
+    const styling = await stylingOf(root, stylingChoice());
+    const impactClass = lastImpact;
+    lastImpact = undefined;
+
+    return {
+      ...linesOf(out.touched ?? []),
+      file_ext: fileExtOf(out.path),
+      target: ask ? targetOf(ask, styling) : STRUCTURE_TARGETS[editKind],
+      prop_category: ask ? propCategoryOf(ask.prop, ask.css) : undefined,
+      breakpoint: breakpointOf(ask?.breakpoint),
+      state: stateOf(ask?.state),
+      source: replay === Replay.History ? 'revert' : 'manual',
+      impact: impactClass
+    };
+  }
+
+  function agentEdited(out: Written & { ok: true }) {
+    const id = edits.latest();
+    if (id !== null) {
+      aiWrites.add(id);
+    }
+    usage?.edit(EditKind.Other, { ...linesOf(out.touched ?? []), file_ext: fileExtOf(out.path), source: 'ai', agent: aiAgent });
+  }
+
+  function reverted() {
+    const id = edits.latest();
+    const byAi = id !== null && aiWrites.has(id);
+    usage?.track(UsageKind.EditReverted, byAi ? { source: 'ai', agent: aiAgent } : { source: 'manual' });
+  }
+
+  const undone = () => (reverted(), edits.undo());
 
   async function edited(out: Written, ask: EditAsk | null, replay = Replay.Fresh) {
     if (out.ok) {
-      usage?.edit(editKind);
+      usage?.edit(editKind, usage ? await editDetails(out, ask, replay) : {});
+    }
+    const written = edits.latest();
+    if (out.ok && replay === Replay.Fresh && author && written !== null) {
+      authors.set(written, author.name);
     }
     usages.invalidate();
+    classes.invalidate();
     await postHistory();
     const saved = ask ? (liveAtOf(ask.at) ?? undefined) : undefined;
-    await post(out.ok ? { kind: ToView.Edited, ok: true, fromHistory: replay === Replay.History, written: out.written, saved, note: out.note, select: out.selected } : { kind: ToView.Edited, ok: false, reason: out.reason, at: out.at });
+    await post(out.ok ? { kind: ToView.Edited, ok: true, fromHistory: replay === Replay.History, written: out.written, saved, note: out.note, select: out.selected, inject: out.created ? ask?.css : undefined } : { kind: ToView.Edited, ok: false, reason: out.reason, at: out.at });
     return out;
   }
 
@@ -188,10 +332,23 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     const out: Written = ready.ok ? await edits.library(m.at, m.place, ready.item, ask.tokens) : ready;
     await edited(out, null);
     if (out.ok) {
-      usage?.track(UsageKind.LibraryInsert, { tier: ask.pro ? 'pro' : 'free' });
+      usage?.track(UsageKind.LibraryInsert, { tier: ask.pro ? 'pro' : 'free', library_item: identifierOf(m.id), library_category: ask.category });
     }
     if (!ready.ok && ready.refusal) {
       void proPrompted(ready.refusal);
+    }
+  }
+
+  async function pageCreated(m: Extract<HostMessage, { kind: ToHost.NewPage }>) {
+    const made = await newPage(reader(root), { route: m.route, item: m.item, catalog: (await platform.library?.()) ?? null });
+    if (!made.ok) {
+      await edited(made, null);
+      return;
+    }
+    const out = await edits.page(made.route, made.changes);
+    await edited(out, null);
+    if (out.ok) {
+      await post({ kind: ToView.PageCreated, route: made.route });
     }
   }
 
@@ -229,7 +386,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     ? pluginsSession({ host: { root: platform.plugins.root, dev: () => platform.plugins!.dev().map((folder) => resolve(root, folder)) }, post, notify: platform.notify, onInstalled: () => usage?.track(UsageKind.PluginInstalled) })
     : null;
 
-  const comments = commentsHost(platform.cloud, post);
+  const comments = commentsHost(platform.cloud, post, () => edits.history());
   const sharing = shareSession({ platform, workspace, appUrl: () => running?.url ?? null, post });
 
   const postAccount = (state: AccountState, email?: string) => {
@@ -246,6 +403,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     if (signing) {
       return;
     }
+    usage?.track(UsageKind.SignInPrompted);
     signing = new AbortController();
     await postAccount(AccountState.Waiting);
     const outcome = await signIn({ openBrowser: platform.openExternal, signal: signing.signal });
@@ -289,6 +447,10 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     await showSupport();
   }
 
+  async function showAgents() {
+    await post({ kind: ToView.Agents, found: platform.agents?.() ?? [] });
+  }
+
   async function showSkillHint() {
     if (platform.skillHint?.surface === HintSurface.Panel && hintDue(platform, [...new Set([root, workspace])])) {
       usage?.track(UsageKind.SkillHintShown);
@@ -324,7 +486,26 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     delayMs: SYNC_SELECTION_DELAY_MS
   });
 
-  const impact = (ask: ImpactAsk) => impactOf(root, ask, edits.targets, usages);
+  let agentContext: string | null = null;
+  const published = platform
+    .localBridge?.(workspace, {
+      selection: () => agentContext,
+      changes: () => edits.history(),
+      screenshot: async (selection) => (await viewAsks.ask(AgentAsk.Screenshot, selection))?.png ?? null,
+      context: async () => (await viewAsks.ask(AgentAsk.Context, false))?.text ?? null
+    })
+    ?.catch(() => null);
+
+  async function impact(ask: ImpactAsk) {
+    const found = ask.cls ? classImpactOf(classOf(await classes.snapshot(), ask.cls)) : await impactOf(root, ask, edits.targets, usages);
+    lastImpact = IMPACT_CLASS[found.kind];
+
+    return found;
+  }
+
+  async function classesShown(at: string) {
+    await post({ kind: ToView.Classes, view: await classesAt(root, await classes.snapshot(), at) });
+  }
 
   async function impactShown(id: number, ask: ImpactAsk) {
     await post({ kind: ToView.Impact, id, impact: await impact(ask) });
@@ -333,7 +514,8 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   async function held(ask: EditAsk): Promise<boolean> {
     const asked = platform.settings()[SettingKey.PreviewUnknown] !== false && ask.prop !== LiveProp.Text;
     const found = asked ? await impact(ask) : null;
-    if (found?.kind !== ImpactKind.Unknown) {
+    const reason = found && holdReason(found);
+    if (!reason) {
       return false;
     }
     const preview = await edits.preview(ask);
@@ -341,8 +523,34 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     if (!files.length) {
       return false;
     }
-    await post({ kind: ToView.Preview, ask, reason: found.reason, files });
+    author && approvals.set(askKey(ask), author);
+    await post({ kind: ToView.Preview, ask, reason, files, by: author });
     return true;
+  }
+
+  async function propsHeld(ask: ApplyAsk): Promise<boolean> {
+    if (platform.settings()[SettingKey.PreviewUnknown] === false) {
+      return false;
+    }
+    const plan = await edits.propsPlan(ask);
+    if (!plan.ok || !plan.cautions.length) {
+      return false;
+    }
+    await post({ kind: ToView.PropsPreview, ask, reason: plan.cautions.join('; '), files: diffOf([plan.change]), by: author });
+    return true;
+  }
+
+  async function usagePropsShown(ask: ReadAsk) {
+    const usage = liveAtOf(ask.usage);
+    const out = usage && inside(root, usage.file) ? await readProps(reader(root), { component: ask.component, usage, which: ask.which }) : null;
+    await post({ kind: ToView.UsageProps, component: ask.component, values: out?.ok ? out.values : {}, dynamic: out?.ok ? out.dynamic : [], spread: out?.ok ? out.spread : false });
+  }
+
+  async function applyProps(ask: ApplyAsk, gate = Gate.Ask): Promise<Written | null> {
+    if (gate === Gate.Ask && (await propsHeld(ask))) {
+      return null;
+    }
+    return edits.applyProps(ask).then((out) => edited(out, null));
   }
 
   async function edit(ask: EditAsk, gate = Gate.Ask): Promise<Written | null> {
@@ -351,13 +559,13 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     }
     return edits.edit(ask).then((out) => edited(out, ask));
   }
-  const undo = () => edits.undo().then((out) => edited(out, null, Replay.History));
+  const undo = () => undone().then((out) => edited(out, null, Replay.History));
 
   async function revert(id: number | null) {
     if (id === null) {
       let last: Written | null = null;
       while (edits.canUndo()) {
-        last = await edits.undo();
+        last = await undone();
         if (!last.ok) {
           break;
         }
@@ -414,6 +622,8 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     edits = editsAt(root);
     usages.dispose();
     usages = usagesOf(root);
+    classes.dispose();
+    classes = classesOf(root);
     await platform.store(Stored.App, next);
   }
 
@@ -590,7 +800,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   };
 
   const handlers: { [K in ToHost]: (m: Extract<HostMessage, { kind: K }>) => unknown } = {
-    [ToHost.Ready]: () => (showApp(), postSettings(), postHistory(), showAccount(), showOnboarding(), showSupport(), showSkillHint(), comments.show(), sharing.show(), pluginList?.show()),
+    [ToHost.Ready]: () => (showApp(), postSettings(), postHistory(), showAccount(), showOnboarding(), showSupport(), showAgents(), showSkillHint(), comments.show(), sharing.show(), pluginList?.show()),
     [ToHost.Edit]: (m) => edit(m.ask, m.gate),
     [ToHost.Impact]: (m) => impactShown(m.id, m.ask),
     [ToHost.Undo]: undo,
@@ -624,41 +834,88 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.SignIn]: startSignIn,
     [ToHost.CancelSignIn]: () => signing?.abort(),
     [ToHost.SignOut]: signOut,
-    [ToHost.OnboardingStep]: (m) => usage?.track(UsageKind.OnboardingStep, { step: m.step }),
-    [ToHost.OnboardingDone]: (m) => (usage?.track(ONBOARDING_END[m.outcome]), platform.onboarding.markSeen()),
+    [ToHost.OnboardingStep]: (m) => ((onboardingStep = m.step), usage?.track(UsageKind.OnboardingStep, { step: m.step, outcome: 'viewed' }), m.step === OnboardingStep.Agents && void ai.prepare()),
+    [ToHost.OnboardingDone]: (m) => (onboardingStep && usage?.track(UsageKind.OnboardingStep, { step: onboardingStep, outcome: ONBOARDING_OUTCOME[m.outcome] }), usage?.track(ONBOARDING_END[m.outcome]), platform.onboarding.markSeen()),
     [ToHost.Support]: (m) => supportAct(m.item),
     [ToHost.SkillHintDismiss]: dismissSkillHint,
     [ToHost.SkillHintNever]: neverSkillHint,
     [ToHost.ImageChoose]: imageChosen,
     [ToHost.ImageUpload]: (m) => imageSaved(m.name, Buffer.from(m.data, 'base64')),
     [ToHost.Wiring]: (m) => wiringShown(m.at, m.instance),
+    [ToHost.Classes]: (m) => classesShown(m.at),
     [ToHost.Link]: (m) => edits.link(m.at, m.edit, m.instance).then((out) => edited(out, null)),
     [ToHost.Attribute]: (m) => edits.attribute(m.at, m.name, m.value).then((out) => edited(out, null)),
+    [ToHost.ApplyProps]: (m) => applyProps(m.ask, m.gate),
+    [ToHost.ReadProps]: (m) => usagePropsShown(m.ask),
     [ToHost.Go]: (m) => edits.go(m.at, m.ask).then((out) => edited(out, null)),
-    [ToHost.Selected]: (m) => syncSelection(m.at),
-    [ToHost.Copy]: (m) => platform.copyText?.(m.text),
+    [ToHost.Selected]: (m) => (m.at && usage?.track(UsageKind.ElementSelected), void published?.then((bridge) => bridge?.touch()), sharing.hostSelected(m.at), syncSelection(m.at)),
+    [ToHost.Context]: (m) => void (agentContext = m.text),
+    [ToHost.Copy]: (m) => (m.text === MCP_COMMAND && usage?.track(UsageKind.OnboardingStep, { step: OnboardingStep.Agents, outcome: 'completed', choice: ONBOARDING_MCP_CHOICE }), platform.copyText?.(m.text)),
+    [ToHost.Usage]: (m) => usage?.track(WEBVIEW_USAGE[m.event], webviewDimsOf(m.dims)),
     [ToHost.Comments]: comments.show,
-    [ToHost.CommentAdd]: (m) => comments.add(m.draft),
+    [ToHost.CommentAdd]: (m) => (usage?.track(UsageKind.CloudAction, { action: 'comment_add' }), comments.add(m.draft)),
     [ToHost.CommentResolve]: (m) => comments.resolve(m.id),
-    [ToHost.ShareStart]: (m) => sharing.start(m.name, m.canEdit),
+    [ToHost.RevisionPublish]: (m) => (usage?.track(UsageKind.CloudAction, { action: 'revision_publish' }), comments.publish(m.summary)),
+    [ToHost.ShareStart]: (m) => (usage?.track(UsageKind.ShareAction, { action: 'share_start' }), sharing.start(m.name, m.canEdit)),
     [ToHost.ShareStop]: sharing.stop,
     [ToHost.ShareKick]: (m) => sharing.kick(m.userId),
     [ToHost.ShareRole]: (m) => sharing.setRole(m.userId, m.role),
     [ToHost.LibraryList]: libraryShown,
     [ToHost.LibraryInsert]: libraryInserted,
+    [ToHost.NewPage]: pageCreated,
     [ToHost.Plugin]: async (m) => post({ kind: ToView.Plugin, id: m.id, result: await pluginRun(m.ask) }),
     [ToHost.PluginEnable]: (m) => pluginList?.enable(m.id, m.enabled),
     [ToHost.PluginRemove]: (m) => pluginList?.remove(m.id),
     [ToHost.PluginInstall]: (m) => pluginList?.install(m.source),
-    [ToHost.PreviewReady]: () => usage?.previewReady()
+    [ToHost.PreviewReady]: () => usage?.previewReady(),
+    [ToHost.Cursor]: (m) => sharing.hostPointed(m.at),
+    [ToHost.AiList]: ai.list,
+    [ToHost.AiStart]: (m) => ((aiAgent = m.agent), aiStats?.started(m.agent), ai.start(m.agent)),
+    [ToHost.AiSend]: (m) => (aiStats?.sent(), void ai.send(m.text, m.context, m.images)),
+    [ToHost.AgentAnswer]: viewAsks.answer,
+    [ToHost.AiCancel]: () => (aiStats?.cancelled(), ai.cancel()),
+    [ToHost.AiAnswer]: (m) => (aiStats?.answered(m.id, m.optionId), ai.answer(m.id, m.optionId)),
+    [ToHost.AiMode]: (m) => void ai.setMode(m.id),
+    [ToHost.AiConfig]: (m) => void ai.setConfig(m.id, m.value),
+    [ToHost.AiOpen]: (m) => ai.open(m.chat),
+    [ToHost.AiRename]: (m) => ai.rename(m.chat, m.title),
+    [ToHost.AiDelete]: (m) => void ai.remove(m.chat),
+    [ToHost.AiRetry]: () => void ai.retry(),
+    [ToHost.AiPolicy]: (m) => ai.setPolicy(m.policy)
   };
 
-  platform.receive((message) => {
-    const kind = editKindOf(message);
-    if (kind !== EditKind.Other) {
-      editKind = kind;
+  const askKey = (ask: EditAsk) => JSON.stringify(ask);
+
+  const approvedAsk = (message: Authored) => (message.kind === ToHost.Edit && message.gate === Gate.Apply ? message.ask : null);
+
+  function authorOf(message: Authored): Author | undefined {
+    const ask = approvedAsk(message);
+    if (!ask) {
+      return message.by;
     }
-    return (handlers[message.kind] as (m: HostMessage) => unknown)(message);
+    const approved = approvals.get(askKey(ask));
+    approvals.delete(askKey(ask));
+    return approved;
+  }
+
+  async function apply(message: Authored) {
+    if (message.by && approvedAsk(message)) {
+      return;
+    }
+    author = authorOf(message);
+    try {
+      return await (handlers[message.kind] as (m: HostMessage) => unknown)(message);
+    } finally {
+      author = undefined;
+    }
+  }
+
+  platform.receive((message: Authored) => {
+    const kind = editKindOf(message);
+    if (kind === EditKind.Other && !message.by) {
+      return (handlers[message.kind] as (m: HostMessage) => unknown)(message);
+    }
+    return queue.run(() => (kind === EditKind.Other || (editKind = kind), apply(message)));
   });
 
   function pick(x: number, y: number): Promise<Pick | null> {
@@ -685,9 +942,13 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     addPlugin: installPlugin,
     stop: async () => {
       close();
+      ai.close();
       usages.dispose();
+      classes.dispose();
       pluginList?.stop();
       await sharing.stop();
+      await (await published)?.stop();
+      aiStats?.ended();
       await usage?.end();
     },
     usageChanged: () => usage?.recheck(),

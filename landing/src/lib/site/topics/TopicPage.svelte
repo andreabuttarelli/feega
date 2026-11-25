@@ -5,6 +5,7 @@
   import { AUTHOR } from '$lib/site/alternatives';
   import { primaryCta } from '$lib/site/install';
   import { lower } from '$lib/site/lower';
+  import { eventAttrs } from '$lib/site/analytics/attrs';
   import { topicJsonLd } from '$lib/site/structured-data';
   import CatalogLayout from '../catalog/CatalogLayout.svelte';
   import { topicOutline } from '../catalog/outline';
@@ -60,7 +61,7 @@
     <ol>
       {#each topic.tryIt as step (step)}<li>{step}</li>{/each}
     </ol>
-    <a class="landing-cta" href={cta.href}>{cta.label} →</a>
+    <a class="landing-cta" href={cta.href} {...eventAttrs('download_click', { target: 'download_page', place: 'topic' })}>{cta.label} →</a>
   </section>
 
   <section>

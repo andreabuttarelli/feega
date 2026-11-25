@@ -1,16 +1,17 @@
 <script lang="ts">
-  import type { CloudComment, CommentDraft } from '../host/cloud-api';
+  import type { CloudComment, CloudRevisions, CommentDraft } from '../host/cloud-api';
   import type { Pick, Source } from '../messages';
-  import { draftOf, sourceOfComment, threadsOf } from './comments';
+  import { draftOf, reviewLine, sourceOfComment, threadsOf, verdictLines } from './comments';
 
-  type CommentsState = { enabled: boolean; comments: CloudComment[]; error: string };
+  type CommentsState = { enabled: boolean; comments: CloudComment[]; review: CloudRevisions; error: string };
 
-  let { cloud, picked, composing, onsubmit, oncancel, onresolve, onselect, oncopy }: { cloud: CommentsState; picked: Pick | null; composing: boolean; onsubmit: (draft: CommentDraft) => void; oncancel: () => void; onresolve: (id: string) => void; onselect: (source: Source) => void; oncopy: (comment: CloudComment, replies: CloudComment[]) => void } = $props();
+  let { cloud, picked, composing, onsubmit, oncancel, onresolve, onselect, oncopy, onpublish }: { cloud: CommentsState; picked: Pick | null; composing: boolean; onsubmit: (draft: CommentDraft) => void; oncancel: () => void; onresolve: (id: string) => void; onselect: (source: Source) => void; oncopy: (comment: CloudComment, replies: CloudComment[]) => void; onpublish: (summary: string) => void } = $props();
 
   let showResolved = $state(false);
   let text = $state('');
   let replyingTo = $state<string | null>(null);
   let replyText = $state('');
+  let roundSummary = $state('');
 
   const threads = $derived(threadsOf(cloud.comments, showResolved));
   const open = $derived(threadsOf(cloud.comments, false).length);
@@ -36,6 +37,15 @@
     replyingTo = null;
   }
 
+  function publish() {
+    const summary = roundSummary.trim();
+    if (!summary) {
+      return;
+    }
+    onpublish(summary);
+    roundSummary = '';
+  }
+
   function submitOnEnter(e: KeyboardEvent, run: () => void) {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
@@ -52,6 +62,12 @@
       <span>{open} open</span>
       <button type="button" class="link" data-testid="comments-resolved-toggle" onclick={() => (showResolved = !showResolved)}>{showResolved ? 'Hide resolved' : 'Show resolved'}</button>
     </header>
+    <section class="round" data-testid="review">
+      <strong data-testid="review-line">{reviewLine(cloud.review)}</strong>
+      {#each verdictLines(cloud.review) as line (line)}<span class="meta">{line}</span>{/each}
+      <input bind:value={roundSummary} placeholder="What changed in this round" aria-label="Round summary" data-testid="round-summary" onkeydown={(e) => submitOnEnter(e, publish)} />
+      <button type="button" class="send" data-testid="round-publish" disabled={!roundSummary.trim()} onclick={publish}>Publish new round</button>
+    </section>
     {#if cloud.error}<p class="error" role="alert" data-testid="comments-error">{cloud.error}</p>{/if}
     {#if composing && picked}
       <div class="composer" data-testid="comment-composer">
@@ -115,6 +131,14 @@
 
   .thread,
   .composer {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--ui-divider);
+  }
+
+  .round {
     display: flex;
     flex-direction: column;
     gap: 6px;

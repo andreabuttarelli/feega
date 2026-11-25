@@ -1,4 +1,6 @@
-import type { HostMessage, Source, ViewMessage } from '../messages';
+import type { PublishedBridge } from './local-bridge/publish';
+import type { BridgeState } from './local-bridge/server';
+import type { AgentId, HostMessage, Source, ViewMessage } from '../messages';
 import type { Catalog } from '../../../packages/library/src/catalog';
 import type { ProFetch } from './pro-insert';
 import type { AccountStore } from './account';
@@ -9,6 +11,9 @@ import type { SupportStore } from './support';
 import type { PluginsHost } from './plugins-session';
 import type { UsageHost } from './usage';
 import type { SkillHintHost } from './skill-hint';
+import type { AgentEnv } from './agents';
+import type { OpenAgent } from './ai/agent-session';
+import type { Adapters } from './ai/adapters';
 import type { SettingKey, SettingValue, Settings } from '../settings';
 
 export enum Stored {
@@ -19,7 +24,9 @@ export enum Stored {
   Pids = 'feegaInspect.pids',
   SkillHint = 'feegaInspect.skillHint',
   SkillHintShown = 'feegaInspect.skillHintShown',
-  SkillInstalledSent = 'feegaInspect.skillInstalledSent'
+  SkillInstalledSent = 'feegaInspect.skillInstalledSent',
+  AiPolicy = 'feegaInspect.aiPolicy',
+  AiChats = 'feegaInspect.aiChats'
 }
 
 import type { Watch } from './file-watch';
@@ -56,6 +63,7 @@ export type Platform = Transport & {
   proFiles?: ProFetch;
   watchFiles?: Watch;
   usage?: UsageHost;
+  localBridge?: (projectRoot: string, state: BridgeState) => Promise<PublishedBridge>;
   account: AccountStore;
   cloud?: CommentsCloud;
   share?: SharePort;
@@ -63,4 +71,7 @@ export type Platform = Transport & {
   support?: SupportStore;
   plugins?: PluginsHost;
   skillHint?: SkillHintHost;
+  agents?: () => AgentId[];
+  adapterDir?: string;
+  ai?: { env: () => AgentEnv; open: OpenAgent; adapters?: Adapters };
 };

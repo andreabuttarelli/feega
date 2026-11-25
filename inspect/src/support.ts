@@ -1,3 +1,5 @@
+import { LINKS } from './settings';
+
 export enum SupportItem {
   Star = 'star',
   FollowX = 'follow_x',
@@ -13,7 +15,7 @@ const SITE_URL = 'https://www.feega.app';
 export const SUPPORT_ITEMS: SupportEntry[] = [
   { id: SupportItem.Star, label: 'Star the repository', karma: 10, url: 'https://github.com/andreabuttarelli/feega' },
   { id: SupportItem.FollowX, label: 'Follow Feega on X', karma: 5, url: 'https://x.com/feega_app' },
-  { id: SupportItem.Discord, label: 'Join the Discord', karma: 5, url: 'https://discord.gg/PUp37DG6vr' },
+  { id: SupportItem.Discord, label: 'Join the Discord', karma: 5, url: LINKS.discord },
   { id: SupportItem.Coffee, label: 'Support with a coffee', karma: 20, url: 'https://buy.stripe.com/5kQ00k2A97C08sd94LeME07' },
   { id: SupportItem.Share, label: 'Share Feega (copies a text)', karma: 10, text: `I design in my codebase with Feega: click an element in the running app, edit it, the change lands in the source. Free and open source. ${SITE_URL}` }
 ];

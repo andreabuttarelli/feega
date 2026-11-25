@@ -1,11 +1,18 @@
 import type { SupportItem } from './support';
+import type { AcpAgent, AcpId } from './host/ai/acp-agents';
+import type { AgentEvent, ConfigView, ModeView } from './host/ai/agent-session';
+import type { Item } from './host/ai/transcript';
+import type { Policy } from './host/ai/permission-policy';
 import type { LiveEditAsk } from '@feega/live-edit/live-ask';
 import type { Place } from '@feega/live-edit/move-node';
 import type { AddKind, AddPlace } from '@feega/live-edit/add-node';
 import type { WrapTag } from '@feega/live-edit/wrap-node';
 import type { LoopMove } from '@feega/live-edit/move-loop-item';
 import type { Usage } from '@feega/live-edit/move-usage';
+import type { Json } from '@feega/live-edit/prop-syntax';
 import type { StructureOp } from '@feega/live-edit/structure';
+import type { ClassEntry, UseSite } from '@feega/live-edit/class-index';
+import type { ClassTarget } from '@feega/live-edit/class-rule';
 import type { Scope } from '@feega/live-edit/scoped-rule';
 import type { PageTarget } from '@feega/live-edit/page-rule';
 import type { ElementState } from '@feega/live-edit/element-state';
@@ -16,11 +23,11 @@ import type { OffsetSide } from '@feega/live-edit/authored-offsets';
 import type { Breakpoints } from '@feega/live-edit/breakpoints';
 import type { Theme } from '@feega/live-edit/themes';
 import type { Scales } from '@feega/live-edit/theme-scales';
-import type { CloudComment, CommentDraft } from './host/cloud-api';
+import type { CloudComment, CloudRevisions, CommentDraft } from './host/cloud-api';
 import type { DiffFile } from './host/diff-preview';
 import type { Catalog } from '@feega/plugin-api/external';
 import type { Proposal } from '@feega/plugin-api/protocol';
-import type { Present, VisitorRole } from '../../packages/share-protocol/src/frame';
+import type { Point, Present, VisitorRole } from '../../packages/share-protocol/src/frame';
 import type { ReportFacts, SettingKey, SettingValue, Settings } from './settings';
 
 export enum IconSource {
@@ -34,15 +41,26 @@ export type Rect = { x: number; y: number; width: number; height: number };
 
 export type Source = { file: string; line: number; col: number };
 
+export type Author = { userId: string; name: string };
+
 export enum ImpactKind {
   Local = 'local',
   Component = 'component',
+  Class = 'class',
   Unknown = 'unknown'
 }
 
 export type UsageSite = { file: string; line: number };
 
-export type Impact = { kind: ImpactKind.Local } | { kind: ImpactKind.Component; name: string; files: UsageSite[] } | { kind: ImpactKind.Unknown; reason: string };
+export type ClassInfo = Omit<ClassEntry, 'uses'> & { uses: UseSite[]; elements: number; files: number };
+
+export type ClassesView = { at: string; element: ClassInfo[]; inFile: ClassInfo[]; dynamic: boolean };
+
+export type Impact = { kind: ImpactKind.Local } | { kind: ImpactKind.Component; name: string; files: UsageSite[] } | { kind: ImpactKind.Class; name: string; elements: number; files: UsageSite[] } | { kind: ImpactKind.Unknown; reason: string };
+
+export type ReadAsk = { component: string; usage: string; which?: { index: number; count: number } };
+
+export type ApplyAsk = { component: string; usage: string; which?: { index: number; count: number }; set: Record<string, Json>; remove: string[] };
 
 export type ImpactAsk = { at: string } & Partial<EditAsk>;
 
@@ -91,7 +109,7 @@ export enum Styling {
   Css = 'css'
 }
 
-export type EditAsk = LiveEditAsk & { css?: Record<string, string>; scope?: Scope; inner?: string; page?: PageTarget; state?: ElementState; breakpoint?: string; theme?: string };
+export type EditAsk = LiveEditAsk & { css?: Record<string, string>; scope?: Scope; inner?: string; page?: PageTarget; state?: ElementState; breakpoint?: string; theme?: string; cls?: ClassTarget };
 
 export enum ServerState {
   Detecting = 'detecting',
@@ -189,30 +207,85 @@ export enum ToHost {
   ImageChoose = 'image-choose',
   ImageUpload = 'image-upload',
   Wiring = 'wiring',
+  Classes = 'classes',
   Link = 'link',
   Attribute = 'attribute',
+  ApplyProps = 'apply-props',
+  ReadProps = 'read-props',
   Go = 'go',
   Selected = 'selected',
+  Context = 'context',
   Copy = 'copy',
   Comments = 'comments',
   CommentAdd = 'comment-add',
   CommentResolve = 'comment-resolve',
+  RevisionPublish = 'revision-publish',
   ShareStart = 'share-start',
   ShareStop = 'share-stop',
   ShareKick = 'share-kick',
   ShareRole = 'share-role',
   LibraryList = 'library-list',
   LibraryInsert = 'library-insert',
+  NewPage = 'new-page',
   Plugin = 'plugin',
   PluginEnable = 'plugin-enable',
   PluginRemove = 'plugin-remove',
   PluginInstall = 'plugin-install',
-  PreviewReady = 'preview-ready'
+  PreviewReady = 'preview-ready',
+  Cursor = 'cursor',
+  AiList = 'ai-list',
+  AiStart = 'ai-start',
+  AiSend = 'ai-send',
+  AiCancel = 'ai-cancel',
+  AiAnswer = 'ai-answer',
+  AiMode = 'ai-mode',
+  AiConfig = 'ai-config',
+  AiPolicy = 'ai-policy',
+  AiOpen = 'ai-open',
+  AiRename = 'ai-rename',
+  AiDelete = 'ai-delete',
+  AgentAnswer = 'agent-answer',
+  AiRetry = 'ai-retry',
+  Usage = 'usage'
 }
 
-export type ChangeRow = { id: number; at: string; prop: string; value: string; scope: string; files: string[]; time: number };
+export enum WebviewUsage {
+  CopyForAgent = 'copy_for_agent',
+  FocusOpened = 'focus_opened',
+  FocusPropsChanged = 'focus_props_changed',
+  FocusVariantsShown = 'focus_variants_shown',
+  StateSwitch = 'state_switch',
+  BreakpointSwitch = 'breakpoint_switch',
+  ErrorWebview = 'error_webview'
+}
 
-export type Prefs = { size: string; custom: number | null; barClosed: boolean; route?: string; anchor?: string; barWidth?: number; leftWidth?: number; leftClosed?: boolean; layers?: Record<string, { hidden: string[]; locked: string[] }> };
+export type WebviewUsageDims = Partial<{ variant: string; mode: string; control: string; prop_count: number; state: string; breakpoint: string; error_class: string; area: string }>;
+
+export type ChangeRow = { id: number; at: string; prop: string; value: string; scope: string; files: string[]; time: number; by?: string };
+
+export type Prefs = { size: string; custom: number | null; barClosed: boolean; route?: string; anchor?: string; dock?: { edge: string; offset: number }; barWidth?: number; leftWidth?: number; leftClosed?: boolean; layers?: Record<string, { hidden: string[]; locked: string[] }> };
+
+export type ChatRow = { id: string; agent: AcpId; title: string; updatedAt: number; running: boolean };
+
+export enum AgentAsk {
+  Screenshot = 'screenshot',
+  Context = 'context'
+}
+
+export enum AdapterState {
+  Installing = 'installing',
+  Ready = 'ready',
+  Failed = 'failed'
+}
+
+export type AdapterRow = { agent: AcpId; label: string; state: AdapterState; reason?: string };
+
+export enum AiState {
+  Idle = 'idle',
+  Starting = 'starting',
+  Ready = 'ready',
+  Busy = 'busy'
+}
 
 export enum ToView {
   App = 'app',
@@ -228,9 +301,11 @@ export enum ToView {
   Account = 'account',
   Onboarding = 'onboarding',
   Support = 'support',
+  Agents = 'agents',
   SkillHint = 'skill-hint',
   ImageSaved = 'image-saved',
   Wiring = 'wiring',
+  Classes = 'classes',
   Comments = 'comments',
   Share = 'share',
   Library = 'library',
@@ -238,7 +313,19 @@ export enum ToView {
   Plugins = 'plugins',
   Reload = 'reload',
   Impact = 'impact',
-  Preview = 'preview'
+  Preview = 'preview',
+  PropsPreview = 'props-preview',
+  UsageProps = 'usage-props',
+  Peers = 'peers',
+  AiAgents = 'ai-agents',
+  AiState = 'ai-state',
+  AiEvent = 'ai-event',
+  AiPolicy = 'ai-policy',
+  AiChats = 'ai-chats',
+  AiChat = 'ai-chat',
+  AgentAsk = 'agent-ask',
+  Adapters = 'adapters',
+  PageCreated = 'page-created'
 }
 
 export enum ShareState {
@@ -250,8 +337,19 @@ export enum ShareState {
 export enum OnboardingStep {
   Welcome = 'welcome',
   Agent = 'agent',
+  LocalAgents = 'local_agents',
+  Agents = 'agents',
   SignIn = 'sign_in',
   Support = 'support'
+}
+
+export enum AgentId {
+  ClaudeCode = 'claude-code',
+  Cursor = 'cursor',
+  Codex = 'codex',
+  Windsurf = 'windsurf',
+  Copilot = 'copilot',
+  Gemini = 'gemini'
 }
 
 export enum OnboardingOutcome {
@@ -314,25 +412,48 @@ export type HostMessage =
   | { kind: ToHost.ImageChoose }
   | { kind: ToHost.ImageUpload; name: string; data: string }
   | { kind: ToHost.Wiring; at: string; instance?: number }
+  | { kind: ToHost.Classes; at: string }
   | { kind: ToHost.Link; at: string; edit: LinkEdit; instance?: number }
   | { kind: ToHost.Attribute; at: string; name: string; value: string }
+  | { kind: ToHost.ApplyProps; ask: ApplyAsk; gate?: Gate }
+  | { kind: ToHost.ReadProps; ask: ReadAsk }
   | { kind: ToHost.Go; at: string; ask: GoAsk }
   | { kind: ToHost.Selected; at: Source | null }
+  | { kind: ToHost.Context; text: string | null }
   | { kind: ToHost.Copy; text: string }
   | { kind: ToHost.Comments }
   | { kind: ToHost.CommentAdd; draft: CommentDraft }
   | { kind: ToHost.CommentResolve; id: string }
+  | { kind: ToHost.RevisionPublish; summary: string }
   | { kind: ToHost.ShareStart; name: string; canEdit: boolean }
   | { kind: ToHost.ShareStop }
   | { kind: ToHost.ShareKick; userId: string }
   | { kind: ToHost.ShareRole; userId: string; role: VisitorRole }
   | { kind: ToHost.LibraryList }
   | { kind: ToHost.LibraryInsert; id: string; at: string; place: AddPlace }
+  | { kind: ToHost.NewPage; route: string; item: string | null }
   | { kind: ToHost.Plugin; id: number; ask: PluginAsk }
   | { kind: ToHost.PluginEnable; id: string; enabled: boolean }
   | { kind: ToHost.PluginRemove; id: string }
   | { kind: ToHost.PluginInstall; source: string }
-  | { kind: ToHost.PreviewReady };
+  | { kind: ToHost.PreviewReady }
+  | { kind: ToHost.Cursor; at: Point | null }
+  | { kind: ToHost.AiList }
+  | { kind: ToHost.AiStart; agent: AcpId }
+  | { kind: ToHost.AiSend; text: string; context: string | null; images: string[] }
+  | { kind: ToHost.AiCancel }
+  | { kind: ToHost.Usage; event: WebviewUsage; dims?: WebviewUsageDims }
+  | { kind: ToHost.AiAnswer; id: string; optionId: string | null }
+  | { kind: ToHost.AiMode; id: string }
+  | { kind: ToHost.AiConfig; id: string; value: string }
+  | { kind: ToHost.AiPolicy; policy: Policy }
+  | { kind: ToHost.AiOpen; chat: string }
+  | { kind: ToHost.AiRename; chat: string; title: string }
+  | { kind: ToHost.AiDelete; chat: string }
+  | { kind: ToHost.AiRetry }
+  | { kind: ToHost.AgentAnswer; id: number; png: string | null; text: string | null };
+
+export type Authored = HostMessage & { by?: Author };
 
 export type ViewMessage =
   | { kind: ToView.App; url: string; styling: Styling; prefs: Prefs | null; route?: string; breakpoints: Breakpoints; themes: Theme[]; scales: Scales | null }
@@ -340,7 +461,7 @@ export type ViewMessage =
   | { kind: ToView.Settings; values: Settings; facts: ReportFacts }
   | { kind: ToView.History; changes: ChangeRow[]; canUndo: boolean; canRedo: boolean }
   | { kind: ToView.Status; text: string }
-  | { kind: ToView.Edited; ok: boolean; fromHistory?: boolean; reason?: string; written?: string; at?: Source; saved?: Source; note?: string; select?: Source }
+  | { kind: ToView.Edited; ok: boolean; fromHistory?: boolean; reason?: string; written?: string; at?: Source; saved?: Source; note?: string; select?: Source; inject?: Record<string, string> }
   | { kind: ToView.Change; row: string; value: string }
   | { kind: ToView.Pick; id: number; x: number; y: number }
   | { kind: ToView.IconResults; id: number; library: string | null; hits: IconHit[]; error?: string }
@@ -348,17 +469,31 @@ export type ViewMessage =
   | { kind: ToView.Account; state: AccountState; email?: string }
   | { kind: ToView.Onboarding; state: Onboarding }
   | { kind: ToView.Support; done: SupportItem[] }
+  | { kind: ToView.Agents; found: AgentId[] }
   | { kind: ToView.SkillHint; command: string }
   | { kind: ToView.ImageSaved; url: string }
   | { kind: ToView.Wiring; at: string; instance?: number; wiring: Wiring }
-  | { kind: ToView.Comments; enabled: boolean; comments: CloudComment[]; error?: string }
+  | { kind: ToView.Classes; view: ClassesView }
+  | { kind: ToView.Comments; enabled: boolean; comments: CloudComment[]; review?: CloudRevisions; error?: string }
   | { kind: ToView.Share; state: ShareState; available: boolean; name: string; canEdit: boolean; url?: string; expiresAt?: string; visitors: Present[]; notice: boolean; error?: string }
   | { kind: ToView.Library; items: LibraryEntry[] }
   | { kind: ToView.Plugin; id: number; result: PluginResult }
   | { kind: ToView.Plugins; catalog: Catalog; canInstall: boolean }
   | { kind: ToView.Reload }
+  | { kind: ToView.PageCreated; route: string }
   | { kind: ToView.Impact; id: number; impact: Impact }
-  | { kind: ToView.Preview; ask: EditAsk; reason: string; files: DiffFile[] };
+  | { kind: ToView.Preview; ask: EditAsk; reason: string; files: DiffFile[]; by?: Author }
+  | { kind: ToView.UsageProps; component: string; values: Record<string, Json>; dynamic: string[]; spread: boolean }
+  | { kind: ToView.PropsPreview; ask: ApplyAsk; reason: string; files: DiffFile[]; by?: Author }
+  | { kind: ToView.Peers; peers: Present[] }
+  | { kind: ToView.AiAgents; agents: AcpAgent[] }
+  | { kind: ToView.AiState; state: AiState; agent?: AcpId; chat?: string; images?: boolean }
+  | { kind: ToView.AiEvent; event: AgentEvent; chat?: string }
+  | { kind: ToView.AiPolicy; policy: Policy }
+  | { kind: ToView.AiChats; chats: ChatRow[]; active: string | null }
+  | { kind: ToView.AgentAsk; id: number; ask: AgentAsk; selection: boolean }
+  | { kind: ToView.Adapters; rows: AdapterRow[] }
+  | { kind: ToView.AiChat; chat: string | null; agent?: AcpId; state: AiState; items: Item[]; modes: ModeView[]; mode: string | null; configs: ConfigView[]; images?: boolean };
 
 export const INSPECT = 'feega:inspect';
 export const INSPECT_RESULT = 'feega:inspect:result';
@@ -371,6 +506,8 @@ export const LOCATION = 'feega:location';
 export const BRIDGE_READY = 'feega:source-map:ready';
 export const MODE = 'feega:mode';
 export const HIDE = 'feega:hide';
+export const CAPTURE = 'feega:capture';
+export const CAPTURED = 'feega:captured';
 export const PALETTE = 'feega:palette';
 export const PALETTE_RESULT = 'feega:palette:result';
 export const TREE = 'feega:tree';
@@ -380,6 +517,13 @@ export type LayerNode = { name: string; tag: string; display: string; direction:
 export const SCROLL = 'feega:scroll';
 export const SCROLLED = 'feega:scrolled';
 export const REVEAL = 'feega:reveal';
+export const FOCUS = 'feega:focus';
+export const FOCUSED = 'feega:focused';
+export const FOCUS_CANVAS = 'feega:focus-canvas';
+export const FOCUS_ZOOM = 'feega:focus-zoom';
+export const FOCUS_ZOOMED = 'feega:focus-zoomed';
+export const MOUNT_STATUS = 'feega:mount:status';
+export const MOUNT_PROPS = 'feega:mount:props';
 export const TEXT_EDIT = 'feega:text:edit';
 export const TEXT_DONE = 'feega:text:done';
 export const TEXT_RESTORE = 'feega:text:restore';

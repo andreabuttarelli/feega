@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { CloudComment } from '../host/cloud-api';
+import type { CloudComment, CloudRevisions } from '../host/cloud-api';
 import type { Pick } from '../messages';
-import { PIN_SLOT_PREFIX, draftOf, pinIdOf, pinSlot, pinsOf, sourceOfComment, threadsOf } from './comments';
+import { PIN_SLOT_PREFIX, draftOf, pinIdOf, pinSlot, pinsOf, reviewLine, sourceOfComment, threadsOf, verdictLines } from './comments';
 
 const comment = (over: Partial<CloudComment>): CloudComment => ({ id: 'c1', sessionId: 's1', authorId: 'u1', authorName: 'Ada', body: 'Tighter', selector: 'div.card', sourceFile: 'src/Card.svelte', sourceLine: 4, sourceCol: 2, parentId: null, createdAt: '2026-11-21T10:00:00Z', resolvedAt: null, resolvedBy: null, ...over });
 
@@ -81,5 +81,21 @@ describe('comment drafts', () => {
 
   it('turns a comment back into a source', () => {
     expect(sourceOfComment(comment({}))).toEqual({ file: 'src/Card.svelte', line: 4, col: 2 });
+  });
+});
+
+describe('review lines', () => {
+  const round = (verdicts: CloudRevisions['revisions'][number]['verdicts']): CloudRevisions => ({ status: 'changes_requested', revisions: [{ id: 'r1', sessionId: 's1', number: 2, authorId: 'h', summary: 'Two', changes: [], createdAt: '2026-11-21T10:00:00Z', status: 'changes_requested', verdicts }] });
+
+  it('says no round was published yet', () => {
+    expect(reviewLine({ status: 'open', revisions: [] })).toBe('No round published yet');
+  });
+
+  it('names the latest round and its status', () => {
+    expect(reviewLine(round([]))).toBe('Round 2: Changes requested');
+  });
+
+  it('lists who decided, with the note', () => {
+    expect(verdictLines(round([{ reviewerId: 'u', reviewerName: 'Vera', verdict: 'changes_requested', note: 'Tighter', decidedAt: '2026-11-21T10:30:00Z' }]))).toEqual(['Vera: Changes requested - Tighter']);
   });
 });

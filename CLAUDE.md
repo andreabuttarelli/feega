@@ -153,8 +153,10 @@ no stories.
 ## Changelog
 
 A user-visible change adds one English entry in `src/lib/content/changelog/YYYY-MM-DD-<slug>.ts`
-(`ChangelogEntry` as default export), read by the landing at build. Release-note style, one line,
-no file or function names. Skip it for refactors, tests and indexes.
+(`ChangelogEntry` as default export), read by the landing at build. One line, max 90 characters,
+no file or function names. Same-day entries about one feature merge into one. Never about removed
+products. Skip refactors, tests and indexes. In the same commit run `node scripts/changelog-prune.mjs`
+(keeps the 40 newest).
 
 ## Docs
 

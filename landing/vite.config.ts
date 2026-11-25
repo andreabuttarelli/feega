@@ -1,4 +1,5 @@
-import { readdirSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { build } from 'esbuild';
@@ -10,6 +11,10 @@ const CHANGELOG_DIR = resolve(import.meta.dirname, '../src/lib/content/changelog
 const LIBRARY_DIR = resolve(import.meta.dirname, '../packages/library');
 const ENTRY_FILE = /^2.*\.ts$/;
 const TEST_FILE = /\.test\.ts$/;
+const OG_IMAGE_FILE = resolve(import.meta.dirname, 'static/og.png');
+const VERSION_LENGTH = 8;
+
+const ogImageVersion = () => createHash('sha256').update(readFileSync(OG_IMAGE_FILE)).digest('hex').slice(0, VERSION_LENGTH);
 
 function entryFiles(): string[] {
   return readdirSync(CHANGELOG_DIR)
@@ -30,7 +35,7 @@ function changelogEntries(): Plugin {
 
       const files = entryFiles();
       const imports = files.map((file, i) => `import e${i} from ${JSON.stringify(file)};`);
-      const contents = `${imports.join('\n')}\nimport legacy from './legacy';\nexport default [${files.map((_, i) => `e${i}`).join(',')}, ...legacy];`;
+      const contents = `${imports.join('\n')}\nexport default [${files.map((_, i) => `e${i}`).join(',')}];`;
       const out = await build({
         stdin: { contents, resolveDir: CHANGELOG_DIR, loader: 'ts' },
         tsconfigRaw: {},
@@ -58,7 +63,7 @@ async function latestVersion(): Promise<string> {
 }
 
 export default defineConfig(async () => ({
-  define: { __FEEGA_VERSION__: JSON.stringify(await latestVersion()) },
+  define: { __FEEGA_VERSION__: JSON.stringify(await latestVersion()), __OG_IMAGE_VERSION__: JSON.stringify(ogImageVersion()) },
   esbuild: { tsconfigRaw: '{}' },
   plugins: [sveltekit(), changelogEntries()],
   server: { fs: { allow: [CHANGELOG_DIR, LIBRARY_DIR] } },

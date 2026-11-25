@@ -1,0 +1,286 @@
+<script lang="ts">
+  import { lower } from '../lower';
+  import { GUIDE_COPY, GUIDE_FEATURES, GuideLayout, type GuideFeature } from '../editor-guide';
+  import Pixel from '../alternatives/Pixel.svelte';
+  import MockCrop from '../editor-guide/mock/MockCrop.svelte';
+
+  const ICON_PX = 4;
+  const rows = GUIDE_FEATURES.filter((f) => f.layout === GuideLayout.Row);
+  const grid = GUIDE_FEATURES.filter((f) => f.layout === GuideLayout.Grid);
+</script>
+
+{#snippet item(feature: GuideFeature)}
+    <li class="feature" class:cell={feature.layout === GuideLayout.Grid} data-feature={feature.id}>
+      <figure class="visual">
+        <div class="box" aria-hidden="true"><MockCrop id={feature.id} layout={feature.layout} /></div>
+        <figcaption class="sr">{feature.alt}</figcaption>
+      </figure>
+      <div class="copy">
+        <span class="icon"><Pixel icon={feature.icon} size={ICON_PX} /></span>
+        <h3>{lower(feature.title)}</h3>
+        <p class="text">{lower(feature.text)}</p>
+        <details class="lands">
+          <summary>{lower(GUIDE_COPY.landsLabel)}</summary>
+          <ul class="code">
+            {#each feature.lands as line (line)}<li><code>{line}</code></li>{/each}
+          </ul>
+        </details>
+      </div>
+    </li>
+{/snippet}
+
+<section class="guide site-wide" id="editor-guide" aria-labelledby="guide-title">
+  <header class="band">
+    <p class="eyebrow">{lower(GUIDE_COPY.eyebrow)}</p>
+    <h2 id="guide-title">{lower(GUIDE_COPY.heading)}</h2>
+    <p class="lead">{lower(GUIDE_COPY.lead)}</p>
+  </header>
+
+  <ul class="features">
+    {#each rows as feature (feature.id)}
+      {@render item(feature)}
+    {/each}
+  </ul>
+
+  <ul class="features grid">
+    {#each grid as feature (feature.id)}
+      {@render item(feature)}
+    {/each}
+  </ul>
+</section>
+
+<style>
+  .guide {
+    padding: var(--site-section) var(--site-gutter);
+    box-sizing: border-box;
+    color: var(--site-ink);
+  }
+
+  p,
+  h2,
+  h3 {
+    margin: 0;
+  }
+
+  .band {
+    width: 100vw;
+    margin: 0 calc(50% - 50vw) 32px;
+    padding: 200px var(--site-gutter) 72px;
+    box-sizing: border-box;
+    text-align: center;
+    background:
+      linear-gradient(180deg, rgb(0 0 0 / 0.1) 0%, rgb(0 0 0 / 0.45) 45%, var(--site-bg) 100%),
+      url('/img/pixel-band.png') center top / cover no-repeat;
+    image-rendering: pixelated;
+  }
+
+  .band .lead {
+    max-width: 560px;
+    margin-inline: auto;
+  }
+
+  .eyebrow {
+    color: #ff8a3d;
+  }
+
+  h2 {
+    margin-top: 16px;
+    font-size: 34px;
+    line-height: 36px;
+    letter-spacing: -0.04em;
+    font-weight: 400;
+  }
+
+  .lead {
+    margin-top: 16px;
+    opacity: 0.85;
+  }
+
+  .features {
+    display: grid;
+    gap: 48px;
+    margin: 24px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .features.grid {
+    margin-top: 48px;
+  }
+
+  .feature {
+    min-width: 0;
+  }
+
+  .visual {
+    margin: 0 0 20px;
+  }
+
+  .sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    clip-path: inset(50%);
+  }
+
+  h3 {
+    font-size: 22px;
+    line-height: 26px;
+    letter-spacing: -0.04em;
+    font-weight: 400;
+  }
+
+  .icon {
+    display: block;
+    margin-bottom: 12px;
+    line-height: 0;
+  }
+
+  .icon :global(svg) {
+    display: block;
+    image-rendering: pixelated;
+  }
+
+  .text {
+    margin-top: 8px;
+    opacity: 0.7;
+  }
+
+  .lands {
+    margin-top: 16px;
+    font-size: 14px;
+  }
+
+  .lands summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    list-style: none;
+    opacity: 0.5;
+    transition: opacity 0.2s;
+  }
+
+  .lands summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .lands summary::after {
+    content: '+';
+    font-family: var(--sx-mono);
+  }
+
+  .lands[open] summary::after {
+    content: '−';
+  }
+
+  .lands summary:hover,
+  .lands summary:focus-visible,
+  .lands[open] summary {
+    opacity: 0.8;
+  }
+
+  .code {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 8px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  code {
+    display: inline-block;
+    max-width: 100%;
+    padding: 4px 8px;
+    overflow-wrap: anywhere;
+    border-radius: 4px;
+    background: var(--sx-pill);
+    font-family: var(--sx-mono);
+    font-size: 13px;
+  }
+
+  @media (min-width: 810px) {
+    .guide {
+      padding-inline: 0;
+    }
+
+    .band {
+      padding: 280px 24px 96px;
+      margin-bottom: 56px;
+    }
+
+    h2 {
+      font-size: 40px;
+      line-height: 42px;
+    }
+  }
+
+  @media (min-width: 900px) {
+    .features {
+      gap: 108px;
+      margin-top: 0;
+    }
+
+    .feature {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 520px);
+      grid-template-areas: 'copy visual';
+      gap: 64px;
+      align-items: center;
+    }
+
+    .feature:nth-child(even) {
+      grid-template-columns: minmax(0, 520px) minmax(0, 1fr);
+      grid-template-areas: 'visual copy';
+    }
+
+    .visual {
+      grid-area: visual;
+      margin: 0;
+    }
+
+    .copy {
+      grid-area: copy;
+    }
+
+    .box {
+      height: 360px;
+    }
+
+    .feature.cell {
+      display: block;
+    }
+
+    .cell .visual {
+      margin-bottom: 20px;
+    }
+
+    .cell .box {
+      height: 240px;
+    }
+  }
+
+  @media (min-width: 700px) {
+    .features.grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 48px 32px;
+    }
+  }
+
+  @media (min-width: 900px) {
+    .features.grid {
+      margin-top: 108px;
+    }
+  }
+
+  @media (min-width: 1100px) {
+    .features.grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+</style>

@@ -1,3 +1,5 @@
+import { POLICY_ROWS, Policy } from './host/ai/permission-policy';
+
 export enum SettingKey {
   Telemetry = 'feegaInspect.telemetry',
   Styling = 'feegaInspect.styling',
@@ -5,7 +7,8 @@ export enum SettingKey {
   DefaultSize = 'feegaInspect.defaultSize',
   KeepServerAlive = 'feegaInspect.keepServerAlive',
   SyncSelection = 'feegaInspect.syncSelection',
-  PreviewUnknown = 'feegaInspect.previewUnknown'
+  PreviewUnknown = 'feegaInspect.previewUnknown',
+  AiPermissions = 'feegaInspect.aiPermissions'
 }
 
 export enum StylingChoice {
@@ -73,6 +76,13 @@ export const SETTINGS: SettingRow[] = [
     label: 'Preview edits with unknown impact',
     hint: 'When Feega cannot tell where an edit will land (global CSS, a class built from props or a function, a CSS variable), it shows the diff and waits for Apply.',
     fallback: true
+  },
+  {
+    key: SettingKey.AiPermissions,
+    label: 'AI agent permissions',
+    hint: 'Default for new projects: when the AI tab asks before an agent edits a file or runs a command. Each project remembers its own choice.',
+    fallback: Policy.Ask,
+    choices: POLICY_ROWS.map((row) => ({ value: row.id, label: row.name }))
   }
 ];
 
@@ -85,8 +95,20 @@ export const LINKS = {
   docs: 'https://docs.feega.app/integrations/inspect/',
   changelog: 'https://feega.app/changelog',
   dashboard: 'https://feega.app/',
-  issues: 'https://github.com/andreabuttarelli/feega/issues/new'
+  issues: 'https://github.com/andreabuttarelli/feega/issues/new',
+  discord: 'https://discord.gg/PUp37DG6vr'
 };
+
+export type HelpLink = { label: string; url: string };
+
+export function helpLinks(facts: ReportFacts | null): HelpLink[] {
+  return [
+    { label: 'Documentation', url: LINKS.docs },
+    { label: "What's new", url: LINKS.changelog },
+    { label: 'Send feedback', url: LINKS.discord },
+    { label: 'Report a problem', url: facts ? issueUrl(facts) : LINKS.issues }
+  ];
+}
 
 export type ReportFacts = { version: string; framework: string; styling: string };
 

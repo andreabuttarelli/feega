@@ -34,7 +34,7 @@ const launcher = () => {
 function vsCode(): Made {
   memory.state.clear();
   memory.sent.length = 0;
-  const context = { extension: { packageJSON: { version: '1' } }, workspaceState: { get: (k: string) => memory.state.get(k), update: async (k: string, v: unknown) => void memory.state.set(k, v) } };
+  const context = { globalStorageUri: { fsPath: '/storage' }, extension: { packageJSON: { version: '1' } }, workspaceState: { get: (k: string) => memory.state.get(k), update: async (k: string, v: unknown) => void memory.state.set(k, v) } };
   const panel = { viewColumn: 1, webview: { postMessage: async (m: unknown) => (memory.sent.push(m), true), onDidReceiveMessage: () => ({ dispose: () => undefined }) } };
   const platform = vsCodePlatform({ context, output: { append: () => undefined, show: () => undefined }, launcher: launcher() } as never, panel as never, new Map());
   return { platform, sent: memory.sent as ViewMessage[] };

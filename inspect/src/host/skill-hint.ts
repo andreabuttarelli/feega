@@ -1,9 +1,10 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { SKILL_COMMAND } from '../webview/onboarding-slides';
 import { Stored, type Platform } from './platform';
 
-export const SKILL_COMMAND = 'npx skills add andreabuttarelli/feega';
+export { SKILL_COMMAND };
 
 const SKILL_NAME = 'feega';
 const LOCK_FILE = 'skills-lock.json';

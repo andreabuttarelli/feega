@@ -73,3 +73,14 @@ Structure:
 Selecting in the editor selects the same element in the code editor, and the reverse. "Copy for agent" copies the selected element with its source location, for you to read and edit.
 
 After editing, tell the user what changed and that Feega shows the same edits under Changes, where each is undoable.
+
+## 4. Read the user's selection over MCP
+
+When the user says "this element", "the card I picked" or "what I just changed", ask Feega instead of guessing. Add the server once: `claude mcp add feega -- npx -y feega mcp` (Cursor: `.cursor/mcp.json`; Codex: `~/.codex/config.toml`; see docs.feega.app, "Connect your agent via MCP").
+
+Local tools, no sign-in, need Feega open in the project (`npx feega` or the VS Code panel):
+- `feega_selection`: the selected element's file, line, selector and view, the same text as "Copy for agent". Edit that location.
+- `feega_changes`: the visual edits made this session, with the files each touched.
+- `feega_editors`: the editors running on this machine. Pass `project` (a folder) to `feega_selection` or `feega_changes` to ask another one.
+
+If a tool answers that no editor is running, tell the user to open Feega in the project first; do not start one for them. The Cloud tools (`feega_share`, `feega_snapshot`, `feega_comments`, `feega_resolve`, `feega_stop`) need `npx feega` sign-in or `FEEGA_API_KEY`, and a Feega Cloud plan.

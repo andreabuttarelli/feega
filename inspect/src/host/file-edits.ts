@@ -21,6 +21,8 @@ import { StructureOp, structure } from '@feega/live-edit/structure';
 import { structureMany, type Skipped, type Target } from '@feega/live-edit/structure-many';
 import { pageRule } from '@feega/live-edit/page-rule';
 import { ElementState } from '@feega/live-edit/element-state';
+import { markupFirst } from '@feega/live-edit/markup-first';
+import { classRule } from '@feega/live-edit/class-rule';
 import { scopedRule, type Scope } from '@feega/live-edit/scoped-rule';
 import { styleAttr, type Css } from '@feega/live-edit/style-attr';
 import { targetOf } from '@feega/live-edit/breakpoints';
@@ -31,8 +33,9 @@ import { svgMarkup } from '@feega/live-edit/svg-markup';
 import { addGo, type GoAsk } from '@feega/live-edit/go-action';
 import { linkWrite, type LinkEdit } from '@feega/live-edit/link-edit';
 import { attributeWrite } from '@feega/live-edit/attribute-edit';
+import { applyProps, type Applied } from '@feega/live-edit/apply-props';
 import type { Proposal } from '@feega/plugin-api/protocol';
-import { Styling, type EditAsk, type ImpactAsk } from '../messages';
+import { Styling, type ApplyAsk, type EditAsk, type ImpactAsk } from '../messages';
 import { StylingChoice } from '../settings';
 import { stylingOf } from './styling';
 import { breakpointsOf } from './breakpoints';
@@ -47,7 +50,7 @@ export type DetachAsk = { at: string; usage: string; which: Which };
 
 export type ManyAsk = { op: StructureOp; targets: { at: string; instance?: number }[]; wrap?: WrapTag };
 
-export type Written = { ok: true; path: string; written: string; note?: string; selected?: LiveAt; changes?: FileChange[] } | { ok: false; reason: string; at?: LiveAt };
+export type Written = { ok: true; path: string; written: string; note?: string; created?: boolean; selected?: LiveAt; changes?: FileChange[]; touched?: FileChange[] } | { ok: false; reason: string; at?: LiveAt };
 
 type Changes = { ok: true; changes: FileChange[] } | { ok: false; reason: string; at?: LiveAt };
 
@@ -80,6 +83,12 @@ const CSS_WRITERS: Record<string, CssWriter> = {
   tsx: MODULE
 };
 
+const STAGED_WRITES: Record<string, (from: string, to: string) => string | null> = { astro: markupFirst };
+
+const stagedOf = (file: string) => STAGED_WRITES[file.slice(file.lastIndexOf('.') + 1)];
+
+export type Settle = () => Promise<void>;
+
 const cssWriterOf = (file: string): CssWriter => CSS_WRITERS[file.slice(file.lastIndexOf('.') + 1)] ?? INLINE;
 
 const afterChanges = (read: ReadFile, changes: FileChange[]): ReadFile => async (path) => changes.find((c) => c.path === path)?.after ?? read(path);
@@ -101,7 +110,8 @@ async function ruled(read: ReadFile, out: Extract<Structured, { ok: true }>, css
 
 export enum Commit {
   Write = 'write',
-  Preview = 'preview'
+  Preview = 'preview',
+  Record = 'record'
 }
 
 const PROBE_CSS: Css = { 'outline-offset': '7.25px' };
@@ -118,7 +128,7 @@ const FONT_CONFIGS = ['tailwind.config.mjs', 'tailwind.config.cjs'];
 
 export type Snapshot = { steps: { step: Step; change: Change }[]; undone: { step: Step; change: Change }[] };
 
-export function fileEdits(root: string, choice: () => StylingChoice = () => StylingChoice.Auto, saved?: Snapshot) {
+export function fileEdits(root: string, choice: () => StylingChoice = () => StylingChoice.Auto, saved?: Snapshot, settle: Settle = async () => undefined) {
   const paths = new Map<Step, Change>();
   const restore = (list: Snapshot['steps']) => list.map(({ step, change }) => (paths.set(step, change), step));
   const steps: Step[] = restore(saved?.steps ?? []);
@@ -150,18 +160,21 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
       }
       step.push({ full, before: change.before, after: change.after, encoding: change.encoding });
     }
-    await Promise.all(step.map((s) => mkdir(dirname(s.full), { recursive: true })));
-    await Promise.all(step.map((s) => writeFile(s.full, s.after, s.encoding)));
+    if (mode === Commit.Write) {
+      await Promise.all(step.map((s) => mkdir(dirname(s.full), { recursive: true })));
+      await Promise.all(step.map((s) => staged(s.full, s.before, s.after, s.encoding)));
+      await Promise.all(step.map((s) => writeFile(s.full, s.after, s.encoding)));
+    }
     steps.push(step);
     undone.length = 0;
     const change = { ...meta, id: ++nextId, files: moving.map((c) => c.path), time: Date.now() };
     log.unshift(change);
     paths.set(step, change);
-    return { ok: true, path: changes[0]?.path ?? '', written: token, note };
+    return { ok: true, path: changes[0]?.path ?? '', written: token, note, touched: moving };
   }
 
   async function edited(ask: EditAsk, extra: FileChange[] = [], mode = Commit.Write): Promise<Written> {
-    meta = { at: ask.at, prop: ask.prop, value: ask.value ?? '', scope: ask.scope ?? '' };
+    meta = { at: ask.at, prop: ask.prop, value: ask.value ?? '', scope: ask.cls ? `class .${ask.cls.name}` : (ask.scope ?? '') };
     const written = (changes: FileChange[], token: string, note?: string) => writtenAll([...changes, ...extra.filter((e) => !changes.some((c) => c.path === e.path))], token, note, mode);
     const breakpoint = ask.breakpoint === undefined ? undefined : targetOf(await breakpointsOf(root), ask.breakpoint);
     if (breakpoint === null) {
@@ -173,9 +186,17 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     }
     const media = theme ? combinedMedia(breakpoint?.media, theme.media) : breakpoint?.media;
     const within = theme?.within;
+    if (ask.cls) {
+      const out = await classRule(reader(root), ask.cls, ask.css ?? {}, ask.viewport, ask.state, media, within);
+      return out.ok ? written(out.changes, '') : out;
+    }
     if (ask.page) {
       const out = await pageRule(reader(root), ask.page, ask.css ?? {}, ask.viewport, media, within);
-      return out.ok ? written([out.change], '') : out;
+      if (!out.ok) {
+        return out;
+      }
+      const done = await written(out.changes, '');
+      return done.ok && out.created ? { ...done, created: true } : done;
     }
     const at = liveAtOf(ask.at);
     if (!at || !inside(root, at.file)) {
@@ -312,6 +333,24 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     return out.ok ? writtenAll([out.change], '') : out;
   }
 
+  async function propsPlanned(ask: ApplyAsk): Promise<Applied> {
+    const usage = placed(ask.usage);
+    if (!usage) {
+      return { ok: false, reason: `${ask.usage} is not a file:line:col inside the workspace` };
+    }
+    return applyProps(reader(root), { component: ask.component, usage, which: ask.which, set: ask.set, remove: ask.remove });
+  }
+
+  async function propsWritten(ask: ApplyAsk): Promise<Written> {
+    meta = { at: ask.usage, prop: 'props', value: [...Object.keys(ask.set), ...ask.remove].join(', '), scope: '' };
+    const out = await propsPlanned(ask);
+    if (!out.ok) {
+      return out;
+    }
+    const note = out.skipped.length ? `Not written: ${out.skipped.join(', ')}` : undefined;
+    return writtenAll([out.change], '', note);
+  }
+
   async function goWritten(rawAt: string, ask: GoAsk): Promise<Written> {
     meta = { at: rawAt, prop: 'go', value: `${ask.go} ${ask.target}`, scope: '' };
     const at = placed(rawAt);
@@ -324,6 +363,14 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
 
   const put = (full: string, text: string, encoding?: 'base64') => (text === '' ? rm(full, { force: true }) : writeFile(full, text, encoding));
 
+  async function staged(full: string, from: string, to: string, encoding?: 'base64') {
+    const first = encoding || !from || !to ? null : stagedOf(full)?.(from, to);
+    if (typeof first === 'string') {
+      await put(full, first);
+      await settle();
+    }
+  }
+
   async function replay(from: Step[], to: Step[], expect: 'before' | 'after', write: 'before' | 'after', empty: string): Promise<Written> {
     const step = from.at(-1);
     if (!step) {
@@ -334,6 +381,7 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
       return { ok: false, reason: CHANGED_SINCE };
     }
     from.pop();
+    await Promise.all(step.map((s) => staged(s.full, s[expect], s[write], s.encoding)));
     await Promise.all(step.map((s) => put(s.full, s[write], s.encoding)));
     to.push(step);
     return { ok: true, path: step[0]?.full ?? '', written: '' };
@@ -412,11 +460,27 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     return written.ok ? { ...written, selected: out.selected } : written;
   }
 
+  async function pageWritten(route: string, changes: FileChange[]): Promise<Written> {
+    meta = { at: changes[0]?.path ?? '', prop: 'page', value: route, scope: '' };
+    return writtenAll(changes, '');
+  }
+
   async function proposed(proposal: Proposal, appDir: string): Promise<Written> {
     const first = proposal.ops.find((op) => 'at' in op);
     meta = { at: first && 'at' in first ? first.at : '', prop: 'plugin', value: proposal.label, scope: '' };
     const out = await proposalChanges(proposal.ops, { root, read: reader(root), files: () => filesIn(root), appDir, style: (read, at, css) => cssWriterOf(at.file).write(read, at, css) });
     return out.ok ? writtenAll(out.changes, '') : out;
+  }
+
+  async function agentWritten(path: string, content: string, agent: string): Promise<Written> {
+    meta = { at: path, prop: 'agent', value: agent, scope: '' };
+    const before = (await reader(root)(path)) ?? '';
+    return writtenAll([{ path, before, after: content }], '');
+  }
+
+  async function agentRecorded(path: string, before: string, after: string, agent: string): Promise<Written> {
+    meta = { at: path, prop: 'agent', value: agent, scope: '' };
+    return writtenAll([{ path, before, after }], '', undefined, Commit.Record);
   }
 
   const skippedNote = (total: number, skipped: Skipped[]): string | undefined => {
@@ -466,10 +530,13 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
 
   return {
     proposal: (proposal: Proposal, appDir: string) => inTurn(() => proposed(proposal, appDir)),
+    agentWrite: (path: string, content: string, agent: string) => inTurn(() => agentWritten(path, content, agent)),
+    agentRecord: (path: string, before: string, after: string, agent: string) => inTurn(() => agentRecorded(path, before, after, agent)),
     saveVariable: (ask: EditAsk, name: string) => inTurn(() => variableSaved(ask, name)),
     structure: (ask: StructureAsk) => inTurn(() => restructured(ask)),
     detach: (ask: DetachAsk) => inTurn(() => detached(ask.at, ask.usage, ask.which)),
     library: (at: string, place: AddPlace, item: InsertItem, tokens: string) => inTurn(() => libraryWritten(at, place, item, tokens)),
+    page: (route: string, changes: FileChange[]) => inTurn(() => pageWritten(route, changes)),
     structureMany: (ask: ManyAsk) => inTurn(() => restructuredMany(ask)),
     move: (from: string, to: string, place: Place) => inTurn(() => moved(from, to, place)),
     edit: (ask: EditAsk) => inTurn(() => edited(ask)),
@@ -482,6 +549,8 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     loadFont: (family: string) => inTurn(() => fontLoaded(family)),
     link: (at: string, edit: LinkEdit, instance?: number) => inTurn(() => linkWritten(at, edit, instance)),
     attribute: (at: string, name: string, value: string) => inTurn(() => attributeWritten(at, name, value)),
+    propsPlan: (ask: ApplyAsk) => inTurn(() => propsPlanned(ask)),
+    applyProps: (ask: ApplyAsk) => inTurn(() => propsWritten(ask)),
     go: (at: string, ask: GoAsk) => inTurn(() => goWritten(at, ask)),
     undo: () => inTurn(undoStep),
     redo: () => inTurn(redoStep),

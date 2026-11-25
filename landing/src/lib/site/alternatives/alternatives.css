@@ -530,6 +530,10 @@
   border-radius: var(--sx-radius-lg);
 }
 
+.catalog .compare .cta-block .landing-cta {
+  margin-top: 0;
+}
+
 .catalog .compare .cta-block p {
   flex: 1 1 240px;
   margin: 0;

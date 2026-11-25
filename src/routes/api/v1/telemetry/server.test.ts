@@ -27,4 +27,62 @@ describe('POST /api/v1/telemetry', () => {
     expect(res.status).toBe(204);
     expect(stored.rows as UsageRow[]).toMatchObject([{ event: 'edit', editor: 'cursor', country: 'DE', city: 'Berlin', edit_count: 3 }]);
   });
+
+  it('accepts funnel fields and rejects unknown ones', async () => {
+    const send = (extra: object) =>
+      POST({
+        request: new Request('https://oh.feega.app/api/v1/telemetry', { method: 'POST', body: JSON.stringify({ events: [{ ...body.events[0], ...extra }] }) }),
+        getClientAddress: () => `funnel-${Math.random()}`
+      } as Parameters<typeof POST>[0]);
+
+    expect((await send({ edit_kind: 'style', framework: 'sveltekit', signed_in: false })).status).toBe(204);
+    expect(stored.rows).toMatchObject([{ edit_kind: 'style', framework: 'sveltekit', signed_in: false }]);
+    expect((await send({ event: 'preview_ready' })).status).toBe(204);
+    expect((await send({ edit_kind: 'bogus' })).status).toBe(400);
+    expect((await send({ framework: 'not a framework' })).status).toBe(400);
+  });
+
+  it.each(['install', 'opened', 'sign_in', 'sign_out', 'session_resume'])('accepts the account event %s', async (event) => {
+    const request = new Request('https://oh.feega.app/api/v1/telemetry', { method: 'POST', body: JSON.stringify({ events: [{ ...body.events[0], event }] }) });
+    const res = await POST({ request, getClientAddress: () => `route-test-${event}` } as Parameters<typeof POST>[0]);
+
+    expect(res.status).toBe(204);
+    expect(stored.rows as UsageRow[]).toMatchObject([{ event }]);
+  });
+
+  const post = (extra: object) => POST({ request: new Request('https://oh.feega.app/api/v1/telemetry', { method: 'POST', body: JSON.stringify({ events: [{ ...body.events[0], ...extra }] }) }), getClientAddress: () => `route-test-${JSON.stringify(extra)}` } as Parameters<typeof POST>[0]);
+
+  it.each(['onboarding_started', 'onboarding_finished', 'onboarding_skipped', 'setup_applied', 'setup_failed', 'skill_hint_shown', 'skill_installed', 'plugin_installed'])('accepts the lifecycle event %s', async (event) => {
+    expect((await post({ event })).status).toBe(204);
+    expect(stored.rows as UsageRow[]).toMatchObject([{ event, step: null, tier: null }]);
+  });
+
+  it('stores the onboarding step and the library tier', async () => {
+    await post({ event: 'onboarding_step', step: 'sign_in' });
+    await post({ event: 'library_insert', tier: 'pro' });
+
+    expect(stored.rows as UsageRow[]).toMatchObject([{ event: 'onboarding_step', step: 'sign_in' }, { event: 'library_insert', tier: 'pro' }]);
+  });
+
+  it('stores the support step and the support action item', async () => {
+    await post({ event: 'onboarding_step', step: 'support' });
+    await post({ event: 'support_action', item: 'coffee' });
+
+    expect(stored.rows as UsageRow[]).toMatchObject([{ event: 'onboarding_step', step: 'support' }, { event: 'support_action', item: 'coffee' }]);
+  });
+
+  it('rejects a support item outside the known ids', async () => {
+    expect((await post({ event: 'support_action', item: 'a-secret-item' })).status).toBe(400);
+  });
+
+  it('leaves item out of rows that carry none', async () => {
+    await post({ event: 'edit' });
+
+    expect(stored.rows[0]).not.toHaveProperty('item');
+  });
+
+  it('rejects a step or tier outside the known ids', async () => {
+    expect((await post({ event: 'onboarding_step', step: 'free text' })).status).toBe(400);
+    expect((await post({ event: 'library_insert', tier: 'a-secret-item' })).status).toBe(400);
+  });
 });

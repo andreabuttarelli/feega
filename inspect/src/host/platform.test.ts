@@ -29,7 +29,7 @@ vi.mock('vscode', () => ({
 const { vsCodePlatform } = await import('./vscode-platform');
 
 function vsCode(): [Platform, Wire] {
-  const context = { extension: { packageJSON: { version: '1.2.3' } }, workspaceState: { get: (k: string) => memory.state.get(k), update: async (k: string, v: unknown) => void memory.state.set(k, v) } };
+  const context = { globalStorageUri: { fsPath: '/storage' }, extension: { packageJSON: { version: '1.2.3' } }, workspaceState: { get: (k: string) => memory.state.get(k), update: async (k: string, v: unknown) => void memory.state.set(k, v) } };
   const panel = {
     viewColumn: 1,
     webview: { postMessage: async (m: unknown) => (memory.sent.push(m), true), onDidReceiveMessage: (h: (m: unknown) => void) => (memory.handlers.push(h), { dispose: () => undefined }) }

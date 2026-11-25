@@ -16,10 +16,10 @@ import { cloudShare } from '../../inspect/src/host/share/share-port-factory';
 import { cloudApiOf, relayUrlOf } from './cloud';
 import { pluginsRoot } from '../../packages/plugin-store/src/registry';
 import { runPlugin, terminalIo } from './plugin-cli';
+import { MIN_NODE_MAJOR, nodeSupported } from './node-version';
 
 declare const FEEGA_VERSION: string;
 
-const MIN_NODE_MAJOR = 20;
 const KEEP_RUNNING = -1;
 const STOP_ON_STDIN_END = 'FEEGA_STOP_ON_STDIN_END';
 
@@ -43,14 +43,14 @@ async function askApp(apps: AppChoice[]): Promise<string | null> {
 }
 
 async function main(): Promise<number> {
-  if (Number(process.versions.node.split('.')[0]) < MIN_NODE_MAJOR) {
+  if (!nodeSupported(process.versions.node)) {
     say(`feega: Node ${MIN_NODE_MAJOR}+ is required (found ${process.versions.node})`);
     return 1;
   }
   const cloud = cloudEnabled({ setting: undefined, env: process.env });
-  const args = argsOf(process.argv.slice(2), process.cwd(), cloud);
+  const args = argsOf(process.argv.slice(2), process.cwd());
   if (args.run === Run.Help) {
-    say(usageOf(cloud));
+    say(usageOf());
     return 0;
   }
   if (args.run === Run.Version) {
@@ -65,7 +65,7 @@ async function main(): Promise<number> {
     return runPlugin(terminalIo(pluginsRoot(), say), args.action, args.value);
   }
   if (args.run === Run.Error) {
-    say(`feega: ${args.reason}\n\n${usageOf(cloud)}`);
+    say(`feega: ${args.reason}\n\n${usageOf()}`);
     return 1;
   }
 

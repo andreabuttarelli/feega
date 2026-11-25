@@ -29,6 +29,11 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
     tables: ['usage_events']
   },
   {
+    path: 'src/lib/server/admin/stats-db.ts — statsDb (page /app/admin/stats)',
+    why: "usage_events grants nothing to anon/authenticated, and the rows are anonymous installs, not the viewer's org. The page load checks the signed-in email against the ADMIN_EMAILS allowlist before any call. Read-only: it calls four SQL functions that return aggregate counts per week, cohort, funnel step and sign-up week, never rows, ids, emails or locations.",
+    tables: ['usage_events']
+  },
+  {
     path: 'src/lib/server/cloud-emails/send-once.ts — dbStore (sendOnce)',
     why: "An email goes out from a webhook, a cron or another user's action (an invite, a share, a failed payment), so the recipient has no session, and user_emails grants nothing to anon/authenticated: only the server writes it. user_id is the recipient the caller resolved, never a value chosen by a request. It inserts one (user_id, kind, ref_id) row to claim the send, deletes that same row if the send fails, and reads nothing.",
     tables: ['user_emails']
@@ -42,6 +47,11 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
     path: 'src/lib/server/core-usage.ts — profileIsInternal',
     why: "Un evento di prodotto nasce anche fuori da una richiesta con sessione (un render che finisce, una chiave API): per escludere il team come fa il browser serve l'email dell'utente che ha agito. Legge solo profiles.email per quell'id, e fuori esce solo il booleano interno/no, mai l'email.",
     tables: ['profiles']
+  },
+  {
+    path: 'src/lib/server/library/storage-store.ts — storageStore (route /api/v1/library/pro/[id])',
+    why: "The Pro template source lives in the private bucket `library-pro`, which grants nothing to anon/authenticated: only the server reads it, and only after the route resolved the caller's org and the org's Cloud subscription was confirmed. The path read is <id>/latest.json or <id>/<version>/<framework>/<file>, where id is validated against a slug pattern and framework against a fixed list, never a free path from the caller. Read-only; it writes nothing and touches no table.",
+    tables: ['storage.objects']
   },
   {
     path: 'src/lib/server/cli-auth.ts — authenticateApiKey',
@@ -82,5 +92,10 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
     path: 'src/lib/server/account/account-server.ts — deleteAccount',
     why: "Cancellare il proprio account (GDPR art. 17) tocca righe che la RLS non lascia toccare a nessun JWT: auth.users, i riferimenti actor_id in org condivise, lo storage `${userId}/` e quello delle org di cui l'utente era l'unico membro. Lo user_id è sempre quello della sessione, verificata di recente e confermata a mano; nessun org_id arriva da chi chiama. La funzione SQL delete_account rifiuta se un'org resterebbe senza proprietario, cancella solo le org senza altri membri, e scrive in account_deletions un conteggio senza dati personali.",
     tables: ['orgs_members', 'orgs', 'account_deletions', 'profiles', 'chat_threads', 'nodes', 'chat_messages']
+  },
+  {
+    path: 'src/lib/server/cloud/notify-db.ts — dbNotifyStore (session-shared push, the 15-minute comments digest cron)',
+    why: "A push or a digest goes to other people: members who have no request in flight, and the digest runs from a cron with no user. RLS lets a user read only their own push_subscriptions, so reaching a teammate's device needs the service role. org_id and the recipient are read from the session row or the org being notified, never from a request body. Reads orgs_members (user ids of one org), push_subscriptions (endpoint and keys of those users), unresolved share_comments of one 15-minute window with their session, and profiles.email of the host; deletes only push_subscriptions rows the push service reported gone.",
+    tables: ['orgs_members', 'push_subscriptions', 'share_comments', 'share_sessions', 'profiles']
   }
 ] as const;

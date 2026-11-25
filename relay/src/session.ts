@@ -4,7 +4,7 @@ import { VISITOR_HEADER, decodeVisitor, withVisitor } from '../../packages/share
 import type { VisitorInfo, VisitorRole } from '../../packages/share-protocol/src/frame';
 import { CloseCode, EXP_HEADER, INTENT_HEADER, Intent, SID_HEADER, type Env } from './env';
 import { Deadline, MAX_VISITORS, deadlineOf } from './limits';
-import { forwardHeaders, snapshotUrl } from './routing';
+import { forwardHeaders, isPageVisit, offlineUrl, snapshotUrl } from './routing';
 import { failure, pendingResponse, type Pending } from './streams';
 
 const HTTP_BAD_REQUEST = 400;
@@ -145,7 +145,7 @@ export class Session extends DurableObject<Env> {
     }
     const host = this.hostSocket();
     if (!host) {
-      return failure(HTTP_UNAVAILABLE, 'the host is offline');
+      return isPageVisit(request.headers) ? Response.redirect(offlineUrl(this.env.WEB_ORIGIN, request.headers.get(SID_HEADER) ?? ''), HTTP_FOUND) : failure(HTTP_UNAVAILABLE, 'the host is offline');
     }
     const here = this.present();
     if (here.length >= MAX_VISITORS && !here.some((p) => p.userId === visitor.userId)) {

@@ -1,10 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { eventAttrs } from '../analytics/attrs';
   import { FRAMEWORK_QUERY } from './paths';
   import { FRAMEWORK_LABEL } from './labels';
   import { Framework, type FrameworkCode } from './template';
 
-  let { code, initial }: { code: FrameworkCode; initial: Framework } = $props();
+  let { id, code, initial }: { id: string; code: FrameworkCode; initial: Framework } = $props();
 
   const COPIED_MS = 1600;
   const frameworks = Object.values(Framework);
@@ -31,7 +32,7 @@
 <div class="tpl-code">
   <div class="chips" role="tablist" aria-label="Framework">
     {#each frameworks as framework (framework)}
-      <button type="button" role="tab" id="tab-{framework}" aria-controls="code-{framework}" aria-selected={active === framework} onclick={() => (active = framework)}>
+      <button type="button" role="tab" id="tab-{framework}" aria-controls="code-{framework}" aria-selected={active === framework} onclick={() => (active = framework)} {...eventAttrs('template_view_code', { id, framework })}>
         {FRAMEWORK_LABEL[framework]}
       </button>
     {/each}
@@ -43,7 +44,7 @@
         <figure class="file">
           <figcaption>
             <span>{file.name}</span>
-            <button type="button" class="copy" onclick={() => copy(`${framework}-${file.name}`, file.code)}>
+            <button type="button" class="copy" onclick={() => copy(`${framework}-${file.name}`, file.code)} {...eventAttrs('template_copy', { id, framework })}>
               {copied === `${framework}-${file.name}` ? 'copied' : 'copy'}
             </button>
           </figcaption>

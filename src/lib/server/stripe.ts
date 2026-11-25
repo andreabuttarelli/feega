@@ -93,6 +93,24 @@ export async function seatSubscription(subscriptionId: string): Promise<SeatSubs
   };
 }
 
+const CLOUD_STATUSES: ReadonlySet<string> = new Set(['active', 'trialing']);
+
+export async function cloudSubscriptionActive(subscriptionId: string): Promise<boolean> {
+  const sub = await stripe().subscriptions.retrieve(subscriptionId);
+
+  return CLOUD_STATUSES.has(sub.status) && sub.items.data.some((item) => isCloudPrice(item.price.id));
+}
+
+const SEAT_STATUSES: ReadonlySet<string> = new Set(['active', 'trialing']);
+const SUBSCRIPTIONS_PAGE = 100;
+
+export async function cloudSeatCount(customerId: string, priceIds: string[]): Promise<number> {
+  const { data } = await stripe().subscriptions.list({ customer: customerId, status: 'all', limit: SUBSCRIPTIONS_PAGE });
+  const items = data.filter((sub) => SEAT_STATUSES.has(sub.status)).flatMap((sub) => sub.items.data);
+
+  return items.filter((item) => priceIds.includes(item.price.id)).reduce((seats, item) => seats + (item.quantity ?? 1), 0);
+}
+
 export async function setSeatQuantity(subscriptionId: string, itemId: string, quantity: number, proration: SeatProration): Promise<void> {
   await stripe().subscriptions.update(subscriptionId, { items: [{ id: itemId, quantity }], proration_behavior: proration });
 }

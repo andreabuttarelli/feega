@@ -2,6 +2,7 @@ import { SITE_URL } from './links';
 import { SITE_PATHS } from './paths';
 import { HUBS } from './topics';
 import { topicPath } from './topics/topic';
+import { ALT_LANDING_PATHS, CHECKED } from './alt-landings';
 import { ALTERNATIVES, ALTERNATIVES_PATH, alternativePath } from './alternatives';
 
 const latest = (dates: readonly string[]): string => [...dates].sort().at(-1) ?? '';
@@ -14,6 +15,10 @@ function lastModified(): ReadonlyMap<string, string> {
     dates.set(alternativePath(slug), article.checked);
   }
   dates.set(ALTERNATIVES_PATH, latest(articles.map(([, a]) => a.checked)));
+
+  for (const path of ALT_LANDING_PATHS) {
+    dates.set(path, CHECKED);
+  }
 
   for (const hub of HUBS) {
     const topics = Object.entries(hub.topics);

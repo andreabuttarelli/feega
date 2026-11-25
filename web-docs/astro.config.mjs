@@ -1,11 +1,14 @@
 import { defineConfig } from 'astro/config';
+import sitemap from '@astrojs/sitemap';
 import starlight from '@astrojs/starlight';
+import { withLastmod } from './lastmod.mjs';
 
 const SITE = 'https://docs.feega.app';
 
 export default defineConfig({
   site: SITE,
   integrations: [
+    sitemap({ serialize: withLastmod }),
     starlight({
       title: 'Feega docs',
       description: 'Documentation for Feega, the free open-source VS Code extension to design in your codebase.',

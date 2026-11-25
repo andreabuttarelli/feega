@@ -53,12 +53,14 @@ export type ErrorBody = { message: string };
 export type Role = 'host' | 'editor' | 'viewer';
 export type VisitorRole = Exclude<Role, 'host'>;
 export type VisitorInfo = { userId: string; name: string; role: VisitorRole };
-export type Present = VisitorInfo & { selection?: string };
+export type Point = { x: number; y: number };
+export type Present = VisitorInfo & { selection?: string; cursor?: Point };
 export type Presence = { visitors: Present[] };
 export type Kick = { userId: string };
 export type Roled = { userId: string; role: VisitorRole };
 
 export const SET_COOKIE_SEPARATOR = '\n';
+export const HOST_PEER = 'host';
 export const CONTROL_STREAM = 0;
 export const MAX_STREAM_ID = 0xffffffff;
 

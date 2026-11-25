@@ -25,6 +25,6 @@ describe('the library nav item', () => {
   });
 
   it('describes templates with the free count', () => {
-    expect(LIBRARY_ITEMS[0].describe(61)).toContain('61 free sections');
+    expect(LIBRARY_ITEMS[0].describe(61)).toBe('free sections and components for Svelte, React, Vue and Astro');
   });
 });

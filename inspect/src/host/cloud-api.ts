@@ -38,12 +38,25 @@ export type CloudComment = {
   sourceLine: number;
   sourceCol: number;
   parentId: string | null;
+  revisionId?: string | null;
   createdAt: string;
   resolvedAt: string | null;
   resolvedBy: string | null;
 };
 
 export type CommentDraft = { body: string; selector: string; sourceFile: string; sourceLine: number; sourceCol: number; parentId?: string };
+
+export type RevisionChange = { file: string; prop: string; value: string };
+
+export type ReviewStatus = 'open' | 'changes_requested' | 'approved';
+
+export type RevisionVerdict = { reviewerId: string; reviewerName: string; verdict: 'approved' | 'changes_requested'; note: string | null; decidedAt: string };
+
+export type CloudRevision = { id: string; sessionId: string; number: number; authorId: string; summary: string; changes: RevisionChange[]; createdAt: string; verdicts: RevisionVerdict[]; status: ReviewStatus };
+
+export type CloudRevisions = { status: ReviewStatus; revisions: CloudRevision[] };
+
+export type CloudReview = { status: ReviewStatus; revision: CloudRevision | null; openComments: CloudComment[] };
 
 export type ProFile = { path: string; content: string };
 
@@ -98,6 +111,9 @@ export function cloudApi({ base = CLOUD_BASE, token, fetch: send = fetch }: Clou
     comments: async (id: string, openOnly: boolean) => (await call<{ comments: CloudComment[] }>(Verb.Get, `${commentsPath(id)}${openOnly ? '?open=1' : ''}`)).comments,
     addComment: (id: string, draft: CommentDraft) => call<CloudComment>(Verb.Post, commentsPath(id), draft),
     resolve: (id: string, commentId: string, note?: string) => call<CloudComment>(Verb.Patch, `${commentsPath(id)}/${commentId}`, { resolved: true, ...(note && { note }) }),
+    revisions: (id: string) => call<CloudRevisions>(Verb.Get, `/sessions/${id}/revisions`),
+    publishRevision: (id: string, summary: string, changes: RevisionChange[]) => call<{ id: string; number: number }>(Verb.Post, `/sessions/${id}/revisions`, { summary, changes }),
+    review: (id: string) => call<CloudReview>(Verb.Get, `/sessions/${id}/review`),
     setMember: (id: string, userId: string, role: VisitorRole) => call<unknown>(Verb.Post, `/sessions/${id}/members/${userId}`, { role }),
     libraryPro: async (id: string, framework: string) => (await call<{ files: ProFile[] }>(Verb.Get, `/library/pro/${id}?framework=${framework}`)).files
   };

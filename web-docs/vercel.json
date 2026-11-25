@@ -22,6 +22,11 @@
   },
   "redirects": [
     {
+      "source": "/sitemap.xml",
+      "destination": "/sitemap-index.xml",
+      "permanent": true
+    },
+    {
       "source": "/integrations/inspect/",
       "destination": "/getting-started/what-is-feega/",
       "permanent": true

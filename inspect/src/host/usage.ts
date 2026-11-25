@@ -12,6 +12,8 @@ export const USAGE_URL = `${APP_URL}/api/v1/telemetry`;
 const FLUSH_INTERVAL_MS = 3 * 60 * 1000;
 const RESUME_AFTER_MS = 30 * 60 * 1000;
 const SEND_TIMEOUT_MS = 5000;
+const FLUSH_AT = 40;
+const DIFF_SOURCE_REVERT = 'revert';
 const GLOBAL_KEY = 'feegaInspect.installId';
 const INSTALL_FILE = join('.config', 'feega', 'install.json');
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -37,8 +39,74 @@ export enum UsageKind {
   SkillInstalled = 'skill_installed',
   LibraryInsert = 'library_insert',
   PluginInstalled = 'plugin_installed',
-  SupportAction = 'support_action'
+  SupportAction = 'support_action',
+  ProjectDetected = 'project_detected',
+  EditorOpened = 'editor_opened',
+  ElementSelected = 'element_selected',
+  EditReverted = 'edit_reverted',
+  BreakpointSwitch = 'breakpoint_switch',
+  StateSwitch = 'state_switch',
+  CopyForAgent = 'copy_for_agent',
+  FocusOpened = 'focus_opened',
+  FocusPropsChanged = 'focus_props_changed',
+  FocusVariantsShown = 'focus_variants_shown',
+  AiAgentChosen = 'ai_agent_chosen',
+  AiSessionStarted = 'ai_session_started',
+  AiChatCreated = 'ai_chat_created',
+  AiMessageSent = 'ai_message_sent',
+  AiFirstResponse = 'ai_first_response',
+  AiToolCall = 'ai_tool_call',
+  AiPermission = 'ai_permission',
+  AiCancel = 'ai_cancel',
+  AiConfigChanged = 'ai_config_changed',
+  AiSessionError = 'ai_session_error',
+  AiSessionEnded = 'ai_session_ended',
+  SignInPrompted = 'sign_in_prompted',
+  ShareAction = 'share_action',
+  CloudAction = 'cloud_action',
+  McpToolCall = 'mcp_tool_call',
+  ErrorHost = 'error_host',
+  ErrorWebview = 'error_webview'
 }
+
+export type UsageDims = Partial<{
+  styling: string;
+  impact: string;
+  target: string;
+  prop_category: string;
+  file_ext: string;
+  breakpoint: string;
+  state: string;
+  source: string;
+  outcome: string;
+  choice: string;
+  area: string;
+  variant: string;
+  agent: string;
+  category: string;
+  library_item: string;
+  library_category: string;
+  mode: string;
+  control: string;
+  prop_count: number;
+  tool: string;
+  error_class: string;
+  action: string;
+  lines_added: number;
+  lines_removed: number;
+  files_count: number;
+  diff_count: number;
+  message_count: number;
+  chat_count: number;
+  live_count: number;
+  tool_count: number;
+  duration_ms: number;
+  step: OnboardingStep | string;
+  tier: LibraryTier;
+  item: SupportItem;
+}>;
+
+export type EditDetails = UsageDims & { paths?: string[] };
 
 export type LibraryTier = 'free' | 'pro';
 
@@ -61,6 +129,7 @@ export enum Editor {
   Cursor = 'cursor',
   Windsurf = 'windsurf',
   VsCodium = 'vscodium',
+  Other = 'other',
   Npx = 'npx'
 }
 
@@ -72,7 +141,7 @@ export enum Device {
 
 export type Identity = { installId: string; version: string; editor: Editor; os: string; arch: string; device: Device; firstRun?: boolean };
 
-export type UsageEvent = {
+export type UsageEvent = UsageDims & {
   event: UsageKind;
   install_id: string;
   session_id: string;
@@ -86,9 +155,6 @@ export type UsageEvent = {
   edit_kind?: EditKind;
   framework?: string;
   signed_in?: boolean;
-  step?: OnboardingStep;
-  tier?: LibraryTier;
-  item?: SupportItem;
 };
 
 export type Send = (events: UsageEvent[]) => Promise<unknown>;
@@ -169,10 +235,11 @@ export const installIdOf = (store: InstallStore, newId?: () => string): string =
 const EDITORS_BY_APP_NAME: [string, Editor][] = [
   ['cursor', Editor.Cursor],
   ['windsurf', Editor.Windsurf],
-  ['codium', Editor.VsCodium]
+  ['codium', Editor.VsCodium],
+  ['visual studio code', Editor.VsCode]
 ];
 
-export const editorOf = (appName: string): Editor => EDITORS_BY_APP_NAME.find(([needle]) => appName.toLowerCase().includes(needle))?.[1] ?? Editor.VsCode;
+export const editorOf = (appName: string): Editor => EDITORS_BY_APP_NAME.find(([needle]) => appName.toLowerCase().includes(needle))?.[1] ?? Editor.Other;
 
 const AUTOMATION_MARKERS: [string, (value: string) => boolean][] = [
   ['CI', (value) => !['', '0', 'false'].includes(value.toLowerCase())],
@@ -198,6 +265,10 @@ export function usageSession({ identity: identityOf, enabled, send = httpSend, n
   let identity: Identity | null = null;
   let queue: UsageEvent[] = [];
   let edits = 0;
+  let diffs = 0;
+  let linesAdded = 0;
+  let linesRemoved = 0;
+  const files = new Set<string>();
   let startedAt = 0;
   let stopTimer: (() => void) | null = null;
   let state: 'idle' | 'running' | 'ended' = 'idle';
@@ -237,8 +308,7 @@ export function usageSession({ identity: identityOf, enabled, send = httpSend, n
     if (queue.length === 0) {
       return;
     }
-    const batch = queue.map(withFacts);
-    queue = [];
+    const batch = queue.splice(0).map(withFacts);
     try {
       await send(batch);
     } catch {
@@ -272,7 +342,14 @@ export function usageSession({ identity: identityOf, enabled, send = httpSend, n
     }
   }
 
-  function edit(kind: EditKind = EditKind.Other) {
+  const queued = (e: UsageEvent) => {
+    queue.push(e);
+    if (queue.length >= FLUSH_AT) {
+      void flush();
+    }
+  };
+
+  function edit(kind: EditKind = EditKind.Other, details: EditDetails = {}) {
     if (state !== 'running') {
       return;
     }
@@ -280,11 +357,18 @@ export function usageSession({ identity: identityOf, enabled, send = httpSend, n
     if (!enabled()) {
       return;
     }
+    const { paths = [], ...dims } = details;
+    if (dims.source !== DIFF_SOURCE_REVERT) {
+      diffs++;
+      linesAdded += dims.lines_added ?? 0;
+      linesRemoved += dims.lines_removed ?? 0;
+      paths.forEach((path) => files.add(path));
+    }
     if (firstEdit && !firstEdit.seen()) {
       firstEdit.mark();
       queue.push(event(UsageKind.FirstEdit));
     }
-    queue.push(event(UsageKind.Edit, { edit_kind: kind }));
+    queued(event(UsageKind.Edit, { edit_kind: kind, ...dims }));
   }
 
   function account(kind: UsageKind.SignIn | UsageKind.SignOut) {
@@ -293,9 +377,9 @@ export function usageSession({ identity: identityOf, enabled, send = httpSend, n
     }
   }
 
-  function track(kind: UsageKind, extra: Pick<UsageEvent, 'step' | 'tier' | 'item'> = {}) {
+  function track(kind: UsageKind, extra: UsageDims = {}) {
     if (state === 'running' && enabled()) {
-      queue.push(event(kind, extra));
+      queued(event(kind, extra));
     }
   }
 
@@ -320,7 +404,7 @@ export function usageSession({ identity: identityOf, enabled, send = httpSend, n
     state = 'ended';
     stopTimer?.();
     if (enabled()) {
-      queue.push(event(UsageKind.SessionEnd, { duration_ms: now() - startedAt, edit_count: edits }));
+      queue.push(event(UsageKind.SessionEnd, { duration_ms: now() - startedAt, edit_count: edits, diff_count: diffs, lines_added: linesAdded, lines_removed: linesRemoved, files_count: files.size }));
     }
     await flush();
   }

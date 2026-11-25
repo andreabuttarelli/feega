@@ -102,13 +102,13 @@ jobs:
       - run: npm --prefix web-docs ci
         if: needs.changes.outputs.web-docs == 'true'
 
-      - name: Every docs page has a thumbnail
-        if: needs.changes.outputs.web-docs == 'true'
-        run: npm --prefix web-docs test
-
       - name: Build the docs site
         if: needs.changes.outputs.web-docs == 'true'
         run: npm --prefix web-docs run build
+
+      - name: Check the built docs (thumbnails, sitemap)
+        if: needs.changes.outputs.web-docs == 'true'
+        run: npm --prefix web-docs test
 
   web-blog:
     runs-on: ubuntu-24.04

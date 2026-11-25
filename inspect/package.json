@@ -2,7 +2,7 @@
   "name": "feega",
   "displayName": "Feega",
   "description": "Design in your codebase: click any element of your running app, edit it visually, and the change is written to your code. No AI, no tokens.",
-  "version": "0.2.16",
+  "version": "0.2.19",
   "publisher": "andreabuttarelli",
   "license": "Apache-2.0",
   "icon": "images/icon.png",
@@ -113,6 +113,16 @@
             "60"
           ],
           "description": "Minutes the dev server Feega started stays warm after the panel closes. 0: stop on close. Closing the window always stops it."
+        },
+        "feegaInspect.aiPermissions": {
+          "type": "string",
+          "default": "ask",
+          "enum": [
+            "ask",
+            "edits",
+            "all"
+          ],
+          "description": "Default for the AI tab: Ask every time, Allow edits and ask for commands, or Allow all. Each project remembers its own choice."
         },
         "feegaInspect.cloud.enabled": {
           "type": "boolean",

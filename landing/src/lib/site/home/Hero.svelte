@@ -3,6 +3,7 @@
   import InstallCta from '../InstallCta.svelte';
   import { HERO_HEADLINE } from '../home';
   import { DOWNLOAD_PATH } from '../links';
+  import { eventAttrs } from '../analytics/attrs';
   import AsciiField from './AsciiField.svelte';
   import { FieldFit } from '../ascii-field';
   import EditorMock from '../EditorMock.svelte';
@@ -11,6 +12,10 @@
   import { LEAD_AGENTS, LEAD_EDITORS, type AgentChip, type LeadChip } from './works-with';
 
   import { MockWindow as Window } from './mock-window';
+  import { HeadlineSize } from './headline-size';
+  import type { Snippet } from 'svelte';
+
+  let { headline = HERO_HEADLINE, size = HeadlineSize.Display, lead, art }: { headline?: string; size?: HeadlineSize; lead?: Snippet; art?: Snippet } = $props();
 
   const MOCK_WIDTH = 960;
 
@@ -27,6 +32,7 @@
   let mockHeight = $state(0);
 
   const scale = $derived(fitWidth / MOCK_WIDTH);
+  const fitHeight = $derived(mockHeight * scale);
 </script>
 
 <svelte:head>
@@ -40,7 +46,7 @@
 {#snippet chips(list: readonly LeadChip[], joiner: string)}{#each list as c, i}{#if i > 0}{i === list.length - 1 ? ` ${joiner} ` : ', '}{/if}{@render chip(c)}{/each}{/snippet}
 
 <section class="hero" id="hero">
-  <a class="platforms" href={DOWNLOAD_PATH} aria-label="Available on macOS, Windows and Linux: download">
+  <a class="platforms" href={DOWNLOAD_PATH} aria-label="Available on macOS, Windows and Linux: download" {...eventAttrs('download_click', { target: 'download_page', place: 'hero_platforms' })}>
     <span>available on</span>
     <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" role="img"><title>macOS</title><path d="M16.37 12.62c-.03-2.6 2.12-3.85 2.22-3.91-1.21-1.77-3.09-2.01-3.76-2.04-1.6-.16-3.12.94-3.93.94-.81 0-2.06-.92-3.39-.89-1.74.03-3.35 1.01-4.25 2.57-1.81 3.14-.46 7.78 1.3 10.33.86 1.25 1.89 2.65 3.24 2.6 1.3-.05 1.79-.84 3.36-.84 1.57 0 2.01.84 3.38.82 1.4-.03 2.28-1.27 3.13-2.52.99-1.45 1.4-2.85 1.42-2.92-.03-.01-2.72-1.04-2.75-4.14zM13.8 4.98c.71-.87 1.19-2.07 1.06-3.27-1.03.04-2.27.68-3.01 1.55-.66.77-1.24 2-1.09 3.18 1.14.09 2.31-.58 3.04-1.46z"/></svg>
     <i aria-hidden="true"></i>
@@ -49,24 +55,32 @@
     <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" role="img"><title>Linux</title><path d="M12 2.5c-2 0-3.4 1.8-3.4 4.3 0 1.3.2 2.3-.5 3.5-.9 1.5-2.6 3.6-2.6 6 0 .9.3 1.6.8 2.1-.4.6-1 .9-1.7 1.2-.7.3-.4 1 .3 1.2 1 .3 2.2.2 2.9.9.6.6 1.4 1.2 2.4 1.2 1 0 1.5-.5 2.3-.5s1.3.5 2.3.5c1 0 1.8-.6 2.4-1.2.7-.7 1.9-.6 2.9-.9.7-.2 1-.9.3-1.2-.7-.3-1.3-.6-1.7-1.2.5-.5.8-1.2.8-2.1 0-2.4-1.7-4.5-2.6-6-.7-1.2-.5-2.2-.5-3.5 0-2.5-1.4-4.3-3.4-4.3zm-1.4 4.3c.4 0 .7.5.7 1s-.3.9-.7.9-.7-.4-.7-.9.3-1 .7-1zm2.8 0c.4 0 .7.5.7 1s-.3.9-.7.9-.7-.4-.7-.9.3-1 .7-1zM12 9c1 0 1.9.6 1.9 1.1S13 11.4 12 11.4s-1.9-.7-1.9-1.2S11 9 12 9z"/></svg>
   </a>
 
-  <h1 class="site-display" data-agent-id="hero-title">{lower(HERO_HEADLINE)}</h1>
+  <h1 class="site-display" class:compact={size === HeadlineSize.Compact} data-agent-id="hero-title">{lower(headline)}</h1>
 
   <p class="lead" data-agent-id="hero-lead">
-    edit your running app like in figma, inside the
-    {@render chips(LEAD_EDITORS, 'or')}
-    you already use. works with
-    {@render agents(LEAD_AGENTS, 'and')}: you design, your agent codes, same files, every change a diff.
+    {#if lead}
+      {@render lead()}
+    {:else}
+      edit your running app like in figma, inside the
+      {@render chips(LEAD_EDITORS, 'or')}
+      you already use. works with
+      {@render agents(LEAD_AGENTS, 'and')}: you design, your agent codes, same files, every change a diff.
+    {/if}
   </p>
 
   <InstallCta id="hero-install" />
 
-  <div class="fit" bind:clientWidth={fitWidth} style:height="{mockHeight * scale}px">
+  {#if art}
+    <div class="art">{@render art()}</div>
+  {:else}
+  <div class="fit" bind:clientWidth={fitWidth} style:height="{fitHeight}px">
     <div class="mock" bind:offsetHeight={mockHeight} style:transform="scale({scale})">
       <AsciiField fit={FieldFit.Box} />
       <div class="term" class:front={front === Window.Terminal} role="button" tabindex="0" aria-label="Bring the terminal to front" onclick={(e) => raise(Window.Terminal, e)} onkeydown={(e) => raise(Window.Terminal, e)}><TerminalMock /></div>
       <div class="win" class:front={front === Window.Editor} role="button" tabindex="0" aria-label="Bring the editor to front" onclick={(e) => raise(Window.Editor, e)} onkeydown={(e) => raise(Window.Editor, e)}><EditorMock /></div>
     </div>
   </div>
+  {/if}
 
   <WorksWith />
 </section>
@@ -166,6 +180,21 @@
     margin: 36px auto 0;
   }
 
+  .art {
+    width: 100%;
+    max-width: var(--site-max);
+    margin: 36px auto 0;
+    border-radius: var(--ui-radius-lg, 10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+  }
+
+  .art :global(img) {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
   .mock {
     position: relative;
     width: 960px;
@@ -211,6 +240,11 @@
     transform: translateY(-4px);
   }
 
+  h1.compact {
+    font-size: clamp(36px, 9vw, 52px);
+    line-height: 1;
+  }
+
   @media (min-width: 1200px) {
     .hero {
       max-width: var(--site-max);
@@ -220,6 +254,12 @@
     h1 {
       font-size: 80px;
       line-height: 64px;
+    }
+
+    h1.compact {
+      font-size: 60px;
+      line-height: 60px;
+      max-width: 1000px;
     }
 
     .lead {
@@ -237,6 +277,11 @@
     h1 {
       font-size: 80px;
       line-height: 64px;
+    }
+
+    h1.compact {
+      font-size: 52px;
+      line-height: 54px;
     }
 
     .lead {

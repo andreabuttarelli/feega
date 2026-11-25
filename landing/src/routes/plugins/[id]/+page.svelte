@@ -4,6 +4,7 @@
   import { PLUGINS_PATH } from '$lib/site/plugins/plugins';
   import { primaryCta } from '$lib/site/install';
   import { lower } from '$lib/site/lower';
+  import { eventAttrs } from '$lib/site/analytics/attrs';
 
   let { data } = $props();
 
@@ -33,7 +34,7 @@
 
     <p class="lead">{plugin.description}</p>
 
-    <a class="cta" href={open.href}>open in feega</a>
+    <a class="cta" href={open.href} {...eventAttrs('download_click', { target: 'download_page', place: 'plugin' })}>open in feega</a>
 
     <section>
       <h2>what it can do</h2>
@@ -44,9 +45,10 @@
 
     <section>
       <h2>screenshots</h2>
-      <div class="shots" aria-label="Screenshots">
-        <div class="shot"></div>
-        <div class="shot"></div>
+      <div class="shots">
+        {#each plugin.shots as shot (shot.src)}
+          <img src={shot.src} alt={shot.alt} width={shot.width} height={shot.height} loading="lazy" decoding="async" />
+        {/each}
       </div>
     </section>
   </main>
@@ -146,11 +148,11 @@
     gap: 16px;
   }
 
-  .shot {
-    aspect-ratio: 16 / 10;
+  .shots img {
+    display: block;
+    width: 100%;
+    height: auto;
     border-radius: 10px;
-    background: #000;
-    border: 1px dashed var(--sx-line-strong);
   }
 
   @media (min-width: 810px) {
@@ -165,6 +167,10 @@
 
     .shots {
       grid-template-columns: 1fr 1fr;
+    }
+
+    .shots img:first-child {
+      grid-column: 1 / -1;
     }
   }
 </style>

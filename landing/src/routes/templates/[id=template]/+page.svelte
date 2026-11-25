@@ -5,7 +5,7 @@
   import Callout from '$lib/site/alternatives/Callout.svelte';
   import CtaBlock from '$lib/site/alternatives/CtaBlock.svelte';
   import Table from '$lib/site/alternatives/Table.svelte';
-  import { DOCS_URL, DOWNLOAD_PATH } from '$lib/site/links';
+  import { DOWNLOAD_PATH } from '$lib/site/links';
   import CodeTabs from '$lib/site/templates/CodeTabs.svelte';
   import PreviewFrame from '$lib/site/templates/PreviewFrame.svelte';
   import ProPreview from '$lib/site/templates/ProPreview.svelte';
@@ -67,7 +67,7 @@
         <Callout item={{ tone: CalloutTone.Note, title: 'Included in Feega Cloud', text: 'This template is part of the Pro library in Feega Cloud. The video above shows it running; the code is available to Cloud teams.' }} />
       </div>
     {:else}
-      <CodeTabs code={data.code} initial={Framework.Svelte} />
+      <CodeTabs id={template.id} code={data.code} initial={Framework.Svelte} />
       <details class="tokens">
         <summary>tokens.css, the shared file every template reads</summary>
         <div class="tpl-code">
@@ -113,10 +113,10 @@
     <h2>{lower('Insert with Feega')}</h2>
     <div class="body">
       <p>
-        Copy the code above into your project and it is an ordinary component. Open the running app with Feega, click it, and change spacing, colour or type in the panel; the edit lands in your code as a diff you can undo. The <a href={DOCS_URL}>docs</a> cover setup.
+        Open Add, then Library, and click Insert or drag it into your running app. Feega writes the component, tokens and fonts for your framework. One undo. <a href="https://docs.feega.app/getting-started/library/">how it works</a>
       </p>
     </div>
-    <CtaBlock item={{ text: 'Free VS Code extension. No account, no AI.', label: 'insert with Feega', href: DOWNLOAD_PATH }} />
+    <CtaBlock item={{ text: 'Free VS Code extension. No account, no AI.', label: 'get feega', href: DOWNLOAD_PATH }} />
   </section>
 
   <section>

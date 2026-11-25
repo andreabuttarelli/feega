@@ -15,7 +15,7 @@
     <div class="strip terminal" aria-hidden="true"><span>$</span>npx feega</div>
     <h3>Feega extension</h3>
     <p class="for">{lower(EXTENSION_FOR)}</p>
-    <PriceTag amount="free" unit="forever" cta={lower(install.label)} href={install.href} />
+    <PriceTag amount="free" unit="forever" cta={lower(install.label)} href={install.href} plan="extension" />
     <p class="start">{lower(EXTENSION_NOTE)}</p>
     <ul>
       {#each EXTENSION_LINES as line (line)}<li>{lower(line)}</li>{/each}
@@ -26,7 +26,7 @@
     <div class="strip canvas" aria-hidden="true"></div>
     <h3>Feega {plan.name}</h3>
     <p class="for">{lower(CLOUD_SOON_FOR)}</p>
-    <PriceTag amount={priceLabel(plan)} unit={lower(priceUnit(plan))} cta="follow on github" href={GITHUB_URL} tone="outline" />
+    <PriceTag amount={priceLabel(plan)} unit={lower(priceUnit(plan))} cta="follow on github" href={GITHUB_URL} tone="outline" plan="cloud" />
     <p class="start">{lower(annualLine(plan))} {lower('Coming soon.')} {lower(CLOUD_SOON_NOTE)}</p>
     <ul>
       {#each CLOUD_SOON_LINES as line (line)}<li>{lower(line)}</li>{/each}

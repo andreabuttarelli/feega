@@ -230,6 +230,63 @@ describe('installIdOf', () => {
   });
 });
 
+describe('usageSession product events', () => {
+  const dims = { target: 'tailwind_class', prop_category: 'spacing', file_ext: 'tsx', lines_added: 2, lines_removed: 1, files_count: 1, breakpoint: 'md', state: 'hover', source: 'manual', paths: ['src/Secret.tsx'] };
+
+  it('an edit carries its dimensions and never a path', async () => {
+    const t = setup();
+    t.session.begin();
+    t.session.edit(EditKind.Style, dims);
+    await t.session.end();
+
+    const edit = t.sent[0].find((e) => e.event === 'edit')!;
+    expect(edit).toMatchObject({ edit_kind: 'style', target: 'tailwind_class', prop_category: 'spacing', file_ext: 'tsx', lines_added: 2, breakpoint: 'md', state: 'hover', source: 'manual' });
+    expect(JSON.stringify(t.sent)).not.toContain('Secret');
+  });
+
+  it('the session end totals diffs, lines and distinct files', async () => {
+    const t = setup();
+    t.session.begin();
+    t.session.edit(EditKind.Style, dims);
+    t.session.edit(EditKind.Style, dims);
+    t.session.edit(EditKind.Style, { ...dims, source: 'revert' });
+    await t.session.end();
+
+    expect(t.sent[0].at(-1)).toMatchObject({ event: 'session_end', edit_count: 3, diff_count: 2, lines_added: 4, lines_removed: 2, files_count: 1 });
+  });
+
+  it('track carries dimensions on any event', async () => {
+    const t = setup();
+    t.session.begin();
+    t.session.track(UsageKind.FocusOpened, { variant: 'variant' });
+    await t.session.end();
+
+    expect(t.sent[0].find((e) => e.event === 'focus_opened')).toMatchObject({ variant: 'variant' });
+  });
+
+  it('flushes early when the queue is full and never waits for the send', async () => {
+    const t = setup();
+    t.session.begin();
+    for (let i = 0; i < 50; i++) {
+      t.session.track(UsageKind.ElementSelected);
+    }
+    await Promise.resolve();
+
+    expect(t.sent.length).toBeGreaterThan(0);
+    expect(t.sent.every((batch) => batch.length <= 50)).toBe(true);
+  });
+
+  it('sends nothing while telemetry is off', async () => {
+    const t = setup(() => false);
+    t.session.begin();
+    t.session.track(UsageKind.ElementSelected);
+    t.session.edit(EditKind.Style, dims);
+    await t.session.end();
+
+    expect(t.sent).toEqual([]);
+  });
+});
+
 describe('editorOf', () => {
   it.each([
     ['Visual Studio Code', 'vscode'],
@@ -237,7 +294,8 @@ describe('editorOf', () => {
     ['Cursor', 'cursor'],
     ['Windsurf', 'windsurf'],
     ['VSCodium', 'vscodium'],
-    ['Something Else', 'vscode']
+    ['Void', 'other'],
+    ['Something Else', 'other']
   ])('%s is %s', (appName, expected) => {
     expect(editorOf(appName)).toBe(expected);
   });

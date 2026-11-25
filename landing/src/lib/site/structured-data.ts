@@ -13,10 +13,20 @@ const ORGANIZATION = {
   '@type': 'Organization',
   name: 'Feega',
   url: SITE,
+  logo: `${SITE}site/logo.png`,
   email: 'hi@feega.app',
   sameAs: SAME_AS,
   founder: { '@type': 'Person', name: 'Andrea Buttarelli' },
   contactPoint: [{ '@type': 'ContactPoint', contactType: 'customer support', email: 'support@feega.app' }]
+};
+
+const WEBSITE = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: 'Feega',
+  alternateName: ['feega.app', 'Feega editor'],
+  url: SITE,
+  publisher: { '@type': 'Organization', name: 'Feega', url: SITE }
 };
 
 const APPLICATION = {
@@ -26,8 +36,8 @@ const APPLICATION = {
   url: SITE,
   applicationCategory: 'DeveloperApplication',
   operatingSystem: 'Windows, macOS, Linux',
-  description: 'Feega Inspect is a free VS Code extension: click any element of your running app, edit it like in Figma, and the change is written to your code. No AI, no tokens, with diffs.',
-  offers: { '@type': 'Offer', price: 0, priceCurrency: 'EUR', description: 'Free VS Code extension.' },
+  description: 'Feega is a free, open-source editor for your running app: click any element, edit it like in Figma, and the change is written to your code. Runs in VS Code, Cursor and Windsurf, or from any terminal with npx feega. No AI inside, no credits, with diffs.',
+  offers: { '@type': 'Offer', price: 0, priceCurrency: 'EUR', description: 'Free and open source.' },
   sameAs: SAME_AS,
   publisher: { '@type': 'Organization', name: 'Feega', sameAs: SAME_AS }
 };
@@ -59,7 +69,20 @@ export const breadcrumbJsonLd = (trail: readonly Crumb[]) =>
     itemListElement: [{ name: 'Feega', path: '/' }, ...trail].map((c, i) => ({ '@type': 'ListItem', position: i + 1, name: c.name, item: `${SITE}${c.path.slice(1)}` }))
   });
 
-export const HOME_JSON_LD = [ORGANIZATION, APPLICATION, FOUNDER].map(script).join('') + faqJsonLd(FAQ);
+export const HOME_JSON_LD = [WEBSITE, ORGANIZATION, APPLICATION, FOUNDER].map(script).join('') + faqJsonLd(FAQ);
+
+export const altLandingJsonLd = (page: { name: string; description: string; path: string; faq: readonly { q: string; a: string }[] }) =>
+  script({
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    name: page.name,
+    description: page.description,
+    url: `${SITE}${page.path.slice(1)}`,
+    isPartOf: { '@type': 'WebSite', name: 'Feega', url: SITE },
+    about: { '@type': 'SoftwareApplication', name: 'Feega', url: SITE }
+  }) +
+  script(APPLICATION) +
+  faqJsonLd(page.faq);
 
 export const articleJsonLd = (article: { title: string; description: string; path: string; checked: string }) =>
   script({

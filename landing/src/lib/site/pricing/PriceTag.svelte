@@ -1,10 +1,12 @@
 <script lang="ts">
-  let { amount, unit, cta, href, tone = 'solid' }: { amount: string; unit: string; cta: string; href: string; tone?: 'solid' | 'outline' } = $props();
+  import { eventAttrs } from '../analytics/attrs';
+
+  let { amount, unit, cta, href, plan, tone = 'solid' }: { amount: string; unit: string; cta: string; href: string; plan: string; tone?: 'solid' | 'outline' } = $props();
 </script>
 
 <div class="tag">
   <p class="price"><span class="amount">{amount}</span> <span class="unit">{unit}</span></p>
-  <a class="cta" class:outline={tone === 'outline'} {href}>{cta}</a>
+  <a class="cta" class:outline={tone === 'outline'} {href} {...eventAttrs('pricing_cta', { plan })}>{cta}</a>
 </div>
 
 <style>

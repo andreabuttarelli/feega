@@ -6,6 +6,7 @@ import { COFFEE_URL, DOWNLOAD_PATH, EDITORS, EXTENSION_PUBLISHED, GITHUB_URL, SI
 import { PRICING_PATH, SITE_PATHS } from './paths';
 import { LEGAL_DOCS } from './legal';
 import { ALTERNATIVES, ALTERNATIVES_INDEX, ALTERNATIVES_PATH, alternativePath } from './alternatives';
+import { ALT_LANDINGS, ALT_LANDING_PATHS, altLandingPath } from './alt-landings';
 import { plainText } from './text';
 import type { Crumb } from './structured-data';
 import { HUBS } from './topics';
@@ -16,7 +17,7 @@ import { CATEGORY_SLUGS, HUB_FRAMEWORKS, TEMPLATES_PATH, categoryPath, framework
 import type { Category } from './templates/template';
 import { topicPath } from './topics/topic';
 
-const SUMMARY = 'Feega is a free, open-source (Apache-2.0) tool to design in your codebase: click any element of your running app, edit it like in Figma, and the change is written to your code. No AI, no tokens, with diffs and undo. React, Next.js, SvelteKit, Vue, Nuxt, React Router, Astro and Vite, with Tailwind or plain CSS. Runs as a VS Code extension, or from any terminal with npx feega. Feega Cloud is coming soon.';
+const SUMMARY = 'Feega is a free, open-source (Apache-2.0) tool to design in your codebase: click any element of your running app, edit it like in Figma, and the change is written to your code. No AI inside, no credits, with diffs and undo. React, Next.js, SvelteKit, Vue, Nuxt, React Router, Astro and Vite, with Tailwind or plain CSS. Runs as a VS Code extension, or from any terminal with npx feega. Feega Cloud is coming soon.';
 
 const SURFACES = [
   '- VS Code extension: the same editor inside VS Code, and inside VS Code-based editors Cursor, Windsurf and VSCodium. VS Code installs from the Visual Studio Marketplace; Cursor, Windsurf and VSCodium install from Open VSX. macOS, Windows and Linux.',
@@ -57,6 +58,7 @@ export const PAGE_TITLES: Record<string, string> = {
   ...TEMPLATE_TITLES,
   ...Object.fromEntries(HUBS.map((h) => [h.path, h.title])),
   ...Object.fromEntries(HUBS.flatMap((h) => Object.entries(h.topics).map(([slug, t]) => [topicPath(h, slug), t.title]))),
+  ...Object.fromEntries(ALT_LANDINGS.map((v) => [altLandingPath(v.slug), v.title])),
   ...Object.fromEntries(Object.entries(ALTERNATIVES).map(([slug, a]) => [alternativePath(slug), a.title])),
   ...Object.fromEntries(Object.entries(LEGAL_DOCS).map(([slug, d]) => [`/${slug}`, d.title]))
 };
@@ -67,7 +69,9 @@ const prefixesOf = (path: string) => path.split('/').filter(Boolean).map((_, i, 
 
 export const trailOf = (path: string): Crumb[] => prefixesOf(path).flatMap((p) => (PAGE_TITLES[p] ? [{ name: PAGE_TITLES[p], path: p }] : []));
 
-const OTHER_PATHS = SITE_PATHS.filter((p) => !TEMPLATE_PATHS.includes(p));
+const OTHER_PATHS = SITE_PATHS.filter((p) => !TEMPLATE_PATHS.includes(p) && !ALT_LANDING_PATHS.includes(p));
+
+const quickAlternatives = () => ALT_LANDINGS.map((v) => `- [${v.title}](${SITE_URL}${altLandingPath(v.slug)}): ${v.meta.description}`).join('\n');
 
 const TEMPLATES_SUMMARY = `${TEMPLATES.length} free website sections, UI components and app screens, each in Svelte, React, Vue, Astro and HTML with --feega-* tokens, light and dark.`;
 
@@ -95,6 +99,8 @@ export const llmsTxt = () =>
     '## Templates',
     templatesIndex(),
     templatesList(),
+    '## Alternatives (quick)',
+    quickAlternatives(),
     '## Pages',
     OTHER_PATHS.map(link).join('\n'),
     '## Install',
@@ -125,6 +131,8 @@ export const llmsFullTxt = () =>
     templatesIndex(),
     '### All templates',
     templatesList(),
+    '## Alternatives (quick)',
+    quickAlternatives(),
     '## Pages',
     OTHER_PATHS.map(link).join('\n')
   ].join('\n\n') + '\n';

@@ -72,9 +72,9 @@ export const CATEGORY_COPY: Readonly<Record<Category, CategoryCopy>> = {
 };
 
 export const HUB_COPY = {
-  lead: `${TEMPLATES.length} sections, components and app screens you copy into your project, in Svelte, React, Vue, Astro and plain HTML.`,
+  lead: `${TEMPLATES.length} sections, components and app screens you insert or copy into your project, in Svelte, React, Vue, Astro and plain HTML.`,
   paragraphs: [
-    'This is the free Feega library. Every item has a live preview you can resize and switch between light and dark, the code in five flavours on the same page, and the list of tokens it reads. There is nothing to install and no account: just copy the code.',
+    'This is the free Feega library. Every item has a live preview you can resize and switch between light and dark, the code in five flavours on the same page, and the list of tokens it reads. The extension is free and needs no account: insert an item from Add, then Library, or copy the code.',
     'Everything is built on one small set of --feega-* custom properties for colour, type, radius and spacing. Change the accent once and every item follows, in light and dark. Items have no dependencies, so they sit next to Tailwind, a UI library or plain CSS.',
     'Start from the categories if you know what you need, or from your framework if you want to see how the code reads in it.'
   ],
@@ -130,7 +130,7 @@ export const FRAMEWORK_COPY: Readonly<Record<HubFramework, FrameworkCopy>> = {
     title: 'Free SvelteKit sections and UI templates (Svelte 5) | Feega',
     description: 'Free, Svelte 5 native sections and UI components for SvelteKit: heroes, pricing, footers, forms and app shells. Token-based, light and dark.',
     heading: 'Free SvelteKit sections and UI templates',
-    lead: 'Svelte 5 native, token-based and dependency-free: page sections and UI parts you copy into a SvelteKit project.',
+    lead: 'Svelte 5 native, token-based and dependency-free: page sections and UI parts you insert or copy into a SvelteKit project.',
     sections: [
       {
         heading: 'Why this exists for Svelte',
@@ -144,7 +144,7 @@ export const FRAMEWORK_COPY: Readonly<Record<HubFramework, FrameworkCopy>> = {
         heading: 'Svelte 5, the way you would write it',
         paragraphs: [
           'Each item is one .svelte file with TypeScript in a script block, plain markup and a scoped style block. Items that hold state use runes: the tab list and the toast use $state, and the command palette adds $derived for its filtered list. The modal uses bind:this with the native dialog element. Items that need no state have no script at all.',
-          'No item touches window or document, and none registers a global listener, so they render the same on the server and in the browser and work with SvelteKit prerendering. There are no stores, no context and no props to learn: copy the file, import it, and replace the placeholder text.',
+          'No item touches window or document, and none registers a global listener, so they render the same on the server and in the browser and work with SvelteKit prerendering. There are no stores, no context and no props to learn: insert the item with Feega, or copy the file, import it, and replace the placeholder text.',
           'Place files in src/lib/components and import them in a route, for example import HeroSplit from "$lib/components/HeroSplit.svelte". Styles are scoped by Svelte and written with plain class selectors, so overriding them from your own CSS is straightforward.'
         ]
       },

@@ -2,10 +2,12 @@
   import { browserEnv, installOptions, Outcome, runOption, type InstallOption } from './install';
   import { EDITOR_ICONS } from './editor-icons';
   import CommandField from './CommandField.svelte';
+  import { eventAttrs } from './analytics/attrs';
+  import { installOptionAttrs } from './analytics/nav';
   import { APPLE_ICON } from './social-icons';
   import { DESKTOP_DMGS, DESKTOP_INSTALL_COMMAND, DESKTOP_PUBLISHED, DOWNLOAD_PATH } from './links';
 
-  let { label }: { label: string } = $props();
+  let { label, place }: { label: string; place: string } = $props();
 
   const options = installOptions().filter((o) => !o.soon);
   let open = $state(false);
@@ -34,7 +36,7 @@
 <svelte:window onkeydown={onKey} onpointerdown={onPointer} />
 
 <div class="split" bind:this={root}>
-  <a class="main" href={DOWNLOAD_PATH}>{label}</a>
+  <a class="main" href={DOWNLOAD_PATH} {...eventAttrs('download_click', { target: 'download_page', place })}>{label}</a>
   <button class="chev" type="button" aria-label="More ways to install" aria-haspopup="menu" aria-expanded={open} onclick={() => (open = !open)}>
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
   </button>
@@ -42,7 +44,7 @@
   {#if open}
     <div class="menu" role="menu">
       {#each options as option (option.label)}
-        <button role="menuitem" type="button" onclick={() => choose(option)}>
+        <button role="menuitem" type="button" onclick={() => choose(option)} {...installOptionAttrs(option, place)}>
           <span class="logo">{@html EDITOR_ICONS[option.label] ?? ''}</span>
           <span>{(option.command ?? option.label).toLowerCase()}</span>
           {#if option.command && copied}<span class="done">copied</span>{/if}
@@ -52,11 +54,11 @@
         <p class="section"><img src="/img/feega-desktop.png" alt="" width="20" height="20" />desktop app (beta)</p>
         <div class="field"><CommandField command={DESKTOP_INSTALL_COMMAND} /></div>
         {#each DESKTOP_DMGS as dmg (dmg.arch)}
-          <a role="menuitem" href={dmg.href}><span class="logo">{@html APPLE_ICON}</span><span>dmg · {dmg.arch.toLowerCase()}</span></a>
+          <a role="menuitem" href={dmg.href} {...eventAttrs('download_click', { target: `dmg ${dmg.arch.toLowerCase()}`, place })}><span class="logo">{@html APPLE_ICON}</span><span>dmg · {dmg.arch.toLowerCase()}</span></a>
         {/each}
         <p class="hint">macOS blocks the dmg. allow it in privacy & security, open anyway.</p>
       {/if}
-      <a role="menuitem" class="all" href={DOWNLOAD_PATH}>All download options →</a>
+      <a role="menuitem" class="all" href={DOWNLOAD_PATH} {...eventAttrs('download_click', { target: 'download_page', place })}>All download options →</a>
     </div>
   {/if}
 </div>

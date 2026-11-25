@@ -14,7 +14,7 @@
   import { MOVES, Shortcut, isMac, needsBareFocus, shortcutOf, typingIn } from './selection-keys';
   import { Click, NONE, Surface, clickOf, contains, extend, keyOf, only, primary, refOf, siblingsOf, toggle, visibleRows, type Selection } from './selection';
   import type { SupportItem } from '../support';
-  import { AccountState, Mode, Onboarding, OnboardingOutcome, Move, ServerAction, Slot, type ChangeRow, type FontChoice, type LayerNode, type LibraryEntry, type Palette, ServerState, type ServerInfo, Styling, ToHost, ToView, type Impact, type ImpactAsk, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
+  import { AccountState, type AgentId, Mode, Onboarding, OnboardingOutcome, OnboardingStep, Move, ServerAction, Slot, type ChangeRow, type FontChoice, type LayerNode, type LibraryEntry, type Palette, ServerState, type ServerInfo, Styling, ToHost, ToView, WebviewUsage, type AdapterRow, type Impact, type ImpactAsk, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
   import { fromHost, inVscode, toHost } from './host';
   import { imageSaved } from './image-file.svelte';
   import { iconDrawn, iconsFound } from './icon-search.svelte';
@@ -31,12 +31,26 @@
   import Interactions from './Interactions.svelte';
   import Attributes from './Attributes.svelte';
   import { wiringState } from './wiring-state.svelte';
+  import ClassesSection from './ClassesSection.svelte';
+  import { classesState, classOfKey } from './classes-state.svelte';
+  import { editingLabel, editTarget } from './class-view';
   import ModeSwitch from './ModeSwitch.svelte';
+  import CloseButton from './CloseButton.svelte';
+  import DockTab from './DockTab.svelte';
+  import { dockedEdge, isDocked, slideAway, tabBox, type Docked } from './dock';
   import FeegaMenu from './FeegaMenu.svelte';
   import OnboardingDialog from './Onboarding.svelte';
   import ServerPopover from './ServerPopover.svelte';
   import SharePanel from './SharePanel.svelte';
   import LayersTree from './LayersTree.svelte';
+  import FocusTabs from './FocusTabs.svelte';
+  import ComponentProps from './ComponentProps.svelte';
+  import { propTally } from './focus-usage';
+  import { applyAskOf } from './apply-plan';
+  import { readAskOf, withUsage, type Mounted } from './usage-values';
+  import { controlsOf, variantsOf, type PropControl, type PropValue } from './prop-controls';
+  import { FocusMode } from './page-bridge';
+  import { FocusKey, Scheme, View, focusKeyOf, focusOf, REAL_SIZE, rowFocus, schemeApplyOf, schemeOf, snapshotNoticeOf, stepZoom, themeOfScheme, wheelFactor, type Focus } from './focus';
   import { hasSourceInfo } from './source-info';
   import ChangesList from './ChangesList.svelte';
   import DeviceBar from './DeviceBar.svelte';
@@ -62,11 +76,19 @@
   import { applyMessage, heldOf, muteMessage, type Held } from './preview-gate';
   import { detachState } from './detach';
   import LibraryPanel from './LibraryPanel.svelte';
+  import NewPage from './NewPage.svelte';
   import { LIBRARY_DRAG_TYPE } from './library';
-  import { agentContexts, commentContext } from './agent-context';
+  import { agentContexts, commentContext, type AgentView } from './agent-context';
   import CommentsList from './CommentsList.svelte';
-  import type { CloudComment, CommentDraft } from '../host/cloud-api';
+  import AiPanel from './AiPanel.svelte';
+  import { answerAsk } from './agent-ask';
+  import { ai, aiHeard } from './ai-state.svelte';
+  import { withImpact } from './ai-context';
+  import type { CloudComment, CloudRevisions, CommentDraft } from '../host/cloud-api';
   import { pinIdOf, pinSlot, pinsOf, sourceOfComment, threadsOf } from './comments';
+  import { HOST_PEER, type Point, type Present } from '../../../packages/share-protocol/src/frame';
+  import PeerLayer from './PeerLayer.svelte';
+  import { peerIdOf, peerSlot, peerSourceOf, strangersOf } from './peers';
   import { AddKind, AddPlace } from '@feega/live-edit/add-node';
   import { WrapTag } from '@feega/live-edit/wrap-node';
   import { ADD_DRAG_TYPE, insertSpot, type InsertSpot } from './insert-drop';
@@ -75,6 +97,7 @@
   import { browseHistory } from './history';
   import { DEFAULT_ANCHOR, anchorBox, isAnchor, nearestAnchor, nextAnchor, type Anchor } from './anchors';
   import { PRESETS, SIZES, Size, Snap, fitOf, sizeForKey, snapped } from './sizes';
+  import { breakpointOfSize } from './usage-report';
   import { Where } from '@feega/plugin-api/manifest';
   import type { Place as PluginPlace } from '@feega/plugin-api/protocol';
   import PluginSections from './PluginSections.svelte';
@@ -139,6 +162,7 @@
   let baseline = $state<Styles | null>(null);
   const writtenState = $derived(elementState === ElementState.Default ? undefined : elementState);
   const TOAST_MS = 2500;
+  let noSourceDismissed = $state(false);
   let toast = $state<string | null>(null);
   let toastTimer: ReturnType<typeof setTimeout> | undefined;
   function showToast(text: string) {
@@ -185,12 +209,17 @@
 
   let tab = $state<string>(Tab.Properties);
   let share = $state<Extract<ViewMessage, { kind: ToView.Share }> | null>(null);
-  let cloud = $state<{ enabled: boolean; comments: CloudComment[]; error: string }>({ enabled: false, comments: [], error: '' });
+  let cloud = $state<{ enabled: boolean; comments: CloudComment[]; review: CloudRevisions; error: string }>({ enabled: false, comments: [], review: { status: 'open', revisions: [] }, error: '' });
   let composing = $state(false);
   let pinRects = $state<Record<string, Pick['rect'] | null>>({});
   let lostSlots = $state<Record<string, boolean>>({});
   let pinned = new Set<string>();
+  let peers = $state<Present[]>([]);
+  let peerRects = $state<Record<string, Pick['rect'] | null>>({});
+  let tracking = new Map<string, string>();
+  let lastPointAt = 0;
   const COMMENTS_POLL_MS = 15_000;
+  const CURSOR_THROTTLE_MS = 50;
   const PIN_SIZE_PX = 20;
   const PIN_STACK_PX = 22;
   const pins = $derived(pinsOf(threadsOf(cloud.comments, false)));
@@ -205,6 +234,8 @@
   let canUndo = $state(false);
   let canRedo = $state(false);
   let scope = $state(Scope.Element);
+  const classInfo = $derived(classOfKey(classesState.view, classesState.targetKey));
+  const classTarget = $derived(classInfo ? editTarget(classInfo) : null);
   let layersOpen = $state<Record<string, boolean>>({ '(html):0:0': true, '(page):0:0': true });
   const layerDrag = $state<{ source: Source | null; name: string; component: boolean; parentFile: string | null; hint: { id: string; place: AddPlace } | null }>({ source: null, name: '', component: false, parentFile: null, hint: null });
 
@@ -255,6 +286,7 @@
     savePrefs();
   }
   let anchor = $state<Anchor>(DEFAULT_ANCHOR);
+  let docked = $state<Docked | null>(null);
   let bar = $state({ w: 0, h: 0 });
   let toolbarH = $state(0);
   let moving = $state<{ dx: number; dy: number; x: number; y: number } | null>(null);
@@ -263,6 +295,8 @@
   let account = $state<{ state: AccountState; email?: string }>({ state: AccountState.SignedOut });
   let onboarding = $state(Onboarding.Seen);
   let support = $state<SupportItem[]>([]);
+  let agents = $state<AgentId[]>([]);
+  let adapters = $state<AdapterRow[]>([]);
 
   function finishOnboarding(outcome: OnboardingOutcome) {
     onboarding = Onboarding.Seen;
@@ -283,7 +317,7 @@
       }
     });
   });
-  const area = $derived({ x: leftPx, y: toolbarH, w: stage.w, h: stage.h });
+  const area = $derived({ x: leftPx, y: toolbarH + (focus ? tabsH : 0), w: stage.w, h: stage.h });
   const barAt = $derived(moving ? { x: moving.x, y: moving.y } : anchorBox(anchor, area, bar));
   const canBack = $derived((navTick, history.canBack()));
   const canForward = $derived((navTick, history.canForward()));
@@ -294,24 +328,46 @@
         showToast('Page reloaded · scroll and selection kept');
       }
       bridged = true;
+      if (injected) {
+        bridge.preview(injected.source, injected.css, injected.inner, injected.state);
+      }
       toHost({ kind: ToHost.PreviewReady });
       server = ServerState.Running;
       restarting = false;
       visited(path);
-      bridge.mode(mode);
-      showTheme();
-      bridge.tree();
-      bridge.palette();
-      untrack(() => picked && elementState !== ElementState.Default && bridge.force(picked.source, elementState));
-      refresh();
-      bridge.track(Slot.Selected, untrack(() => picked?.source) ?? null, untrack(() => picked?.instanceIndex));
-      bridge.track(Slot.Hovered, untrack(() => hover?.source) ?? null, untrack(() => hover?.instanceIndex));
-      pinned.clear();
-      trackPins();
+      untrack(() => focus && ((reopening = true), bridge.focus(focus.source, viewing === View.Focus, focus.index)));
+      untrack(() => viewing === View.Page && syncView());
     },
+    focusReady: () => untrack(() => viewing === View.Focus && syncView()),
     moved: (path) => (visited(path), bridge.tree()),
     tree: (tree) => ((layers = tree), askPalette()),
+    mounted: (status) => {
+      mount = { controls: controlsOf(status.controls, status.props), values: status.props, touched: mount?.touched ?? [], dynamic: mount?.dynamic ?? [] };
+      sendProps();
+      askUsageProps();
+    },
+    zoomed: (zoom) => (zoomNow = zoom),
+    focused: (count, mode, reason, detail, dark) => {
+      pageDark = dark ?? false;
+      snapshotNotice = mode === FocusMode.Snapshot ? snapshotNoticeOf(reason, detail) : null;
+      if (mode === FocusMode.Snapshot) {
+        mount = null;
+      }
+      if (count > 0) {
+        reportFocusOpened(mode);
+        reopening = false;
+        return;
+      }
+      if (!reopening) {
+        exitFocus();
+      }
+    },
     tracked: (slot, rect) => {
+      const peer = peerIdOf(slot);
+      if (peer) {
+        peerRects[peer] = rect;
+        return;
+      }
       const pin = pinIdOf(slot);
       if (pin) {
         pinRects[pin] = rect;
@@ -383,6 +439,44 @@
     }
   });
 
+  function trackPeers() {
+    const wanted = new Map(peers.filter((peer) => peer.selection).map((peer) => [peer.userId, peer.selection!]));
+    for (const [id, selection] of wanted) {
+      const source = peerSourceOf(selection);
+      if (source && tracking.get(id) !== selection) {
+        bridge.track(peerSlot(id), source);
+      }
+    }
+    for (const id of tracking.keys()) {
+      if (!wanted.has(id)) {
+        bridge.track(peerSlot(id), null);
+        delete peerRects[id];
+      }
+    }
+    tracking = wanted;
+  }
+
+  $effect(() => {
+    peers;
+    if (bridged) {
+      untrack(trackPeers);
+    }
+  });
+
+  function point(e: PointerEvent): Point | null {
+    const now = Date.now();
+    if (now - lastPointAt < CURSOR_THROTTLE_MS) {
+      return null;
+    }
+    lastPointAt = now;
+    return pagePoint(e);
+  }
+
+  function pointed(e: PointerEvent) {
+    const at = point(e);
+    at && toHost({ kind: ToHost.Cursor, at });
+  }
+
   $effect(() => {
     if (!cloud.enabled) {
       return;
@@ -407,6 +501,20 @@
   function sendComment(draft: CommentDraft) {
     toHost({ kind: ToHost.CommentAdd, draft });
     composing = false;
+  }
+
+  function heardStep(step: OnboardingStep) {
+    toHost({ kind: ToHost.OnboardingStep, step });
+    if (step === OnboardingStep.LocalAgents) {
+      toHost({ kind: ToHost.AiList });
+    }
+  }
+
+  function copyText(text: string) {
+    toHost({ kind: ToHost.Copy, text });
+    if (!inVscode) {
+      void navigator.clipboard?.writeText(text);
+    }
   }
 
   function copyComment(comment: CloudComment, replies: CloudComment[]) {
@@ -440,6 +548,17 @@
       return;
     }
     frame.src = new URL(route, url).toString();
+  }
+
+  let injected: { source: Source; css: Record<string, string>; inner?: string; state?: ElementState } | null = null;
+
+  function injectWritten(css: Record<string, string>) {
+    if (!picked) {
+      reloadAfterRestart();
+      return;
+    }
+    injected = { source: picked.source, css, inner: picked.inner, state: writtenState };
+    bridge.preview(injected.source, css, injected.inner, injected.state);
   }
 
   function go(path: string | null) {
@@ -484,6 +603,7 @@
     if (!picked || next === elementState) {
       return;
     }
+    toHost({ kind: ToHost.Usage, event: WebviewUsage.StateSwitch, dims: { state: next } });
     baseline = elementState === ElementState.Default ? { ...picked.styles } : baseline;
     elementState = next;
     bridge.force(picked.source, next);
@@ -493,7 +613,40 @@
 
   function showTheme() {
     const plain = $state.snapshot(themes);
-    bridge.theme(plain.map((t) => t.apply), activeApply(plain, themeName));
+    const emulating = viewing === View.Focus && userScheme !== null;
+    bridge.theme(plain.map((t) => t.apply), emulating ? schemeApplyOf(plain, themeName, userScheme!) : activeApply(plain, themeName));
+    bridge.canvas(userScheme, transparentCanvas);
+  }
+
+  let userScheme = $state<Scheme | null>(null);
+  let pageDark = $state(false);
+  let transparentCanvas = $state(false);
+  let zoomNow = $state(REAL_SIZE);
+  const darkThemeName = $derived(themeOfScheme(themes, Scheme.Dark));
+  const shownScheme = $derived(userScheme ?? (darkThemeName ? schemeOf(themes, themeName) : pageDark ? Scheme.Dark : Scheme.Light));
+
+  function switchScheme(next: Scheme) {
+    userScheme = next;
+    const name = themeOfScheme(themes, next);
+    if (darkThemeName && name) {
+      chooseTheme(name);
+      return;
+    }
+    showTheme();
+  }
+
+  function toggleTransparent() {
+    transparentCanvas = !transparentCanvas;
+    showTheme();
+  }
+
+  function wheelOnFocus(e: WheelEvent) {
+    if (viewing === View.Focus && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      bridge.zoom({ mode: 'by', value: wheelFactor(e.deltaY) });
+      return;
+    }
+    bridge.scroll(e.deltaX / fit.scale, e.deltaY / fit.scale);
   }
 
   function chooseTheme(name: string) {
@@ -519,7 +672,7 @@
   }
 
   function savePrefs() {
-    toHost({ kind: ToHost.Prefs, prefs: { size, custom, barClosed, route, anchor, barWidth, leftWidth, leftClosed, layers: layerFlags.saved() } });
+    toHost({ kind: ToHost.Prefs, prefs: { size, custom, barClosed, route, anchor, dock: docked ?? undefined, barWidth, leftWidth, leftClosed, layers: layerFlags.saved() } });
   }
 
   function restore(prefs: Prefs | null) {
@@ -532,6 +685,7 @@
     barClosed = prefs.barClosed;
     route = prefs.route ?? route;
     anchor = isAnchor(prefs.anchor) ? prefs.anchor : anchor;
+    docked = isDocked(prefs.dock) ? prefs.dock : null;
     barWidth = prefs.barWidth ?? barWidth;
     leftWidth = prefs.leftWidth ?? leftWidth;
     leftClosed = prefs.leftClosed ?? leftClosed;
@@ -555,8 +709,16 @@
     },
     [ToView.Server]: (m) => ((server = m.state), (restarting = restarting ? m.state !== ServerState.Stopped : m.state === ServerState.Restarting), (serverReason = m.reason ?? ''), (serverInfo = m.info ?? serverInfo)),
     [ToView.Reload]: () => reloadAfterRestart(),
+    [ToView.PageCreated]: (m) => go(m.route),
     [ToView.Impact]: (m) => (m.id === impactId ? (impact = m.impact) : impact),
     [ToView.Preview]: (m) => (held = heldOf(m)),
+    [ToView.PropsPreview]: (m) => (held = heldOf(m)),
+    [ToView.UsageProps]: (m) => {
+      if (mount && focus?.source.file === m.component) {
+        mount = withUsage($state.snapshot(mount), m);
+        sendProps();
+      }
+    },
     [ToView.Status]: (m) => (problem = { text: m.text }),
     [ToView.Edited]: (m) => {
       const unsavedText = textPending;
@@ -577,6 +739,10 @@
       problem = null;
       saved = m.saved ?? null;
       warning = m.note ?? '';
+      injected = null;
+      if (m.inject) {
+        injectWritten(m.inject);
+      }
       if (m.note) {
         showToast(m.note);
       }
@@ -599,14 +765,25 @@
     [ToView.Plugins]: (m) => plugins.sync(m.catalog, m.canInstall),
     [ToView.Account]: (m) => (account = { state: m.state, email: m.email }),
     [ToView.Share]: (m) => (share = m),
+    [ToView.Peers]: (m) => (peers = share ? strangersOf(m.peers, HOST_PEER) : m.peers),
     [ToView.Library]: (m) => (libraryItems = m.items),
-    [ToView.Comments]: (m) => (cloud = { enabled: m.enabled, comments: m.comments, error: m.error ?? '' }),
+    [ToView.Comments]: (m) => (cloud = { enabled: m.enabled, comments: m.comments, review: m.review ?? cloud.review, error: m.error ?? '' }),
     [ToView.Onboarding]: (m) => (onboarding = m.state),
     [ToView.Support]: (m) => (support = m.done),
+    [ToView.Agents]: (m) => (agents = m.found),
+    [ToView.AiAgents]: aiHeard,
+    [ToView.AiState]: aiHeard,
+    [ToView.AiEvent]: aiHeard,
+    [ToView.AiPolicy]: aiHeard,
+    [ToView.Adapters]: (m) => (adapters = m.rows),
+    [ToView.AiChats]: aiHeard,
+    [ToView.AiChat]: aiHeard,
+    [ToView.AgentAsk]: (m) => void answerAsk(m, { capture: shoot, context: () => (aiContext === null ? null : withImpact(aiContext, impact)) }).then(toHost),
     [ToView.SkillHint]: (m) => (skillHint = m.command),
     [ToView.IconResults]: (m) => iconsFound({ id: m.id, library: m.library, hits: m.hits, error: m.error ?? '' }),
     [ToView.IconPreview]: (m) => iconDrawn(m.name, m.svg),
     [ToView.ImageSaved]: (m) => (imageSaved.url = m.url),
+    [ToView.Classes]: (m) => (classesState.view = m.view),
     [ToView.Wiring]: (m) => Object.assign(wiringState, { at: m.at, instance: m.instance, wiring: m.wiring }),
     [ToView.Pick]: (m) => bridge.at(m.x, m.y).then((pick) => (setSingle(pick), toHost({ kind: ToHost.Picked, id: m.id, pick }))),
     [ToView.Change]: (m) => {
@@ -653,8 +830,14 @@
     if (!moving) {
       return;
     }
-    anchor = nearestAnchor({ x: moving.x, y: moving.y }, area, bar);
+    docked = dockedEdge({ x: moving.x, y: moving.y }, area, bar);
+    anchor = docked ? anchor : nearestAnchor({ x: moving.x, y: moving.y }, area, bar);
     moving = null;
+    savePrefs();
+  }
+
+  function undock() {
+    docked = null;
     savePrefs();
   }
 
@@ -751,7 +934,7 @@
 
   function askOf(row: Row, value: string, token?: string) {
     const { prop, side, family, value: written } = row.change(value);
-    return { at: sourceText(picked!.source), prop, side, family, value: written, token, rem: picked!.rem, viewport: picked!.viewport, css: kebab(row.preview(value)), scope, inner: picked!.inner, page: picked!.page, state: writtenState, breakpoint: target, theme: writtenThemeName };
+    return { at: sourceText(picked!.source), prop, side, family, value: written, token, rem: picked!.rem, viewport: picked!.viewport, css: kebab(row.preview(value)), scope, cls: classTarget ?? undefined, inner: picked!.inner, page: picked!.page, state: writtenState, breakpoint: target, theme: writtenThemeName };
   }
 
   function change(row: Row, value: string, token?: string) {
@@ -770,6 +953,7 @@
   }
 
   function pickSize(next: Size) {
+    toHost({ kind: ToHost.Usage, event: WebviewUsage.BreakpointSwitch, dims: { breakpoint: breakpointOfSize(next) } });
     size = next;
     savePrefs();
   }
@@ -981,6 +1165,144 @@
     }
   }
 
+  let mount = $state<Mounted | null>(null);
+  let usageAsked = false;
+  let showGrid = $state(false);
+  let snapshotNotice = $state<string | null>(null);
+  const variants = $derived(variantsOf(mount?.controls ?? []));
+
+  function askUsageProps() {
+    const ask = focus && !usageAsked ? readAskOf(focus) : null;
+    if (ask) {
+      usageAsked = true;
+      toHost({ kind: ToHost.ReadProps, ask });
+    }
+  }
+
+  function sendProps() {
+    if (mount) {
+      bridge.mountProps($state.snapshot(mount.values), showGrid ? $state.snapshot(variants.variants) : null);
+    }
+  }
+
+  const propsChanged = propTally();
+  let focusReported = false;
+
+  function reportFocusOpened(mode: FocusMode) {
+    if (focusReported) {
+      return;
+    }
+    focusReported = true;
+    toHost({ kind: ToHost.Usage, event: WebviewUsage.FocusOpened, dims: { variant: 'focus', mode } });
+  }
+
+  function reportPropsChanged() {
+    propsChanged.drain().forEach((dims) => toHost({ kind: ToHost.Usage, event: WebviewUsage.FocusPropsChanged, dims }));
+  }
+
+  function setProp(name: string, value: PropValue | undefined) {
+    if (!mount) {
+      return;
+    }
+    const control = mount.controls.find((c) => c.name === name);
+    if (control) {
+      propsChanged.add(control.kind);
+    }
+    const { [name]: _, ...rest } = mount.values;
+    mount = { ...mount, values: value === undefined ? rest : { ...rest, [name]: value }, touched: mount.touched.includes(name) ? mount.touched : [...mount.touched, name], dynamic: mount.dynamic.filter((d) => d !== name) };
+    sendProps();
+  }
+
+  function setGrid(on: boolean) {
+    showGrid = on;
+    if (on) {
+      toHost({ kind: ToHost.Usage, event: WebviewUsage.FocusVariantsShown });
+    }
+    sendProps();
+  }
+
+  let focus = $state<Focus | null>(null);
+
+  const applyPlan = $derived(focus && mount ? applyAskOf({ focus, controls: mount.controls, values: mount.values, touched: mount.touched }) : null);
+
+  function applyToPage() {
+    if (applyPlan) {
+      const { skipped: _skipped, ...ask } = $state.snapshot(applyPlan);
+      toHost({ kind: ToHost.ApplyProps, ask });
+    }
+  }
+  let viewing = $state(View.Page);
+  let reopening = false;
+  let tabsH = $state(0);
+
+  function syncView() {
+    bridge.mode(mode);
+    showTheme();
+    bridge.tree();
+    bridge.palette();
+    untrack(() => picked && elementState !== ElementState.Default && bridge.force(picked.source, elementState));
+    refresh();
+    bridge.track(Slot.Selected, untrack(() => picked?.source) ?? null, untrack(() => picked?.instanceIndex));
+    bridge.track(Slot.Hovered, untrack(() => hover?.source) ?? null, untrack(() => hover?.instanceIndex));
+    pinned.clear();
+    trackPins();
+    tracking.clear();
+    trackPeers();
+  }
+
+  function showTab(next: View) {
+    if (!focus || next === viewing) {
+      return;
+    }
+    viewing = next;
+    bridge.useFocus(next === View.Focus);
+    bridge.focus(focus.source, next === View.Focus, focus.index);
+    syncView();
+  }
+
+  function enterFocus(next: Focus | null) {
+    if (!next) {
+      return;
+    }
+    reportPropsChanged();
+    focusReported = false;
+    focus = next;
+    viewing = View.Focus;
+    reopening = false;
+    mount = null;
+    showGrid = false;
+    snapshotNotice = null;
+    usageAsked = false;
+    userScheme = null;
+    pageDark = false;
+    transparentCanvas = false;
+    bridge.useFocus(true);
+    bridge.focus(next.source, true, next.index);
+    bridge.zoom({ mode: 'set', value: REAL_SIZE });
+  }
+
+  function exitFocus() {
+    if (!focus) {
+      return;
+    }
+    reportPropsChanged();
+    const wasFocused = viewing === View.Focus;
+    focus = null;
+    mount = null;
+    showGrid = false;
+    snapshotNotice = null;
+    usageAsked = false;
+    userScheme = null;
+    pageDark = false;
+    transparentCanvas = false;
+    viewing = View.Page;
+    bridge.useFocus(false);
+    bridge.focus(null);
+    if (wasFocused) {
+      syncView();
+    }
+  }
+
   function detach() {
     if (picked?.component) {
       toHost({ kind: ToHost.Detach, at: sourceText(picked.source), usage: sourceText(picked.component), which: picked.usage });
@@ -989,10 +1311,15 @@
 
   let impact = $state<Impact | null>(null);
   let impactId = 0;
+
+  $effect(() => {
+    void pickedAt;
+    classesState.targetKey = null;
+  });
   let held = $state<Held | null>(null);
 
   const impactAsk = $derived(
-    picked ? { at: sourceText(picked.source), scope, inner: picked.inner, page: picked.page, state: writtenState, breakpoint: target, theme: writtenThemeName } : null
+    picked ? { at: sourceText(picked.source), scope, cls: classTarget ?? undefined, inner: picked.inner, page: picked.page, state: writtenState, breakpoint: target, theme: writtenThemeName } : null
   );
   const impactKey = $derived(JSON.stringify(impactAsk));
 
@@ -1036,17 +1363,39 @@
       [Command.Structure]: () => chosen.command === Command.Structure && restructure(chosen.op),
       [Command.Add]: () => chosen.command === Command.Add && addElement(chosen.kind, chosen.place),
       [Command.Wrap]: () => chosen.command === Command.Wrap && wrapWith(chosen.tag),
-      [Command.Detach]: detach
+      [Command.Detach]: detach,
+      [Command.Focus]: () => picked && viewing === View.Page && enterFocus(focusOf(picked))
     };
     run[chosen.command]();
   }
 
-  async function copyForAgent() {
+  let aiContext = $state<string | null>(null);
+
+  const shoot = (selection: boolean) => bridge.capture(selection && picked ? picked.source : null, picked?.instanceIndex);
+
+  async function agentText(): Promise<string | null> {
     if (!picked) {
-      return;
+      return null;
     }
     const picks = several ? (await Promise.all(selection.refs.map((r) => bridge.again(r.source, r.instance)))).filter((p): p is Pick => p !== null) : [picked];
-    const text = agentContexts(picks, { route, width: Math.round(fit.width), breakpoint: size === Size.Full ? undefined : reachBadge, theme: themeName === DEFAULT_THEME ? undefined : themeName, state: elementState === ElementState.Default ? undefined : elementState });
+    return agentContexts(picks, agentView());
+  }
+
+  const agentView = (): AgentView => ({
+    route,
+    width: Math.round(fit.width),
+    breakpoint: size === Size.Full ? undefined : reachBadge,
+    theme: themeName === DEFAULT_THEME ? undefined : themeName,
+    state: elementState === ElementState.Default ? undefined : elementState,
+    focus: focus && viewing === View.Focus ? { name: focus.name, source: focus.source } : undefined
+  });
+
+  async function copyForAgent() {
+    toHost({ kind: ToHost.Usage, event: WebviewUsage.CopyForAgent });
+    const text = await agentText();
+    if (text === null) {
+      return;
+    }
     if (inVscode) {
       toHost({ kind: ToHost.Copy, text });
     } else {
@@ -1054,6 +1403,17 @@
     }
     showToast('Copied for your agent');
   }
+
+  $effect(() => {
+    pickedAt;
+    route;
+    size;
+    themeName;
+    elementState;
+    focus;
+    viewing;
+    void agentText().then((text) => (toHost({ kind: ToHost.Context, text }), (aiContext = text ?? agentContexts([], agentView()))));
+  });
 
   function restructure(op: StructureOp) {
     if (several) {
@@ -1128,6 +1488,12 @@
 
   function onKey(e: KeyboardEvent) {
     const cmd = e.metaKey || e.ctrlKey;
+    const focusKey = cmd || typing(e) || editing ? null : focusKeyOf(e.key, { focused: viewing === View.Focus, available: Boolean(picked?.component) && mode === Mode.Design && !several });
+    if (focusKey) {
+      e.preventDefault();
+      focusKey === FocusKey.Exit ? exitFocus() : picked && enterFocus(focusOf(picked));
+      return;
+    }
     if (runShortcut(e, shortcutOf(e, isMac))) {
       return;
     }
@@ -1185,7 +1551,7 @@
     {:else}
     <header class="left-head">Layers<button type="button" class="add" title="Add an element (/)" aria-label="Add" data-testid="add-button" disabled={!picked} onclick={(e) => openAddMenu(e.clientX, e.clientY)}>+ Add</button></header>
     <div class="layers" role="tree" aria-label="Layers" data-testid="layers">
-      <LayersTree nodes={layers} {picked} selected={selectedKeys} badge={badgeOf(elementState)} open={layersOpen} onselect={selectRow} onhover={hoverLayer} onopen={(at) => toHost({ kind: ToHost.Open, at })} onmove={moveLayer} onusage={moveUsage} dragging={layerDrag} hidden={hiddenNow} locked={lockedNow} ontoggle={toggleFlag} oncontext={openLayerMenu} onadd={layerAdd} />
+      <LayersTree nodes={layers} {picked} selected={selectedKeys} badge={badgeOf(elementState)} open={layersOpen} onselect={selectRow} onhover={hoverLayer} onopen={(at) => toHost({ kind: ToHost.Open, at })} onmove={moveLayer} onusage={moveUsage} dragging={layerDrag} hidden={hiddenNow} locked={lockedNow} ontoggle={toggleFlag} oncontext={openLayerMenu} onadd={layerAdd} onfocus={(node) => viewing === View.Page && enterFocus(rowFocus(node))} />
     </div>
     {/if}
     {#if !leftClosed}<span class="edge-right" role="separator" aria-orientation="vertical" aria-label="Resize Layers" title="Drag to resize, double-click to reset" onpointerdown={(e) => ((e.currentTarget as HTMLElement).setPointerCapture(e.pointerId), (leftSizing = { x: e.clientX, width: leftPx }))} onpointermove={(e) => leftSizing && (leftWidth = leftSizing.width + (e.clientX - leftSizing.x))} onpointerup={() => leftSizing && ((leftSizing = null), (leftWidth = leftPx), savePrefs())} ondblclick={() => ((leftWidth = LEFT_DEFAULT_PX), savePrefs())}></span>{/if}
@@ -1197,6 +1563,7 @@
       <button type="button" class="icon" title="Back (⌘[)" disabled={!canBack} onclick={() => go(history.back())}><ArrowLeft size={15} /></button>
       <button type="button" class="icon" title="Forward (⌘])" disabled={!canForward} onclick={() => go(history.forward())}><ArrowRight size={15} /></button>
       <button type="button" class="icon" title="Reload (⌘R)" onclick={() => go(route)}><RotateCw size={14} /></button>
+      <NewPage items={libraryItems} onopen={() => toHost({ kind: ToHost.LibraryList })} oncreate={(route, item) => toHost({ kind: ToHost.NewPage, route, item })} />
       <form class="address" onsubmit={(e) => (e.preventDefault(), go(address))}>
         <ServerPopover state={server} reason={serverReason} info={serverInfo} onopen={(link) => toHost({ kind: ToHost.External, url: link })} onaction={(action) => (action === ServerAction.ReloadPage ? go(route) : toHost({ kind: ToHost.Server, action }))} />
         <input bind:value={address} aria-label="Route" data-testid="address" spellcheck="false" />
@@ -1209,13 +1576,14 @@
       {#if share?.available}<SharePanel view={share} onstart={(name, canEdit) => toHost({ kind: ToHost.ShareStart, name, canEdit })} onstop={() => toHost({ kind: ToHost.ShareStop })} onkick={(userId) => toHost({ kind: ToHost.ShareKick, userId })} onrole={(userId, role) => toHost({ kind: ToHost.ShareRole, userId, role })} />{/if}
       <button type="button" class="icon" class:on={!barClosed} title="Properties (⌘\)" onclick={toggleBar} data-testid="bar-toggle"><PanelRight size={15} /></button>
     </header>
+    {#if focus}<FocusTabs name={focus.name} active={viewing} notice={snapshotNotice} scheme={shownScheme} onscheme={switchScheme} transparent={transparentCanvas} ontransparent={toggleTransparent} zoom={zoomNow} onzoom={(request) => bridge.zoom(request)} onstep={(direction) => bridge.zoom({ mode: 'set', value: stepZoom(zoomNow, direction) })} onselect={showTab} onclose={exitFocus} bind:height={tabsH} />{/if}
 
     <div class="backdrop" role="presentation" bind:clientWidth={stage.w} bind:clientHeight={stage.h} onpointermove={resizeFrame} onpointerup={endDrag}>
       <div class="frame" class:framed={size !== Size.Full} style={`width:${fit.width * fit.scale}px;height:${fit.height * fit.scale}px`}>
         {#if url}<iframe bind:this={frame} src={start} title="App" data-testid="app-frame" style={`width:${fit.width}px;height:${fit.height}px;transform:scale(${fit.scale})`}></iframe>{/if}
         {#if restarting}<div class="restarting" data-testid="restarting" role="status"><span class="server-dot-inline amber"></span>Restarting dev server…</div>{/if}
         {#if mode === Mode.Design && bridged && !editing}
-          <div class="overlay" role="presentation" onpointerdown={pressOverlay} onpointermove={dragOverlay} onpointerleave={() => (hover = null)} onclick={onPick} oncontextmenu={onMenu} ondragover={overAdd} ondragleave={() => (addSpot = null)} ondrop={dropAdd} ondblclick={onDouble} onwheel={(e) => bridge.scroll(e.deltaX / fit.scale, e.deltaY / fit.scale)}>
+          <div class="overlay" role="presentation" onpointerdown={pressOverlay} onpointermove={(e) => (pointed(e), dragOverlay(e))} onpointerleave={() => ((hover = null), toHost({ kind: ToHost.Cursor, at: null }))} onclick={onPick} oncontextmenu={onMenu} ondragover={overAdd} ondragleave={() => (addSpot = null)} ondrop={dropAdd} ondblclick={onDouble} onwheel={wheelOnFocus}>
             {#if hover && !lostSlots[Slot.Hovered]}<div class="outline hover" style={box(hover)}></div>{/if}
             {#if addSpot}
               <div class="drop-line box" data-testid="add-outline" style={`left:${addSpot.outline.x * fit.scale - 1}px;top:${addSpot.outline.y * fit.scale - 1}px;width:${Math.max(2, addSpot.outline.w * fit.scale)}px;height:${Math.max(2, addSpot.outline.h * fit.scale)}px`}></div>
@@ -1225,7 +1593,8 @@
           {#if picked && hint}{#each hintBoxes(picked, hint) as area, i (i)}<div class="hint {hint.group}" style={`left:${area.x * fit.scale}px;top:${area.y * fit.scale}px;width:${area.w * fit.scale}px;height:${area.h * fit.scale}px`}></div>{/each}{/if}
           {#if picked}<PluginOverlay {plugins} {picked} scale={fit.scale} />{/if}
           {#each others as other (keyOf(refOf(other.source, other.instanceIndex)))}<div class="outline picked" data-testid="selected-outline" style={box(other)}></div>{/each}
-          {#if picked && !lostSlots[Slot.Selected]}<div class="outline picked" style={box(picked)}><span class="label"><Breadcrumb pick={picked} onselect={select} compact state={elementState} /></span></div>{/if}
+          <PeerLayer {peers} rects={peerRects} scale={fit.scale} />
+          {#if picked && !lostSlots[Slot.Selected]}<div class="outline picked" style={box(picked)}>{#if !(viewing === View.Focus && showGrid)}<span class="label"><Breadcrumb pick={picked} onselect={select} compact state={elementState} /></span>{/if}</div>{/if}
           {#each pins as pin (pin.id)}
             {@const rect = pinRects[pin.id]}
             {#if rect}
@@ -1256,9 +1625,10 @@
           </form>
         </div>
       {/if}
-      {#if bridged && !hasSourceInfo(layers)}
+      {#if bridged && !noSourceDismissed && !hasSourceInfo(layers)}
         <div class="notice nosource" data-testid="no-source">
           <span>This page has no source info</span>
+          <CloseButton onclose={() => (noSourceDismissed = true)} />
           <button type="button" class="link" data-action="add-plugin" onclick={() => toHost({ kind: ToHost.AddPlugin })}>Add the Feega plugin</button>
           <button type="button" class="link" data-action={ServerAction.RestartUnderFeega} onclick={() => toHost({ kind: ToHost.Server, action: ServerAction.RestartUnderFeega })}>Let Feega start the server</button>
         </div>
@@ -1271,16 +1641,18 @@
           <button type="button" class="link" data-action="skill-hint-copy" onclick={() => toHost({ kind: ToHost.Copy, text: skillHint! })}>Copy command</button>
           <button type="button" class="link" data-action="skill-hint-never" onclick={() => (toHost({ kind: ToHost.SkillHintNever }), (skillHint = null))}>Don't show again</button>
           <button type="button" class="link" data-action="skill-hint-dismiss" onclick={() => (toHost({ kind: ToHost.SkillHintDismiss }), (skillHint = null))}>Dismiss</button>
+          <CloseButton onclose={() => (toHost({ kind: ToHost.SkillHintDismiss }), (skillHint = null))} />
         </div>
       {/if}
       {#if fontNotice}
         <div class="notice missingfont" data-testid="font-notice">
           <MissingFont missing={fontNotice} project={palette.fonts.filter((name) => !palette.missing.some((m) => m.family === name))} onreplace={replaceFont} onload={loadFont} />
           <button type="button" class="link" onclick={() => dismissedFonts.add(fontNotice!.family)}>Dismiss</button>
+          <CloseButton onclose={() => dismissedFonts.add(fontNotice!.family)} />
         </div>
       {/if}
-      {#if toast}<div class="toast" role="status">{toast}</div>{/if}
-      <div class="float" class:moving bind:clientWidth={bar.w} bind:clientHeight={bar.h} style={`left:${barAt.x}px;top:${barAt.y}px`} data-anchor={anchor}>
+      {#if toast}<div class="toast" role="status"><span>{toast}</span><CloseButton onclose={() => (toast = null)} /></div>{/if}
+      <div class="float" class:moving class:docked={!!docked} inert={!!docked} style:--away={docked ? slideAway(docked.edge) : 'none'} bind:clientWidth={bar.w} bind:clientHeight={bar.h} style={`left:${barAt.x}px;top:${barAt.y}px`} data-anchor={anchor}>
         <button type="button" class="grip" title="Drag to move (arrow keys)" aria-label="Move the bar" onpointerdown={grabBar} onpointermove={dragBar} onpointerup={dropBar} onkeydown={onHandleKey}>
           <svg width="8" height="12" viewBox="0 0 8 12" aria-hidden="true">{#each [0, 1, 2] as row (row)}{#each [0, 1] as col (col)}<circle cx={2 + col * 4} cy={2 + row * 4} r="1.1" fill="currentColor" />{/each}{/each}</svg>
         </button>
@@ -1288,6 +1660,8 @@
         <button type="button" class="icon" title="Undo (⌘Z)" disabled={!canUndo} onclick={() => toHost({ kind: ToHost.Undo })}><Undo2 size={14} /></button>
         <button type="button" class="icon" title="Redo (⇧⌘Z)" disabled={!canRedo} onclick={() => toHost({ kind: ToHost.Redo })}><Redo2 size={14} /></button>
       </div>
+
+      {#if docked}<DockTab edge={docked.edge} box={tabBox(docked, area)} onrestore={undock} />{/if}
 
       {#if barClosed && picked}
         <button type="button" class="pill" onclick={toggleBar} data-testid="selection-pill">&lt;{picked.tag}&gt; {fileName(picked.source)} · Edit</button>
@@ -1302,6 +1676,7 @@
             <button type="button" class="link" onclick={() => toHost({ kind: ToHost.Open, at: saved! })}>{saved ? `Saved to ${fileName(saved)}` : ''}</button>
             {#if warning}<span class="warn">{warning}</span>{/if}
           {/if}
+          <CloseButton onclose={() => ((problem = null), (saved = null), (warning = ''))} />
         </div>
       {/if}
     </div>
@@ -1314,9 +1689,13 @@
         <Tabs.Trigger value={Tab.Properties} class="tab">Properties</Tabs.Trigger>
         <Tabs.Trigger value={Tab.Changes} class="tab" data-testid="changes-tab">Changes{changes.length ? ` ${changes.length}` : ''}</Tabs.Trigger>
         {#if cloudOn}<Tabs.Trigger value={Tab.Comments} class="tab" data-testid="comments-tab">Comments{openComments ? ` ${openComments}` : ''}</Tabs.Trigger>{/if}
+        <Tabs.Trigger value={Tab.Ai} class="tab" data-testid="ai-tab">AI</Tabs.Trigger>
         {#each plugins.sidePanel as panel (panel.plugin + panel.entry.id)}<Tabs.Trigger value={`plugin:${panel.plugin}/${panel.entry.id}`} class="tab" data-testid="plugin-tab">{panel.entry.title}</Tabs.Trigger>{/each}
       </Tabs.List>
       <Tabs.Content value={Tab.Properties}>
+        {#if mount && viewing === View.Focus && mount.controls.length}
+          <ComponentProps controls={mount.controls} values={mount.values} grid={showGrid} {variants} dynamic={mount.dynamic} apply={{ ready: Boolean(applyPlan), usage: Boolean(focus?.usage), skipped: applyPlan?.skipped ?? [] }} onchange={setProp} ongrid={setGrid} onapply={applyToPage} />
+        {/if}
         {#if several}
           <div class="what" data-testid="multi-selection">
             <strong>{selection.refs.length} elements selected</strong>
@@ -1332,17 +1711,25 @@
         {:else if picked}
           <div class="what" data-testid="selection">
             <Breadcrumb pick={picked} onselect={select} state={elementState} />
-            <ImpactLabel {impact} instances={picked.instances} detachable={detachState(picked).show} detachReason={detachState(picked).reason} ondetach={detach} onopen={(at) => toHost({ kind: ToHost.Open, at })} />
+            <ImpactLabel {impact} instances={picked.instances} detachable={!classInfo && detachState(picked).show} detachReason={detachState(picked).reason} ondetach={detach} onopen={(at) => toHost({ kind: ToHost.Open, at })} />
             <span class="where">{#if picked.component}in {picked.component.file.split('/').pop()} · {/if}<button type="button" class="link" onclick={() => toHost({ kind: ToHost.Open, at: picked!.source })}>{picked.source.file.split('/').pop()}:{picked.source.line}</button> · <button type="button" class="link" data-testid="copy-for-agent" title="Copy file, selector and view for your coding agent" onclick={copyForAgent}>Copy for agent</button>{#if cloudOn} · <button type="button" class="link" data-testid="comment-start" title="Comment on this element (C)" onclick={startComment}>Comment</button>{/if}</span>
             {#if authored(picked.classes)}<code class="classes">{authored(picked.classes)}</code>{/if}
           </div>
           <BreakpointBar badge={reachBadge} theme={themeBadge(themeName)} items={reachItems(breakpoints)} choice={reach} onchoose={(id) => (reach = id)} />
+          {#if classInfo}
+            <div class="scope editing" data-testid="class-editing">
+              <span class="editing-label">{editingLabel(classInfo)}</span>
+              <button type="button" class="on" data-action="class-stop" onclick={() => (classesState.targetKey = null)}>This element</button>
+            </div>
+          {:else}
           <div class="scope" role="radiogroup" aria-label="Edit scope" data-testid="scope">
             <button type="button" class:on={scope === Scope.Element} onclick={() => (scope = Scope.Element)} title="Only this element (every instance of its component: {picked.instances})">This element{picked.instances > 1 ? ` ×${picked.instances}` : ''}</button>
             <button type="button" class:on={scope === Scope.Class} disabled={!picked.classCount || styling === Styling.Tailwind} onclick={() => (scope = Scope.Class)} title={styling === Styling.Tailwind ? 'Class scope needs CSS rules, not Tailwind' : `Every element with this class: ${picked.classCount}`}>All .{picked.classes.split(' ')[0] || 'class'}{picked.classCount ? ` (${picked.classCount})` : ''}</button>
           </div>
+          {/if}
           {#if held}<PreviewBar {held} onapply={applyHeld} oncancel={cancelHeld} onmute={muteHeld} />{/if}
           <Properties pick={picked} {breakpoints} {scales} {palette} {elementState} {baseline} onstate={chooseState} onpreview={preview} onchange={change} onsavevar={saveVar} onhint={(h) => (hint = h)} onfont={pickFont} onfontreplace={replaceFont} onfontload={loadFont} onnotice={showToast} />
+          <ClassesSection pick={picked} {changes} onselect={select} />
           <Attributes pick={picked} {palette} />
           <PluginSections {plugins} {palette} />
           <Interactions pick={picked} {changes} />
@@ -1358,15 +1745,18 @@
           <iframe class="plugin-panel" title={panel.entry.title} sandbox="allow-scripts" srcdoc={panel.entry.html}></iframe>
         </Tabs.Content>
       {/each}
+      <Tabs.Content value={Tab.Ai}>
+        <AiPanel context={aiContext === null ? null : withImpact(aiContext, impact)} tohost={toHost} capture={() => shoot(false)} />
+      </Tabs.Content>
       <Tabs.Content value={Tab.Comments}>
-        <CommentsList {cloud} {picked} {composing} onsubmit={(draft) => (draft.parentId ? toHost({ kind: ToHost.CommentAdd, draft }) : sendComment(draft))} oncancel={() => (composing = false)} onresolve={(id) => toHost({ kind: ToHost.CommentResolve, id })} onselect={select} oncopy={copyComment} />
+        <CommentsList {cloud} {picked} {composing} onsubmit={(draft) => (draft.parentId ? toHost({ kind: ToHost.CommentAdd, draft }) : sendComment(draft))} oncancel={() => (composing = false)} onresolve={(id) => toHost({ kind: ToHost.CommentResolve, id })} onselect={select} oncopy={copyComment} onpublish={(summary) => toHost({ kind: ToHost.RevisionPublish, summary })} />
       </Tabs.Content>
     </Tabs.Root>
   </aside>
 </main>
 
 {#if onboarding === Onboarding.Pending}
-  <OnboardingDialog {account} {support} onaccount={(kind) => toHost({ kind })} onsupport={(item) => toHost({ kind: ToHost.Support, item })} onstep={(step) => toHost({ kind: ToHost.OnboardingStep, step })} ondone={finishOnboarding} />
+  <OnboardingDialog {account} {support} {agents} local={ai.agents} {adapters} oncopy={copyText} onlink={(url) => toHost({ kind: ToHost.External, url })} onaccount={(kind) => toHost({ kind })} onsupport={(item) => toHost({ kind: ToHost.Support, item })} onstep={heardStep} ondone={finishOnboarding} />
 {/if}
 
 <style>
@@ -1666,6 +2056,9 @@
     box-shadow: 0 0 0 1px var(--ui-divider), 0 4px 12px rgb(0 0 0 / 0.15);
     color: var(--ui-text);
     font-size: var(--ui-text-xs);
+    display: flex;
+    align-items: center;
+    gap: 6px;
   }
 
   .width-label {
@@ -1690,7 +2083,10 @@
     z-index: 5;
     transition:
       left 180ms cubic-bezier(0.16, 1, 0.3, 1),
-      top 180ms cubic-bezier(0.16, 1, 0.3, 1);
+      top 180ms cubic-bezier(0.16, 1, 0.3, 1),
+      transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
+      opacity 180ms ease,
+      visibility 180ms;
     display: flex;
     align-items: center;
     gap: 6px;
@@ -1703,6 +2099,13 @@
 
   .float.moving {
     transition: none;
+  }
+
+  .float.docked {
+    visibility: hidden;
+    opacity: 0;
+    transform: var(--away);
+    pointer-events: none;
   }
 
   .grip {
@@ -1756,6 +2159,10 @@
     background: var(--ui-float);
     box-shadow: 0 0 0 1px var(--ui-divider);
     font-size: var(--ui-text-sm);
+  }
+
+  .notice :global(.close) {
+    align-self: flex-end;
   }
 
   .notice.nosource {
@@ -1832,6 +2239,22 @@
     padding: 2px;
     border-radius: var(--ui-radius-md);
     background: var(--ui-input);
+  }
+
+  .editing-label {
+    flex: 1;
+    align-self: center;
+    padding: 0 8px;
+    overflow: hidden;
+    color: var(--ui-accent);
+    font-size: var(--ui-text-xs);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .scope.editing button {
+    flex: 0 0 auto;
+    padding: 0 8px;
   }
 
   .scope button {

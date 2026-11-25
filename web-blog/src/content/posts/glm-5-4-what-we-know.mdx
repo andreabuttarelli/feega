@@ -1,0 +1,71 @@
+---
+title: "GLM-5.4: what we know so far"
+description: "GLM-5.4 from Z.ai is live on the GLM Coding Plan with vision and 50% more weekly quota than GLM-5.3. No benchmarks yet. What is confirmed, what is not, and what vision means for UI work."
+date: 2026-11-23
+updated: 2026-11-23
+cover: /covers/glm-5-4-what-we-know.png
+coverAlt: "Cover: GLM-5.4, what we know."
+tags: [ai, models, glm]
+---
+
+Z.ai released GLM-5.4 on 23 November 2026 to GLM Coding Plan subscribers. Last updated: 2026-11-23.
+
+Short version: it adds image input, it is said to code better, and it comes with 50% more weekly quota than GLM-5.3. Z.ai has published no benchmark scores. This post separates what is confirmed from what is reported, and we will update it when numbers land.
+
+## What is confirmed
+
+- **Availability.** All GLM Coding Plan users, plus ZCode and Z.ai Chat ([TestingCatalog](https://www.testingcatalog.com/z-ai-launches-glm-5-4-its-first-loop-transformer-model/)).
+- **Vision.** New for the flagship line. GLM-5.3 was text-only ([OrcaRouter](https://www.orcarouter.ai/blog/glm-5-4-release-what-we-know)). Z.ai frames it as "stronger visual coding."
+- **Quota.** Users with weekly quotas get 50% more GLM-5.4 quota than they had on GLM-5.3, per Zixuan Li of Z.ai.
+- **Model ID.** `glm-5.4[1m]` in Claude Code, `glm-5.4` in other tools (TestingCatalog).
+- **API and open weights.** API access is listed as coming soon, after a safety evaluation. Open weights are planned once safety hardening is done. No dates for either, and no GLM-5.4 repository exists yet in the `zai-org` organisation on Hugging Face (OrcaRouter).
+
+## What is not confirmed
+
+- **Benchmarks.** None, from Z.ai or from independent evaluators. A Z.ai team member said they will come later. Early posts comparing one-shot results with larger models are anecdotes, not measurements.
+- **Parameter count.** Z.ai has not disclosed one. Reports say about 700B or 750B. Treat both as unverified.
+- **The Loop Transformer.** TestingCatalog reports that GLM-5.4 runs 28 layers of the GLM-5 base model for two iterations, adding depth without adding parameters, on top of continued training. OrcaRouter says no loop count or depth has been published. The two disagree, so we do not rely on either.
+- **Company claims.** Z.ai says the model reaches intelligence "comparable to 2T- to 3T-parameter models." That is Z.ai's claim, with no public evaluation behind it.
+
+One limitation Z.ai does acknowledge: the model can get stuck in long "marathon thinking" loops. Z.ai says the extra self-correction still improves accuracy.
+
+## Earlier versions
+
+OrcaRouter lists GLM-5.2 on 16 June 2026, GLM-5.3 on 18 August and GLM-5.3-Flash on 26 August. The Z.ai docs describe GLM-5.3-Flash as a multimodal coding model for visual programming, so GLM-5.4 is the first flagship with image input, not the first Z.ai model.
+
+## What vision means for UI work
+
+None of this is measured yet, so these are uses to test, not results.
+
+- **Screenshot to code.** Give the model a screenshot of a page or a mock and ask for the component.
+- **Review against a mock.** Give it your running page and the design, and ask for the differences: spacing, type size, colour.
+- **Debugging layout.** A screenshot of a broken state carries information a stack trace does not.
+
+How well GLM-5.4 does these is the open question. Pixel-level accuracy, such as spacing off by 4px or the wrong font weight, is what we would check first.
+
+## How to try it
+
+If you have a GLM Coding Plan, select `glm-5.4` in a tool that supports Z.ai's endpoint. The docs say the plan is compatible with 20+ agent tools and link a setup guide ([docs.z.ai](https://docs.z.ai)). They do not yet mention GLM-5.4, so check there for the current setup. If you are not a subscriber, wait: the API is not open.
+
+OrcaRouter's reading of the plan: weekly credits of 10,000 (Lite), 60,000 (Pro) and 140,000 (Max), with weekday 14:00 to 18:00 (UTC+8) billed at full rate and other hours at half. The 50% uplift on those figures is their arithmetic, not Z.ai's.
+
+## What to watch
+
+1. Official benchmarks, and whether independent runs match them.
+2. The API release and its pricing.
+3. Open weights, and whether you can run them yourself.
+4. Whether the long thinking loops cost you quota on simple tasks.
+
+## Designing UIs on your real codebase
+
+A model with vision can read a screenshot. It still edits code by guessing which element you meant. Feega removes the guessing: select an element in your running app, edit it visually, and the change lands in your source. It is a free, open-source extension for VS Code, Cursor and Windsurf, and also runs with `npx feega`. It works alongside whatever model your agent uses, GLM-5.4 included.
+
+## Sources
+
+- [TestingCatalog: Z.ai launches GLM-5.4, its first Loop Transformer model](https://www.testingcatalog.com/z-ai-launches-glm-5-4-its-first-loop-transformer-model/), 23 Nov 2026
+- [OrcaRouter: GLM-5.4 release, what we know](https://www.orcarouter.ai/blog/glm-5-4-release-what-we-know)
+- [Z.ai docs](https://docs.z.ai)
+
+We could not read the original X announcement, so every claim attributed to Z.ai comes through the articles above.
+
+Last updated: 2026-11-23

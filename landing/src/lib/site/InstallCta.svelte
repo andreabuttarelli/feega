@@ -1,19 +1,20 @@
 <script lang="ts">
   import { primaryCta, secondaryCtas, starCta } from './install';
-  import InstallMenu from './InstallMenu.svelte'
+  import InstallMenu from './InstallMenu.svelte';
+  import { eventAttrs } from './analytics/attrs';
 
   let { id }: { id: string } = $props();
 
   const primary = primaryCta();
   const secondary = secondaryCtas();
 
-  const HERO_FACTS = ['free, forever', 'every edit a diff', 'no AI, no tokens'] as const;
+  const HERO_FACTS = ['free, forever', 'every edit a diff', 'no AI inside, no credits'] as const;
 </script>
 
 <div class="install" data-agent-id={id}>
   <div class="buttons">
-    <InstallMenu label={primary.label} />
-    <a class="star" href={starCta.href}>{starCta.label}</a>
+    <InstallMenu label={primary.label} place={id} />
+    <a class="star" href={starCta.href} {...eventAttrs('github_click', { place: id })}>{starCta.label}</a>
   </div>
   <p class="more">
     {#each secondary as cta (cta.label)}<a href={cta.href}>{cta.label}</a>{/each}

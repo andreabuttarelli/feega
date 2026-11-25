@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { isReachable } from './app-routes';
 
 describe('app routes', () => {
-  it.each(['/app', '/app/', '/app/settings/profile', '/app/settings/billing'])('%s stays reachable', (path) => {
+  it.each(['/app', '/app/', '/app/settings/profile', '/app/settings/billing', '/app/admin/stats'])('%s stays reachable', (path) => {
     expect(isReachable(path)).toBe(true);
   });
 

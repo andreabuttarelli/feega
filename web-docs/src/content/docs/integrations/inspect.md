@@ -129,7 +129,23 @@ proceed. Styles stay single-element: the Properties controls apply to one elemen
 | Cmd/Ctrl+C | Copy for agent |
 | Enter / Shift+Enter | Select the child / the parent |
 | Tab / Shift+Tab | Select the next / the previous sibling |
-| Esc | Clear the selection |
+| F | Open the component of the selection in its own tab |
+| Esc | Close the component tab, otherwise select the parent, which also ends a multi-selection |
+
+## Focus a component
+
+Select an element inside a component and press **F**, choose **Focus component** in the
+right-click menu, or double-click a component row in Layers. A tab named after the component opens
+next to **Page**. It shows only that one instance of the component, the one you selected or the
+row you double-clicked, on a neutral checkerboard, with nothing else of the page. Layers lists
+only that component. Select, edit and undo there exactly as on the page: edits go to
+the component source, so every instance changes, and the tab updates when the source changes. **Page** takes you back to
+the page and the component tab stays open; **×** or **Esc** closes it. One component tab is open
+at a time: focusing another component replaces it.
+
+The tab is a copy of the rendered component with the page stylesheets, so it works on React,
+Vue, Svelte and Astro without any setup. It is not a running component: scripts and event
+handlers do not run in it, and state changes such as an opened menu do not show.
 
 ## In the browser: `npx feega`
 
@@ -176,7 +192,7 @@ code --install-extension feega-inspect-0.1.0.vsix
   (Claude Code, Cursor, Copilot, Cline, Codex, Gemini CLI) see what you selected. Turn it off with
   the `feegaInspect.syncSelection` setting.
 - **Copy for agent.** Right-click the selected element and choose **Copy for agent**, or use the
-  link next to the file name in the bar. The clipboard gets `file:line`, selector, component, page,
+  link next to the file name in the bar, or right-click a row in Layers. The clipboard gets `file:line`, selector, component, page,
   preview width, and the breakpoint, theme and state when set. Paste it into your agent.
 - **Skill tip.** In a project with agent files (`CLAUDE.md`, `AGENTS.md`, `.claude/`, `.cursor/`,
   `.codex/` or `.agents/`) and no Feega skill, Feega shows a one-time tip with

@@ -1,8 +1,8 @@
 import type { ClientRequest } from 'node:http';
 import WebSocket from 'ws';
-import { FrameType, bytesFrame, decodeFrame, emptyFrame, encodeFrame, jsonFrame, jsonOf, textFrame, textOf, type Frame, type ErrorBody, type Present, type Presence, type ReqHead, type VisitorInfo, type VisitorRole, type WsClose, type WsOpen, CONTROL_STREAM } from '../../../../packages/share-protocol/src/frame';
+import { FrameType, bytesFrame, decodeFrame, emptyFrame, encodeFrame, jsonFrame, jsonOf, textFrame, textOf, type Frame, type ErrorBody, type Point, type Present, type Presence, type ReqHead, type VisitorInfo, type VisitorRole, type WsClose, type WsOpen, CONTROL_STREAM } from '../../../../packages/share-protocol/src/frame';
 import { VISITOR_HEADER, decodeVisitor } from '../../../../packages/share-protocol/src/visitor';
-import { ToView } from '../../messages';
+import { ToHost, ToView, type Author } from '../../messages';
 import { editGate } from './gate';
 import { localHeaders, localRequest } from './local';
 import { viewForVisitor } from './view-filter';
@@ -37,7 +37,24 @@ export type ShareClientOptions = {
 
 export type ShareClient = { ready: Promise<void>; appUrl: () => string | null; visitors: () => Present[]; kick: (userId: string) => void; setRole: (userId: string, role: VisitorRole) => void; close: () => void };
 
+type Signal = { selection?: string; cursor?: Point };
+
 type Stream = { abort: () => void; visitor?: VisitorInfo; request?: ClientRequest };
+
+const sourceText = (at: unknown) => {
+  const source = at as { file?: string; line?: number; col?: number } | null;
+  return source?.file ? `${source.file}:${source.line}:${source.col}` : undefined;
+};
+
+const pointOf = (at: unknown): Point | undefined => {
+  const point = at as Point | null;
+  return point && Number.isFinite(point.x) && Number.isFinite(point.y) ? { x: point.x, y: point.y } : undefined;
+};
+
+const SIGNALS: Record<string, (at: unknown, known: Signal) => Signal> = {
+  [ToHost.Selected]: (at, known) => ({ ...known, selection: sourceText(at) }),
+  [ToHost.Cursor]: (at, known) => ({ ...known, cursor: pointOf(at) })
+};
 
 const pause = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -50,6 +67,7 @@ export function shareClient(options: ShareClientOptions): ShareClient {
   const sockets = new Map<number, { target: Target; visitor: VisitorInfo; forward: (payload: string | Buffer) => void }>();
   let relay: WebSocket | null = null;
   let present: Present[] = [];
+  const signals = new Map<string, Signal>();
   let stopped = false;
   let wasOpen = false;
 
@@ -79,26 +97,42 @@ export function shareClient(options: ShareClientOptions): ShareClient {
     streams.set(streamId, { abort: () => request.destroy(), request });
   }
 
-  function viewFromLocal(streamId: number, data: WebSocket.RawData, isBinary: boolean, target: Target) {
+  function viewFromLocal(streamId: number, data: WebSocket.RawData, isBinary: boolean, target: Target, visitor: VisitorInfo) {
     if (isBinary) {
       send(bytesFrame(streamId, FrameType.WsBinary, new Uint8Array(data as Buffer)));
       return;
     }
-    const filtered = target === Target.Editor ? viewForVisitor(String(data), visitorOrigin) : { text: String(data), appUrl: undefined };
+    const filtered = target === Target.Editor ? viewForVisitor(String(data), visitorOrigin, visitor) : { text: String(data), appUrl: undefined };
     filtered.appUrl && (app = new URL(filtered.appUrl));
     filtered.text !== null && send(textFrame(streamId, filtered.text));
   }
 
+  const listed = (): Present[] => present.map((visitor) => ({ ...visitor, ...signals.get(visitor.userId) }));
+
+  const signalled = () => onPresence?.(listed());
+
+  function signal(visitor: VisitorInfo, message: { kind: string; at?: unknown }) {
+    const known = signals.get(visitor.userId) ?? {};
+    const next = SIGNALS[message.kind](message.at, known);
+    signals.set(visitor.userId, next);
+    signalled();
+  }
+
   function guarded(visitor: VisitorInfo, streamId: number, text: string, forward: (text: string) => void) {
-    let message: unknown;
+    let message: { kind?: string; at?: unknown };
     try {
-      message = JSON.parse(text);
+      message = JSON.parse(text) ?? {};
     } catch {
       return;
     }
-    const verdict = gate.check(visitor, (message ?? {}) as { kind?: string });
+    const verdict = gate.check(visitor, message);
+    if (verdict.ok && message.kind && message.kind in SIGNALS) {
+      signal(visitor, message as { kind: string; at?: unknown });
+      return;
+    }
     if (verdict.ok) {
-      forward(text);
+      const by: Author = { userId: visitor.userId, name: visitor.name };
+      forward(JSON.stringify({ ...message, by }));
       return;
     }
     verdict.quiet || send(textFrame(streamId, JSON.stringify({ kind: ToView.Edited, ok: false, reason: verdict.reason })));
@@ -116,7 +150,7 @@ export function shareClient(options: ShareClientOptions): ShareClient {
     const queued: (string | Buffer)[] = [];
     const forward = (payload: string | Buffer) => (local.readyState === WebSocket.OPEN ? local.send(payload) : queued.push(payload));
     local.on('open', () => queued.splice(0).forEach((payload) => local.send(payload)));
-    local.on('message', (data, isBinary) => viewFromLocal(streamId, data, isBinary, target));
+    local.on('message', (data, isBinary) => viewFromLocal(streamId, data, isBinary, target, visitor));
     local.on('close', (code) => {
       const live = streams.delete(streamId);
       sockets.delete(streamId);
@@ -157,9 +191,14 @@ export function shareClient(options: ShareClientOptions): ShareClient {
       [FrameType.WsBinary]: () => fromVisitor(frame),
       [FrameType.WsClose]: () => release(frame.streamId),
       [FrameType.Error]: () => release(frame.streamId),
-      [FrameType.Presence]: () => ((present = jsonOf<Presence>(frame)?.visitors ?? []), onPresence?.(present))
+      [FrameType.Presence]: () => ((present = jsonOf<Presence>(frame)?.visitors ?? []), forgetGone(), signalled())
     };
     handlers[frame.type]?.();
+  }
+
+  function forgetGone() {
+    const here = new Set(present.map((visitor) => visitor.userId));
+    [...signals.keys()].filter((userId) => !here.has(userId)).forEach((userId) => signals.delete(userId));
   }
 
   function release(streamId: number) {
@@ -219,7 +258,7 @@ export function shareClient(options: ShareClientOptions): ShareClient {
   return {
     ready,
     appUrl: () => app?.toString() ?? null,
-    visitors: () => present,
+    visitors: listed,
     kick: (userId) => void send(jsonFrame(CONTROL_STREAM, FrameType.Kick, { userId })),
     setRole: (userId, role) => {
       [...sockets.values()].filter((socket) => socket.visitor.userId === userId).forEach((socket) => (socket.visitor.role = role));

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.19
+
+Focus mode edits every kind of prop, applies them to the page, reads real Svelte and Astro values, says why it shows a snapshot, and opens at 100% on a grey canvas with zoom and a light/dark switch. A Classes panel edits plain CSS classes globally. The AI tab installs agent connectors once, adds more agents with their logos, sends the page you are on, and lets the agent take screenshots. The toolbar docks to an edge; notices have a close button. Fixed a duplicate body row in Layers and page styles in projects without a global stylesheet.
+
+## 0.2.18
+
+Focus mode opens one component in its own tab and mounts the real component in React, Vue, Svelte, Next.js, Nuxt and Astro, with Layers listing only its subtree. An AI tab chats with local coding agents (ACP): model and effort pickers, chats saved and run in parallel. Agent edits made straight on disk are listed. Send feedback in the Feega menu Help. Pixel icons and a support karma badge. Fixed stale Astro CSS after a first style edit.
+
+## 0.2.17
+
+Local MCP tools let Claude Code, Cursor and Codex read the element you selected and your changes. An agents step in onboarding sets them up. Copy for agent in Layers copies an element for your agent. Fixed a race in the launcher copy.
+
 ## 0.2.16
 
 A Library item you insert is selected right away, ready to edit. The breakpoint trigger is styled like the other dropdowns.

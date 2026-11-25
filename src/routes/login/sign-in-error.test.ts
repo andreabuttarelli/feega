@@ -12,6 +12,10 @@ describe('signInErrorIn', () => {
     expect(at('?error=link')).toBe(SignInError.Link);
   });
 
+  it('riconosce un dominio email bloccato', () => {
+    expect(at('?error=blockedDomain')).toBe(SignInError.BlockedDomain);
+  });
+
   it('ignora valori sconosciuti e assenti', () => {
     expect(at('?error=boh')).toBeNull();
     expect(at('')).toBeNull();

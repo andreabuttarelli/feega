@@ -1,4 +1,5 @@
 import { redirect } from '@sveltejs/kit';
+import { BLOCKED_SIGNUP_MESSAGE } from '$lib/server/email-policy/domain-policy';
 import { inviteTokenIn, landingPath } from '$lib/server/tenancy/landing';
 import { SIGN_IN_ERROR_PARAM, SignInError } from '../../login/sign-in-error';
 import type { RequestHandler } from './$types';
@@ -8,7 +9,8 @@ import type { RequestHandler } from './$types';
 // propria tela — che apre da sé, senza parametri da portarsi dietro.
 export const GET: RequestHandler = async ({ url, cookies, locals: { supabase, db } }) => {
   if (url.searchParams.has(SIGN_IN_ERROR_PARAM)) {
-    throw redirect(303, `/login?${SIGN_IN_ERROR_PARAM}=${SignInError.OAuth}`);
+    const blocked = url.searchParams.get('error_description')?.includes(BLOCKED_SIGNUP_MESSAGE);
+    throw redirect(303, `/login?${SIGN_IN_ERROR_PARAM}=${blocked ? SignInError.BlockedDomain : SignInError.OAuth}`);
   }
 
   const code = url.searchParams.get('code');

@@ -6,7 +6,7 @@ import type { EntryGenerator, RequestHandler } from './$types';
 const NOT_FOUND = 404;
 const FIRST_LATER_PAGE = 2;
 
-export const prerender = true;
+export const prerender = changelogPageCount(all) >= FIRST_LATER_PAGE;
 
 export const entries: EntryGenerator = () =>
   Array.from({ length: changelogPageCount(all) - 1 }, (_, i) => ({ page: String(i + FIRST_LATER_PAGE) }));
