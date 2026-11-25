@@ -156,7 +156,7 @@ const supportBody = ({ deps }: Ctx) => [
 ];
 
 const STEP_BODIES: Record<OnboardingStep, (ctx: Ctx) => HTMLElement[]> = {
-  [OnboardingStep.Welcome]: () => [],
+  [OnboardingStep.Welcome]: () => [el('div', { class: 'onb-band', title: 'Pixel landscape at dusk' })],
   [OnboardingStep.Agent]: () => [],
   [OnboardingStep.LocalAgents]: localBody,
   [OnboardingStep.Agents]: agentsBody,
