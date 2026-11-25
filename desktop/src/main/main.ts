@@ -1,8 +1,11 @@
-import { BrowserWindow, app, dialog, ipcMain, nativeImage, nativeTheme, shell } from 'electron';
+import { BrowserWindow, app, clipboard, dialog, ipcMain, nativeImage, nativeTheme, shell } from 'electron';
 import { basename, join, resolve } from 'node:path';
 import { accountStore } from './account';
 import { SCHEME, acceptDeepLink, linkOfArgv } from './deep-link';
+import { acpAgents } from '../../../inspect/src/host/ai/acp-agents';
+import { machineEnv } from '../../../inspect/src/host/agents';
 import { LINKS } from './links';
+import { onboardingUrlAllowed } from './onboarding-links';
 import { installMenu } from './menu';
 import { pidFile } from './pid-file';
 import { frameworkOf } from './project-info';
@@ -89,7 +92,8 @@ app.whenReady().then(() => {
     node,
     project,
     invite: inviteWanted(settings.get(), account.email()),
-    documents: app.getPath('documents')
+    documents: app.getPath('documents'),
+    onboarded: settings.get().onboarded
   });
 
   const publish = () => window.webContents.send(Channel.State, state());
@@ -176,6 +180,17 @@ app.whenReady().then(() => {
     project = null;
     publish();
   });
+  ipcMain.handle(Channel.FinishOnboarding, () => {
+    settings.finishOnboarding();
+    publish();
+  });
+  ipcMain.handle(Channel.ReplayOnboarding, () => {
+    settings.replayOnboarding();
+    publish();
+  });
+  ipcMain.handle(Channel.DetectAgents, () => acpAgents(machineEnv()));
+  ipcMain.handle(Channel.Copy, (_event, text: string) => clipboard.writeText(text));
+  ipcMain.handle(Channel.OpenUrl, (_event, url: string) => (onboardingUrlAllowed(url) ? shell.openExternal(url) : undefined));
   ipcMain.handle(Channel.DismissInvite, () => {
     settings.dismissInvite();
     publish();

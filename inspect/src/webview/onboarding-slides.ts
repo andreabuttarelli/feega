@@ -4,6 +4,13 @@ import { PixelIcon } from '@feega/pixel-icons/pixel';
 export type Slide = { step: OnboardingStep; icon: PixelIcon; title: string; body: string; more?: string };
 
 export const MCP_COMMAND = 'claude mcp add feega -- npx -y feega mcp';
+export const LOCAL_EMPTY = 'No coding agent found on this machine yet.';
+export const LOCAL_LATER = 'You can connect more agents later from the chat picker.';
+export const SKILL_COMMAND = 'npx skills add andreabuttarelli/feega';
+export const SKILL_TITLE = 'Install the Feega skill';
+export const SKILL_DETAIL = 'Lets your agent drive Feega';
+export const FAQ_QUESTION = "How do I pass a UI element's references to my agent?";
+export const FAQ_ANSWER = 'Right-click any element in the preview and choose Copy for agent. Paste it into your agent: it gets the file, the selector and the view.';
 export const MCP_DOCS_URL = 'https://docs.feega.app/more/connect-your-agent-via-mcp/';
 
 export const SLIDES: Slide[] = [
@@ -21,9 +28,15 @@ export const SLIDES: Slide[] = [
     more: 'Design mode picks and edits. Navigate mode lets you use your app.'
   },
   {
+    step: OnboardingStep.LocalAgents,
+    icon: PixelIcon.Cursor,
+    title: 'works side by side with your agents',
+    body: "Feega's local chat runs on the coding agents installed here."
+  },
+  {
     step: OnboardingStep.Agents,
     icon: PixelIcon.Stack,
-    title: 'Connect Feega to your agents',
+    title: 'connect Feega to your agents',
     body: 'Feega works with the coding agent you already use.'
   },
   {
