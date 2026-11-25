@@ -4,6 +4,7 @@ import { PIXELS, pixelSvg } from './pixel';
 import { STACKS, Stack } from '../../../cli/lib/scaffold/stacks';
 import { TEMPLATES, TEMPLATE_LABELS, Template } from '../../../cli/lib/scaffold/templates';
 import { Step } from '../../../cli/lib/scaffold/step';
+import { el, pill, run } from './dom';
 import { Link, NodeStatus, TabStatus, UpdateState, type RecentInfo, type ShellState, type TabInfo } from '../main/types';
 
 type Bridge = {
@@ -57,31 +58,6 @@ const FRIENDLY: [RegExp, string][] = [
   [/EADDRINUSE/i, 'a port needed by the dev server is already in use.'],
   [/not found|ENOENT/i, 'something the dev server needs was not found.']
 ];
-
-type Props = { class?: string; text?: string; html?: string; on?: () => void; title?: string };
-
-const el = (tag: string, props: Props = {}, ...children: (Node | string)[]) => {
-  const node = document.createElement(tag);
-  node.className = props.class ?? '';
-  if (props.text !== undefined) {
-    node.textContent = props.text;
-  }
-  if (props.html !== undefined) {
-    node.innerHTML = props.html;
-  }
-  if (props.title) {
-    node.title = props.title;
-  }
-  if (props.on) {
-    node.addEventListener('click', props.on);
-  }
-  node.append(...children);
-  return node;
-};
-
-const run = (action: () => Promise<unknown>) => () => void action();
-
-const pill = (text: string, kind: string, on: () => void) => el('button', { class: `pill ${kind}`, text, on });
 
 const mark = (size: number = MARK_SIZE) => `<svg width="${size}" height="${size}" viewBox="0 0 300 300" fill="${MARK_FILL}">${MARK}</svg>`;
 
