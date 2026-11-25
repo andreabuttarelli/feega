@@ -41,6 +41,7 @@ The server adds country, region and city from the request. It does not store the
 | `library_insert` | A library item was inserted. | `library_item`, `tier` |
 | `copy_for_agent` | You copied a change for an agent. | |
 | `focus_opened` | Focus mode opened. | `variant` (`focus`) |
+| `ai_chat_created` | A chat was created. | `chat_count`, `live_count` (numbers only, never text) |
 | `ai_agent_chosen`, `ai_session_started`, `ai_session_ended` | An agent was chosen; an AI session started or ended. | `agent`; on end: `message_count`, `tool_count`, `duration_ms` |
 | `ai_message_sent`, `ai_first_response` | A message was sent; the first reply arrived. | `agent`; first response: `duration_ms` |
 | `ai_tool_call`, `ai_permission`, `ai_cancel`, `ai_session_error` | Agent activity. | `agent`; permission: `outcome` (`allow` or `reject`); error: `error_class` |

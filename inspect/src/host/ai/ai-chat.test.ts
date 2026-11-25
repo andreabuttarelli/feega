@@ -1,0 +1,191 @@
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { describe, expect, it } from 'vitest';
+import { AiState, ToView, type ChatRow, type ViewMessage } from '../../messages';
+import { AcpId } from './acp-agents';
+import { aiChat, MAX_LIVE, type ChatRecord } from './ai-chat';
+import { AgentEventKind, type OpenAgent } from './agent-session';
+import { openAcpAgent } from './acp-session';
+import { ItemKind } from './transcript';
+import { Policy } from './permission-policy';
+
+const FAKE = fileURLToPath(new URL('./fake-acp-agent.mjs', import.meta.url));
+const WAIT_MS = 5000;
+
+const eventually = async (check: () => boolean) => {
+  const start = Date.now();
+  while (!check()) {
+    if (Date.now() - start > WAIT_MS) {
+      throw new Error('timed out');
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+};
+
+type Options = { flags?: string[]; confirmed?: boolean; saved?: ChatRecord[] };
+
+function setup({ flags = [], confirmed = true, saved = [] }: Options = {}) {
+  const root = mkdtempSync(join(tmpdir(), 'ai-chat-'));
+  writeFileSync(join(root, 'a.txt'), 'x');
+  const sent: ViewMessage[] = [];
+  const opened: (string | null)[] = [];
+  const created: [number, number][] = [];
+  let stored: ChatRecord[] = saved;
+  let clock = 1000;
+  let ids = 0;
+  const open: OpenAgent = (_launch, deps) => (opened.push(deps.resume), openAcpAgent({ command: process.execPath, args: [FAKE, ...flags] }, deps));
+  const chat = aiChat({
+    root: () => root,
+    env: () => ({ path: ['/bin'], home: '/h', exists: (p) => p === '/bin/opencode', appName: '', extensions: [] }),
+    open,
+    confirm: async () => confirmed,
+    post: (message) => void sent.push(message),
+    write: async () => undefined,
+    policy: { get: () => Policy.Ask, set: () => undefined },
+    store: { load: () => stored, save: (records) => void (stored = records) },
+    now: () => ++clock,
+    newId: () => `chat-${++ids}`,
+    created: (chats, live) => void created.push([chats, live])
+  });
+  const rows = (): ChatRow[] => sent.flatMap((m) => (m.kind === ToView.AiChats ? [m.chats] : [])).at(-1) ?? [];
+  const snapshot = () => sent.flatMap((m) => (m.kind === ToView.AiChat ? [m] : [])).at(-1);
+  const events = () => sent.flatMap((m) => (m.kind === ToView.AiEvent ? [m.event] : []));
+  return { chat, sent, rows, snapshot, events, opened, created, saved: () => stored, root };
+}
+
+const done = (t: ReturnType<typeof setup>, count: number) => eventually(() => t.events().filter((e) => e.kind === AgentEventKind.Done).length >= count);
+
+describe('the AI chats', () => {
+  it('lists a chat titled by its first prompt', async () => {
+    const t = setup();
+    await t.chat.start(AcpId.OpenCode);
+
+    await t.chat.send('hello', null);
+    await done(t, 1);
+
+    expect(t.rows()).toMatchObject([{ id: 'chat-1', agent: AcpId.OpenCode, title: 'hello', running: false }]);
+    t.chat.close();
+  });
+
+  it('restores the transcript after Feega is reopened', async () => {
+    const first = setup();
+    await first.chat.start(AcpId.OpenCode);
+    await first.chat.send('hello', null);
+    await done(first, 1);
+    first.chat.close();
+
+    const second = setup({ saved: first.saved() });
+    second.chat.list();
+
+    const snapshot = second.snapshot();
+    expect(snapshot?.state).toBe(AiState.Ready);
+    expect(snapshot?.items.map((i) => i.kind)).toEqual([ItemKind.User, ItemKind.Agent]);
+    expect(second.rows()).toHaveLength(1);
+  });
+
+  it('resumes the agent session when it can load one', async () => {
+    const first = setup({ flags: ['load'] });
+    await first.chat.start(AcpId.OpenCode);
+    await first.chat.send('hello', null);
+    await done(first, 1);
+    first.chat.close();
+
+    const second = setup({ flags: ['load'], saved: first.saved() });
+    second.chat.list();
+    await second.chat.send('again', null);
+    await done(second, 1);
+
+    expect(second.opened).toEqual(['fake-session']);
+    expect(second.snapshot()?.items.some((i) => i.kind === ItemKind.Note)).toBeFalsy();
+    second.chat.close();
+  });
+
+  it('says the agent forgot when it cannot load the old session', async () => {
+    const first = setup();
+    await first.chat.start(AcpId.OpenCode);
+    await first.chat.send('hello', null);
+    await done(first, 1);
+    first.chat.close();
+
+    const second = setup({ saved: first.saved() });
+    second.chat.list();
+    await second.chat.send('again', null);
+    await done(second, 1);
+
+    const notes = second.snapshot()?.items.flatMap((i) => (i.kind === ItemKind.Note ? [i.text] : []));
+    expect(notes).toEqual(["New session — the agent doesn't remember earlier messages"]);
+    second.chat.close();
+  });
+
+  it('keeps a chat running while another one is opened', async () => {
+    const t = setup();
+    await t.chat.start(AcpId.OpenCode);
+    void t.chat.send('wait', null);
+    await eventually(() => t.rows()[0]?.running === true);
+
+    await t.chat.start(AcpId.OpenCode);
+    await t.chat.send('hello', null);
+    await done(t, 1);
+
+    expect(t.rows().map((r) => r.running)).toEqual([false, true]);
+    await t.chat.open('chat-1');
+    expect(t.snapshot()?.state).toBe(AiState.Busy);
+    await t.chat.cancel();
+    await done(t, 2);
+    t.chat.close();
+  });
+
+  it('refuses a chat beyond the running limit with a clear message', async () => {
+    const t = setup();
+    for (let i = 0; i < MAX_LIVE; i++) {
+      await t.chat.start(AcpId.OpenCode);
+      void t.chat.send('wait', null);
+      await eventually(() => t.rows().filter((r) => r.running).length === i + 1);
+    }
+
+    await t.chat.start(AcpId.OpenCode);
+
+    const failed = t.events().filter((e) => e.kind === AgentEventKind.Failed).at(-1);
+    expect(failed && failed.kind === AgentEventKind.Failed && failed.reason).toBe(`${MAX_LIVE} chats are already working. Stop one or wait for it to finish.`);
+    expect(t.rows()).toHaveLength(MAX_LIVE);
+    t.chat.close();
+  });
+
+  it('renames a chat', async () => {
+    const t = setup();
+    await t.chat.start(AcpId.OpenCode);
+
+    t.chat.rename('chat-1', 'Hero spacing');
+
+    expect(t.rows()[0].title).toBe('Hero spacing');
+    expect(t.saved()[0].title).toBe('Hero spacing');
+    t.chat.close();
+  });
+
+  it('deletes a chat only after the user confirms', async () => {
+    const no = setup({ confirmed: false });
+    await no.chat.start(AcpId.OpenCode);
+    await no.chat.remove('chat-1');
+    expect(no.rows()).toHaveLength(1);
+    no.chat.close();
+
+    const yes = setup();
+    await yes.chat.start(AcpId.OpenCode);
+    await yes.chat.remove('chat-1');
+    expect(yes.rows()).toHaveLength(0);
+    expect(yes.saved()).toEqual([]);
+    expect(yes.snapshot()?.chat).toBeNull();
+  });
+
+  it('counts chats and live sessions without their text', async () => {
+    const t = setup();
+
+    await t.chat.start(AcpId.OpenCode);
+    await t.chat.start(AcpId.OpenCode);
+
+    expect(t.created).toEqual([[1, 1], [2, 2]]);
+    t.chat.close();
+  });
+});

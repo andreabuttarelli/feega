@@ -6,6 +6,7 @@ import { AgentEventKind, ToolStatus, type AgentDeps, type AgentSession, type Dif
 
 const CLIENT_NAME = 'feega';
 const CANCELLED = { outcome: { outcome: 'cancelled' as const } };
+const AUTH_REQUIRED = -32000;
 const ALLOWS = new Set(['allow_once', 'allow_always']);
 
 const STATUSES: Record<string, ToolStatus> = {
@@ -27,6 +28,7 @@ export const openAcpAgent = async (launch: Launch, deps: AgentDeps): Promise<Age
   let asked = 0;
   let sessionId = '';
   let available: ModeView[] = [];
+  let replaying = false;
 
   const modeChanged = (current: string) => deps.emit({ kind: AgentEventKind.Modes, available, current });
 
@@ -44,6 +46,9 @@ export const openAcpAgent = async (launch: Launch, deps: AgentDeps): Promise<Age
   };
 
   const updated = ({ update }: SessionNotification) => {
+    if (replaying) {
+      return;
+    }
     if (update.sessionUpdate === 'agent_message_chunk' && update.content.type === 'text') {
       deps.emit({ kind: AgentEventKind.Text, text: update.content.text });
     } else if (update.sessionUpdate === 'agent_thought_chunk' && update.content.type === 'text') {
@@ -86,8 +91,42 @@ export const openAcpAgent = async (launch: Launch, deps: AgentDeps): Promise<Age
   child.on('error', (error) => deps.emit({ kind: AgentEventKind.Failed, reason: messageOf(error) }));
   child.on('exit', (code) => deps.emit({ kind: AgentEventKind.Failed, reason: `the agent exited (${code})` }));
 
-  await connection.agent.request(methods.agent.initialize, { protocolVersion: PROTOCOL_VERSION, clientCapabilities: { fs: { readTextFile: true, writeTextFile: true } }, clientInfo: { name: CLIENT_NAME, version: '1' } });
-  const created = await connection.agent.request(methods.agent.session.new, { cwd: deps.cwd, mcpServers: [] });
+  const hello = await connection.agent.request(methods.agent.initialize, { protocolVersion: PROTOCOL_VERSION, clientCapabilities: { fs: { readTextFile: true, writeTextFile: true } }, clientInfo: { name: CLIENT_NAME, version: '1' } });
+
+  const newSession = () => connection.agent.request(methods.agent.session.new, { cwd: deps.cwd, mcpServers: [] });
+
+  const signedIn = async () => {
+    for (const method of hello.authMethods ?? []) {
+      const ok = await connection.agent.request(methods.agent.authenticate, { methodId: method.id }).then(() => true, () => false);
+      if (ok) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const fresh = () =>
+    newSession().catch(async (error) => {
+      if ((error as { code?: number }).code !== AUTH_REQUIRED || !(await signedIn())) {
+        throw error;
+      }
+      return newSession();
+    });
+
+  const loaded = async (id: string) => {
+    replaying = true;
+    try {
+      const response = await connection.agent.request(methods.agent.session.load, { sessionId: id, cwd: deps.cwd, mcpServers: [] });
+      return { sessionId: id, modes: response.modes };
+    } catch {
+      return null;
+    } finally {
+      replaying = false;
+    }
+  };
+
+  const resumed = deps.resume !== null && hello.agentCapabilities?.loadSession === true ? await loaded(deps.resume) : null;
+  const created = resumed ?? (await fresh());
   sessionId = created.sessionId;
   if (created.modes?.availableModes.length) {
     available = created.modes.availableModes.map((m) => ({ id: m.id, name: m.name, description: m.description ?? '' }));
@@ -100,6 +139,8 @@ export const openAcpAgent = async (launch: Launch, deps: AgentDeps): Promise<Age
   };
 
   return {
+    id: sessionId,
+    resumed: resumed !== null,
     send: async (prompt) => {
       try {
         const done = await connection.agent.request(methods.agent.session.prompt, { sessionId, prompt: [{ type: 'text', text: prompt }] });

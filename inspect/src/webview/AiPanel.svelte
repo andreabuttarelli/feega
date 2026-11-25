@@ -4,6 +4,10 @@
   import Check from '@lucide/svelte/icons/check';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
+  import History from '@lucide/svelte/icons/history';
+  import Pencil from '@lucide/svelte/icons/pencil';
+  import Plus from '@lucide/svelte/icons/plus';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
   import Heading1 from '@lucide/svelte/icons/heading-1';
   import ImageIcon from '@lucide/svelte/icons/image';
   import Layers from '@lucide/svelte/icons/layers';
@@ -18,12 +22,12 @@
   import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
   import X from '@lucide/svelte/icons/x';
   import { AiState, ToHost, type HostMessage } from '../messages';
-  import { ai, aiAnswered, aiCleared, aiSaid } from './ai-state.svelte';
+  import { ai, aiAnswered, aiSaid } from './ai-state.svelte';
   import { ChipIcon, chipView } from './ai-chip';
   import { sendsOnKey } from './ai-keys';
-  import { SUGGESTIONS, isDanger, isThinking, markOf, pickerLabel, placeholderOf, statusOf } from './ai-view';
+  import { SUGGESTIONS, agoOf, isDanger, isThinking, markOf, pickerLabel, placeholderOf, statusOf } from './ai-view';
   import { POLICY_ROWS, type Policy } from '../host/ai/permission-policy';
-  import { ItemKind } from './ai-transcript';
+  import { ItemKind } from '../host/ai/transcript';
   import { lineDiff } from './ai-diff';
   import { markdown } from './ai-markdown';
   import { ToolStatus } from '../host/ai/agent-session';
@@ -40,6 +44,10 @@
   let menu = $state(false);
   let input = $state<HTMLTextAreaElement>();
   let permissions = $state(false);
+  let chatsOpen = $state(false);
+  let renaming = $state<string | null>(null);
+  let draft = $state('');
+  const now = $derived(ai.chats.length ? Date.now() : 0);
 
   const chip = $derived(context !== null && dropped !== context ? chipView(context) : null);
   const busy = $derived(ai.state === AiState.Busy);
@@ -58,6 +66,7 @@
 
   $effect(() => {
     void text;
+    void ready;
     if (!input) {
       return;
     }
@@ -70,8 +79,33 @@
     if (id === ai.agent) {
       return;
     }
-    aiCleared();
     tohost({ kind: ToHost.AiStart, agent: id as never });
+  }
+
+  function newChat() {
+    const agent = ai.agent ?? available[0]?.id;
+    chatsOpen = false;
+    if (agent) {
+      tohost({ kind: ToHost.AiStart, agent: agent as never });
+    }
+  }
+
+  function openChat(id: string) {
+    chatsOpen = false;
+    renaming = null;
+    tohost({ kind: ToHost.AiOpen, chat: id });
+  }
+
+  function beginRename(id: string, title: string) {
+    renaming = id;
+    draft = title;
+  }
+
+  function commitRename() {
+    if (renaming) {
+      tohost({ kind: ToHost.AiRename, chat: renaming, title: draft });
+    }
+    renaming = null;
   }
 
   function send() {
@@ -163,6 +197,34 @@
               </div>
             {/each}
           {/if}
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
+    <Popover.Root bind:open={chatsOpen}>
+      <Popover.Trigger class="agent-trigger history" data-testid="ai-history" aria-label="Chats">
+        <History size={14} />
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content class="agent-menu chats-menu" align="end" sideOffset={4} data-testid="ai-chats-menu">
+          <button type="button" class="agent-option" data-testid="ai-new-chat" onclick={newChat}><Plus size={14} /><span class="agent-name">New chat</span></button>
+          {#if ai.chats.length}<p class="menu-label">Chats</p>{/if}
+          {#each ai.chats as chat (chat.id)}
+            {@const agent = ai.agents.find((a) => a.id === chat.agent)}
+            <div class="chat-row" class:current={chat.id === ai.chat} data-testid="ai-chat-row" data-chat={chat.id}>
+              {#if renaming === chat.id}
+                <input class="rename" aria-label="Chat name" data-testid="ai-chat-rename" bind:value={draft} onkeydown={(e) => (e.key === 'Enter' ? commitRename() : e.key === 'Escape' ? (renaming = null) : undefined)} onblur={commitRename} />
+              {:else}
+                <button type="button" class="chat-open" onclick={() => openChat(chat.id)}>
+                  {@render glyph(chat.agent, agent?.label ?? chat.agent, 14)}
+                  <span class="chat-title">{chat.title || 'New chat'}</span>
+                  {#if chat.running}<span class="dot green pulse" title="Working" data-testid="ai-chat-running"></span>{/if}
+                  <span class="chat-ago">{agoOf(now, chat.updatedAt)}</span>
+                </button>
+                <button type="button" class="chat-action" aria-label="Rename chat" data-testid="ai-chat-rename-action" onclick={() => beginRename(chat.id, chat.title)}><Pencil size={12} /></button>
+                <button type="button" class="chat-action" aria-label="Delete chat" data-testid="ai-chat-delete" onclick={() => tohost({ kind: ToHost.AiDelete, chat: chat.id })}><Trash2 size={12} /></button>
+              {/if}
+            </div>
+          {/each}
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>
@@ -278,6 +340,85 @@
   header {
     display: flex;
     align-items: center;
+    justify-content: space-between;
+  }
+
+  .chat-row {
+    display: flex;
+    align-items: center;
+    border-radius: var(--ui-radius-sm);
+  }
+
+  .chat-row:hover,
+  .chat-row.current {
+    background: var(--ui-input-hover);
+  }
+
+  .chat-open {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    align-items: center;
+    gap: 8px;
+    height: var(--ui-hit);
+    padding: 0 8px;
+    border: 0;
+    background: none;
+    color: var(--ui-text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .chat-title {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .chat-ago {
+    flex: none;
+    color: var(--ui-text-3);
+    font-size: var(--ui-text-xs);
+  }
+
+  .chat-action {
+    display: none;
+    place-items: center;
+    width: 22px;
+    height: var(--ui-hit);
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--ui-text-3);
+    cursor: pointer;
+  }
+
+  .chat-row:hover .chat-action {
+    display: grid;
+  }
+
+  .chat-action:hover {
+    color: var(--ui-text);
+  }
+
+  .rename {
+    flex: 1;
+    height: var(--ui-hit);
+    margin: 0 4px;
+    padding: 0 6px;
+    border: 1px solid var(--ui-accent);
+    border-radius: var(--ui-radius-sm);
+    outline: 0;
+    background: var(--ui-input);
+    color: var(--ui-text);
+    font: inherit;
+  }
+
+  .pulse {
+    animation: pulse 1.2s ease-in-out infinite;
   }
 
   :global(.agent-trigger) {

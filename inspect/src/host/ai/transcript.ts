@@ -1,4 +1,4 @@
-import { AgentEventKind, type AgentEvent, type OptionView, type PlanEntryView, type ToolView } from '../host/ai/agent-session';
+import { AgentEventKind, type AgentEvent, type OptionView, type PlanEntryView, type ToolView } from './agent-session';
 
 export enum ItemKind {
   User = 'user',

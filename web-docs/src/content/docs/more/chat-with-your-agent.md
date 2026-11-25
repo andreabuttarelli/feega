@@ -39,4 +39,16 @@ Select an element in the preview, then write. The element is attached to your me
 - **Stop** cancels the current turn.
 - Files the agent writes land in the **Changes** tab as one change each, marked with the agent's name. [Undo them](/editing/undo-and-changes/) like any other change.
 
+## Chats
+
+Every chat is saved on your machine, per project, with its agent, mode and messages. Close Feega and reopen it: the chats are still there.
+
+The clock icon at the top right of the AI tab opens the list. Each row shows the agent, the first prompt as the title, how long ago it was active, and a green dot while the agent is working. **New chat** starts another one; hover a row to rename or delete it. Deleting asks first.
+
+Chats run in parallel. Switching to another chat does not stop the one that is working. At most four agents run at once; an idle one is parked to make room, and if all four are busy Feega says so.
+
+When you write in an old chat, Feega asks the agent to load its earlier session, if it supports that, so it keeps the context. If not, the history stays visible, a note says "New session — the agent doesn't remember earlier messages", and the agent starts fresh.
+
+Feega signs in to agents that ask for it with the login method they offer (for example Cursor Agent after `agent login`).
+
 The agent runs in your project folder. It can only read and write files inside it.

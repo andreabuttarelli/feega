@@ -1,6 +1,7 @@
 import type { SupportItem } from './support';
 import type { AcpAgent, AcpId } from './host/ai/acp-agents';
-import type { AgentEvent } from './host/ai/agent-session';
+import type { AgentEvent, ModeView } from './host/ai/agent-session';
+import type { Item } from './host/ai/transcript';
 import type { Policy } from './host/ai/permission-policy';
 import type { LiveEditAsk } from '@feega/live-edit/live-ask';
 import type { Place } from '@feega/live-edit/move-node';
@@ -223,6 +224,9 @@ export enum ToHost {
   AiAnswer = 'ai-answer',
   AiMode = 'ai-mode',
   AiPolicy = 'ai-policy',
+  AiOpen = 'ai-open',
+  AiRename = 'ai-rename',
+  AiDelete = 'ai-delete',
   Usage = 'usage'
 }
 
@@ -239,6 +243,8 @@ export type WebviewUsageDims = Partial<{ variant: string; state: string; breakpo
 export type ChangeRow = { id: number; at: string; prop: string; value: string; scope: string; files: string[]; time: number; by?: string };
 
 export type Prefs = { size: string; custom: number | null; barClosed: boolean; route?: string; anchor?: string; barWidth?: number; leftWidth?: number; leftClosed?: boolean; layers?: Record<string, { hidden: string[]; locked: string[] }> };
+
+export type ChatRow = { id: string; agent: AcpId; title: string; updatedAt: number; running: boolean };
 
 export enum AiState {
   Idle = 'idle',
@@ -277,7 +283,9 @@ export enum ToView {
   AiAgents = 'ai-agents',
   AiState = 'ai-state',
   AiEvent = 'ai-event',
-  AiPolicy = 'ai-policy'
+  AiPolicy = 'ai-policy',
+  AiChats = 'ai-chats',
+  AiChat = 'ai-chat'
 }
 
 export enum ShareState {
@@ -392,7 +400,10 @@ export type HostMessage =
   | { kind: ToHost.Usage; event: WebviewUsage; dims?: WebviewUsageDims }
   | { kind: ToHost.AiAnswer; id: string; optionId: string | null }
   | { kind: ToHost.AiMode; id: string }
-  | { kind: ToHost.AiPolicy; policy: Policy };
+  | { kind: ToHost.AiPolicy; policy: Policy }
+  | { kind: ToHost.AiOpen; chat: string }
+  | { kind: ToHost.AiRename; chat: string; title: string }
+  | { kind: ToHost.AiDelete; chat: string };
 
 export type Authored = HostMessage & { by?: Author };
 
@@ -424,9 +435,11 @@ export type ViewMessage =
   | { kind: ToView.Preview; ask: EditAsk; reason: string; files: DiffFile[]; by?: Author }
   | { kind: ToView.Peers; peers: Present[] }
   | { kind: ToView.AiAgents; agents: AcpAgent[] }
-  | { kind: ToView.AiState; state: AiState; agent?: AcpId }
-  | { kind: ToView.AiEvent; event: AgentEvent }
-  | { kind: ToView.AiPolicy; policy: Policy };
+  | { kind: ToView.AiState; state: AiState; agent?: AcpId; chat?: string }
+  | { kind: ToView.AiEvent; event: AgentEvent; chat?: string }
+  | { kind: ToView.AiPolicy; policy: Policy }
+  | { kind: ToView.AiChats; chats: ChatRow[]; active: string | null }
+  | { kind: ToView.AiChat; chat: string | null; agent?: AcpId; state: AiState; items: Item[]; modes: ModeView[]; mode: string | null };
 
 export const INSPECT = 'feega:inspect';
 export const INSPECT_RESULT = 'feega:inspect:result';
