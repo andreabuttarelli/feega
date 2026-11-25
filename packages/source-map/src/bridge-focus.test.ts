@@ -1,6 +1,7 @@
 import { JSDOM } from 'jsdom';
 import { describe, expect, it } from 'vitest';
 import { installBridge } from './bridge.js';
+import { canvasCss } from './focus.js';
 
 const CARD = 'src/Card.tsx:4:5';
 
@@ -378,6 +379,19 @@ describe('focus tab', () => {
       const body = frame()!.contentDocument!.body;
       expect(body.style.fontFamily).toContain('Brand');
       expect(body.style.color).toBe('rgb(1, 2, 3)');
+    });
+
+    it('paints the real component on the page background, in a style the mount runtime does not own', () => {
+      const { win, send, frame } = reactive();
+      win.document.body.setAttribute('style', 'background-color: rgb(10, 10, 10)');
+      send({ type: 'feega:focus', source: 'src/Card.tsx:5:7' });
+      (frame()!.contentWindow as unknown as Record<symbol, boolean>)[Symbol.for('feega.nested-host')] = true;
+      frame()!.dispatchEvent(new (win as unknown as typeof globalThis).Event('load'));
+      const inner = frame()!.contentDocument!;
+      inner.head.insertAdjacentHTML('beforeend', `<style id="feega-focus-canvas">${canvasCss({ layoutOnly: true })}</style>`);
+
+      expect(inner.getElementById('feega-focus-surface')!.textContent).toContain('background-color:rgb(10, 10, 10)');
+      expect(inner.getElementById('feega-focus-canvas')!.textContent).not.toContain('background-color');
     });
 
     it('ignores a status from anything but the focus tab', () => {

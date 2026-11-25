@@ -72,10 +72,15 @@ function surfaceOf({ scheme, bg, transparent }) {
   return `background-color:${own ? own.color : base}!important;background-image:${own && own.image ? own.image : NO_IMAGE}!important`;
 }
 
-export const canvasCss = ({ scheme = DEFAULT_SCHEME, bg = null, transparent = false } = {}) =>
-  `html{min-height:100%;${surfaceOf({ scheme, bg, transparent })}}body>*{zoom:var(${ZOOM_VAR},1)}body{display:flex!important;flex-wrap:wrap;align-items:center;align-content:center;justify-content:center;gap:${GAP_PX}px;box-sizing:border-box;min-height:100vh;margin:0!important;padding:${PADDING_PX}px!important;background:transparent!important}`;
+const LAYOUT_CSS = `body>*{zoom:var(${ZOOM_VAR},1)}body{display:flex!important;flex-wrap:wrap;align-items:center;align-content:center;justify-content:center;gap:${GAP_PX}px;box-sizing:border-box;min-height:100vh;margin:0!important;padding:${PADDING_PX}px!important;background:transparent!important}`;
 
-export const CANVAS_CSS = canvasCss();
+export const SURFACE_ID = 'feega-focus-surface';
+
+export const surfaceCss = (canvas = {}) => `html{min-height:100%;${surfaceOf({ scheme: DEFAULT_SCHEME, bg: null, transparent: false, ...canvas })}}`;
+
+export const canvasCss = ({ layoutOnly = false, ...canvas } = {}) => (layoutOnly ? LAYOUT_CSS : surfaceCss(canvas) + LAYOUT_CSS);
+
+export const CANVAS_CSS = canvasCss({ layoutOnly: true });
 
 const nameOfFile = (file) => file.split('/').pop().replace(/\.[^.]+$/, '');
 const attrsOf = (element) => Object.fromEntries([...element.attributes].filter(({ name }) => name !== SOURCE_ATTR).map(({ name, value }) => [name, value]));
@@ -284,7 +289,7 @@ export function focusTab(win, { install, prepare, report }) {
         loaded = true;
         if (mode === FocusMode.Mount) {
           carryPage(win.document, mine.contentDocument, rootOf(win.document, source, index));
-          mine.contentDocument.getElementById(CANVAS_ID)?.replaceChildren(canvasCss(canvasNow()));
+          putSurface(mine.contentDocument);
         }
         mine.contentDocument.documentElement.style.setProperty(ZOOM_VAR, String(zoomNow));
         install(mine.contentWindow);
@@ -297,10 +302,18 @@ export function focusTab(win, { install, prepare, report }) {
 
   const surfaceColor = () => (canvasNow().transparent ? paletteOf(canvasNow().scheme).fill : (isDark(bg) === (canvasNow().scheme === 'dark') && bg ? bg.color : paletteOf(canvasNow().scheme).base));
 
+  function putSurface(inner) {
+    const style = inner.getElementById(SURFACE_ID) ?? inner.head.appendChild(inner.createElement('style'));
+    style.id = SURFACE_ID;
+    style.textContent = surfaceCss(canvasNow());
+  }
+
   function paintCanvas() {
-    const style = frame?.contentDocument?.getElementById(CANVAS_ID);
-    if (style) {
-      style.textContent = canvasCss(canvasNow());
+    const inner = frame?.contentDocument;
+    if (inner?.getElementById(SURFACE_ID)) {
+      putSurface(inner);
+    } else if (inner?.getElementById(CANVAS_ID)) {
+      inner.getElementById(CANVAS_ID).textContent = canvasCss(canvasNow());
     }
     if (frame) {
       frame.style.background = surfaceColor();
