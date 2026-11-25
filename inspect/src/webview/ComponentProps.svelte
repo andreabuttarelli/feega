@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { EDITORS, INVALID, Input, type PropControl, type PropValue, type Variants } from './prop-controls';
+  import { EDITORS, INVALID, editorFor, Input, type PropControl, type PropValue, type Variants } from './prop-controls';
 
   type Apply = { ready: boolean; usage: boolean; skipped: string[] };
   type Props = { controls: PropControl[]; values: Record<string, unknown>; grid: boolean; variants: Variants; dynamic: string[]; apply: Apply; onchange: (name: string, value: PropValue | undefined) => void; ongrid: (on: boolean) => void; onapply: () => void };
@@ -36,7 +36,7 @@
   </div>
   {#if grid && variants.variants}<p class="note" data-testid="variants-note">{note}</p>{/if}
   {#each controls as control (control.name)}
-    {@const editor = EDITORS[control.kind]}
+    {@const editor = editorFor(control, values[control.name])}
     {@const current = editor.show(values[control.name], control)}
     <div class="row" data-row={control.name} data-kind={control.kind}>
       <span class="label" title={control.name}>{control.name}{#if control.required}<span class="required" title="Required" aria-label="required">*</span>{/if}{#if dynamic.includes(control.name)}<span class="dynamic" title="The usage passes an expression: showing the default" data-testid="dynamic-{control.name}">dynamic</span>{/if}</span>

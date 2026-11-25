@@ -1,7 +1,7 @@
 import { CANVAS_CSS, CANVAS_ID, PADDING_PX } from './focus.js';
 import { fitZoom, gridOf } from './variant-grid.js';
 
-import { DATE_MARK, FUNCTION_MARK, MOUNT_PROPS, MOUNT_STATUS, Status } from './mount-protocol.js';
+import { DATE_MARK, FUNCTION_MARK, JSX_MARK, MOUNT_PROPS, MOUNT_STATUS, Status } from './mount-protocol.js';
 
 export const Reason = { NoExport: 'The component is not exported', Empty: 'It rendered nothing' };
 
@@ -13,6 +13,7 @@ const CAPTION_PX = 11;
 
 const MARKS = [
   { mark: FUNCTION_MARK, matches: (value) => value === true, revive: () => () => undefined },
+  { mark: JSX_MARK, matches: (value) => value === true, revive: () => undefined },
   { mark: DATE_MARK, matches: (value) => typeof value === 'string', revive: (value) => new Date(value) }
 ];
 

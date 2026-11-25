@@ -1488,7 +1488,7 @@
           {#if picked}<PluginOverlay {plugins} {picked} scale={fit.scale} />{/if}
           {#each others as other (keyOf(refOf(other.source, other.instanceIndex)))}<div class="outline picked" data-testid="selected-outline" style={box(other)}></div>{/each}
           <PeerLayer {peers} rects={peerRects} scale={fit.scale} />
-          {#if picked && !lostSlots[Slot.Selected]}<div class="outline picked" style={box(picked)}><span class="label"><Breadcrumb pick={picked} onselect={select} compact state={elementState} /></span></div>{/if}
+          {#if picked && !lostSlots[Slot.Selected]}<div class="outline picked" style={box(picked)}>{#if !(viewing === View.Focus && showGrid)}<span class="label"><Breadcrumb pick={picked} onselect={select} compact state={elementState} /></span>{/if}</div>{/if}
           {#each pins as pin (pin.id)}
             {@const rect = pinRects[pin.id]}
             {#if rect}
