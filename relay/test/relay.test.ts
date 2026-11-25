@@ -104,6 +104,15 @@ describe('http through the tunnel', () => {
     expect(response.status).toBe(503);
   });
 
+  it('sends a browser page visit to the offline page of the web app', async () => {
+    const sid = freshSid();
+
+    const response = await visit(sid, '/deep?x=1', {}, { headers: { accept: 'text/html,application/xhtml+xml' } });
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get('location')).toBe(`http://web.test/s/${sid}?offline=1`);
+  });
+
   it('streams a request to the host and the answer back', async () => {
     const sid = freshSid();
     const host = await connectHost(sid);

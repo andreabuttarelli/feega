@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { CLOUD_SETTING } from './cloud-flag';
-import { SETTINGS, issueUrl } from './settings';
+import { SETTINGS, helpLinks, issueUrl } from './settings';
 
 const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 const SETTINGS_JSON_ONLY = ['feegaInspect.plugins.dev'];
@@ -29,5 +29,20 @@ describe('settings', () => {
 
     expect(url.searchParams.get('body')).toContain('0.1.0');
     expect(url.searchParams.get('body')).toContain('sveltekit');
+  });
+});
+
+describe('the help links', () => {
+  it('offer docs, changelog, feedback on Discord and a bug report', () => {
+    const links = helpLinks(null);
+
+    expect(links.map((l) => l.label)).toEqual(['Documentation', "What's new", 'Send feedback', 'Report a problem']);
+    expect(links.find((l) => l.label === 'Send feedback')?.url).toBe('https://discord.gg/PUp37DG6vr');
+  });
+
+  it('prefill the bug report when the facts are known', () => {
+    const facts = { version: '0.1.0', framework: 'next', styling: 'css' };
+
+    expect(helpLinks(facts).find((l) => l.label === 'Report a problem')?.url).toBe(issueUrl(facts));
   });
 });

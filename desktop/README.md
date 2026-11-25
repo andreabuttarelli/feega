@@ -14,6 +14,10 @@ npm run dev
 
 Tests, from the repo root: `npx vitest run --root . --dir desktop desktop/src`.
 
+## Start a project
+
+The welcome screen scaffolds a project with `cli/lib/scaffold` (bundled files plus library sections), runs `npm install`, then opens it. The login-shell `PATH` is read at start and Node.js is checked before any tab opens.
+
 ## Package
 
 ```bash

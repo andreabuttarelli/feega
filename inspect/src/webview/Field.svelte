@@ -2,6 +2,8 @@
   import { untrack, type Snippet } from 'svelte';
   import { MIXED, type Shared } from '@feega/properties-panel/mixed';
   import { heldValue, liveNumber, type Held } from './scrub';
+  import type { Step } from '@feega/live-edit/theme-scales';
+  import { Origin, Snap, check, settled, snap, ticksAround } from './snap';
   import { typedCommit } from './typed-commit';
   import { Unit, convert, cssOf, isKeyword, keywordOf, parseLength, stepOf, type UnitContext } from './units';
 
@@ -18,20 +20,23 @@
     max?: number;
     title?: string;
     override?: string;
+    steps?: Step[] | null;
     onchange: (value: string) => void;
     onpreview?: (value: string) => void;
   };
 
-  let { name, prefix = '', icon, px, units, unit = '', css = '', context, min = -100000, max = 100000, title, override = '', onchange, onpreview = () => undefined }: Props = $props();
+  let { name, prefix = '', icon, px, units, unit = '', css = '', context, min = -100000, max = 100000, title, override = '', steps = null, onchange, onpreview = () => undefined }: Props = $props();
 
   const COARSE = 10;
   const DRAG_PX_PER_STEP = 2;
   const DECIMALS = 3;
+  const TICK_HALF_WIDTH_PX = 40;
 
   let picked = $state<Unit | null>(null);
   let scrub = $state<{ x: number; start: number } | null>(null);
   let draft = $state<number | null>(null);
   let held = $state<Held | null>(null);
+  let locked = $state<Step | null>(null);
 
   const chosen = $derived(picked ?? keywordOf(css, units) ?? Unit.Px);
   $effect(() => {
@@ -60,6 +65,11 @@
   });
   const text = $derived(shown === MIXED || isKeyword(chosen) ? '' : String(Number((shown as number).toFixed(DECIMALS))));
 
+  const snappable = $derived(Boolean(steps?.length) && (!lengthy || chosen === Unit.Px));
+  const modeOf = (bypass: boolean) => (bypass || !snappable ? Snap.Off : Snap.On);
+  const verdict = $derived(snappable && steps && shown !== MIXED && draft === null ? check(shown as number, steps) : null);
+  const ticks = $derived(scrub && snappable && steps && draft !== null ? ticksAround(draft, steps, (TICK_HALF_WIDTH_PX / DRAG_PX_PER_STEP) * step) : []);
+
   const clamp = (v: number) => Math.min(max, Math.max(min, v));
   const written = (v: number) => (lengthy ? cssOf({ value: clamp(v), unit: chosen }) : String(clamp(v)));
   const emit = (v: number) => onchange(written(v));
@@ -81,12 +91,13 @@
         return;
       }
       picked = parsed.unit;
-      onchange(cssOf({ ...parsed, value: clamp(parsed.value) }));
+      const atPx = parsed.unit === Unit.Px && steps ? settled(parsed.value, steps, Origin.Typed, Snap.On) : parsed.value;
+      onchange(cssOf({ ...parsed, value: clamp(atPx) }));
       return;
     }
     const n = parseFloat(raw);
     if (Number.isFinite(n)) {
-      emit(n);
+      emit(steps ? settled(n, steps, Origin.Typed, Snap.On) : n);
     }
   }
 
@@ -127,8 +138,11 @@
 
   function drag(e: PointerEvent) {
     if (scrub) {
-      const steps = Math.round((e.clientX - scrub.x) / DRAG_PX_PER_STEP);
-      draft = clamp(Number((scrub.start + steps * step * (e.shiftKey ? COARSE : 1)).toFixed(DECIMALS)));
+      const moved = Math.round((e.clientX - scrub.x) / DRAG_PX_PER_STEP);
+      const raw = clamp(Number((scrub.start + moved * step * (e.shiftKey ? COARSE : 1)).toFixed(DECIMALS)));
+      const settled = steps ? snap(raw, steps, modeOf(e.altKey)) : { px: raw, step: null };
+      locked = settled.step;
+      draft = clamp(settled.px);
       live.move(written(draft));
     }
   }
@@ -140,6 +154,13 @@
     }
     scrub = null;
     draft = null;
+    locked = null;
+  }
+
+  function applyNearest() {
+    if (verdict?.nearest) {
+      onchange(written(verdict.nearest.px));
+    }
   }
 </script>
 
@@ -155,6 +176,14 @@
   {:else if unit}
     <span class="unit-text">{unit}</span>
   {/if}
+  {#if verdict && !verdict.on && verdict.nearest}
+    <button type="button" class="off-theme-dot" data-off-theme title={`Off theme. Nearest step: ${verdict.nearest.px}px (${verdict.nearest.name}). Click to apply.`} aria-label={`Off theme, apply ${verdict.nearest.px}px`} onclick={applyNearest}></button>
+  {/if}
+  {#if ticks.length}
+    <span class="ticks" aria-hidden="true">
+      {#each ticks as offset (offset)}<span class="tick" class:locked={locked !== null && offset === 0} style={`left: calc(50% + ${(offset / step) * DRAG_PX_PER_STEP}px)`}></span>{/each}
+    </span>
+  {/if}
   {#if override}<span class="override-dot" title={override} aria-label={override} data-override></span>{/if}
 </label>
 
@@ -166,6 +195,42 @@
     width: 6px;
     height: 6px;
     border-radius: var(--ui-radius-full);
+    background: var(--ui-accent);
+  }
+
+  .off-theme-dot {
+    position: absolute;
+    bottom: 3px;
+    right: 3px;
+    width: 6px;
+    height: 6px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--ui-radius-full);
+    background: var(--ui-warning, #d9822b);
+    cursor: pointer;
+  }
+
+  .ticks {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 5px;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  .tick {
+    position: absolute;
+    bottom: 0;
+    width: 1px;
+    height: 4px;
+    background: var(--ui-text-3);
+  }
+
+  .tick.locked {
+    height: 5px;
     background: var(--ui-accent);
   }
 

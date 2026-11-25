@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { AddKind, AddPlace } from '@feega/live-edit/add-node';
 import { StructureOp } from '@feega/live-edit/structure';
 import { WrapTag } from '@feega/live-edit/wrap-node';
-import { ADD_ITEMS, COPY_FOR_AGENT, Command, MENU_ITEMS, WRAP_ITEMS, fitMenu, menuFor, pickedOf, submenuSpot, type MenuItem } from './structure-menu';
+import { ADD_ITEMS, COPY_FOR_AGENT, Command, FOCUS_ID, MENU_ITEMS, WRAP_ITEMS, fitMenu, menuFor, pickedOf, submenuSpot, type MenuItem } from './structure-menu';
 
 const VIEW = { width: 1000, height: 900 };
 
@@ -72,7 +72,7 @@ describe('the one menu table', () => {
 
 describe('menuFor', () => {
   it('keeps the whole menu for one element', () => {
-    expect(menuFor(1)).toEqual(MENU_ITEMS);
+    expect(menuFor(1)).toEqual(MENU_ITEMS.filter((item) => !item.detach && !item.component));
   });
 
   it('drops what only makes sense for one element when several are selected', () => {
@@ -80,5 +80,20 @@ describe('menuFor', () => {
 
     expect(ids).not.toContain('add-child');
     expect(ids).toEqual(expect.arrayContaining([COPY_FOR_AGENT, StructureOp.Duplicate, 'wrap-with', StructureOp.Unwrap, StructureOp.Delete]));
+  });
+});
+
+describe('focus in the menu', () => {
+  it('shows Focus component only for an element inside a component', () => {
+    expect(menuFor(1).map((item) => item.id)).not.toContain(FOCUS_ID);
+    expect(menuFor(1, { show: true }).map((item) => item.id)).toContain(FOCUS_ID);
+  });
+
+  it('is not offered for several elements', () => {
+    expect(menuFor(2, { show: true }).map((item) => item.id)).not.toContain(FOCUS_ID);
+  });
+
+  it('turns its id into the focus command', () => {
+    expect(pickedOf(FOCUS_ID)).toEqual({ command: Command.Focus });
   });
 });

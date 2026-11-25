@@ -10,6 +10,8 @@ const LAUNCHER = here('dist/launcher/');
 
 const BRIDGE_FILES = JSON.parse(await readFile(here('src/host/bridge-files.json'), 'utf8'));
 
+const BUNDLED_BRIDGE_FILES = ['capture-lib.js'];
+
 const WATCH = process.argv.includes('--watch');
 
 await rm(here('dist'), { recursive: true, force: true });
@@ -42,13 +44,16 @@ await esbuild({
   platform: 'node',
   format: 'esm',
   target: 'node20',
-  external: ['vite', 'svelte', 'svelte/*', '@vue/compiler-sfc', '@astrojs/compiler/sync', './bridge.js']
+  external: ['vite', 'svelte', 'svelte/*', '@vue/compiler-sfc', '@astrojs/compiler/sync', './bridge.js', '@babel/preset-*'],
+  banner: { js: "import { createRequire as bundledRequire } from 'node:module'; const require = bundledRequire(import.meta.url);" }
 });
-await Promise.all(BRIDGE_FILES.map((f) => cp(`${SOURCE_MAP}${f}`, `${LAUNCHER}${f}`)));
+await Promise.all(BRIDGE_FILES.filter((f) => !BUNDLED_BRIDGE_FILES.includes(f)).map((f) => cp(`${SOURCE_MAP}${f}`, `${LAUNCHER}${f}`)));
+await esbuild({ entryPoints: [here('launcher/capture-lib.entry.js')], outfile: `${LAUNCHER}capture-lib.js`, bundle: true, platform: 'browser', format: 'esm', target: 'es2020', minify: true });
 await cp(here('launcher/launch.mjs'), `${LAUNCHER}launch.mjs`);
 await cp(here('launcher/next-preload.cjs'), `${LAUNCHER}next-preload.cjs`);
 await cp(here('launcher/astro.mjs'), `${LAUNCHER}astro.mjs`);
 await cp(here('launcher/nuxt-layer'), `${LAUNCHER}nuxt-layer`, { recursive: true });
+await esbuild({ entryPoints: [here('../npx/src/mcp/local-run.ts')], outfile: `${LAUNCHER}mcp.cjs`, bundle: true, platform: 'node', format: 'cjs', target: 'node20' });
 await esbuild({
   entryPoints: [`${SOURCE_MAP}next-loader.ts`],
   outfile: `${LAUNCHER}next-loader.cjs`,
@@ -56,7 +61,7 @@ await esbuild({
   platform: 'node',
   format: 'cjs',
   target: 'node20',
-  external: ['svelte', 'svelte/*', '@vue/compiler-sfc', '@astrojs/compiler/sync'],
+  external: ['svelte', 'svelte/*', '@vue/compiler-sfc', '@astrojs/compiler/sync', '@babel/preset-*'],
   define: { 'import.meta.url': 'importMetaUrl' },
   banner: { js: "const importMetaUrl = require('node:url').pathToFileURL(__filename).href;" },
   footer: { js: 'module.exports = module.exports.default;' }

@@ -1,13 +1,20 @@
-import { ToView, type ViewMessage } from '../messages';
-import type { CloudApi, CloudComment, CommentDraft } from './cloud-api';
+import { ToView, type ChangeRow, type ViewMessage } from '../messages';
+import type { CloudApi, CloudComment, CloudRevisions, CommentDraft, RevisionChange } from './cloud-api';
 
 export type CommentsCloud = {
-  api: Pick<CloudApi, 'comments' | 'addComment' | 'resolve'>;
+  api: Pick<CloudApi, 'comments' | 'addComment' | 'resolve' | 'revisions' | 'publishRevision'>;
   sessionId: () => string | null;
 };
 
-export function commentsHost(cloud: CommentsCloud | undefined, post: (message: ViewMessage) => unknown) {
+const NO_REVIEW: CloudRevisions = { status: 'open', revisions: [] };
+
+export function revisionChangesOf(rows: ChangeRow[]): RevisionChange[] {
+  return rows.flatMap((row) => row.files.map((file) => ({ file, prop: row.prop, value: row.value })));
+}
+
+export function commentsHost(cloud: CommentsCloud | undefined, post: (message: ViewMessage) => unknown, changes: () => ChangeRow[]) {
   let last: CloudComment[] = [];
+  let review: CloudRevisions = NO_REVIEW;
 
   const disabled = () => post({ kind: ToView.Comments, enabled: false, comments: [] });
 
@@ -19,9 +26,10 @@ export function commentsHost(cloud: CommentsCloud | undefined, post: (message: V
     }
     try {
       last = await cloud.api.comments(session, false);
-      await post({ kind: ToView.Comments, enabled: true, comments: last });
+      review = await cloud.api.revisions(session);
+      await post({ kind: ToView.Comments, enabled: true, comments: last, review });
     } catch (failure) {
-      await post({ kind: ToView.Comments, enabled: true, comments: last, error: (failure as Error).message });
+      await post({ kind: ToView.Comments, enabled: true, comments: last, review, error: (failure as Error).message });
     }
   }
 
@@ -34,7 +42,7 @@ export function commentsHost(cloud: CommentsCloud | undefined, post: (message: V
     try {
       await run(cloud.api, session);
     } catch (failure) {
-      await post({ kind: ToView.Comments, enabled: true, comments: last, error: (failure as Error).message });
+      await post({ kind: ToView.Comments, enabled: true, comments: last, review, error: (failure as Error).message });
       return;
     }
     await show();
@@ -43,6 +51,7 @@ export function commentsHost(cloud: CommentsCloud | undefined, post: (message: V
   return {
     show,
     add: (draft: CommentDraft) => change((api, session) => api.addComment(session, draft)),
-    resolve: (id: string) => change((api, session) => api.resolve(session, id))
+    resolve: (id: string) => change((api, session) => api.resolve(session, id)),
+    publish: (summary: string) => change((api, session) => api.publishRevision(session, summary, revisionChangesOf(changes())))
   };
 }

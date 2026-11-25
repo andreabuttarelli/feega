@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from 'node:child_process';
-import { access, cp, readFile, readdir } from 'node:fs/promises';
+import { access, readFile, readdir } from 'node:fs/promises';
 import { connect, createServer } from 'node:net';
 import { basename, join } from 'node:path';
 import { devProxy } from './dev-proxy';
@@ -9,6 +9,7 @@ import { attachRefusal } from '@feega/dev-run/attach-rule';
 import { DepsOutcome, depsMissing, ensureDeps } from './deps';
 import { failureOf, localUrlOf, type Failed } from './dev-output';
 import { killTree } from './process-tree';
+import { copyLauncher } from './launcher-copy';
 import { Launch } from './launch';
 import { Verdict, verdictOf } from './candidate';
 import { until, type Probes, type Watched } from './ready';
@@ -215,7 +216,7 @@ async function userServer(appRoot: string, launch: Launch, framework: Framework,
 
 async function attachedTo(url: string, plan: RunPlan, appRoot: string, launcherSource: string): Promise<Running> {
   const bridgeDir = join(appRoot, LAUNCHER_DIR);
-  await cp(launcherSource, bridgeDir, { recursive: true });
+  await copyLauncher(launcherSource, bridgeDir);
   const proxy = await devProxy(url, bridgeDir);
   return { url: proxy.url, upstream: url, plan, launch: LAUNCH[plan.framework], attached: true, pid: null, command: `already running on ${url}`, stop: proxy.close, exited: () => undefined };
 }
@@ -288,7 +289,7 @@ export async function startDev(root: string, launcherSource: string, hooks: Star
   }
   time.mark('deps');
   if (row.copiesLauncher) {
-    await cp(launcherSource, bridgeDir, { recursive: true });
+    await copyLauncher(launcherSource, bridgeDir);
   }
 
   const child = started(planned, appRoot, launch, command);

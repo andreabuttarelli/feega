@@ -34,6 +34,19 @@ describe('devProxy', () => {
     app.close();
   });
 
+  it('passes the mount routes of the dev server through to it', async () => {
+    const app = createServer((req, res) => res.writeHead(200, { 'content-type': 'text/plain' }).end(`app ${req.url}`));
+    await new Promise<void>((r) => app.listen(0, '127.0.0.1', r));
+    const target = `http://127.0.0.1:${(app.address() as { port: number }).port}`;
+    const proxy = await devProxy(target, tmpdir());
+
+    const mount = await fetch(`${proxy.url}${BRIDGE_PATH.slice(1)}mount?file=a.astro`);
+
+    expect(await mount.text()).toBe('app /__feega/mount?file=a.astro');
+    proxy.close();
+    app.close();
+  });
+
   it('marks every reply as a Feega server so no other instance attaches to it', async () => {
     const app = createServer((_req, res) => res.writeHead(200, { 'content-type': 'text/css' }).end('a{}'));
     await new Promise<void>((r) => app.listen(0, '127.0.0.1', r));

@@ -1,6 +1,6 @@
 # Third-party notices
 
-No third-party source code is vendored in this repository. One data list is: see Disposable email domains. Fonts keep their licence files next to them in `static/fonts/`.
+No third-party source code is vendored in this repository. The extension build bundles `modern-screenshot` (MIT, Copyright (c) qq15725) as `capture-lib.js`, the page-side screenshot used by the AI chat; it is fetched from npm at build time. One data list is vendored: see Disposable email domains. Fonts keep their licence files next to them in `static/fonts/`.
 
 ## Inter Bold
 

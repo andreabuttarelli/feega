@@ -17,9 +17,10 @@ export type PluginsDeps = {
   notify: (text: string) => unknown;
   fetch?: Fetcher;
   watch?: Watch;
+  onInstalled?: () => void;
 };
 
-export function pluginsSession({ host, post, notify, fetch = httpFetcher(), watch }: PluginsDeps) {
+export function pluginsSession({ host, post, notify, fetch = httpFetcher(), watch, onInstalled }: PluginsDeps) {
   let stopWatching: (() => void) | null = null;
 
   async function show() {
@@ -47,6 +48,9 @@ export function pluginsSession({ host, post, notify, fetch = httpFetcher(), watc
       return;
     }
     const out = await installPlugin({ root: host.root, fetch, approve: (review) => approve(questionOf(review), INSTALL_LABEL) }, source);
+    if (out.ok) {
+      onInstalled?.();
+    }
     notify(out.ok ? `Installed ${out.id} ${out.version}` : out.reason);
     await show();
   }

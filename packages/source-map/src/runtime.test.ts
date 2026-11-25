@@ -41,6 +41,16 @@ describe('inspectElement', () => {
     expect(info.component).toEqual({ file: 'src/routes/+page.svelte', line: 5, col: 1 });
   });
 
+  it('counts the usages of a component inside the element that renders them', () => {
+    const feature = (n: number) => `<div data-feega-src="components/Feature.tsx:2:3">${n}</div>`;
+    const win = new JSDOM(`<body><section data-feega-src="app/page.tsx:5:5">${[1, 2, 3].map(feature).join('')}</section><aside data-feega-src="app/page.tsx:9:5">${feature(4)}</aside></body>`).window;
+
+    const info = inspectElement(win.document.querySelectorAll('div')[2])!;
+
+    expect(info.instanceIndex).toBe(2);
+    expect(info.usage).toEqual({ index: 2, count: 3 });
+  });
+
   it('climbs to the nearest tagged ancestor for an untagged element', () => {
     const win = domOf();
 

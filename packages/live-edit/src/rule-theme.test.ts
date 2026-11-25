@@ -66,11 +66,11 @@ describe('a page rule under a theme', () => {
 
   it('body goes under the theme', async () => {
     const out = await pageRule(read, PageTarget.Body, { 'background-color': '#111' }, undefined, undefined, DARK);
-    expect(out.ok && out.change.after).toContain('.dark body {');
+    expect(out.ok && out.changes[0].after).toContain('.dark body {');
   });
 
   it('html carries the theme itself', async () => {
     const out = await pageRule(read, PageTarget.Html, { 'font-size': '18px' }, undefined, undefined, FOREST);
-    expect(out.ok && out.change.after).toContain('html[data-theme="forest"] {');
+    expect(out.ok && out.changes[0].after).toContain('html[data-theme="forest"] {');
   });
 });

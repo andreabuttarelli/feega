@@ -1373,3 +1373,41 @@ Signal: a test of code under `packages/` hangs or ignores your edit in a worktre
 ## Astro compiler offsets are UTF-8 bytes
 
 **Signal:** raw `data-feega-src="..."` shows as visible text in the middle of words on an Astro page, only after the first non-ASCII character (`·`, `€`, accents) in the file. **Move:** convert `position.start.offset` from bytes to string indices before inserting, and keep a non-ASCII case in the Astro stamping test and fixture.
+
+## A reversible toggle that writes into the shared rule is not reversible
+
+**Signal:** Hide then Show leaves a diff (`- display: flex;`): the toggle overwrote a declaration the user authored, and the inverse can only delete it. **Move:** a toggle writes its own override (inline style for Hide) that the inverse removes, never the property of the rule; test it as hide then show leaving the file byte-identical.
+
+## The selection box floats after a Library insert
+
+**Signal:** after inserting a section, the old selection outline stays fixed on screen while the preview scrolls. The insert adds an import above the markup, the selected element's `data-feega-src` line shifts, the tracker finds nothing and sends a null rect, and the page bridge dropped null rects. **Move:** a null rect is a message, not noise: forward it and hide the outline (`page-bridge.test.ts`).
+
+### Un bundle ESM con dentro Babel muore al primo `require` dinamico
+Segnale: `Dynamic require of "x" is not supported` quando il launcher carica `vite.js` appena
+`react-docgen` entra nel bundle. Mossa: banner esbuild con `createRequire(import.meta.url)` e i
+`@babel/preset-*` esterni (non servono a runtime). Provare il bundle con un `import()` vero,
+non solo con la build.
+
+## Astro dev keeps the old CSS after an edit that adds a class and its rule
+
+**Signal:** on an `.astro` component the rule is in the file, the served HTML has it, yet the browser shows the old value even after reload. The `?astro&type=style` module Vite serves to the browser lacks the rule and overwrites the server-rendered `<style>`. **Move:** Astro refreshes that module only when the change is style-only against the last compiled copy; a markup change plus a style change in one write is not. Write the markup first, let the page compile, then write the style (`markupFirst`, `settle` in `fileEdits`).
+
+## The focus tab is blank on Next.js and React Router
+
+**Signal:** the focus tab opens empty and Layers lists nothing. Next has no `/__feega/mount` route (404 page loads, no status ever arrives); React Router's Vite plugin throws "can't detect preamble" before the mount runtime starts. **Move:** a mount that never reports must still fall back: the mount page posts `failed` from a capturing `error` listener installed before the module, and the tab falls back when the loaded page lacks the `feega.nested-host` marker. Check each framework in `inspect/test/focus-shots.mts`.
+
+## Nuxt focus tab always falls back to the snapshot
+
+**Signal:** `/__feega/mount` answers 404 on Nuxt while Vue and Svelte on plain Vite mount fine. **Move:** Nuxt's own server answers before the Vite middlewares that `feegaSource` registers, so the mount routes are unreachable; the tab falls back by design. Serving them there needs a Nitro dev handler in the Nuxt layer.
+
+## Screenshot of one element comes out without its own background
+
+**Signal:** the selection crop shows the page colour where the element has its own background, while the whole-tab shot is right. **Move:** `backgroundColor` in `modern-screenshot` is painted on the cloned root, so on an element it overwrites the element's own background. Pass it only for the whole tab (`captureTab` in `packages/source-map/src/capture.js`). Check capture changes in a real browser, not jsdom.
+
+## An ACP `mcpServers` entry with a bare `node` is refused
+
+**Signal:** the agent answers `-32602` to `session/new`. **Move:** `command` must be an absolute path: use `process.execPath` with `ELECTRON_RUN_AS_NODE=1` (`editorMcp` in `inspect/src/host/ai/editor-mcp.ts`), which also runs inside the VS Code extension host.
+
+## Worktree tests cannot find `@feega/*` or the ACP sdk
+
+**Signal:** `Failed to load url @feega/live-edit/...` in a new worktree whose `node_modules` is a symlink to the main checkout. The symlinks under `@feega` resolve to the main checkout's `packages/`, which may be another branch and lacks the new modules. **Move:** make `node_modules` a real folder of per-entry symlinks and link each `@feega/<name>` to this worktree's `packages/<name>`; install missing dependencies such as `@agentclientprotocol/sdk` outside the repo and link them.

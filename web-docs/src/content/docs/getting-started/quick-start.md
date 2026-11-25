@@ -7,10 +7,11 @@ sidebar:
 
 1. Open your project folder in your editor.
 2. Open the command palette and run **Feega: Open from current workspace**. Or right-click a folder or a page file in the Explorer and choose **Design this folder with Feega** or **Design this page with Feega**. Or run `npx feega` in the app folder.
-3. Feega starts your dev server and opens the app beside your code. The first time, a short onboarding explains Design and Navigate modes and sign in.
+3. Feega starts your dev server and opens the app beside your code. The first time, a short onboarding explains Design and Navigate modes, shows which coding agents Feega found on your machine (Claude Code, Cursor, Codex, Windsurf, GitHub Copilot, Gemini CLI) and how to connect them, then asks you to sign in, then offers an optional checklist to support the project: star the repository, follow on X, join the Discord, buy a coffee, share Feega. Skip it freely; it stays under **Support Feega** in the Feega menu. Feega cannot verify these, so each item is ticked when you click it, and the ticks and the karma count stay on your device.
 4. In **Design** mode, click an element. Its properties open in the right bar.
 5. Change something: a colour, a padding, a font size. Double-click text to edit it in place.
 6. Open **Changes** to see the edit as a diff in your source. Undo it, or keep it.
+7. Something off? **Help** in the Feega menu has **Send feedback** (opens the Discord) and **Report a problem** (opens a GitHub issue with your Feega version, framework and styling filled in).
 
 Check that your framework is in [Supported frameworks](/frameworks/supported-frameworks/). Astro and Nuxt need Feega to start the dev server.
 

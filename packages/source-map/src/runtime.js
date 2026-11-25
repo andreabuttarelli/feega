@@ -34,6 +34,8 @@ const INHERITED_PROPERTIES = new Set([
 ]);
 
 const SOURCE_PATTERN = /^(.+):(\d+):(\d+)$/;
+const CUSTOM_PROPERTY = /^--/;
+const CSS_WIDE = new Set(['', 'initial', 'inherit', 'unset', 'revert', 'revert-layer']);
 
 export function parseSource(value) {
   const match = SOURCE_PATTERN.exec(value ?? '');
@@ -70,16 +72,18 @@ export function deepestAt(doc, x, y) {
   return at;
 }
 
-export function inspectElement(element, { maxHtml = DEFAULT_MAX_HTML } = {}) {
-  const tagged = element.closest(`[${SOURCE_ATTR}]`);
+export function inspectElement(element, { maxHtml = DEFAULT_MAX_HTML, twin = null } = {}) {
+  const closest = element.closest(`[${SOURCE_ATTR}]`);
+  const tagged = closest && !isPageElement(closest) ? closest : null;
   if (!tagged) {
-    return pageTargetOf(element) ? inspectPage(element, maxHtml) : null;
+    const page = closest ?? element;
+    return pageTargetOf(page) ? inspectPage(page, maxHtml) : null;
   }
   const svg = untaggedSvg(element, tagged);
   if (svg) {
-    return { ...inspectTagged(tagged, maxHtml), inner: 'svg', styles: designStyles(svg), html: truncate(svg.outerHTML, maxHtml), rect: rectOf(svg), name: 'icon', ownText: false, inlineText: false, elements: 0, text: null };
+    return { ...inspectTagged(tagged, maxHtml, twin), inner: 'svg', styles: designStyles(svg), html: truncate(svg.outerHTML, maxHtml), rect: rectOf(svg), name: 'icon', ownText: false, inlineText: false, elements: 0, text: null };
   }
-  return inspectTagged(tagged, maxHtml);
+  return inspectTagged(tagged, maxHtml, twin);
 }
 
 export const PAGE_SOURCE = '(page):0:0';
@@ -124,9 +128,9 @@ function inspectPage(body, maxHtml) {
 
 const instancesOf = (tagged) => [...tagged.ownerDocument.querySelectorAll(`[${SOURCE_ATTR}="${tagged.getAttribute(SOURCE_ATTR)}"]`)];
 
-function inspectTagged(tagged, maxHtml) {
-
+function inspectTagged(tagged, maxHtml, twin) {
   const source = parseSource(tagged.getAttribute(SOURCE_ATTR));
+  const onPage = twin?.(tagged) ?? tagged;
   const styles = designStyles(tagged);
   return {
     source,
@@ -138,12 +142,14 @@ function inspectTagged(tagged, maxHtml) {
     classes: tagged.getAttribute('class') ?? '',
     text: tagged.children.length ? null : tagged.textContent,
     name: nameOf(tagged),
-    instances: instancesOf(tagged).length,
+    instances: instancesOf(onPage).length,
     instanceIndex: instancesOf(tagged).indexOf(tagged),
+    usage: usageOf(onPage, source.file),
     classCount: tagged.classList?.[0] ? tagged.ownerDocument.getElementsByClassName(tagged.classList[0]).length : 0,
     parentWidth: tagged.parentElement?.getBoundingClientRect().width ?? 0,
     ancestors: ancestorsOf(tagged),
     attributes: [...tagged.attributes].filter((a) => !BOOKKEEPING_ATTRS.has(a.name)).map(({ name, value }) => ({ name, value })),
+    variables: colourVariables(tagged),
     ownText: [...tagged.childNodes].some((n) => n.nodeType === TEXT_NODE && n.textContent.trim()),
     elements: tagged.children.length,
     inlineText: inlineTextOnly(tagged),
@@ -281,6 +287,11 @@ export function clearPreview(doc, source, state) {
   render(doc);
 }
 
+export function clearPreviews(doc) {
+  previewsOf(doc).clear();
+  render(doc);
+}
+
 export function settlePreview(doc, source, state) {
   const all = previewsOf(doc);
   const key = keyOf(source, undefined, state);
@@ -305,7 +316,18 @@ export function settlePreview(doc, source, state) {
 
 const MAX_ANCESTORS = 12;
 
-const taggedParent = (element) => element.parentElement?.closest(`[${SOURCE_ATTR}]`) ?? null;
+export const GHOST_ATTR = 'data-feega-ghost';
+
+const isGhost = (element) => element?.hasAttribute(GHOST_ATTR) ?? false;
+const isPageElement = (element) => element === element.ownerDocument.body || element === element.ownerDocument.documentElement;
+const taggedParent = (element) => {
+  const parent = element.parentElement?.closest(`[${SOURCE_ATTR}]`) ?? null;
+  return parent && isPageElement(parent) ? null : parent;
+};
+const shownParent = (element) => {
+  const parent = taggedParent(element);
+  return isGhost(parent) ? null : parent;
+};
 const fileOf = (element) => parseSource(element.getAttribute(SOURCE_ATTR))?.file ?? '';
 const componentName = (file) => file.split('/').pop().replace(/\.[^.]+$/, '');
 
@@ -327,7 +349,7 @@ const pageAncestor = (tag) => ({ source: parseSource(PAGE_SOURCES[tag]), name: t
 
 function ancestorsOf(element) {
   const chain = [];
-  for (let node = taggedParent(element); node && chain.length < MAX_ANCESTORS; node = taggedParent(node)) {
+  for (let node = shownParent(element); node && chain.length < MAX_ANCESTORS; node = shownParent(node)) {
     chain.unshift({ source: parseSource(node.getAttribute(SOURCE_ATTR)), name: nameOf(node) });
   }
   const inHead = element.ownerDocument.head?.contains(element);
@@ -345,7 +367,7 @@ function pageParent(element) {
 }
 
 const MOVES = {
-  parent: (element) => taggedParent(element) ?? pageParent(element),
+  parent: (element) => shownParent(element) ?? pageParent(element),
   child: (element) => taggedChildren(element)[0] ?? null,
   next: (element) => sibling(element, 1),
   previous: (element) => sibling(element, -1)
@@ -414,12 +436,15 @@ function pageNode(element, source, children) {
   return { name: tag, tag, display: style.display, direction: 'row', position: style.position || 'static', source: parseSource(source), component: false, count: 1, children };
 }
 
-export function treeOf(doc) {
-  const roots = [...doc.querySelectorAll(`[${SOURCE_ATTR}]`)].filter((e) => !taggedParent(e));
+export function treeOf(doc, { bare = false } = {}) {
+  const roots = [...doc.querySelectorAll(`[${SOURCE_ATTR}]`)].filter((e) => !isPageElement(e) && !isGhost(e) && !shownParent(e));
   const budget = { left: MAX_TREE_NODES, instances: instanceIndexes(doc) };
   const inHead = (e) => Boolean(doc.head?.contains(e));
   const head = foldedOf(roots.filter(inHead), 1, budget);
   const body = foldedOf(roots.filter((e) => !inHead(e)), 0, budget);
+  if (bare) {
+    return body;
+  }
   const group = { name: HEAD_GROUP, tag: 'head', display: 'none', direction: 'row', position: 'static', source: null, component: false, count: head.length, children: head };
   return [pageNode(doc.documentElement, HTML_SOURCE, [...(head.length ? [group] : []), pageNode(doc.body, PAGE_SOURCE, body)])];
 }
@@ -511,6 +536,52 @@ function inheritedStyles(element, styles) {
   return Object.fromEntries(found.filter(([, origin]) => origin));
 }
 
+function matching(element, selector) {
+  try {
+    return element.matches(selector);
+  } catch {
+    return false;
+  }
+}
+
+function sheetRules(sheet) {
+  try {
+    return [...sheet.cssRules];
+  } catch {
+    return [];
+  }
+}
+
+function declaringRules(element, rules) {
+  return rules.flatMap((rule) => {
+    if (rule.cssRules && !rule.selectorText) {
+      return declaringRules(element, [...rule.cssRules]);
+    }
+
+    return rule.selectorText && matching(element, rule.selectorText) ? [rule.style] : [];
+  });
+}
+
+function declaredVariables(element) {
+  const sheets = [...element.ownerDocument.styleSheets].flatMap(sheetRules);
+  const styles = [...declaringRules(element, sheets), element.style].filter(Boolean);
+  const names = (style) => Array.from({ length: style.length }, (_, i) => style[i]);
+  return [...new Set(styles.flatMap((style) => names(style).filter((name) => CUSTOM_PROPERTY.test(name))))];
+}
+
+function isColour(doc, value) {
+  const probe = doc.createElement('i').style;
+  probe.color = value;
+  return !CSS_WIDE.has(value) && probe.color !== '';
+}
+
+function colourVariables(element) {
+  const computed = element.ownerDocument.defaultView.getComputedStyle(element);
+  return declaredVariables(element)
+    .map((name) => ({ name, value: computed.getPropertyValue(name).trim() }))
+    .filter((v) => isColour(element.ownerDocument, v.value));
+}
+
 function designStyles(element) {
   const computed = element.ownerDocument.defaultView.getComputedStyle(element);
   return Object.fromEntries(DESIGN_PROPERTIES.map((name) => [name, computed.getPropertyValue(name)]));
@@ -522,15 +593,26 @@ function truncate(text, max) {
 
 const LAYOUT_FILE = /(^|\/)(\+layout\.svelte|layout\.[jt]sx?|_app\.[jt]sx?|root\.[jt]sx?)$/;
 
-function componentBoundary(element, file) {
-  let root = parseSource(element.getAttribute(SOURCE_ATTR));
+function boundaryOf(element, file) {
+  let root = { source: parseSource(element.getAttribute(SOURCE_ATTR)), node: element };
   for (let node = element.parentElement?.closest(`[${SOURCE_ATTR}]`); node; node = node.parentElement?.closest(`[${SOURCE_ATTR}]`)) {
     const source = parseSource(node.getAttribute(SOURCE_ATTR));
     if (!source || source.file === file) {
-      root = source ?? root;
+      root = source ? { source, node } : root;
       continue;
     }
-    return LAYOUT_FILE.test(source.file) && !LAYOUT_FILE.test(file) ? root : source;
+    return LAYOUT_FILE.test(source.file) && !LAYOUT_FILE.test(file) ? root : { source, node };
   }
   return null;
+}
+
+const componentBoundary = (element, file) => boundaryOf(element, file)?.source ?? null;
+
+function usageOf(tagged, file) {
+  const boundary = boundaryOf(tagged, file);
+  if (!boundary) {
+    return { index: 0, count: 1 };
+  }
+  const same = [...boundary.node.querySelectorAll(`[${SOURCE_ATTR}="${tagged.getAttribute(SOURCE_ATTR)}"]`)];
+  return { index: Math.max(same.indexOf(tagged), 0), count: Math.max(same.length, 1) };
 }

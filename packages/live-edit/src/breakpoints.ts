@@ -17,6 +17,7 @@ export const ALL_SIZES = 'all';
 
 const PX_PER_REM = 16;
 const MAX_PREFIX = 'max-';
+const MIN_PREFIX = 'min-';
 const RESET_ALL = '*';
 
 export const DEFAULT_BREAKPOINTS: Breakpoints = {
@@ -35,6 +36,9 @@ const THEME_VAR = /--breakpoint-([\w*-]+)\s*:\s*([^;}]+)[;}]/g;
 const SCREENS = /screens\s*:\s*\{([^}]*)\}/;
 const SCREEN_PAIR = /(?:['"]([^'"]+)['"]|(\w+))\s*:\s*['"]([^'"]+)['"]/g;
 const EXTEND = /extend\s*:\s*\{/g;
+const TAILWIND_SHEET = /@import\s+(?:url\()?['"]tailwindcss|@tailwind\b|@theme\b/;
+const PIXEL_NAME = /^[\d.]+px$/;
+const ARBITRARY = /^(?:min|max)-\[([^\]]+)\]$/;
 const MEDIA_WIDTH = /@media[^{]*\(\s*(min|max)-width\s*:\s*([\d.]+)(px|em|rem)/g;
 
 function pxOf(text: string): number | null {
@@ -118,8 +122,14 @@ function mediaBreakpoints(sheets: string[]): Breakpoints | null {
   return { direction: max > min ? Direction.DesktopFirst : Direction.MobileFirst, points };
 }
 
+const usesTailwind = (project: ProjectCss) => project.tailwindConfig !== null || project.sheets.some((s) => TAILWIND_SHEET.test(s));
+
 export function readBreakpoints(project: ProjectCss): Breakpoints {
-  return themeBreakpoints(project.sheets) ?? configBreakpoints(project.tailwindConfig) ?? mediaBreakpoints(project.sheets) ?? DEFAULT_BREAKPOINTS;
+  const named = themeBreakpoints(project.sheets) ?? configBreakpoints(project.tailwindConfig);
+  if (named || usesTailwind(project)) {
+    return named ?? DEFAULT_BREAKPOINTS;
+  }
+  return mediaBreakpoints(project.sheets) ?? DEFAULT_BREAKPOINTS;
 }
 
 export function activeAt(set: Breakpoints, width: number): Breakpoint | null {
@@ -137,18 +147,21 @@ export function targetOf(set: Breakpoints, name: string): Target | null {
   if (!point) {
     return null;
   }
+  const label = PIXEL_NAME.test(name) ? `[${name}]` : name;
   if (set.direction === Direction.DesktopFirst) {
-    return { variant: `${MAX_PREFIX}${name}`, media: `(max-width: ${point.px}px)` };
+    return { variant: `${MAX_PREFIX}${label}`, media: `(max-width: ${point.px}px)` };
   }
-  return { variant: name, media: `(min-width: ${point.px}px)` };
+  return { variant: PIXEL_NAME.test(name) ? `${MIN_PREFIX}${label}` : name, media: `(min-width: ${point.px}px)` };
 }
+
+const breakpointName = (variant: string) => variant.replace(ARBITRARY, '$1').replace(new RegExp(`^${MAX_PREFIX}`), '');
 
 export function overriddenAt(set: Breakpoints, classes: string, owns: (utility: string) => boolean): string[] {
   const names = new Set(
     classes
       .split(/\s+/)
       .filter((token) => token && owns(utilityOf(token)))
-      .map((token) => variantOf(token).replace(new RegExp(`^${MAX_PREFIX}`), ''))
+      .map((token) => breakpointName(variantOf(token)))
   );
   return set.points.filter((p) => names.has(p.name)).map((p) => p.name);
 }
