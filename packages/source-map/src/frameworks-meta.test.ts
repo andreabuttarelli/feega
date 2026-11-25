@@ -51,6 +51,13 @@ describe('stampSources', () => {
 });
 
 describe('mountOf', () => {
+  it('reads a Date prop of a Vue instance as a date mark', () => {
+    const doc = docOf('<h1>a</h1>');
+    (doc.querySelector('h1') as any).__vueParentComponent = { props: { when: new Date('2026-05-06T00:00:00.000Z') } };
+
+    expect(mountOf(doc.querySelector('h1')!)).toEqual({ name: '', props: { when: { $date: '2026-05-06T00:00:00.000Z' } } });
+  });
+
   it('mounts an element rendered by an Astro component, which has no props to read', () => {
     const doc = docOf(`<h1 ${SOURCE_ATTR}="src/Card.astro:4:3">a</h1>`);
 

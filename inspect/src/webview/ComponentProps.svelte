@@ -1,14 +1,22 @@
 <script lang="ts">
-  import { ControlKind, type PropControl, type PropValue, type Variants } from './prop-controls';
+  import { EDITORS, INVALID, Input, type PropControl, type PropValue, type Variants } from './prop-controls';
 
   type Props = { controls: PropControl[]; values: Record<string, unknown>; grid: boolean; variants: Variants; onchange: (name: string, value: PropValue | undefined) => void; ongrid: (on: boolean) => void };
 
   let { controls, values, grid, variants, onchange, ongrid }: Props = $props();
 
+  let invalid = $state<Record<string, boolean>>({});
+
   const shown = $derived(variants.variants?.length ?? 0);
   const note = $derived(variants.dropped.length ? `Showing ${shown} of ${variants.total} combinations. Left out: ${variants.dropped.join(', ')}.` : `${shown} combinations.`);
-  const textOf = (value: unknown) => (value === undefined || value === null ? '' : String(value));
-  const numberOf = (raw: string) => (raw === '' ? undefined : Number(raw));
+
+  function commit(control: PropControl, raw: string) {
+    const value = EDITORS[control.kind].read(raw, control);
+    invalid[control.name] = value === INVALID;
+    if (value !== INVALID) {
+      onchange(control.name, value);
+    }
+  }
 </script>
 
 <section data-section="Props" data-testid="component-props">
@@ -20,20 +28,27 @@
   </div>
   {#if grid && variants.variants}<p class="note" data-testid="variants-note">{note}</p>{/if}
   {#each controls as control (control.name)}
-    <div class="row" data-row={control.name}>
-      <span class="label" title={control.name}>{control.name}</span>
+    {@const editor = EDITORS[control.kind]}
+    {@const current = editor.show(values[control.name], control)}
+    <div class="row" data-row={control.name} data-kind={control.kind}>
+      <span class="label" title={control.name}>{control.name}{#if control.required}<span class="required" title="Required" aria-label="required">*</span>{/if}</span>
       <div class="control">
-        {#if control.kind === ControlKind.Select}
-          <select class="text" value={textOf(values[control.name])} aria-label={control.name} data-field={control.name} onchange={(e) => onchange(control.name, e.currentTarget.value)}>
+        {#if editor.input === Input.Select}
+          <select class="text" value={current} aria-label={control.name} data-field={control.name} onchange={(e) => commit(control, e.currentTarget.value)}>
             {#if values[control.name] === undefined}<option value="" disabled selected>unset</option>{/if}
-            {#each control.options ?? [] as option (option)}<option value={option}>{option}</option>{/each}
+            {#each control.options ?? [] as option (option)}<option value={String(option)}>{option}</option>{/each}
           </select>
-        {:else if control.kind === ControlKind.Toggle}
-          <input type="checkbox" checked={values[control.name] === true} aria-label={control.name} data-field={control.name} onchange={(e) => onchange(control.name, e.currentTarget.checked)} />
-        {:else if control.kind === ControlKind.Number}
-          <input type="number" class="text" value={textOf(values[control.name])} aria-label={control.name} data-field={control.name} onchange={(e) => onchange(control.name, numberOf(e.currentTarget.value))} />
+        {:else if editor.input === Input.Checkbox}
+          <input type="checkbox" checked={current === 'true'} aria-label={control.name} data-field={control.name} onchange={(e) => commit(control, String(e.currentTarget.checked))} />
+        {:else if editor.input === Input.Json}
+          <textarea class="text json" class:invalid={invalid[control.name]} rows="3" spellcheck="false" aria-label={control.name} aria-invalid={invalid[control.name] ? 'true' : 'false'} data-field={control.name} value={current} onchange={(e) => commit(control, e.currentTarget.value)}></textarea>
+        {:else if editor.input === Input.Readonly}
+          <span class="text readonly" data-field={control.name}>{current}</span>
         {:else}
-          <input type="text" class="text" value={textOf(values[control.name])} aria-label={control.name} data-field={control.name} onchange={(e) => onchange(control.name, e.currentTarget.value)} />
+          {#if editor.swatch}
+            <input type="color" class="swatch" value={editor.swatch(values[control.name])} aria-label="{control.name} picker" oninput={(e) => commit(control, e.currentTarget.value)} />
+          {/if}
+          <input type={editor.input} class="text" value={current} aria-label={control.name} data-field={control.name} onchange={(e) => commit(control, e.currentTarget.value)} />
         {/if}
       </div>
     </div>
@@ -105,6 +120,41 @@
   .control {
     display: flex;
     min-width: 0;
+  }
+
+  .required {
+    margin-left: 2px;
+    color: var(--ui-text-2);
+  }
+
+  .swatch {
+    flex: none;
+    width: 28px;
+    height: 28px;
+    padding: 2px;
+    margin-right: 4px;
+    border: 1px solid var(--ui-field-border);
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-input);
+  }
+
+  .json {
+    height: auto;
+    padding: 4px 8px;
+    font-family: var(--ui-mono, monospace);
+    font-size: var(--ui-text-xs);
+    resize: vertical;
+  }
+
+  .invalid {
+    border-color: var(--ui-danger, #d33);
+  }
+
+  .readonly {
+    display: flex;
+    align-items: center;
+    color: var(--ui-text-2);
+    font-style: italic;
   }
 
   .text {

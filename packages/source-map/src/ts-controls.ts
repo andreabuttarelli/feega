@@ -1,59 +1,111 @@
-import { PropKind, type PropControl, type PropValue } from './component-props.ts';
+import { NOOP, TypeTag, controlOf, type PropControl, type PropMember, type PropType, type PropValue, type Scalar } from './prop-model.ts';
 
 export type TsNode = { type: string; [key: string]: any };
 
-export type PropMember = { name: string; optional: boolean; type: TsNode | null; fallback?: PropValue };
+export type TsMember = { name: string; optional: boolean; type: TsNode | null };
 
-const CHILDREN = 'children';
-const CHILDREN_TYPE = /Snippet|Slot/;
-const IGNORED = new Set(['TSUndefinedKeyword', 'TSNullKeyword']);
-const KEYWORDS: Record<string, PropKind> = { TSStringKeyword: PropKind.Text, TSNumberKeyword: PropKind.Number, TSBooleanKeyword: PropKind.Toggle };
-const PRIMITIVE_KINDS: Record<string, PropKind> = { string: PropKind.Text, number: PropKind.Number, boolean: PropKind.Toggle };
+const MAX_DEPTH = 8;
+const NAMED_TYPE = /^[A-Z]/;
+const NODE_NAME = /Snippet|Slot|ReactNode|ReactElement|JSX|VNode/;
+const ARRAY_NAMES = new Set(['Array', 'ReadonlyArray']);
+const OBJECT_NAMES = new Set(['Record', 'Partial', 'Required', 'Readonly', 'Pick', 'Omit', 'Map', 'Set']);
+const FUNCTION_NAMES = new Set(['Function']);
+const PROPERTY_TYPES = new Set(['Property', 'ObjectProperty']);
+const DATE_NAMES = new Set(['Date']);
+
+const SCALARS = ['string', 'number', 'boolean'];
+
+const VALUE_OF_NODE: Record<string, (node: TsNode) => PropValue | undefined> = {
+  UnaryExpression: (node) => (node.operator === '-' && typeof node.argument?.value === 'number' ? -node.argument.value : undefined),
+  TemplateLiteral: (node) => (node.expressions.length === 0 ? node.quasis[0].value.cooked : undefined),
+  ArrayExpression: (node) => {
+    const items = (node.elements as TsNode[]).map((element) => literalOf(element));
+    return items.every((item) => item !== undefined) ? (items as PropValue[]) : undefined;
+  },
+  ObjectExpression: (node) => {
+    const entries = (node.properties as TsNode[]).map((property) => [property.key?.name ?? property.key?.value, PROPERTY_TYPES.has(property.type) ? literalOf(property.value) : undefined] as const);
+    return entries.every(([key, value]) => key !== undefined && value !== undefined) ? Object.fromEntries(entries as [string, PropValue][]) : undefined;
+  },
+  ArrowFunctionExpression: () => NOOP,
+  FunctionExpression: () => NOOP
+};
 
 export function literalOf(node: TsNode | null | undefined): PropValue | undefined {
   if (!node) {
     return undefined;
   }
-  if (node.type === 'UnaryExpression' && node.operator === '-' && typeof node.argument?.value === 'number') {
-    return -node.argument.value;
+  const read = VALUE_OF_NODE[node.type];
+  if (read) {
+    return read(node);
   }
-  return ['string', 'number', 'boolean'].includes(typeof node.value) ? node.value : undefined;
+  return SCALARS.includes(typeof node.value) ? node.value : undefined;
 }
 
-function optionsOf(types: TsNode[]): string[] | null {
-  const values = types.map((member) => (member.type === 'TSLiteralType' ? literalOf(member.literal) : undefined));
-  return values.length > 0 && values.every((value) => typeof value === 'string') ? (values as string[]) : null;
+export function factoryValueOf(node: TsNode | null | undefined): PropValue | undefined {
+  const isFactory = node?.type === 'ArrowFunctionExpression' && node.body.type !== 'BlockStatement';
+  return isFactory ? literalOf(node.body) : literalOf(node);
 }
 
-function kindOfType(type: TsNode): { kind: PropKind; options?: string[] } | null {
-  if (type.type === 'TSTypeReference' && CHILDREN_TYPE.test(type.typeName?.name ?? '')) {
-    return { kind: PropKind.Children };
-  }
-  if (KEYWORDS[type.type]) {
-    return { kind: KEYWORDS[type.type] };
-  }
-  if (type.type !== 'TSUnionType') {
-    return null;
-  }
-  const members = (type.types as TsNode[]).filter((member) => !IGNORED.has(member.type));
-  const options = optionsOf(members);
-  if (options) {
-    return { kind: PropKind.Select, options };
-  }
-  return members.length === 1 ? kindOfType(members[0]) : null;
+export type Scope = { declared: Map<string, TsNode>; depth: number };
+
+const tagged = (tag: TypeTag): (() => PropType) => () => ({ tag });
+
+function literalType(node: TsNode): PropType {
+  const literal = literalOf(node.literal);
+  return typeof literal === 'object' || literal === undefined ? { tag: TypeTag.Unknown } : { tag: TypeTag.Literal, literal: literal as Scalar };
 }
 
-export function controlOf({ name, optional, type, fallback }: PropMember): PropControl | null {
-  const typed = type ? kindOfType(type) : { kind: name === CHILDREN ? PropKind.Children : fallback === undefined ? PropKind.Text : PRIMITIVE_KINDS[typeof fallback] };
-  if (!typed) {
-    return null;
+function referenceType(node: TsNode, scope: Scope): PropType {
+  const name: string = node.typeName?.name ?? '';
+  if (NODE_NAME.test(name)) {
+    return { tag: TypeTag.Node };
   }
-  return { name, kind: typed.kind, required: !optional && fallback === undefined, ...(typed.options && { options: typed.options }), ...(fallback !== undefined && { default: fallback }) };
+  const byName = [
+    [ARRAY_NAMES, TypeTag.Array],
+    [OBJECT_NAMES, TypeTag.Object],
+    [FUNCTION_NAMES, TypeTag.Function],
+    [DATE_NAMES, TypeTag.Date]
+  ] as const;
+  const known = byName.find(([names]) => names.has(name));
+  if (known) {
+    return { tag: known[1] };
+  }
+  const declaration = scope.declared.get(name);
+  if (!declaration) {
+    return { tag: NAMED_TYPE.test(name) ? TypeTag.Object : TypeTag.Unknown };
+  }
+  if (scope.depth >= MAX_DEPTH) {
+    return { tag: TypeTag.Unknown };
+  }
+  return declaration.type === 'TSInterfaceDeclaration' ? { tag: TypeTag.Object } : typeOf(declaration, { ...scope, depth: scope.depth + 1 });
+}
+
+const TYPE_OF_NODE: Record<string, (node: TsNode, scope: Scope) => PropType> = {
+  TSStringKeyword: tagged(TypeTag.String),
+  TSNumberKeyword: tagged(TypeTag.Number),
+  TSBooleanKeyword: tagged(TypeTag.Boolean),
+  TSNullKeyword: tagged(TypeTag.Nullish),
+  TSUndefinedKeyword: tagged(TypeTag.Nullish),
+  TSAnyKeyword: tagged(TypeTag.Unknown),
+  TSUnknownKeyword: tagged(TypeTag.Unknown),
+  TSObjectKeyword: tagged(TypeTag.Object),
+  TSTypeLiteral: tagged(TypeTag.Object),
+  TSMappedType: tagged(TypeTag.Object),
+  TSArrayType: tagged(TypeTag.Array),
+  TSTupleType: tagged(TypeTag.Array),
+  TSFunctionType: tagged(TypeTag.Function),
+  TSLiteralType: literalType,
+  TSUnionType: (node, scope) => ({ tag: TypeTag.Union, members: (node.types as TsNode[]).map((member) => typeOf(member, scope)) }),
+  TSTypeReference: referenceType
+};
+
+export function typeOf(node: TsNode, scope: Scope): PropType {
+  return (TYPE_OF_NODE[node.type] ?? tagged(TypeTag.Unknown))(node, scope);
 }
 
 const keyOf = (key: TsNode) => key.name ?? key.value;
 
-export function membersOf(type: TsNode | null | undefined, declared: Map<string, TsNode>): { name: string; optional: boolean; type: TsNode | null }[] {
+export function membersOf(type: TsNode | null | undefined, declared: Map<string, TsNode>): TsMember[] {
   if (!type) {
     return [];
   }
@@ -84,6 +136,30 @@ export function declarationsOf(body: TsNode[]): Map<string, TsNode> {
   return declared;
 }
 
-export function controlsOfMembers(members: { name: string; optional: boolean; type: TsNode | null }[], defaults: Map<string, PropValue>): PropControl[] {
-  return members.flatMap((member) => controlOf({ ...member, fallback: defaults.get(member.name) }) ?? []);
+export function controlsOfMembers(members: TsMember[], defaults: Map<string, PropValue>, declared: Map<string, TsNode>): PropControl[] {
+  const scope = { declared, depth: 0 };
+  return members.flatMap((member) => {
+    const propMember: PropMember = { name: member.name, optional: member.optional, type: member.type && typeOf(member.type, scope), fallback: defaults.get(member.name) };
+    return controlOf(propMember) ?? [];
+  });
+}
+
+export type Destructured = { name: string; fallback: PropValue | undefined };
+
+export function destructuredOf(pattern: TsNode): Destructured[] {
+  return (pattern.properties as TsNode[]).flatMap((property) => {
+    if (!PROPERTY_TYPES.has(property.type) || !property.key?.name) {
+      return [];
+    }
+    const withDefault = property.value.type === 'AssignmentPattern';
+    return [{ name: property.key.name, fallback: withDefault ? literalOf(property.value.right) : undefined }];
+  });
+}
+
+export function controlsOfPattern(names: Destructured[] | null, typeNode: TsNode | null | undefined, declared: Map<string, TsNode>): PropControl[] {
+  const typed = membersOf(typeNode, declared);
+  const byName = new Map(typed.map((member) => [member.name, member]));
+  const members: TsMember[] = names ? names.map(({ name }) => byName.get(name) ?? { name, optional: false, type: null }) : typed;
+  const defaults = new Map((names ?? []).flatMap(({ name, fallback }) => (fallback === undefined ? [] : [[name, fallback] as [string, PropValue]])));
+  return controlsOfMembers(members, defaults, declared);
 }

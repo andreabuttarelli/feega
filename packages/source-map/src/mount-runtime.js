@@ -1,17 +1,29 @@
 import { CANVAS_CSS, CANVAS_ID } from './focus.js';
 
-import { FUNCTION_MARK, MOUNT_PROPS, MOUNT_STATUS, Status } from './mount-protocol.js';
+import { DATE_MARK, FUNCTION_MARK, MOUNT_PROPS, MOUNT_STATUS, Status } from './mount-protocol.js';
 
 export const Reason = { NoExport: 'The component is not exported', Empty: 'It rendered nothing' };
 
 const SETTLE_MS = 350;
+const GIVE_UP_MS = 8000;
 const GAP_PX = 24;
 const CAPTION_PX = 11;
 
-const isMarkedFunction = (value) => value !== null && typeof value === 'object' && value[FUNCTION_MARK] === true;
+const MARKS = [
+  { mark: FUNCTION_MARK, matches: (value) => value === true, revive: () => () => undefined },
+  { mark: DATE_MARK, matches: (value) => typeof value === 'string', revive: (value) => new Date(value) }
+];
+
+function reviveValue(value) {
+  if (value === null || typeof value !== 'object') {
+    return value;
+  }
+  const marked = MARKS.find(({ mark, matches }) => matches(value[mark]));
+  return marked ? marked.revive(value[marked.mark]) : value;
+}
 
 export function reviveProps(props) {
-  return Object.fromEntries(Object.entries(props ?? {}).map(([name, value]) => [name, isMarkedFunction(value) ? () => undefined : value]));
+  return Object.fromEntries(Object.entries(props ?? {}).map(([name, value]) => [name, reviveValue(value)]));
 }
 
 export const rendersNothing = (container) => container.querySelector('*') === null && container.textContent.trim() === '';
@@ -20,7 +32,7 @@ function propsFor(base, extra) {
   return reviveProps({ ...base, ...extra });
 }
 
-export function runMount({ Target, name, file, props, controlsUrl, win = window, render }) {
+export function runMount({ Target, name, file, props, controlsUrl, win = window, render, giveUpMs = GIVE_UP_MS }) {
   const doc = win.document;
   const container = doc.getElementById('root');
   const style = doc.createElement('style');
@@ -48,18 +60,24 @@ export function runMount({ Target, name, file, props, controlsUrl, win = window,
   });
 
   draw(current);
-  win.setTimeout(async () => {
+  const started = Date.now();
+  const settle = async () => {
     if (rendersNothing(container)) {
+      if (Date.now() - started < giveUpMs) {
+        win.setTimeout(settle, SETTLE_MS);
+        return;
+      }
       post({ status: Status.Failed, reason: Reason.Empty });
       return;
     }
     const controls = await win.fetch(controlsUrl).then((r) => r.json()).then((body) => body.controls).catch(() => null);
     ready = true;
     post({ status: Status.Ready, name, file, controls, props: current.props });
-  }, SETTLE_MS);
+  };
+  win.setTimeout(settle, SETTLE_MS);
 }
 
-export function startMount({ react, createRoot, mod, name, file, props, providers, controlsUrl, win = window }) {
+export function startMount({ react, createRoot, mod, name, file, props, providers, controlsUrl, win = window, giveUpMs }) {
   const { createElement, Component, Fragment } = react;
   const Target = mod[name] ?? mod.default;
 
@@ -86,5 +104,5 @@ export function startMount({ react, createRoot, mod, name, file, props, provider
     return (current) => root.render(createElement(Boundary, { key: ++version }, createElement(providers ?? Fragment, null, view(current))));
   };
 
-  runMount({ Target, name, file, props, controlsUrl, win, render });
+  runMount({ Target, name, file, props, controlsUrl, win, render, giveUpMs });
 }

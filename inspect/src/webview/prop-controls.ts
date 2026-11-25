@@ -3,23 +3,105 @@ export enum ControlKind {
   Toggle = 'toggle',
   Text = 'text',
   Number = 'number',
-  Children = 'children'
+  Children = 'children',
+  Array = 'array',
+  Object = 'object',
+  Callback = 'callback',
+  Color = 'color',
+  Date = 'date'
 }
 
-export type PropValue = string | number | boolean;
-export type PropControl = { name: string; kind: ControlKind; options?: string[]; default?: PropValue };
+export type Scalar = string | number | boolean;
+export type PropValue = Scalar | null | PropValue[] | { [key: string]: PropValue };
+export type PropControl = { name: string; kind: ControlKind; required?: boolean; options?: Scalar[]; default?: PropValue };
 export type Variant = { label: string; props: Record<string, PropValue> };
 export type Variants = { variants: Variant[] | null; dropped: string[]; total: number };
 
 export const VARIANT_CAP = 24;
+export const INVALID = Symbol('invalid');
+
+export enum Input {
+  Select = 'select',
+  Checkbox = 'checkbox',
+  Number = 'number',
+  Text = 'text',
+  Date = 'date',
+  Json = 'json',
+  Readonly = 'readonly'
+}
+
+export type Editor = {
+  input: Input;
+  readonly?: boolean;
+  show: (value: unknown, control: PropControl) => string;
+  read: (raw: string, control: PropControl) => PropValue | undefined | typeof INVALID;
+  swatch?: (value: unknown) => string;
+};
+
 const CHILDREN = 'children';
+const HEX = /^#[0-9a-f]{6}$/i;
+const SWATCH_FALLBACK = '#000000';
+const DATE_MARK = '$date';
+const FUNCTION_MARK = '$fn';
+const DATE_LENGTH = 10;
+const JSON_INDENT = 2;
+const MIDNIGHT = 'T00:00:00.000Z';
+
+const textOf = (value: unknown) => (value === undefined || value === null ? '' : String(value));
+
+const text: Editor = { input: Input.Text, show: textOf, read: (raw) => raw };
+
+function json(isShape: (value: unknown) => boolean): Editor {
+  return {
+    input: Input.Json,
+    show: (value) => (value === undefined ? '' : JSON.stringify(value, null, JSON_INDENT)),
+    read: (raw) => {
+      if (raw.trim() === '') {
+        return undefined;
+      }
+      try {
+        const parsed = JSON.parse(raw);
+        return isShape(parsed) ? parsed : INVALID;
+      } catch {
+        return INVALID;
+      }
+    }
+  };
+}
+
+const isPlainObject = (value: unknown) => typeof value === 'object' && value !== null && !Array.isArray(value);
+
+export const EDITORS: Record<ControlKind, Editor> = {
+  [ControlKind.Select]: { input: Input.Select, show: textOf, read: (raw, control) => control.options?.find((option) => String(option) === raw) },
+  [ControlKind.Toggle]: { input: Input.Checkbox, show: (value) => String(value === true), read: (raw) => raw === 'true' },
+  [ControlKind.Number]: { input: Input.Number, show: textOf, read: (raw) => (raw === '' ? undefined : Number(raw)) },
+  [ControlKind.Text]: text,
+  [ControlKind.Children]: text,
+  [ControlKind.Color]: { ...text, swatch: (value) => (typeof value === 'string' && HEX.test(value) ? value : SWATCH_FALLBACK) },
+  [ControlKind.Array]: json(Array.isArray),
+  [ControlKind.Object]: json(isPlainObject),
+  [ControlKind.Date]: {
+    input: Input.Date,
+    show: (value) => textOf((value as { $date?: string } | undefined)?.[DATE_MARK]).slice(0, DATE_LENGTH),
+    read: (raw) => (raw === '' ? undefined : { [DATE_MARK]: `${raw}${MIDNIGHT}` })
+  },
+  [ControlKind.Callback]: { input: Input.Readonly, readonly: true, show: () => 'function', read: () => undefined }
+};
+
+const plainKind = (value: object): ControlKind => (FUNCTION_MARK in value ? ControlKind.Callback : DATE_MARK in value ? ControlKind.Date : ControlKind.Object);
+
+const OBSERVED: Record<string, (value: unknown) => ControlKind> = {
+  string: () => ControlKind.Text,
+  boolean: () => ControlKind.Toggle,
+  number: () => ControlKind.Number,
+  object: (value) => (Array.isArray(value) ? ControlKind.Array : plainKind(value as object))
+};
 
 function observedKind(name: string, value: unknown): ControlKind | null {
   if (name === CHILDREN) {
     return typeof value === 'string' || typeof value === 'number' ? ControlKind.Children : null;
   }
-  const byType: Record<string, ControlKind> = { string: ControlKind.Text, boolean: ControlKind.Toggle, number: ControlKind.Number };
-  return byType[typeof value] ?? null;
+  return value === null ? null : (OBSERVED[typeof value]?.(value) ?? null);
 }
 
 export function controlsOf(documented: PropControl[] | null, observed: Record<string, unknown>): PropControl[] {
@@ -31,7 +113,12 @@ export function controlsOf(documented: PropControl[] | null, observed: Record<st
   return [...(documented ?? []), ...added];
 }
 
-const axisOf = (control: PropControl): PropValue[] | null => (control.kind === ControlKind.Select ? (control.options ?? null) : control.kind === ControlKind.Toggle ? [false, true] : null);
+const AXES: Partial<Record<ControlKind, (control: PropControl) => PropValue[] | null>> = {
+  [ControlKind.Select]: (control) => control.options ?? null,
+  [ControlKind.Toggle]: () => [false, true]
+};
+
+const axisOf = (control: PropControl): PropValue[] | null => AXES[control.kind]?.(control) ?? null;
 
 export function variantsOf(controls: PropControl[]): Variants {
   const axes = controls.flatMap((control) => {

@@ -13,6 +13,11 @@ const NO_MODULES = 'The bundle does not expose React';
 const HIDE_PAGE_CSS = 'body > *:not(#root){display:none!important}';
 const KIND = { string: 'text', number: 'number', boolean: 'toggle' };
 
+export function pageControls(win, request) {
+  const registered = win.__feegaControls?.[request.file];
+  return registered?.[request.name] ?? registered?.default ?? controlsOfProps(request.props);
+}
+
 export function controlsOfProps(props) {
   return Object.entries(props).flatMap(([name, value]) => (KIND[typeof value] ? [{ name, kind: KIND[typeof value], required: false, default: value }] : []));
 }
@@ -60,7 +65,7 @@ export function startPageMount({ win, request, modules = () => webpackModules(wi
   }
   win[STARTED] = true;
   containerIn(win.document);
-  const controls = controlsOfProps(request.props);
+  const controls = pageControls(win, request);
   const controlsUrl = `data:application/json,${encodeURIComponent(JSON.stringify({ controls }))}`;
   startMount({ ...loaded, mod: { default: Type }, name: request.name, file: request.file, props: request.props, providers: null, controlsUrl, win });
   return true;

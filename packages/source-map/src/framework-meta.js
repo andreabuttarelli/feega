@@ -18,6 +18,7 @@ function fiberOf(element) {
 
 const COMPONENT_TAGS = new Set([0, 1, 11, 14, 15]);
 const FUNCTION_MARK = { $fn: true };
+const dateMark = (date) => ({ $date: date.toISOString() });
 const MAX_PROP_DEPTH = 4;
 
 function componentName(type) {
@@ -30,6 +31,9 @@ function plain(value, depth) {
   }
   if (value === null || ['string', 'number', 'boolean'].includes(typeof value)) {
     return value;
+  }
+  if (value instanceof Date) {
+    return dateMark(value);
   }
   if (typeof value !== 'object' || value.$$typeof || value.nodeType) {
     return undefined;

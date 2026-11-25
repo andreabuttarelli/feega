@@ -1,91 +1,95 @@
 import { builtinResolvers, makeFsImporter, parse, type Documentation } from 'react-docgen';
+import { parseExpression } from '@babel/parser';
+import { literalOf as nodeLiteralOf } from './ts-controls.ts';
+import { TypeTag, controlOf, tagOfFallback, type PropControl, type PropType, type PropValue, type Scalar } from './prop-model.ts';
 
-export enum PropKind {
-  Select = 'select',
-  Toggle = 'toggle',
-  Text = 'text',
-  Number = 'number',
-  Children = 'children'
-}
-
-export type PropValue = string | number | boolean;
-
-export type PropControl = { name: string; kind: PropKind; required: boolean; options?: string[]; default?: PropValue };
+export { PropKind, type PropControl, type PropValue } from './prop-model.ts';
 
 type PropDoc = NonNullable<Documentation['props']>[string];
+type Shape = { name: string; raw?: string; value?: unknown; elements?: Shape[]; type?: string };
 
-const CHILDREN = 'children';
 const NODE_TYPE = /ReactNode|ReactElement|JSX/;
-const QUOTED = /^(['"`])(.*)\1$/s;
-const NUMERIC = /^-?\d+(\.\d+)?$/;
-const IGNORED_MEMBERS = new Set(['undefined', 'null']);
+const ARRAY_NAMES = new Set(['Array', 'ReadonlyArray', 'tuple']);
+const OBJECT_NAMES = new Set(['object', 'Record', 'Partial', 'Required', 'Readonly', 'Pick', 'Omit', 'Map', 'Set']);
+const NAMED_TYPE = /^[A-Z]/;
+const FUNCTION_SIGNATURE = 'function';
 
 const resolver = new builtinResolvers.FindExportedDefinitionsResolver({ limit: 0 });
 const importer = makeFsImporter();
 
-const unquote = (raw: string) => QUOTED.exec(raw)?.[2] ?? raw;
-
 function literalOf(raw: string): PropValue | undefined {
-  if (raw === 'true' || raw === 'false') {
-    return raw === 'true';
+  try {
+    return nodeLiteralOf(parseExpression(raw));
+  } catch {
+    return undefined;
   }
-  if (NUMERIC.test(raw)) {
-    return Number(raw);
-  }
-  return QUOTED.test(raw) ? unquote(raw) : undefined;
 }
 
-type Shape = { name: string; raw?: string; value?: unknown; elements?: Shape[] };
+const tagged = (tag: TypeTag): (() => PropType) => () => ({ tag });
 
-const optionsOf = (members: Shape[]): string[] | null => {
-  const options = members.filter((m) => !IGNORED_MEMBERS.has(m.name));
-  const values = options.map((m) => (m.name === 'literal' ? literalOf(String(m.value)) : undefined));
-  return values.length > 0 && values.every((v) => typeof v === 'string') ? (values as string[]) : null;
+function literalType(shape: Shape): PropType {
+  const literal = literalOf(String(shape.value));
+  return typeof literal === 'object' || literal === undefined ? { tag: TypeTag.Unknown } : { tag: TypeTag.Literal, literal };
+}
+
+const TS_TYPES: Record<string, (shape: Shape) => PropType> = {
+  string: tagged(TypeTag.String),
+  number: tagged(TypeTag.Number),
+  boolean: tagged(TypeTag.Boolean),
+  null: tagged(TypeTag.Nullish),
+  undefined: tagged(TypeTag.Nullish),
+  literal: literalType,
+  Date: tagged(TypeTag.Date),
+  Function: tagged(TypeTag.Function),
+  signature: (shape) => ({ tag: shape.type === FUNCTION_SIGNATURE ? TypeTag.Function : TypeTag.Object }),
+  union: (shape) => ({ tag: TypeTag.Union, members: (shape.elements ?? []).map(typeOfTs) })
 };
 
-function kindOfTs(name: string, ts: Shape): { kind: PropKind; options?: string[] } | null {
-  if (name === CHILDREN || NODE_TYPE.test(ts.raw ?? ts.name)) {
-    return { kind: PropKind.Children };
+function typeOfTs(shape: Shape): PropType {
+  if (NODE_TYPE.test(shape.raw ?? shape.name)) {
+    return { tag: TypeTag.Node };
   }
-  if (ts.name === 'union') {
-    const options = optionsOf(ts.elements ?? []);
-    const members = (ts.elements ?? []).filter((m) => !IGNORED_MEMBERS.has(m.name));
-    if (options) {
-      return { kind: PropKind.Select, options };
-    }
-    return members.length === 1 ? kindOfTs(name, members[0]) : null;
+  if (ARRAY_NAMES.has(shape.name)) {
+    return { tag: TypeTag.Array };
   }
-  const simple: Record<string, PropKind> = { boolean: PropKind.Toggle, string: PropKind.Text, number: PropKind.Number };
-  return simple[ts.name] ? { kind: simple[ts.name] } : null;
+  const named = OBJECT_NAMES.has(shape.name) || (!(shape.name in TS_TYPES) && NAMED_TYPE.test(shape.name));
+  return (named ? tagged(TypeTag.Object) : (TS_TYPES[shape.name] ?? tagged(TypeTag.Unknown)))(shape);
 }
 
-function kindOfPropType(name: string, type: Shape): { kind: PropKind; options?: string[] } | null {
-  if (name === CHILDREN || type.name === 'node' || type.name === 'element') {
-    return { kind: PropKind.Children };
-  }
-  if (type.name === 'enum' && Array.isArray(type.value)) {
-    const options = (type.value as { value: string }[]).map((v) => literalOf(v.value));
-    return options.every((v) => typeof v === 'string') ? { kind: PropKind.Select, options: options as string[] } : null;
-  }
-  const simple: Record<string, PropKind> = { bool: PropKind.Toggle, string: PropKind.Text, number: PropKind.Number };
-  return simple[type.name] ? { kind: simple[type.name] } : null;
+function enumType(shape: Shape): PropType {
+  const options = (shape.value as { value: string }[]).map((entry) => literalOf(entry.value));
+  return options.every((option) => typeof option !== 'object' && option !== undefined) ? { tag: TypeTag.Union, members: options.map((literal) => ({ tag: TypeTag.Literal, literal: literal as Scalar })) } : { tag: TypeTag.Unknown };
 }
 
-function kindOfDefault(name: string, fallback: PropValue | undefined): { kind: PropKind } | null {
-  if (name === CHILDREN) {
-    return { kind: PropKind.Children };
+const PROP_TYPES: Record<string, (shape: Shape) => PropType> = {
+  bool: tagged(TypeTag.Boolean),
+  string: tagged(TypeTag.String),
+  number: tagged(TypeTag.Number),
+  node: tagged(TypeTag.Node),
+  element: tagged(TypeTag.Node),
+  func: tagged(TypeTag.Function),
+  array: tagged(TypeTag.Array),
+  arrayOf: tagged(TypeTag.Array),
+  object: tagged(TypeTag.Object),
+  objectOf: tagged(TypeTag.Object),
+  shape: tagged(TypeTag.Object),
+  exact: tagged(TypeTag.Object),
+  instanceOf: (shape) => ({ tag: shape.value === 'Date' ? TypeTag.Date : TypeTag.Object }),
+  enum: (shape) => (Array.isArray(shape.value) ? enumType(shape) : { tag: TypeTag.Unknown })
+};
+
+const typeOfPropType = (shape: Shape): PropType => (PROP_TYPES[shape.name] ?? tagged(TypeTag.Unknown))(shape);
+
+function typeOfDoc(doc: PropDoc, fallback: PropValue | undefined): PropType | null {
+  if (doc.tsType) {
+    return typeOfTs(doc.tsType as Shape);
   }
-  const byType: Record<string, PropKind> = { boolean: PropKind.Toggle, string: PropKind.Text, number: PropKind.Number };
-  return fallback === undefined ? { kind: PropKind.Text } : { kind: byType[typeof fallback] };
+  return doc.type ? typeOfPropType(doc.type as Shape) : fallback === undefined ? null : { tag: tagOfFallback(fallback) };
 }
 
-function controlOf(name: string, doc: PropDoc): PropControl | null {
+function controlOfDoc(name: string, doc: PropDoc): PropControl | null {
   const fallback = doc.defaultValue ? literalOf(String(doc.defaultValue.value)) : undefined;
-  const typed = doc.tsType ? kindOfTs(name, doc.tsType as Shape) : doc.type ? kindOfPropType(name, doc.type as Shape) : kindOfDefault(name, fallback);
-  if (!typed) {
-    return null;
-  }
-  return { name, kind: typed.kind, required: Boolean(doc.required), ...(typed.options && { options: typed.options }), ...(fallback !== undefined && { default: fallback }) };
+  return controlOf({ name, optional: !doc.required, type: typeOfDoc(doc, fallback), fallback });
 }
 
 function documentsOf(code: string, filename: string): Documentation[] | null {
@@ -96,11 +100,24 @@ function documentsOf(code: string, filename: string): Documentation[] | null {
   }
 }
 
+const controlsOfDoc = (doc: Documentation): PropControl[] => Object.entries(doc.props ?? {}).flatMap(([prop, propDoc]) => controlOfDoc(prop, propDoc) ?? []);
+
+const isDefaultExport = (doc: Documentation) => (doc as { exportName?: string }).exportName === 'default';
+
 export function controlsOf(code: string, filename: string, name: string): PropControl[] | null {
   const docs = documentsOf(code, filename);
-  const doc = docs?.find((d) => d.displayName === name) ?? docs?.find((d) => d.exportName === 'default') ?? (docs?.length === 1 ? docs[0] : undefined);
-  if (!doc) {
+  const doc = docs?.find((d) => d.displayName === name) ?? docs?.find(isDefaultExport) ?? (docs?.length === 1 ? docs[0] : undefined);
+  return doc ? controlsOfDoc(doc) : null;
+}
+
+export const DEFAULT_ENTRY = 'default';
+
+export function controlsByName(code: string, filename: string): Record<string, PropControl[]> | null {
+  const docs = documentsOf(code, filename);
+  if (!docs?.length) {
     return null;
   }
-  return Object.entries(doc.props ?? {}).flatMap(([prop, propDoc]) => controlOf(prop, propDoc) ?? []);
+  const named = docs.flatMap((doc) => (doc.displayName ? [[doc.displayName, controlsOfDoc(doc)] as const] : []));
+  const fallback = docs.find(isDefaultExport) ?? (docs.length === 1 ? docs[0] : undefined);
+  return Object.fromEntries([...named, ...(fallback ? [[DEFAULT_ENTRY, controlsOfDoc(fallback)] as const] : [])]);
 }

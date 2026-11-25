@@ -9,23 +9,30 @@ Select an element inside a component and press `F`, or use the focus action on i
 
 ## Real component: React, Vue, Svelte, Next.js, Nuxt and Astro
 
-The tab renders the real component, served by your own dev server: Vite, Nuxt and Astro serve it from a page of their own, and Next.js reopens your page inside the tab and renders the component the page already has. React and Vue start from the props the instance has on the page. Svelte has no way to read them, so it starts from the defaults and a placeholder for each prop. Edits in the tab land in the source like edits on the page, and Vite hot reloads the tab.
+The tab renders the real component, served by your own dev server: Vite, Nuxt and Astro serve it from a page of their own, and Next.js reopens your page inside the tab and renders the component the page already has. React and Vue start from the props the instance has on the page. Svelte and Astro have no way to read them, so they start from the defaults and a placeholder for each prop. Edits in the tab land in the source like edits on the page, and Vite hot reloads the tab.
 
 The right bar gets a Props section at the top:
 
 | Prop type | Control |
 |---|---|
-| Union of strings | Select |
+| Union of literals (`'sm' \| 'lg'`, `1 \| 2 \| 3`) | Select |
 | Boolean | Toggle |
 | String | Text field |
+| String named like a color (`color`, `fill`, `background`) or holding one | Text field with a color picker |
 | Number | Number field |
-| `children` | Text field |
+| Array, tuple | JSON field |
+| Object, record, interface | JSON field |
+| Date | Date field |
+| Callback | Read-only, replaced by a no-op |
+| `children`, `ReactNode`, `Snippet`, `VNode` | Text field |
 
-Props are read from the TypeScript types: `defineProps<{ ... }>()` in Vue (also the object and array forms), and the destructured `$props()` in Svelte 5, with defaults taken from `withDefaults` or the destructuring. React uses the component's props type.
+A star marks a required prop. A JSON field keeps the last valid value and flags text that does not parse or has the wrong shape.
 
-Callbacks are replaced by no-ops. Objects and arrays are passed as they are on the page but have no control.
+Props are read from the types in the source with the same rules in every framework: the props type of a React component (or its PropTypes), `defineProps<{ ... }>()` in Vue (also the object and array forms, `PropType` casts and factory defaults), the destructured `$props()` in Svelte 5, and `interface Props` with `Astro.props` in the frontmatter of an Astro component. Defaults come from the destructuring or `withDefaults`. A type that is declared in another file resolves in React; in Vue, Svelte and Astro a type imported from another file shows a JSON field.
 
-**Variants** shows every combination of the select and toggle props in a grid. The grid holds at most 24 combinations. When there are more, the last props are left out and the bar says which. Hover, focus and disabled simulation works on every cell.
+In Next.js the controls are read from the source too, by the same loader that tags your elements, so selects appear there as well. A prop the source does not describe but the page passes still gets a control.
+
+**Variants** shows every combination of the select and toggle props in a grid. Numeric selects vary by their numbers. The grid holds at most 24 combinations. When there are more, the last props are left out and the bar says which. Hover, focus and disabled simulation works on every cell.
 
 In React the component is wrapped in the providers around your app in the entry file (the `render` call in `main.tsx`), such as a theme, router or query client. Vue and Svelte have no providers: a component that needs a plugin such as a router or store shows the snapshot.
 
@@ -33,7 +40,7 @@ If the component cannot render alone, for example because its provider lives ins
 
 ## Next.js
 
-Next.js needs the webpack dev server (`next dev`, not `--turbopack`) and `withFeegaSource` in `next.config`, or Feega starting the server for you. The tab loads your page, hides it and renders the component in a root of its own, so global styles and fonts apply. Props start from what the instance has on the page. The Props section has a text, number or toggle control for each string, number and boolean prop; there are no select controls because Next.js has no type information at runtime. The providers in `layout` are not applied: a component that needs one shows the snapshot.
+Next.js needs the webpack dev server (`next dev`, not `--turbopack`) and `withFeegaSource` in `next.config`, or Feega starting the server for you. The tab loads your page, hides it and renders the component in a root of its own, so global styles and fonts apply. Props start from what the instance has on the page. The providers in `layout` are not applied: a component that needs one shows the snapshot.
 
 ## Nuxt
 

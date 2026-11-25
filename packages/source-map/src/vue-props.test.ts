@@ -49,8 +49,30 @@ describe('vueControlsOf', () => {
     ]);
   });
 
-  it('leaves out what it cannot make a control for', () => {
-    expect(controls('defineProps<{ items: string[]; label: string }>();')!.map((c) => c.name)).toEqual(['label']);
+  it('unwraps factory defaults of withDefaults', () => {
+    expect(controls("withDefaults(defineProps<{ items?: string[]; theme?: { a: number } }>(), { items: () => ['x'], theme: () => ({ a: 1 }) });")).toEqual([
+      { name: 'items', kind: PropKind.Array, required: false, default: ['x'] },
+      { name: 'theme', kind: PropKind.Object, required: false, default: { a: 1 } }
+    ]);
+  });
+
+  it('reads the constructors of the runtime form', () => {
+    expect(controls("defineProps({ items: Array, theme: Object, onPick: Function, when: Date, mixed: [String, Number] });")!.map((c) => [c.name, c.kind])).toEqual([
+      ['items', PropKind.Array],
+      ['theme', PropKind.Object],
+      ['onPick', PropKind.Callback],
+      ['when', PropKind.Date],
+      ['mixed', PropKind.Text]
+    ]);
+  });
+
+  it('reads PropType casts and factory defaults of the runtime form', () => {
+    const found = controls("defineProps({ size: String as PropType<'sm' | 'lg'>, items: { type: Array, default: () => [1] } });");
+
+    expect(found).toEqual([
+      { name: 'size', kind: PropKind.Select, required: false, options: ['sm', 'lg'] },
+      { name: 'items', kind: PropKind.Array, required: false, default: [1] }
+    ]);
   });
 
   it('answers null when the component declares no props', () => {

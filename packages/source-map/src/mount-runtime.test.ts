@@ -25,6 +25,12 @@ describe('reviveProps', () => {
     expect(props.size).toBe('sm');
     expect((props.onClick as () => unknown)()).toBeUndefined();
   });
+
+  it('turns the date marks back into dates', () => {
+    const props = reviveProps({ when: { $date: '2026-01-02T00:00:00.000Z' } });
+
+    expect(props.when).toEqual(new Date('2026-01-02T00:00:00.000Z'));
+  });
 });
 
 describe('rendersNothing', () => {
@@ -54,10 +60,20 @@ describe('startMount', () => {
 
   it('fails when it rendered nothing', async () => {
     const { start, posted, wait } = setup();
-    start();
+    start({ giveUpMs: 0 });
     await wait(450);
 
     expect(posted).toContainEqual({ type: 'feega:mount:status', status: 'failed', reason: 'It rendered nothing' });
+  });
+
+  it('waits for a component that renders late, as an Astro one does on a cold server', async () => {
+    let element: Element | null = null;
+    const { start, posted, wait } = setup({ draw: (el) => (element = el) });
+    start();
+    setTimeout(() => ((element as Element).innerHTML = '<b>late</b>'), 500);
+    await wait(1200);
+
+    expect(posted.map((message) => message.status)).toEqual(['ready']);
   });
 
   it('reports ready with the controls and props once something is on screen', async () => {

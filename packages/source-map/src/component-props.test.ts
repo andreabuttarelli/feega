@@ -32,9 +32,25 @@ describe('controlsOf', () => {
     expect(controls.find((c) => c.name === 'disabled')!.default).toBe(false);
   });
 
-  it('leaves out callbacks and objects: nothing to type into', () => {
-    expect(Object.keys(kinds(BUTTON, 'Button'))).not.toContain('onClick');
-    expect(Object.keys(kinds(BUTTON, 'Button'))).not.toContain('style');
+  it('shows callbacks and objects with their own kinds', () => {
+    expect(kinds(BUTTON, 'Button')).toMatchObject({ onClick: PropKind.Callback, style: PropKind.Object });
+  });
+
+  it('keeps array and object defaults', () => {
+    const code = "export function List({ items = ['a', 'b'], theme = { gap: 2 }, rows = [] }) { return <ul/>; }";
+    const controls = controlsOf(code, 'List.jsx', 'List')!;
+
+    expect(controls).toEqual([
+      { name: 'items', kind: PropKind.Array, required: false, default: ['a', 'b'] },
+      { name: 'theme', kind: PropKind.Object, required: false, default: { gap: 2 } },
+      { name: 'rows', kind: PropKind.Array, required: false, default: [] }
+    ]);
+  });
+
+  it('reads PropTypes arrays, objects and functions', () => {
+    const code = "import PropTypes from 'prop-types';\nexport function Menu({ items, theme, onPick }) { return <p/>; }\nMenu.propTypes = { items: PropTypes.arrayOf(PropTypes.string), theme: PropTypes.shape({ a: PropTypes.string }), onPick: PropTypes.func };";
+
+    expect(kinds(code, 'Menu', 'Menu.jsx')).toEqual({ items: PropKind.Array, theme: PropKind.Object, onPick: PropKind.Callback });
   });
 
   it('finds the component by name among several in the file', () => {

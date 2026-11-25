@@ -30,8 +30,16 @@ describe('svelteControlsOf', () => {
     ]);
   });
 
-  it('leaves out snippets as children and what it cannot control', () => {
-    expect(controls("import type { Snippet } from 'svelte';\nlet { children, items }: { children: Snippet; items: string[] } = $props();")!.map((c) => c.kind)).toEqual([PropKind.Children]);
+  it('reads snippets as children and arrays as arrays', () => {
+    expect(controls("import type { Snippet } from 'svelte';\nlet { children, items }: { children: Snippet; items: string[] } = $props();")!.map((c) => c.kind)).toEqual([PropKind.Children, PropKind.Array]);
+  });
+
+  it('keeps array and object defaults and guesses callbacks from them', () => {
+    expect(controls("let { items = [1], theme = { a: 1 }, onpick = () => {} } = $props();", 'js')).toEqual([
+      { name: 'items', kind: PropKind.Array, required: false, default: [1] },
+      { name: 'theme', kind: PropKind.Object, required: false, default: { a: 1 } },
+      { name: 'onpick', kind: PropKind.Callback, required: false }
+    ]);
   });
 
   it('answers null when the component has no $props', () => {

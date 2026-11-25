@@ -2,7 +2,7 @@ import { JSDOM } from 'jsdom';
 import { describe, expect, it } from 'vitest';
 import { PropKind } from './component-props.ts';
 import { SOURCE_ATTR } from './runtime.js';
-import { controlsOfProps, startPageMount, webpackModules } from './page-mount.js';
+import { controlsOfProps, pageControls, startPageMount, webpackModules } from './page-mount.js';
 import { pageMountUrl, requestOfHash } from './page-mount-url.js';
 
 const NESTED_HOST = Symbol.for('feega.nested-host');
@@ -95,5 +95,25 @@ describe('webpackModules', () => {
 
   it('finds nothing when the bundle is not webpack', () => {
     expect(webpackModules({} as never)).toBeNull();
+  });
+});
+
+describe('pageControls', () => {
+  const typed = [{ name: 'size', kind: PropKind.Select, required: true, options: ['sm', 'lg'] }];
+
+  it('prefers the controls the loader parsed from the source', () => {
+    const win = { __feegaControls: { 'app/Card.tsx': { Card: typed } } };
+
+    expect(pageControls(win, REQUEST)).toEqual(typed);
+  });
+
+  it('falls back to the default export when the name has no entry', () => {
+    const win = { __feegaControls: { 'app/Card.tsx': { default: typed } } };
+
+    expect(pageControls(win, REQUEST)).toEqual(typed);
+  });
+
+  it('infers from the props of the page instance when the loader parsed nothing', () => {
+    expect(pageControls({}, REQUEST)).toEqual([{ name: 'label', kind: PropKind.Text, required: false, default: 'Hi' }]);
   });
 });
