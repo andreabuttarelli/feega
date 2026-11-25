@@ -38,6 +38,13 @@ export const IMPACT_VIEW: { [K in ImpactKind]: Row<K> } = {
     files: (impact) => impact.files,
     hint: NO_HINT
   },
+  [ImpactKind.Class]: {
+    icon: ImpactIcon.Layers,
+    tone: Tone.Shared,
+    label: (impact) => `.${impact.name} in ${count(impact.elements, 'element')}, ${count(impact.files.length, 'file')}`,
+    files: (impact) => impact.files,
+    hint: NO_HINT
+  },
   [ImpactKind.Unknown]: {
     icon: ImpactIcon.Alert,
     tone: Tone.Unknown,
