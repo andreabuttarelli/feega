@@ -44,11 +44,15 @@ In React the component is wrapped in the providers around your app in the entry 
 
 If the component cannot render alone, for example because its provider lives inside `App`, the tab shows a snapshot of the page instead, and says why next to the tab: a provider or context is missing, the component is not exported or failed to load, it rendered nothing in time, Turbopack cannot mount components, the dev server has no Feega mount page, or the framework cannot mount alone. The snapshot has no props section.
 
-## Light and dark
+## Canvas, light and dark, zoom
 
-When the project has a dark theme, a sun or moon button in the tab switches the component, the variants and the canvas between it and the default theme, through the same theme preview as the toolbar.
+The component sits on the real background of your page: Feega walks up from the instance to the first ancestor that paints a color or image and uses it, so white text on a dark site stays readable. The checkerboard button in the tab bar switches to a transparent checkerboard instead.
 
-The real component also gets the page's fonts, stylesheets and `html` and `body` classes, so text matches the page, and a single component is scaled up to fill the canvas.
+The sun or moon button is always in the tab bar. It starts in the scheme of the page behind the component. With a dark theme in the project it switches to that theme and back, through the same theme preview as the toolbar. Without one it emulates `prefers-color-scheme: dark` in the tab, and the canvas follows the scheme.
+
+The component opens at its real size, centered. Use Fit, minus, plus and the percentage (it resets to 100%) in the tab bar, or Cmd or Ctrl with the mouse wheel, or pinch on a trackpad. Variants show at the same zoom.
+
+The real component also gets the page's fonts, stylesheets, `html` and `body` classes and inherited text styles, so text matches the page.
 
 ## Next.js
 
