@@ -107,6 +107,19 @@ describe('the AI panel in the session', () => {
     await session.stop();
   });
 
+  it('tells the agent the project and the page it is looking at', async () => {
+    const { send, sent, dir, session } = setup();
+
+    await send({ kind: ToHost.AiStart, agent: AcpId.OpenCode });
+    await send({ kind: ToHost.AiSend, text: 'echo', context: 'Feega page\npage: /pricing' });
+    await eventually(() => sent.some((m) => m.kind === ToView.AiEvent && m.event.kind === AgentEventKind.Done));
+
+    const reply = sent.flatMap((m) => (m.kind === ToView.AiEvent && m.event.kind === AgentEventKind.Text ? [m.event.text] : [])).join('');
+    expect(reply).toContain('page: /pricing');
+    expect(reply).toContain(`project: ${dir}`);
+    await session.stop();
+  });
+
   it('refuses an agent that is not installed', async () => {
     const { send, events } = setup([]);
 

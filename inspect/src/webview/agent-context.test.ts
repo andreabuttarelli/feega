@@ -52,3 +52,17 @@ describe('commentContext', () => {
     expect(commentContext(comment, [reply])).toContain('comment: Tighter padding\nreply from Bob: Agreed\nsource:');
   });
 });
+
+describe('the context without a selection', () => {
+  it('still says the page and the focused component', () => {
+    const focus = { name: 'InstallCta', source: { file: 'src/InstallCta.svelte', line: 12, col: 1 } };
+
+    expect(agentContexts([], { route: '/pricing', width: 1280, focus })).toBe(['Feega page', 'page: /pricing', 'preview: 1280px', 'focused component: InstallCta (src/InstallCta.svelte:12:1)'].join('\n'));
+  });
+
+  it('adds the focused component to a selection too', () => {
+    const focus = { name: 'Hero', source: { file: 'src/Hero.tsx', line: 3, col: 1 } };
+
+    expect(agentContexts([pick], { route: '/', width: 800, focus })).toContain('focused component: Hero (src/Hero.tsx:3:1)');
+  });
+});

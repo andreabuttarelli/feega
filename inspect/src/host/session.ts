@@ -138,6 +138,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     env: platform.ai?.env ?? (() => machineEnv()),
     open: platform.ai?.open ?? openAcpAgent,
     confirm: (question, yes) => platform.confirm(question, yes),
+    where: () => [`project: ${root}`, running ? `dev server: ${running.url}` : null].filter(Boolean).join('\n'),
     adapters: {
       granted: (key) => (platform.stored<string[]>(Stored.AiAdapters) ?? []).includes(key),
       grant: (key) => void platform.store(Stored.AiAdapters, [...(platform.stored<string[]>(Stored.AiAdapters) ?? []), key])

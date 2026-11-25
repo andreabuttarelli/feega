@@ -33,6 +33,8 @@ const FALLBACK_LOOK: TagLook = { name: 'Element', icon: ChipIcon.Box };
 const MANY = /^Feega selection: (\d+ elements)/;
 const SOURCE = /^source: (.+?):(\d+):\d+$/m;
 const SELECTOR = /^selector: (.+)$/m;
+const FOCUSED = /^focused component: (.+?) \((.+?):(\d+):\d+\)$/m;
+const ROUTE = /^page: (.+)$/m;
 
 const baseName = (file: string): string => file.split('/').at(-1) ?? file;
 
@@ -43,7 +45,11 @@ const titleOf = (context: string): string => {
   }
   const source = context.match(SOURCE);
   const selector = context.match(SELECTOR);
-  return source ? [`${source[1]}:${source[2]}`, selector?.[1]].filter(Boolean).join(' ') : '';
+  if (source) {
+    return [`${source[1]}:${source[2]}`, selector?.[1]].filter(Boolean).join(' ');
+  }
+  const focused = context.match(FOCUSED);
+  return focused ? `${focused[2]}:${focused[3]}` : (context.match(ROUTE)?.[1] ?? '');
 };
 
 export const chipOf = (context: string | null): string | null => {
@@ -60,7 +66,11 @@ export function chipView(context: string | null): ChipView | null {
   if (many) {
     return { icon: ChipIcon.Many, name: many[1], place: '', title };
   }
-  const source = context.match(SOURCE)!;
+  const source = context.match(SOURCE);
+  if (!source) {
+    const focused = context.match(FOCUSED);
+    return focused ? { icon: ChipIcon.Box, name: focused[1], place: `${baseName(focused[2])}:${focused[3]}`, title } : { icon: ChipIcon.Box, name: 'Page', place: title, title };
+  }
   const tag = context.match(SELECTOR)?.[1].split('.')[0] ?? '';
   const look = TAG_LOOKS[tag] ?? FALLBACK_LOOK;
   return { icon: look.icon, name: look.name, place: `${baseName(source[1])}:${source[2]}`, title };

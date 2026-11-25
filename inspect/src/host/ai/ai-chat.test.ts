@@ -42,6 +42,7 @@ function setup({ flags = [], confirmed = true, saved = [], granted = new Set<str
     env: () => ({ path: ['/bin'], home: '/h', exists: (p) => p === '/bin/opencode' || p === '/bin/grok' || p === '/bin/claude', appName: '', extensions: [] }),
     open,
     confirm: async () => confirmed,
+    where: () => 'project: /work/app\ndev server: http://localhost:5173',
     adapters: { granted: (key) => granted.has(key), grant: (key) => void granted.add(key) },
     post: (message) => void sent.push(message),
     write: async () => undefined,
@@ -62,6 +63,36 @@ function setup({ flags = [], confirmed = true, saved = [], granted = new Set<str
 const done = (t: ReturnType<typeof setup>, count: number) => eventually(() => t.events().filter((e) => e.kind === AgentEventKind.Done).length >= count);
 
 const consents = (t: ReturnType<typeof setup>) => t.sent.filter((m) => m.kind === ToView.AiConsent);
+
+describe('the context the agent receives', () => {
+  it('carries the page, the focused component, the project and the dev server', async () => {
+    const t = setup();
+    const context = ['Feega page', 'page: /pricing', 'focused component: InstallCta (src/InstallCta.svelte:12:1)'].join('\n');
+
+    await t.chat.start(AcpId.OpenCode);
+    await t.chat.send('echo', context);
+    await done(t, 1);
+
+    const reply = t.events().flatMap((e) => (e.kind === AgentEventKind.Text ? [e.text] : [])).join('');
+    expect(reply).toContain('focused component: InstallCta (src/InstallCta.svelte:12:1)');
+    expect(reply).toContain('page: /pricing');
+    expect(reply).toContain('project: /work/app');
+    expect(reply).toContain('dev server: http://localhost:5173');
+    t.chat.close();
+  });
+
+  it('sends the bare message when the user removed the context', async () => {
+    const t = setup();
+
+    await t.chat.start(AcpId.OpenCode);
+    await t.chat.send('echo', null);
+    await done(t, 1);
+
+    const reply = t.events().flatMap((e) => (e.kind === AgentEventKind.Text ? [e.text] : [])).join('');
+    expect(reply).toBe('echo');
+    t.chat.close();
+  });
+});
 
 describe('the adapter consent', () => {
   it('asks inside the chat and opens nothing until the user allows', async () => {

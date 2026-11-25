@@ -30,6 +30,7 @@ export type AiChatDeps = {
   env: () => AgentEnv;
   open: OpenAgent;
   confirm: (question: string, yes: string) => Promise<boolean>;
+  where: () => string;
   adapters: { granted: (key: string) => boolean; grant: (key: string) => void };
   post: (message: ViewMessage) => unknown;
   write: (path: string, content: string, agent: string) => Promise<void>;
@@ -275,7 +276,7 @@ export function aiChat(deps: AiChatDeps) {
     const session = chat.live!;
     chat.watch = turnWatch(deps.root());
     await chat.watch.begin();
-    await session.send(context ? `${context}\n\n${text}` : text);
+    await session.send(context ? `${context}\n${deps.where()}\n\n${text}` : text);
     await chat.settling;
   }
 
