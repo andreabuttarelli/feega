@@ -56,6 +56,7 @@ export enum UsageKind {
   AiToolCall = 'ai_tool_call',
   AiPermission = 'ai_permission',
   AiCancel = 'ai_cancel',
+  AiConfigChanged = 'ai_config_changed',
   AiSessionError = 'ai_session_error',
   AiSessionEnded = 'ai_session_ended',
   SignInPrompted = 'sign_in_prompted',
@@ -80,6 +81,7 @@ export type UsageDims = Partial<{
   area: string;
   variant: string;
   agent: string;
+  category: string;
   library_item: string;
   tool: string;
   error_class: string;

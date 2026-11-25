@@ -1,6 +1,6 @@
 import type { SupportItem } from './support';
 import type { AcpAgent, AcpId } from './host/ai/acp-agents';
-import type { AgentEvent, ModeView } from './host/ai/agent-session';
+import type { AgentEvent, ConfigView, ModeView } from './host/ai/agent-session';
 import type { Item } from './host/ai/transcript';
 import type { Policy } from './host/ai/permission-policy';
 import type { LiveEditAsk } from '@feega/live-edit/live-ask';
@@ -223,6 +223,7 @@ export enum ToHost {
   AiCancel = 'ai-cancel',
   AiAnswer = 'ai-answer',
   AiMode = 'ai-mode',
+  AiConfig = 'ai-config',
   AiPolicy = 'ai-policy',
   AiOpen = 'ai-open',
   AiRename = 'ai-rename',
@@ -400,6 +401,7 @@ export type HostMessage =
   | { kind: ToHost.Usage; event: WebviewUsage; dims?: WebviewUsageDims }
   | { kind: ToHost.AiAnswer; id: string; optionId: string | null }
   | { kind: ToHost.AiMode; id: string }
+  | { kind: ToHost.AiConfig; id: string; value: string }
   | { kind: ToHost.AiPolicy; policy: Policy }
   | { kind: ToHost.AiOpen; chat: string }
   | { kind: ToHost.AiRename; chat: string; title: string }
@@ -439,7 +441,7 @@ export type ViewMessage =
   | { kind: ToView.AiEvent; event: AgentEvent; chat?: string }
   | { kind: ToView.AiPolicy; policy: Policy }
   | { kind: ToView.AiChats; chats: ChatRow[]; active: string | null }
-  | { kind: ToView.AiChat; chat: string | null; agent?: AcpId; state: AiState; items: Item[]; modes: ModeView[]; mode: string | null };
+  | { kind: ToView.AiChat; chat: string | null; agent?: AcpId; state: AiState; items: Item[]; modes: ModeView[]; mode: string | null; configs: ConfigView[] };
 
 export const INSPECT = 'feega:inspect';
 export const INSPECT_RESULT = 'feega:inspect:result';

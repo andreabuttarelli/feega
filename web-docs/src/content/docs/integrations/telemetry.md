@@ -43,6 +43,7 @@ The server adds country, region and city from the request. It does not store the
 | `focus_opened` | Focus mode opened. | `variant` (`focus`) |
 | `ai_chat_created` | A chat was created. | `chat_count`, `live_count` (numbers only, never text) |
 | `ai_agent_chosen`, `ai_session_started`, `ai_session_ended` | An agent was chosen; an AI session started or ended. | `agent`; on end: `message_count`, `tool_count`, `duration_ms` |
+| `ai_config_changed` | A model or effort was picked in an AI chat. | `agent`, `category` (`model` or `thought_level`), `choice` (the value id the agent lists, such as a model id) |
 | `ai_message_sent`, `ai_first_response` | A message was sent; the first reply arrived. | `agent`; first response: `duration_ms` |
 | `ai_tool_call`, `ai_permission`, `ai_cancel`, `ai_session_error` | Agent activity. | `agent`; permission: `outcome` (`allow` or `reject`); error: `error_class` |
 | `onboarding_started`, `onboarding_step`, `onboarding_finished`, `onboarding_skipped` | Onboarding progress. | `step` (`welcome`, `agent`, `agents`, `sign_in`, `support`), `outcome` (`viewed`, `completed`, `skipped`), `choice` (`mcp`, when the MCP setup command is copied) |

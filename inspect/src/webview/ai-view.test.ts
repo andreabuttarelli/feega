@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { AiState } from '../messages';
-import { ToolStatus } from '../host/ai/agent-session';
+import { ConfigCategory, ToolStatus } from '../host/ai/agent-session';
 import { Policy } from '../host/ai/permission-policy';
-import { Dot, agoOf, isDanger, isThinking, markOf, pickerLabel, placeholderOf, statusOf } from './ai-view';
+import { Dot, agoOf, isDanger, isThinking, markOf, pickerLabel, pickerOf, valueName, placeholderOf, statusOf } from './ai-view';
 import { ItemKind } from '../host/ai/transcript';
 
 describe('the agent status', () => {
@@ -74,5 +74,23 @@ describe('agoOf', () => {
     [40 * 86_400_000, '5w']
   ])('says how long ago %i ms was', (elapsed, label) => {
     expect(agoOf(now, now - elapsed)).toBe(label);
+  });
+});
+
+describe('the model and effort pickers', () => {
+  const model = { id: 'model', name: 'Model', category: ConfigCategory.Model, current: 'haiku', values: [{ id: 'haiku', name: 'Haiku', description: '' }] };
+  const effort = { id: 'reasoning_effort', name: 'Reasoning effort', category: ConfigCategory.Effort, current: 'xhigh', values: [] };
+
+  it('finds an option by its category whatever its id', () => {
+    expect(pickerOf([model, effort], ConfigCategory.Effort)?.id).toBe('reasoning_effort');
+  });
+
+  it('is absent when the agent does not advertise it', () => {
+    expect(pickerOf([model], ConfigCategory.Effort)).toBeUndefined();
+  });
+
+  it('shows the name of the current value, or the value itself when unnamed', () => {
+    expect(valueName(model)).toBe('Haiku');
+    expect(valueName(effort)).toBe('xhigh');
   });
 });

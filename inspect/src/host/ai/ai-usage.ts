@@ -3,6 +3,7 @@ import { AgentEventKind, type AgentEvent } from './agent-session';
 
 const FAILED_CLASS = 'agent_failed';
 const OTHER_TOOL = 'other';
+const VALUE_ID = /^[A-Za-z0-9][A-Za-z0-9_.:/[\]-]{0,63}$/;
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$/;
 const REPLY_EVENTS = [AgentEventKind.Text, AgentEventKind.Thought, AgentEventKind.Tool];
 
@@ -79,5 +80,11 @@ export function aiUsage(usage: { track: Track }, now: () => number = Date.now) {
     }
   }
 
-  return { started, sent, heard, answered, cancelled, ended };
+  function configured(category: string, value: string) {
+    if (running) {
+      usage.track(UsageKind.AiConfigChanged, { agent: running.agent, category, choice: VALUE_ID.test(value) ? value : OTHER_TOOL });
+    }
+  }
+
+  return { started, configured, sent, heard, answered, cancelled, ended };
 }

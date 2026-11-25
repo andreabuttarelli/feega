@@ -32,13 +32,14 @@ function setup({ flags = [], confirmed = true, saved = [] }: Options = {}) {
   const sent: ViewMessage[] = [];
   const opened: (string | null)[] = [];
   const created: [number, number][] = [];
+  const configured: [string, string][] = [];
   let stored: ChatRecord[] = saved;
   let clock = 1000;
   let ids = 0;
   const open: OpenAgent = (_launch, deps) => (opened.push(deps.resume), openAcpAgent({ command: process.execPath, args: [FAKE, ...flags] }, deps));
   const chat = aiChat({
     root: () => root,
-    env: () => ({ path: ['/bin'], home: '/h', exists: (p) => p === '/bin/opencode', appName: '', extensions: [] }),
+    env: () => ({ path: ['/bin'], home: '/h', exists: (p) => p === '/bin/opencode' || p === '/bin/grok', appName: '', extensions: [] }),
     open,
     confirm: async () => confirmed,
     post: (message) => void sent.push(message),
@@ -48,12 +49,13 @@ function setup({ flags = [], confirmed = true, saved = [] }: Options = {}) {
     store: { load: () => stored, save: (records) => void (stored = records) },
     now: () => ++clock,
     newId: () => `chat-${++ids}`,
-    created: (chats, live) => void created.push([chats, live])
+    created: (chats, live) => void created.push([chats, live]),
+    configured: (category, value) => void configured.push([category, value])
   });
   const rows = (): ChatRow[] => sent.flatMap((m) => (m.kind === ToView.AiChats ? [m.chats] : [])).at(-1) ?? [];
   const snapshot = () => sent.flatMap((m) => (m.kind === ToView.AiChat ? [m] : [])).at(-1);
   const events = () => sent.flatMap((m) => (m.kind === ToView.AiEvent ? [m.event] : []));
-  return { chat, sent, rows, snapshot, events, opened, created, saved: () => stored, root };
+  return { chat, sent, rows, snapshot, events, opened, created, configured, saved: () => stored, root };
 }
 
 const done = (t: ReturnType<typeof setup>, count: number) => eventually(() => t.events().filter((e) => e.kind === AgentEventKind.Done).length >= count);
@@ -187,6 +189,65 @@ describe('the AI chats', () => {
     await t.chat.start(AcpId.OpenCode);
 
     expect(t.created).toEqual([[1, 1], [2, 2]]);
+    t.chat.close();
+  });
+
+  const currents = (t: ReturnType<typeof setup>) => t.events().flatMap((e) => (e.kind === AgentEventKind.Config ? [e.options] : [])).at(-1)?.map((o) => o.current);
+
+  it('shows the model and effort of the agent in the chat', async () => {
+    const t = setup();
+
+    await t.chat.start(AcpId.OpenCode);
+
+    expect(currents(t)).toEqual(['sonnet', 'medium']);
+    t.chat.close();
+  });
+
+  it('keeps the choice in the chat and reports only its category and value', async () => {
+    const t = setup();
+    await t.chat.start(AcpId.OpenCode);
+
+    await t.chat.setConfig('model', 'haiku');
+
+    expect(t.saved()[0].chosen).toEqual({ model: 'haiku' });
+    expect(t.configured).toEqual([['model', 'haiku']]);
+    t.chat.close();
+  });
+
+  it('restores the choice when the chat is reopened', async () => {
+    const first = setup();
+    await first.chat.start(AcpId.OpenCode);
+    await first.chat.setConfig('effort', 'high');
+    first.chat.close();
+
+    const second = setup({ saved: first.saved() });
+    second.chat.list();
+    await second.chat.send('hello', null);
+    await done(second, 1);
+
+    expect(currents(second)).toEqual(['sonnet', 'high']);
+    second.chat.close();
+  });
+
+  it('starts a new chat with the values last used with that agent', async () => {
+    const t = setup();
+    await t.chat.start(AcpId.OpenCode);
+    await t.chat.setConfig('model', 'haiku');
+
+    await t.chat.start(AcpId.OpenCode);
+
+    expect(currents(t)).toEqual(['haiku', 'medium']);
+    t.chat.close();
+  });
+
+  it('does not carry the values of one agent into another', async () => {
+    const t = setup();
+    await t.chat.start(AcpId.OpenCode);
+    await t.chat.setConfig('model', 'haiku');
+
+    await t.chat.start(AcpId.Grok);
+
+    expect(currents(t)).toEqual(['sonnet', 'medium']);
     t.chat.close();
   });
 });

@@ -14,6 +14,7 @@ export enum AgentEventKind {
   Plan = 'plan',
   Permission = 'permission',
   Modes = 'modes',
+  Config = 'config',
   Done = 'done',
   Failed = 'failed'
 }
@@ -26,6 +27,13 @@ export type PlanEntryView = { content: string; status: string };
 
 export type ModeView = { id: string; name: string; description: string };
 
+export enum ConfigCategory {
+  Model = 'model',
+  Effort = 'thought_level'
+}
+
+export type ConfigView = { id: string; name: string; category: ConfigCategory; current: string; values: ModeView[] };
+
 export type OptionView = { id: string; name: string; allows: boolean };
 
 export type AgentEvent =
@@ -35,6 +43,7 @@ export type AgentEvent =
   | { kind: AgentEventKind.Plan; entries: PlanEntryView[] }
   | { kind: AgentEventKind.Permission; id: string; tool: ToolView; options: OptionView[] }
   | { kind: AgentEventKind.Modes; available: ModeView[]; current: string }
+  | { kind: AgentEventKind.Config; options: ConfigView[] }
   | { kind: AgentEventKind.Done; reason: string }
   | { kind: AgentEventKind.Failed; reason: string };
 
@@ -45,6 +54,7 @@ export type AgentSession = {
   cancel: () => Promise<void>;
   answer: (id: string, optionId: string | null) => void;
   setMode: (id: string) => Promise<void>;
+  setConfig: (id: string, value: string) => Promise<void>;
   close: () => void;
 };
 
@@ -55,6 +65,6 @@ export type AgentFiles = {
 
 export type Launch = { command: string; args: string[] };
 
-export type AgentDeps = { cwd: string; resume: string | null; files: AgentFiles; policy: () => Policy; emit: (event: AgentEvent) => void };
+export type AgentDeps = { cwd: string; resume: string | null; preferred: Record<string, string>; files: AgentFiles; policy: () => Policy; emit: (event: AgentEvent) => void };
 
 export type OpenAgent = (launch: Launch, deps: AgentDeps) => Promise<AgentSession>;

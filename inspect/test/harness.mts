@@ -98,6 +98,7 @@ export async function openPanel(appRoot: string, theme = DARK, cloud?: CommentsC
         now: Date.now,
         newId: randomUUID,
         created: () => undefined,
+        configured: () => undefined,
         write: async (path, content, agent) => {
           await edits.agentWrite(path, content, agent);
           await history();
@@ -127,6 +128,9 @@ export async function openPanel(appRoot: string, theme = DARK, cloud?: CommentsC
     }
     if (m.kind === ToHost.AiMode) {
       await ai?.setMode(m.id as string);
+    }
+    if (m.kind === ToHost.AiConfig) {
+      await ai?.setConfig(m.id as string, (m as unknown as { value: string }).value);
     }
     if (m.kind === ToHost.AiPolicy) {
       ai?.setPolicy((m as unknown as { policy: Policy }).policy);

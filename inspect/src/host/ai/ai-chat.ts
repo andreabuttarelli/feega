@@ -5,7 +5,7 @@ import { AiState, ToView, type ChatRow, type ViewMessage } from '../../messages'
 import type { AgentEnv } from '../agents';
 import { AcpId, acpAgents, launchOf } from './acp-agents';
 import { isPolicy, type Policy } from './permission-policy';
-import { AgentEventKind, type AgentEvent, type AgentFiles, type AgentSession, type ModeView, type OpenAgent } from './agent-session';
+import { AgentEventKind, type AgentEvent, type AgentFiles, type AgentSession, type ConfigView, type ModeView, type OpenAgent } from './agent-session';
 import { turnWatch, type TurnWatch } from './turn-changes';
 import { answered, heard as transcribed, said, ItemKind, type Item } from './transcript';
 
@@ -19,7 +19,7 @@ const KEPT_CHATS = 50;
 
 export const MAX_LIVE = 4;
 
-export type ChatRecord = { id: string; agent: AcpId; title: string; createdAt: number; updatedAt: number; sessionId: string | null; mode: string | null; modes: ModeView[]; items: Item[] };
+export type ChatRecord = { id: string; agent: AcpId; title: string; createdAt: number; updatedAt: number; sessionId: string | null; mode: string | null; modes: ModeView[]; configs: ConfigView[]; chosen: Record<string, string>; items: Item[] };
 
 export type ChatStore = { load: () => ChatRecord[]; save: (records: ChatRecord[]) => void };
 
@@ -38,6 +38,7 @@ export type AiChatDeps = {
   now: () => number;
   newId: () => string;
   created: (chats: number, live: number) => void;
+  configured: (category: string, value: string) => void;
 };
 
 const adapterPackage = (id: AcpId): string => launchOf(id).args.find((arg) => arg.startsWith('@')) ?? launchOf(id).command;
@@ -84,8 +85,8 @@ export function aiChat(deps: AiChatDeps) {
   const snapshot = (chat: Chat | undefined) =>
     post(
       chat
-        ? { kind: ToView.AiChat, chat: chat.record.id, agent: chat.record.agent, state: stateOf(chat), items: chat.record.items, modes: chat.record.modes, mode: chat.record.mode }
-        : { kind: ToView.AiChat, chat: null, state: AiState.Idle, items: [], modes: [], mode: null }
+        ? { kind: ToView.AiChat, chat: chat.record.id, agent: chat.record.agent, state: stateOf(chat), items: chat.record.items, modes: chat.record.modes, mode: chat.record.mode, configs: chat.record.configs }
+        : { kind: ToView.AiChat, chat: null, state: AiState.Idle, items: [], modes: [], mode: null, configs: [] }
     );
 
   const failed = (reason: string, chat?: string) => post({ kind: ToView.AiEvent, event: { kind: AgentEventKind.Failed, reason }, chat });
@@ -134,6 +135,9 @@ export function aiChat(deps: AiChatDeps) {
       record.modes = event.available;
       record.mode = event.current;
     }
+    if (event.kind === AgentEventKind.Config) {
+      record.configs = event.options;
+    }
     post({ kind: ToView.AiEvent, event, chat: record.id });
     if (event.kind === AgentEventKind.Done || event.kind === AgentEventKind.Failed) {
       chat.busy = false;
@@ -177,7 +181,7 @@ export function aiChat(deps: AiChatDeps) {
     chat.opening = true;
     state(chat);
     try {
-      const session = await deps.open(launchOf(agent.id), { cwd: deps.root(), resume: record.sessionId, files: files(() => agent.label, () => chat.watch), policy: deps.policy.get, emit: (event) => heard(chat, event) });
+      const session = await deps.open(launchOf(agent.id), { cwd: deps.root(), resume: record.sessionId, preferred: record.chosen, files: files(() => agent.label, () => chat.watch), policy: deps.policy.get, emit: (event) => heard(chat, event) });
       chat.live = session;
       if (record.items.length && !session.resumed) {
         record.items = [...record.items, { kind: ItemKind.Note, text: FORGOT }];
@@ -197,14 +201,20 @@ export function aiChat(deps: AiChatDeps) {
       return;
     }
     loaded = true;
-    deps.store.load().forEach((record) => chats.set(record.id, { record, live: null, busy: false, opening: false, watch: null, settling: Promise.resolve() }));
+    deps.store.load().forEach((record) => chats.set(record.id, { record: { ...record, configs: record.configs ?? [], chosen: record.chosen ?? {} }, live: null, busy: false, opening: false, watch: null, settling: Promise.resolve() }));
     active = rows()[0]?.id ?? null;
   }
+
+  const lastChosen = (agent: AcpId): Record<string, string> =>
+    [...chats.values()]
+      .map((c) => c.record)
+      .filter((r) => r.agent === agent && Object.keys(r.chosen).length)
+      .sort((a, b) => b.updatedAt - a.updatedAt)[0]?.chosen ?? {};
 
   async function start(agent: AcpId) {
     load();
     const now = deps.now();
-    const chat: Chat = { record: { id: deps.newId(), agent, title: '', createdAt: now, updatedAt: now, sessionId: null, mode: null, modes: [], items: [] }, live: null, busy: false, opening: true, watch: null, settling: Promise.resolve() };
+    const chat: Chat = { record: { id: deps.newId(), agent, title: '', createdAt: now, updatedAt: now, sessionId: null, mode: null, modes: [], configs: [], chosen: { ...lastChosen(agent) }, items: [] }, live: null, busy: false, opening: true, watch: null, settling: Promise.resolve() };
     chats.set(chat.record.id, chat);
     active = chat.record.id;
     snapshot(chat);
@@ -258,6 +268,25 @@ export function aiChat(deps: AiChatDeps) {
     postChats();
   }
 
+  async function setConfig(id: string, value: string) {
+    const chat = current();
+    const option = chat?.record.configs.find((o) => o.id === id);
+    if (!chat?.live || !option) {
+      return;
+    }
+    try {
+      await chat.live.setConfig(id, value);
+    } catch (error) {
+      failed(error instanceof Error ? error.message : String(error), chat.record.id);
+      return;
+    }
+    chat.record.chosen = { ...chat.record.chosen, [id]: value };
+    chat.record.updatedAt = deps.now();
+    persist();
+    postChats();
+    deps.configured(option.category, value);
+  }
+
   function rename(id: string, title: string) {
     const chat = chats.get(id);
     if (!chat || !title.trim()) {
@@ -308,6 +337,7 @@ export function aiChat(deps: AiChatDeps) {
         post({ kind: ToView.AiPolicy, policy });
       }
     },
+    setConfig,
     setMode: async (id: string) => void (await current()?.live?.setMode(id)),
     start,
     send,

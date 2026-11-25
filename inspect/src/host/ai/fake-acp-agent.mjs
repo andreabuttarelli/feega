@@ -9,6 +9,22 @@ const MODES = [
   { id: 'acceptEdits', name: 'Accept edits', description: 'Apply file edits without asking' },
   { id: 'plan', name: 'Plan', description: 'Plan without editing' }
 ];
+const MODELS = [
+  { value: 'sonnet', name: 'Sonnet', description: 'Balanced' },
+  { value: 'haiku', name: 'Haiku', description: 'Fast' }
+];
+const EFFORTS = [
+  { value: 'low', name: 'Low' },
+  { value: 'medium', name: 'Medium' },
+  { value: 'high', name: 'High' }
+];
+const chosen = { model: 'sonnet', effort: 'medium' };
+const configOptions = () => [
+  { id: 'model', name: 'Model', category: 'model', type: 'select', currentValue: chosen.model, options: MODELS },
+  { id: 'effort', name: 'Effort', category: 'thought_level', type: 'select', currentValue: chosen.effort, options: EFFORTS },
+  { id: 'mode', name: 'Mode', category: 'mode', type: 'select', currentValue: 'default', options: MODES.map((m) => ({ value: m.id, name: m.name })) },
+  { id: 'fast', name: 'Fast mode', category: 'speed', type: 'boolean', currentValue: false }
+];
 const WRITTEN = 'written by the agent\n';
 
 const chunk = (text) => ({ sessionId: SESSION, update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text } } });
@@ -70,6 +86,11 @@ const handlers = {
     return 'end_turn';
   },
   wait: () => new Promise((resolve) => (cancelled = resolve)),
+  retune: async (cx) => {
+    chosen.effort = 'high';
+    await cx.client.notify(methods.client.session.update, { sessionId: SESSION, update: { sessionUpdate: 'config_option_update', configOptions: configOptions() } });
+    return 'end_turn';
+  },
   plan: async (cx) => {
     await cx.client.notify(methods.client.session.update, { sessionId: SESSION, update: { sessionUpdate: 'plan', entries: [{ content: 'step one', priority: 'high', status: 'in_progress' }] } });
     return 'end_turn';
@@ -93,15 +114,19 @@ const app = agent({ name: 'fake' })
     if (!signedIn) {
       throw new RequestError(AUTH_REQUIRED, 'Authentication required');
     }
-    return { sessionId: SESSION, modes: { currentModeId: 'default', availableModes: MODES } };
+    return { sessionId: SESSION, modes: { currentModeId: 'default', availableModes: MODES }, configOptions: configOptions() };
   })
   .onRequest(methods.agent.session.load, async (cx) => {
     await cx.client.notify(methods.client.session.update, chunk('replayed history'));
-    return { modes: { currentModeId: 'plan', availableModes: MODES } };
+    return { modes: { currentModeId: 'plan', availableModes: MODES }, configOptions: configOptions() };
   })
   .onRequest(methods.agent.session.setMode, async (cx) => {
     await cx.client.notify(methods.client.session.update, { sessionId: SESSION, update: { sessionUpdate: 'current_mode_update', currentModeId: cx.params.modeId } });
     return {};
+  })
+  .onRequest(methods.agent.session.setConfigOption, (cx) => {
+    chosen[cx.params.configId] = cx.params.value;
+    return { configOptions: configOptions() };
   })
   .onRequest(methods.agent.session.prompt, async (cx) => {
     const text = textOf(cx.params.prompt);
