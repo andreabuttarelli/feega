@@ -50,6 +50,7 @@ export enum UsageKind {
   FocusOpened = 'focus_opened',
   AiAgentChosen = 'ai_agent_chosen',
   AiSessionStarted = 'ai_session_started',
+  AiChatCreated = 'ai_chat_created',
   AiMessageSent = 'ai_message_sent',
   AiFirstResponse = 'ai_first_response',
   AiToolCall = 'ai_tool_call',
@@ -88,6 +89,8 @@ export type UsageDims = Partial<{
   files_count: number;
   diff_count: number;
   message_count: number;
+  chat_count: number;
+  live_count: number;
   tool_count: number;
   duration_ms: number;
   step: OnboardingStep | string;

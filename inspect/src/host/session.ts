@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { readFile, rm } from 'node:fs/promises';
 import { join, relative, resolve } from 'node:path';
 import { appsIn } from '@feega/dev-run/run-plan';
@@ -49,7 +50,7 @@ import { dependenciesOf, offerInstall } from './install-offer';
 import { HintSurface, SKILL_COMMAND, hintDue, installedAfterHint } from './skill-hint';
 import { install } from './dev-server';
 import { SUPPORT_ITEMS } from '../support';
-import { aiChat } from './ai/ai-chat';
+import { aiChat, type ChatRecord } from './ai/ai-chat';
 import { policyOf } from './ai/permission-policy';
 import { openAcpAgent } from './ai/acp-session';
 import { machineEnv } from './agents';
@@ -136,6 +137,10 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     open: platform.ai?.open ?? openAcpAgent,
     confirm: (question, yes) => platform.confirm(question, yes),
     post: (message) => (message.kind === ToView.AiEvent && aiStats?.heard(message.event), platform.send(message)),
+    store: { load: () => platform.stored<ChatRecord[]>(Stored.AiChats) ?? [], save: (records) => void platform.store(Stored.AiChats, records) },
+    now: Date.now,
+    newId: randomUUID,
+    created: (chats, liveCount) => usage?.track(UsageKind.AiChatCreated, { chat_count: chats, live_count: liveCount }),
     policy: {
       get: () => policyOf(platform.stored(Stored.AiPolicy), platform.settings()[SettingKey.AiPermissions]),
       set: (policy) => void platform.store(Stored.AiPolicy, policy)
@@ -787,6 +792,9 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.AiCancel]: () => (aiStats?.cancelled(), ai.cancel()),
     [ToHost.AiAnswer]: (m) => (aiStats?.answered(m.id, m.optionId), ai.answer(m.id, m.optionId)),
     [ToHost.AiMode]: (m) => void ai.setMode(m.id),
+    [ToHost.AiOpen]: (m) => ai.open(m.chat),
+    [ToHost.AiRename]: (m) => ai.rename(m.chat, m.title),
+    [ToHost.AiDelete]: (m) => void ai.remove(m.chat),
     [ToHost.AiPolicy]: (m) => ai.setPolicy(m.policy)
   };
 

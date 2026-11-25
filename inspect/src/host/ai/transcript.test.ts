@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { AgentEventKind, ToolStatus, type ToolView } from '../host/ai/agent-session';
-import { ItemKind, answered, heard, said, type Item } from './ai-transcript';
+import { AgentEventKind, ToolStatus, type ToolView } from './agent-session';
+import { ItemKind, answered, heard, said, type Item } from './transcript';
 
 const tool = (status: ToolStatus, title = 'Edit a.ts'): ToolView => ({ id: 't1', title, kind: 'edit', status, diffs: [] });
 
