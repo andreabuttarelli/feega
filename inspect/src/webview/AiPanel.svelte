@@ -615,8 +615,8 @@
     padding: 6px 12px;
     border: 1px solid transparent;
     border-radius: var(--ui-radius-md);
-    background: var(--ui-text);
-    color: var(--ui-bg);
+    background: var(--ui-accent);
+    color: var(--ui-accent-ink);
     font: inherit;
     cursor: pointer;
   }
