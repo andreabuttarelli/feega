@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.18
+
+Focus mode opens one component in its own tab and mounts the real component in React, Vue, Svelte, Next.js, Nuxt and Astro, with Layers listing only its subtree. An AI tab chats with local coding agents (ACP): model and effort pickers, chats saved and run in parallel. Agent edits made straight on disk are listed. Send feedback in the Feega menu Help. Pixel icons and a support karma badge. Fixed stale Astro CSS after a first style edit.
+
 ## 0.2.17
 
 Local MCP tools let Claude Code, Cursor and Codex read the element you selected and your changes. An agents step in onboarding sets them up. Copy for agent in Layers copies an element for your agent. Fixed a race in the launcher copy.
