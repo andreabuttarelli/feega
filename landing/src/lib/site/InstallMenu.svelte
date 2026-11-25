@@ -37,7 +37,7 @@
 <svelte:window onkeydown={onKey} onpointerdown={onPointer} />
 
 <div class="split" bind:this={root}>
-  <a class="main" href={download.href} {...eventAttrs('download_click', { target: download.target, place })}>{download.label}</a>
+  <a class="main" href={download.href} {...eventAttrs('download_click', { target: download.target, place })}>{#if download.icon}<span class="os">{@html download.icon}</span>{/if}{download.label}</a>
   <button class="chev" type="button" aria-label="More ways to install" aria-haspopup="menu" aria-expanded={open} onclick={() => (open = !open)}>
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
   </button>
@@ -188,5 +188,18 @@
     border-top: 1px solid rgb(255 255 255 / 0.1);
     border-radius: 0;
     color: rgb(255 255 255 / 0.7);
+  }
+
+  .os {
+    display: inline-flex;
+    width: 1.05em;
+    height: 1.05em;
+    margin-right: 0.45em;
+    vertical-align: -0.15em;
+  }
+
+  .os :global(svg) {
+    width: 100%;
+    height: 100%;
   }
 </style>

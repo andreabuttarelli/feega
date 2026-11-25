@@ -1,3 +1,4 @@
+import { APPLE_ICON, LINUX_ICON, WINDOWS_ICON } from './social-icons';
 import { describe, expect, it } from 'vitest';
 import { detectOs, downloadFor, Os } from './desktop-download';
 
@@ -38,5 +39,11 @@ describe('downloadFor', () => {
 
   it('sends an unknown system to the download page', () => {
     expect(downloadFor(Os.Unknown)).toMatchObject({ label: 'download for free', href: '/download' });
+  });
+  it('shows the icon of the visitor system', () => {
+    expect(downloadFor(Os.Mac).icon).toBe(APPLE_ICON);
+    expect(downloadFor(Os.Windows).icon).toBe(WINDOWS_ICON);
+    expect(downloadFor(Os.Linux).icon).toBe(LINUX_ICON);
+    expect(downloadFor(Os.Unknown).icon).toBe('');
   });
 });
