@@ -22,6 +22,7 @@ import { structureMany, type Skipped, type Target } from '@feega/live-edit/struc
 import { pageRule } from '@feega/live-edit/page-rule';
 import { ElementState } from '@feega/live-edit/element-state';
 import { markupFirst } from '@feega/live-edit/markup-first';
+import { classRule } from '@feega/live-edit/class-rule';
 import { scopedRule, type Scope } from '@feega/live-edit/scoped-rule';
 import { styleAttr, type Css } from '@feega/live-edit/style-attr';
 import { targetOf } from '@feega/live-edit/breakpoints';
@@ -172,7 +173,7 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
   }
 
   async function edited(ask: EditAsk, extra: FileChange[] = [], mode = Commit.Write): Promise<Written> {
-    meta = { at: ask.at, prop: ask.prop, value: ask.value ?? '', scope: ask.scope ?? '' };
+    meta = { at: ask.at, prop: ask.prop, value: ask.value ?? '', scope: ask.cls ? `class .${ask.cls.name}` : (ask.scope ?? '') };
     const written = (changes: FileChange[], token: string, note?: string) => writtenAll([...changes, ...extra.filter((e) => !changes.some((c) => c.path === e.path))], token, note, mode);
     const breakpoint = ask.breakpoint === undefined ? undefined : targetOf(await breakpointsOf(root), ask.breakpoint);
     if (breakpoint === null) {
@@ -184,6 +185,10 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     }
     const media = theme ? combinedMedia(breakpoint?.media, theme.media) : breakpoint?.media;
     const within = theme?.within;
+    if (ask.cls) {
+      const out = await classRule(reader(root), ask.cls, ask.css ?? {}, ask.viewport, ask.state, media, within);
+      return out.ok ? written(out.changes, '') : out;
+    }
     if (ask.page) {
       const out = await pageRule(reader(root), ask.page, ask.css ?? {}, ask.viewport, media, within);
       return out.ok ? written([out.change], '') : out;

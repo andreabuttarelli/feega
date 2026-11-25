@@ -1,4 +1,4 @@
-export type ClassUse = { name: string; line: number; dynamic: boolean; module: string | null };
+export type ClassUse = { name: string; line: number; col: number; dynamic: boolean; module: string | null };
 
 type Markup = { attr: RegExp; directive?: RegExp; keys: boolean };
 
@@ -21,7 +21,11 @@ const IDENTIFIER = /[A-Za-z_$][\w$]*/;
 
 const extOf = (file: string) => file.slice(file.lastIndexOf('.') + 1);
 
-const lineOf = (text: string, at: number) => text.slice(0, at).split('\n').length;
+function elementAt(text: string, at: number): { line: number; col: number } {
+  const open = Math.max(text.lastIndexOf('<', at), 0);
+  const before = text.slice(0, open).split('\n');
+  return { line: before.length, col: before[before.length - 1].length + 1 };
+}
 
 const words = (value: string) => value.split(/\s+/).filter(Boolean);
 
@@ -131,5 +135,5 @@ export function classUsesOf(file: string, text: string): ClassUse[] {
   }
   return found
     .sort((a, b) => a.at - b.at)
-    .flatMap(({ at, uses }) => uses.map((u) => ({ ...u, line: lineOf(text, at + 1) })));
+    .flatMap(({ at, uses }) => uses.map((u) => ({ ...u, ...elementAt(text, at) })));
 }

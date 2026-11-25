@@ -2,8 +2,9 @@ import { ClassScope, rulesOf, type RuleSite, type SheetRule } from './class-rule
 import { classUsesOf, type ClassUse } from './class-uses';
 
 export { ClassScope };
+export type { RuleSite };
 
-export type UseSite = { file: string; line: number; dynamic: boolean };
+export type UseSite = { file: string; line: number; col: number; dynamic: boolean };
 
 export type ClassEntry = { key: string; name: string; scope: ClassScope; sheet: string; rules: RuleSite[]; uses: UseSite[]; home: RuleSite | null };
 
@@ -41,7 +42,7 @@ export function buildIndex(facts: Map<string, FileFacts>): ClassIndex {
   }
   for (const [file, { uses }] of facts) {
     for (const use of uses) {
-      entryOf(index, use, file)?.uses.push({ file, line: use.line, dynamic: use.dynamic });
+      entryOf(index, use, file)?.uses.push({ file, line: use.line, col: use.col, dynamic: use.dynamic });
     }
   }
   return index;

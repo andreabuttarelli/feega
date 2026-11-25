@@ -31,6 +31,9 @@
   import Interactions from './Interactions.svelte';
   import Attributes from './Attributes.svelte';
   import { wiringState } from './wiring-state.svelte';
+  import ClassesSection from './ClassesSection.svelte';
+  import { classesState, classOfKey } from './classes-state.svelte';
+  import { editingLabel, editTarget } from './class-view';
   import ModeSwitch from './ModeSwitch.svelte';
   import FeegaMenu from './FeegaMenu.svelte';
   import OnboardingDialog from './Onboarding.svelte';
@@ -223,6 +226,8 @@
   let canUndo = $state(false);
   let canRedo = $state(false);
   let scope = $state(Scope.Element);
+  const classInfo = $derived(classOfKey(classesState.view, classesState.targetKey));
+  const classTarget = $derived(classInfo ? editTarget(classInfo) : null);
   let layersOpen = $state<Record<string, boolean>>({ '(html):0:0': true, '(page):0:0': true });
   const layerDrag = $state<{ source: Source | null; name: string; component: boolean; parentFile: string | null; hint: { id: string; place: AddPlace } | null }>({ source: null, name: '', component: false, parentFile: null, hint: null });
 
@@ -690,6 +695,7 @@
     [ToView.IconResults]: (m) => iconsFound({ id: m.id, library: m.library, hits: m.hits, error: m.error ?? '' }),
     [ToView.IconPreview]: (m) => iconDrawn(m.name, m.svg),
     [ToView.ImageSaved]: (m) => (imageSaved.url = m.url),
+    [ToView.Classes]: (m) => (classesState.view = m.view),
     [ToView.Wiring]: (m) => Object.assign(wiringState, { at: m.at, instance: m.instance, wiring: m.wiring }),
     [ToView.Pick]: (m) => bridge.at(m.x, m.y).then((pick) => (setSingle(pick), toHost({ kind: ToHost.Picked, id: m.id, pick }))),
     [ToView.Change]: (m) => {
@@ -834,7 +840,7 @@
 
   function askOf(row: Row, value: string, token?: string) {
     const { prop, side, family, value: written } = row.change(value);
-    return { at: sourceText(picked!.source), prop, side, family, value: written, token, rem: picked!.rem, viewport: picked!.viewport, css: kebab(row.preview(value)), scope, inner: picked!.inner, page: picked!.page, state: writtenState, breakpoint: target, theme: writtenThemeName };
+    return { at: sourceText(picked!.source), prop, side, family, value: written, token, rem: picked!.rem, viewport: picked!.viewport, css: kebab(row.preview(value)), scope, cls: classTarget ?? undefined, inner: picked!.inner, page: picked!.page, state: writtenState, breakpoint: target, theme: writtenThemeName };
   }
 
   function change(row: Row, value: string, token?: string) {
@@ -1184,10 +1190,15 @@
 
   let impact = $state<Impact | null>(null);
   let impactId = 0;
+
+  $effect(() => {
+    void pickedAt;
+    classesState.targetKey = null;
+  });
   let held = $state<Held | null>(null);
 
   const impactAsk = $derived(
-    picked ? { at: sourceText(picked.source), scope, inner: picked.inner, page: picked.page, state: writtenState, breakpoint: target, theme: writtenThemeName } : null
+    picked ? { at: sourceText(picked.source), scope, cls: classTarget ?? undefined, inner: picked.inner, page: picked.page, state: writtenState, breakpoint: target, theme: writtenThemeName } : null
   );
   const impactKey = $derived(JSON.stringify(impactAsk));
 
@@ -1570,17 +1581,25 @@
         {:else if picked}
           <div class="what" data-testid="selection">
             <Breadcrumb pick={picked} onselect={select} state={elementState} />
-            <ImpactLabel {impact} instances={picked.instances} detachable={detachState(picked).show} detachReason={detachState(picked).reason} ondetach={detach} onopen={(at) => toHost({ kind: ToHost.Open, at })} />
+            <ImpactLabel {impact} instances={picked.instances} detachable={!classInfo && detachState(picked).show} detachReason={detachState(picked).reason} ondetach={detach} onopen={(at) => toHost({ kind: ToHost.Open, at })} />
             <span class="where">{#if picked.component}in {picked.component.file.split('/').pop()} · {/if}<button type="button" class="link" onclick={() => toHost({ kind: ToHost.Open, at: picked!.source })}>{picked.source.file.split('/').pop()}:{picked.source.line}</button> · <button type="button" class="link" data-testid="copy-for-agent" title="Copy file, selector and view for your coding agent" onclick={copyForAgent}>Copy for agent</button>{#if cloudOn} · <button type="button" class="link" data-testid="comment-start" title="Comment on this element (C)" onclick={startComment}>Comment</button>{/if}</span>
             {#if authored(picked.classes)}<code class="classes">{authored(picked.classes)}</code>{/if}
           </div>
           <BreakpointBar badge={reachBadge} theme={themeBadge(themeName)} items={reachItems(breakpoints)} choice={reach} onchoose={(id) => (reach = id)} />
+          {#if classInfo}
+            <div class="scope editing" data-testid="class-editing">
+              <span class="editing-label">{editingLabel(classInfo)}</span>
+              <button type="button" class="on" data-action="class-stop" onclick={() => (classesState.targetKey = null)}>This element</button>
+            </div>
+          {:else}
           <div class="scope" role="radiogroup" aria-label="Edit scope" data-testid="scope">
             <button type="button" class:on={scope === Scope.Element} onclick={() => (scope = Scope.Element)} title="Only this element (every instance of its component: {picked.instances})">This element{picked.instances > 1 ? ` ×${picked.instances}` : ''}</button>
             <button type="button" class:on={scope === Scope.Class} disabled={!picked.classCount || styling === Styling.Tailwind} onclick={() => (scope = Scope.Class)} title={styling === Styling.Tailwind ? 'Class scope needs CSS rules, not Tailwind' : `Every element with this class: ${picked.classCount}`}>All .{picked.classes.split(' ')[0] || 'class'}{picked.classCount ? ` (${picked.classCount})` : ''}</button>
           </div>
+          {/if}
           {#if held}<PreviewBar {held} onapply={applyHeld} oncancel={cancelHeld} onmute={muteHeld} />{/if}
           <Properties pick={picked} {breakpoints} {scales} {palette} {elementState} {baseline} onstate={chooseState} onpreview={preview} onchange={change} onsavevar={saveVar} onhint={(h) => (hint = h)} onfont={pickFont} onfontreplace={replaceFont} onfontload={loadFont} onnotice={showToast} />
+          <ClassesSection pick={picked} {changes} onselect={select} />
           <Attributes pick={picked} {palette} />
           <PluginSections {plugins} {palette} />
           <Interactions pick={picked} {changes} />
@@ -2073,6 +2092,22 @@
     padding: 2px;
     border-radius: var(--ui-radius-md);
     background: var(--ui-input);
+  }
+
+  .editing-label {
+    flex: 1;
+    align-self: center;
+    padding: 0 8px;
+    overflow: hidden;
+    color: var(--ui-accent);
+    font-size: var(--ui-text-xs);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .scope.editing button {
+    flex: 0 0 auto;
+    padding: 0 8px;
   }
 
   .scope button {

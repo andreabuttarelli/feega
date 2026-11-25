@@ -1,7 +1,7 @@
 import { offsetOf, openTagEnd } from '@feega/live-edit/class-patch';
 import { inside, liveAtOf, reader } from '@feega/live-edit/live-ask';
 import { Scope } from '@feega/live-edit/scoped-rule';
-import { ImpactKind, type Impact, type ImpactAsk } from '../messages';
+import { ImpactKind, type ClassInfo, type Impact, type ImpactAsk, type UsageSite } from '../messages';
 import { isEntry, isPage } from './entry-files';
 import type { UsageIndex } from './usages';
 
@@ -63,3 +63,17 @@ export async function impactOf(root: string, ask: ImpactAsk, probe: Probe, index
   const files = (await index.usersOf(at.file)).filter((site) => !isEntry(site.file));
   return files.length ? { kind: ImpactKind.Component, name: nameOf(at.file), files } : { kind: ImpactKind.Local };
 }
+
+const firstUsePerFile = (info: ClassInfo): UsageSite[] => info.uses.filter((u, i) => info.uses.findIndex((o) => o.file === u.file) === i).map(({ file, line }) => ({ file, line }));
+
+export const classImpactOf = (info: ClassInfo | undefined): Impact =>
+  info ? { kind: ImpactKind.Class, name: info.name, elements: info.elements, files: firstUsePerFile(info) } : { kind: ImpactKind.Unknown, reason: 'the class is not in the project index' };
+
+const HOLD_REASON: { [K in ImpactKind]: (impact: Extract<Impact, { kind: K }>) => string | null } = {
+  [ImpactKind.Local]: () => null,
+  [ImpactKind.Component]: () => null,
+  [ImpactKind.Class]: (impact) => (impact.elements > 1 ? `.${impact.name} is used in ${impact.elements} elements, ${impact.files.length} files` : null),
+  [ImpactKind.Unknown]: (impact) => impact.reason
+};
+
+export const holdReason = (impact: Impact): string | null => (HOLD_REASON[impact.kind] as (impact: Impact) => string | null)(impact);

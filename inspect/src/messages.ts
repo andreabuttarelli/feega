@@ -10,6 +10,8 @@ import type { WrapTag } from '@feega/live-edit/wrap-node';
 import type { LoopMove } from '@feega/live-edit/move-loop-item';
 import type { Usage } from '@feega/live-edit/move-usage';
 import type { StructureOp } from '@feega/live-edit/structure';
+import type { ClassEntry, UseSite } from '@feega/live-edit/class-index';
+import type { ClassTarget } from '@feega/live-edit/class-rule';
 import type { Scope } from '@feega/live-edit/scoped-rule';
 import type { PageTarget } from '@feega/live-edit/page-rule';
 import type { ElementState } from '@feega/live-edit/element-state';
@@ -43,12 +45,17 @@ export type Author = { userId: string; name: string };
 export enum ImpactKind {
   Local = 'local',
   Component = 'component',
+  Class = 'class',
   Unknown = 'unknown'
 }
 
 export type UsageSite = { file: string; line: number };
 
-export type Impact = { kind: ImpactKind.Local } | { kind: ImpactKind.Component; name: string; files: UsageSite[] } | { kind: ImpactKind.Unknown; reason: string };
+export type ClassInfo = Omit<ClassEntry, 'uses'> & { uses: UseSite[]; elements: number; files: number };
+
+export type ClassesView = { at: string; element: ClassInfo[]; inFile: ClassInfo[]; dynamic: boolean };
+
+export type Impact = { kind: ImpactKind.Local } | { kind: ImpactKind.Component; name: string; files: UsageSite[] } | { kind: ImpactKind.Class; name: string; elements: number; files: UsageSite[] } | { kind: ImpactKind.Unknown; reason: string };
 
 export type ImpactAsk = { at: string } & Partial<EditAsk>;
 
@@ -97,7 +104,7 @@ export enum Styling {
   Css = 'css'
 }
 
-export type EditAsk = LiveEditAsk & { css?: Record<string, string>; scope?: Scope; inner?: string; page?: PageTarget; state?: ElementState; breakpoint?: string; theme?: string };
+export type EditAsk = LiveEditAsk & { css?: Record<string, string>; scope?: Scope; inner?: string; page?: PageTarget; state?: ElementState; breakpoint?: string; theme?: string; cls?: ClassTarget };
 
 export enum ServerState {
   Detecting = 'detecting',
@@ -195,6 +202,7 @@ export enum ToHost {
   ImageChoose = 'image-choose',
   ImageUpload = 'image-upload',
   Wiring = 'wiring',
+  Classes = 'classes',
   Link = 'link',
   Attribute = 'attribute',
   Go = 'go',
@@ -275,6 +283,7 @@ export enum ToView {
   SkillHint = 'skill-hint',
   ImageSaved = 'image-saved',
   Wiring = 'wiring',
+  Classes = 'classes',
   Comments = 'comments',
   Share = 'share',
   Library = 'library',
@@ -376,6 +385,7 @@ export type HostMessage =
   | { kind: ToHost.ImageChoose }
   | { kind: ToHost.ImageUpload; name: string; data: string }
   | { kind: ToHost.Wiring; at: string; instance?: number }
+  | { kind: ToHost.Classes; at: string }
   | { kind: ToHost.Link; at: string; edit: LinkEdit; instance?: number }
   | { kind: ToHost.Attribute; at: string; name: string; value: string }
   | { kind: ToHost.Go; at: string; ask: GoAsk }
@@ -432,6 +442,7 @@ export type ViewMessage =
   | { kind: ToView.SkillHint; command: string }
   | { kind: ToView.ImageSaved; url: string }
   | { kind: ToView.Wiring; at: string; instance?: number; wiring: Wiring }
+  | { kind: ToView.Classes; view: ClassesView }
   | { kind: ToView.Comments; enabled: boolean; comments: CloudComment[]; review?: CloudRevisions; error?: string }
   | { kind: ToView.Share; state: ShareState; available: boolean; name: string; canEdit: boolean; url?: string; expiresAt?: string; visitors: Present[]; notice: boolean; error?: string }
   | { kind: ToView.Library; items: LibraryEntry[] }

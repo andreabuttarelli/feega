@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { classUsesOf } from './class-uses';
 
 const names = (file: string, text: string) => classUsesOf(file, text).map((u) => [u.name, u.line, u.dynamic, u.module]);
+const at = (file: string, text: string) => classUsesOf(file, text).map((u) => [u.name, u.line, u.col]);
 
 describe('classUsesOf', () => {
   it('reads static classes of an html class attribute with the line', () => {
@@ -9,6 +10,10 @@ describe('classUsesOf', () => {
       ['card', 2, false, null],
       ['big', 2, false, null]
     ]);
+  });
+
+  it('reports the position of the element that holds the class, not of the attribute', () => {
+    expect(at('index.html', '<div>\n  <p\n    id="x"\n    class="card"\n  ></p>\n</div>')).toEqual([['card', 2, 3]]);
   });
 
   it('reads className of jsx, string and braced string', () => {

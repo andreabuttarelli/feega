@@ -62,9 +62,9 @@ describe('entryOf', () => {
     const all = facts({ 'src/A.module.css': '.t { color: red; }', 'app.css': '.g { color: red; }' });
     const index = buildIndex(all);
 
-    expect(entryOf(index, { name: 'g', line: 1, dynamic: false, module: null }, 'x.tsx')!.key).toBe('g');
-    expect(entryOf(index, { name: 't', line: 1, dynamic: false, module: 'src/A.module.css' }, 'src/A.tsx')!.key).toBe('src/A.module.css#t');
-    expect(entryOf(index, { name: 'nope', line: 1, dynamic: false, module: null }, 'x.tsx')).toBeUndefined();
+    expect(entryOf(index, { name: 'g', line: 1, col: 1, dynamic: false, module: null }, 'x.tsx')!.key).toBe('g');
+    expect(entryOf(index, { name: 't', line: 1, col: 1, dynamic: false, module: 'src/A.module.css' }, 'src/A.tsx')!.key).toBe('src/A.module.css#t');
+    expect(entryOf(index, { name: 'nope', line: 1, col: 1, dynamic: false, module: null }, 'x.tsx')).toBeUndefined();
   });
 });
 
