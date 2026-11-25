@@ -1,24 +1,14 @@
 import { builtinResolvers, makeFsImporter, parse, type Documentation } from 'react-docgen';
+import { TypeTag, controlOf, tagOfFallback, type PropControl, type PropType, type PropValue } from './prop-model.ts';
 
-export enum PropKind {
-  Select = 'select',
-  Toggle = 'toggle',
-  Text = 'text',
-  Number = 'number',
-  Children = 'children'
-}
-
-export type PropValue = string | number | boolean;
-
-export type PropControl = { name: string; kind: PropKind; required: boolean; options?: string[]; default?: PropValue };
+export { PropKind, type PropControl, type PropValue } from './prop-model.ts';
 
 type PropDoc = NonNullable<Documentation['props']>[string];
+type Shape = { name: string; raw?: string; value?: unknown; elements?: Shape[]; type?: string };
 
-const CHILDREN = 'children';
 const NODE_TYPE = /ReactNode|ReactElement|JSX/;
 const QUOTED = /^(['"`])(.*)\1$/s;
 const NUMERIC = /^-?\d+(\.\d+)?$/;
-const IGNORED_MEMBERS = new Set(['undefined', 'null']);
 
 const resolver = new builtinResolvers.FindExportedDefinitionsResolver({ limit: 0 });
 const importer = makeFsImporter();
@@ -35,57 +25,56 @@ function literalOf(raw: string): PropValue | undefined {
   return QUOTED.test(raw) ? unquote(raw) : undefined;
 }
 
-type Shape = { name: string; raw?: string; value?: unknown; elements?: Shape[] };
+const tagged = (tag: TypeTag): (() => PropType) => () => ({ tag });
 
-const optionsOf = (members: Shape[]): string[] | null => {
-  const options = members.filter((m) => !IGNORED_MEMBERS.has(m.name));
-  const values = options.map((m) => (m.name === 'literal' ? literalOf(String(m.value)) : undefined));
-  return values.length > 0 && values.every((v) => typeof v === 'string') ? (values as string[]) : null;
+function literalType(shape: Shape): PropType {
+  const literal = literalOf(String(shape.value));
+  return literal === undefined ? { tag: TypeTag.Unknown } : { tag: TypeTag.Literal, literal };
+}
+
+const TS_TYPES: Record<string, (shape: Shape) => PropType> = {
+  string: tagged(TypeTag.String),
+  number: tagged(TypeTag.Number),
+  boolean: tagged(TypeTag.Boolean),
+  null: tagged(TypeTag.Nullish),
+  undefined: tagged(TypeTag.Nullish),
+  literal: literalType,
+  union: (shape) => ({ tag: TypeTag.Union, members: (shape.elements ?? []).map(typeOfTs) })
 };
 
-function kindOfTs(name: string, ts: Shape): { kind: PropKind; options?: string[] } | null {
-  if (name === CHILDREN || NODE_TYPE.test(ts.raw ?? ts.name)) {
-    return { kind: PropKind.Children };
+function typeOfTs(shape: Shape): PropType {
+  if (NODE_TYPE.test(shape.raw ?? shape.name)) {
+    return { tag: TypeTag.Node };
   }
-  if (ts.name === 'union') {
-    const options = optionsOf(ts.elements ?? []);
-    const members = (ts.elements ?? []).filter((m) => !IGNORED_MEMBERS.has(m.name));
-    if (options) {
-      return { kind: PropKind.Select, options };
-    }
-    return members.length === 1 ? kindOfTs(name, members[0]) : null;
-  }
-  const simple: Record<string, PropKind> = { boolean: PropKind.Toggle, string: PropKind.Text, number: PropKind.Number };
-  return simple[ts.name] ? { kind: simple[ts.name] } : null;
+  return (TS_TYPES[shape.name] ?? tagged(TypeTag.Unknown))(shape);
 }
 
-function kindOfPropType(name: string, type: Shape): { kind: PropKind; options?: string[] } | null {
-  if (name === CHILDREN || type.name === 'node' || type.name === 'element') {
-    return { kind: PropKind.Children };
-  }
-  if (type.name === 'enum' && Array.isArray(type.value)) {
-    const options = (type.value as { value: string }[]).map((v) => literalOf(v.value));
-    return options.every((v) => typeof v === 'string') ? { kind: PropKind.Select, options: options as string[] } : null;
-  }
-  const simple: Record<string, PropKind> = { bool: PropKind.Toggle, string: PropKind.Text, number: PropKind.Number };
-  return simple[type.name] ? { kind: simple[type.name] } : null;
+function enumType(shape: Shape): PropType {
+  const options = (shape.value as { value: string }[]).map((entry) => literalOf(entry.value));
+  return options.every((option) => option !== undefined) ? { tag: TypeTag.Union, members: options.map((literal) => ({ tag: TypeTag.Literal, literal })) } : { tag: TypeTag.Unknown };
 }
 
-function kindOfDefault(name: string, fallback: PropValue | undefined): { kind: PropKind } | null {
-  if (name === CHILDREN) {
-    return { kind: PropKind.Children };
+const PROP_TYPES: Record<string, (shape: Shape) => PropType> = {
+  bool: tagged(TypeTag.Boolean),
+  string: tagged(TypeTag.String),
+  number: tagged(TypeTag.Number),
+  node: tagged(TypeTag.Node),
+  element: tagged(TypeTag.Node),
+  enum: (shape) => (Array.isArray(shape.value) ? enumType(shape) : { tag: TypeTag.Unknown })
+};
+
+const typeOfPropType = (shape: Shape): PropType => (PROP_TYPES[shape.name] ?? tagged(TypeTag.Unknown))(shape);
+
+function typeOfDoc(doc: PropDoc, fallback: PropValue | undefined): PropType | null {
+  if (doc.tsType) {
+    return typeOfTs(doc.tsType as Shape);
   }
-  const byType: Record<string, PropKind> = { boolean: PropKind.Toggle, string: PropKind.Text, number: PropKind.Number };
-  return fallback === undefined ? { kind: PropKind.Text } : { kind: byType[typeof fallback] };
+  return doc.type ? typeOfPropType(doc.type as Shape) : fallback === undefined ? null : { tag: tagOfFallback(fallback) };
 }
 
-function controlOf(name: string, doc: PropDoc): PropControl | null {
+function controlOfDoc(name: string, doc: PropDoc): PropControl | null {
   const fallback = doc.defaultValue ? literalOf(String(doc.defaultValue.value)) : undefined;
-  const typed = doc.tsType ? kindOfTs(name, doc.tsType as Shape) : doc.type ? kindOfPropType(name, doc.type as Shape) : kindOfDefault(name, fallback);
-  if (!typed) {
-    return null;
-  }
-  return { name, kind: typed.kind, required: Boolean(doc.required), ...(typed.options && { options: typed.options }), ...(fallback !== undefined && { default: fallback }) };
+  return controlOf({ name, optional: !doc.required, type: typeOfDoc(doc, fallback), fallback });
 }
 
 function documentsOf(code: string, filename: string): Documentation[] | null {
@@ -102,5 +91,5 @@ export function controlsOf(code: string, filename: string, name: string): PropCo
   if (!doc) {
     return null;
   }
-  return Object.entries(doc.props ?? {}).flatMap(([prop, propDoc]) => controlOf(prop, propDoc) ?? []);
+  return Object.entries(doc.props ?? {}).flatMap(([prop, propDoc]) => controlOfDoc(prop, propDoc) ?? []);
 }

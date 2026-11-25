@@ -1,5 +1,5 @@
-import type { PropControl, PropValue } from './component-props.ts';
-import { controlsOfMembers, declarationsOf, literalOf, membersOf, type PropMember, type TsNode } from './ts-controls.ts';
+import type { PropControl, PropValue } from './prop-model.ts';
+import { controlsOfMembers, declarationsOf, literalOf, membersOf, type TsMember, type TsNode } from './ts-controls.ts';
 
 export type SvelteCompiler = { parse: (code: string, options: { modern: true }) => { instance: { content: { body: TsNode[] } } | null } };
 
@@ -28,11 +28,12 @@ export function svelteControlsOf(code: string, compiler: SvelteCompiler): PropCo
       return null;
     }
     const names = destructured(declaration.id);
-    const typed = membersOf(declaration.id.typeAnnotation?.typeAnnotation, declarationsOf(body));
+    const declared = declarationsOf(body);
+    const typed = membersOf(declaration.id.typeAnnotation?.typeAnnotation, declared);
     const byName = new Map(typed.map((member) => [member.name, member]));
-    const members: PropMember[] = names.map(({ name }) => byName.get(name) ?? { name, optional: false, type: null });
+    const members: TsMember[] = names.map(({ name }) => byName.get(name) ?? { name, optional: false, type: null });
     const defaults = new Map(names.flatMap(({ name, fallback }) => (fallback === undefined ? [] : [[name, fallback] as [string, PropValue]])));
-    return controlsOfMembers(members, defaults);
+    return controlsOfMembers(members, defaults, declared);
   } catch {
     return null;
   }

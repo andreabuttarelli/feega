@@ -1,4 +1,4 @@
-import { PropKind, type PropControl, type PropValue } from './component-props.ts';
+import { PropKind, type PropControl, type PropValue } from './prop-model.ts';
 import { controlsOfMembers, declarationsOf, literalOf, membersOf, type TsNode } from './ts-controls.ts';
 
 export type VueCompiler = { parse: (code: string, options: { filename: string }) => { descriptor: { scriptSetup: { content: string } | null } }; babelParse: (code: string, options: object) => { program: { body: TsNode[] } } };
@@ -61,8 +61,9 @@ export function vueControlsOf(code: string, filename: string, compiler: VueCompi
     if (argument) {
       return runtimeControls(argument);
     }
-    const members = membersOf(found.call.typeParameters?.params[0], declarationsOf(body));
-    return controlsOfMembers(members, defaultsOf(found.defaults));
+    const declared = declarationsOf(body);
+    const members = membersOf(found.call.typeParameters?.params[0], declared);
+    return controlsOfMembers(members, defaultsOf(found.defaults), declared);
   } catch {
     return null;
   }
