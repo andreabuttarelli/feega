@@ -8,7 +8,7 @@ describe('page-wide styles', () => {
     const css = '@import "tailwindcss";\n\nbody {\n  margin: 0;\n}\n';
     const out = await pageRule(files({ 'src/app.css': css }), PageTarget.Body, { 'background-color': '#111111', margin: '8px' });
 
-    expect(out).toEqual({ ok: true, changes: [{ path: 'src/app.css', before: css, after: '@import "tailwindcss";\n\nbody {\n  margin: 8px;\n  background-color: #111111;\n}\n' }] });
+    expect(out).toEqual({ ok: true, changes: [{ path: 'src/app.css', before: css, after: '@import "tailwindcss";\n\nbody {\n  margin: 8px;\n  background-color: #111111;\n}\n' }], created: false });
   });
 
   it('html gets its own rule appended when there is none', async () => {
@@ -92,8 +92,56 @@ describe('page-wide styles', () => {
       ]);
     });
 
+    it('sveltekit 5 without a root layout: it is created with the import and children', async () => {
+      const pkg = JSON.stringify({ dependencies: { '@sveltejs/kit': '^2.0.0', svelte: '^5.1.0' } });
+      const out = await after({ 'package.json': pkg, 'src/routes/+page.svelte': '<h1 />\n' });
+
+      expect(out).toEqual([
+        { path: 'src/app.css', before: '', after: 'body {\n  background-color: #111111;\n}\n' },
+        { path: 'src/routes/+layout.svelte', before: '', after: "<script>\n  import '../app.css';\n  let { children } = $props();\n</script>\n\n{@render children()}\n" }
+      ]);
+    });
+
+    it('sveltekit 4 without a root layout: it gets a slot', async () => {
+      const pkg = JSON.stringify({ devDependencies: { '@sveltejs/kit': '^1.20.0', svelte: '^4.2.0' } });
+      const out = await after({ 'package.json': pkg, 'src/routes/+page.svelte': '<h1 />\n' });
+
+      expect(out).toEqual([
+        { path: 'src/app.css', before: '', after: 'body {\n  background-color: #111111;\n}\n' },
+        { path: 'src/routes/+layout.svelte', before: '', after: "<script>\n  import '../app.css';\n</script>\n\n<slot />\n" }
+      ]);
+    });
+
+    it('a project without sveltekit gets no layout', async () => {
+      expect(await after({ 'package.json': JSON.stringify({ dependencies: { svelte: '^5.0.0' } }) })).toMatchObject({ ok: false });
+    });
+
     it('nothing recognised: it says so', async () => {
       expect(await after({})).toMatchObject({ ok: false });
+    });
+  });
+
+  describe('created', () => {
+    const body = { 'background-color': '#111111' };
+    const created = async (all: Record<string, string>) => {
+      const out = await pageRule(files(all), PageTarget.Body, body);
+      return out.ok && out.created;
+    };
+
+    it('is true when a global style block is added', async () => {
+      expect(await created({ 'src/layouts/Layout.astro': '<html><body></body></html>\n' })).toBe(true);
+    });
+
+    it('is false when the global style block already exists', async () => {
+      expect(await created({ 'src/layouts/Layout.astro': '<html></html>\n<style is:global>\n  body {\n    margin: 0;\n  }\n</style>\n' })).toBe(false);
+    });
+
+    it('is true when a stylesheet file is created', async () => {
+      expect(await created({ 'src/routes/+layout.svelte': '<slot />\n' })).toBe(true);
+    });
+
+    it('is false when the global stylesheet exists', async () => {
+      expect(await created({ 'src/app.css': 'body {\n  margin: 0;\n}\n' })).toBe(false);
     });
   });
 });

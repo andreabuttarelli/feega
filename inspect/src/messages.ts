@@ -460,7 +460,7 @@ export type ViewMessage =
   | { kind: ToView.Settings; values: Settings; facts: ReportFacts }
   | { kind: ToView.History; changes: ChangeRow[]; canUndo: boolean; canRedo: boolean }
   | { kind: ToView.Status; text: string }
-  | { kind: ToView.Edited; ok: boolean; fromHistory?: boolean; reason?: string; written?: string; at?: Source; saved?: Source; note?: string; select?: Source }
+  | { kind: ToView.Edited; ok: boolean; fromHistory?: boolean; reason?: string; written?: string; at?: Source; saved?: Source; note?: string; select?: Source; inject?: Record<string, string> }
   | { kind: ToView.Change; row: string; value: string }
   | { kind: ToView.Pick; id: number; x: number; y: number }
   | { kind: ToView.IconResults; id: number; library: string | null; hits: IconHit[]; error?: string }
