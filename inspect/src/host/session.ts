@@ -257,7 +257,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     classes.invalidate();
     await postHistory();
     const saved = ask ? (liveAtOf(ask.at) ?? undefined) : undefined;
-    await post(out.ok ? { kind: ToView.Edited, ok: true, fromHistory: replay === Replay.History, written: out.written, saved, note: out.note, select: out.selected } : { kind: ToView.Edited, ok: false, reason: out.reason, at: out.at });
+    await post(out.ok ? { kind: ToView.Edited, ok: true, fromHistory: replay === Replay.History, written: out.written, saved, note: out.note, select: out.selected, inject: out.created ? ask?.css : undefined } : { kind: ToView.Edited, ok: false, reason: out.reason, at: out.at });
     return out;
   }
 

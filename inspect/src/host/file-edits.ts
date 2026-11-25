@@ -50,7 +50,7 @@ export type DetachAsk = { at: string; usage: string; which: Which };
 
 export type ManyAsk = { op: StructureOp; targets: { at: string; instance?: number }[]; wrap?: WrapTag };
 
-export type Written = { ok: true; path: string; written: string; note?: string; selected?: LiveAt; changes?: FileChange[]; touched?: FileChange[] } | { ok: false; reason: string; at?: LiveAt };
+export type Written = { ok: true; path: string; written: string; note?: string; created?: boolean; selected?: LiveAt; changes?: FileChange[]; touched?: FileChange[] } | { ok: false; reason: string; at?: LiveAt };
 
 type Changes = { ok: true; changes: FileChange[] } | { ok: false; reason: string; at?: LiveAt };
 
@@ -192,7 +192,11 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     }
     if (ask.page) {
       const out = await pageRule(reader(root), ask.page, ask.css ?? {}, ask.viewport, media, within);
-      return out.ok ? written(out.changes, '') : out;
+      if (!out.ok) {
+        return out;
+      }
+      const done = await written(out.changes, '');
+      return done.ok && out.created ? { ...done, created: true } : done;
     }
     const at = liveAtOf(ask.at);
     if (!at || !inside(root, at.file)) {
