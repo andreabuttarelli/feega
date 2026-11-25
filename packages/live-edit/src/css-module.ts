@@ -1,7 +1,7 @@
 import { offsetOf, openTagEnd, type LiveAt } from './class-patch';
 import type { FileChange, ReadFile } from './files';
 import { GLOBAL_SHEETS } from './font-wiring';
-import { hasRule, ruleInBody, Scope, usesOf } from './scoped-rule';
+import { hasRule, ruleInBody, ruleSelector, Scope, usesOf } from './scoped-rule';
 import type { Css } from './style-attr';
 import { ElementState, pseudoOf } from './element-state';
 
@@ -60,9 +60,9 @@ async function plainRule(read: ReadFile, at: LiveAt, text: string, open: string,
   const imported = [...text.matchAll(PLAIN_IMPORT)].map((m) => joinPath(dirOf(at.file), m[1]));
   for (const path of [...imported, ...GLOBAL_SHEETS]) {
     const before = await read(path);
-    const name = before === null ? undefined : classes.find((c) => hasRule(before, `.${c}`) && (scope === Scope.Class || usesOfPlain(text, c) === 1));
-    if (before !== null && name) {
-      return { ok: true, changes: [{ path, before, after: ruleInBody(before, ruleName(name), new Map(Object.entries(css)), viewport, NO_INDENT, media, within) }] };
+    const found = before === null ? undefined : classes.map((c) => ({ c, selector: ruleSelector(before, c) })).find((r) => r.selector && (scope === Scope.Class || usesOfPlain(text, r.c) === 1));
+    if (before !== null && found) {
+      return { ok: true, changes: [{ path, before, after: ruleInBody(before, ruleName(found.selector!.slice(1)), new Map(Object.entries(css)), viewport, NO_INDENT, media, within) }] };
     }
   }
   return null;

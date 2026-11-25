@@ -128,6 +128,16 @@ describe('a preview survives hot reload until the class lands', () => {
   });
 });
 
+describe('a refused write with an inner preview', () => {
+  it('clearing the element removes the preview made on its inner part too', () => {
+    const win = domOf();
+    previewEdit(win.document, { source: SOURCE, inner: 'path', style: { fill: 'red' } });
+    clearPreview(win.document, SOURCE);
+
+    expect(win.document.getElementById('feega-preview')?.textContent ?? '').not.toContain('red');
+  });
+});
+
 describe('a preview made in an element state', () => {
   it('shows only while that state is forced on the element', () => {
     const win = domOf();

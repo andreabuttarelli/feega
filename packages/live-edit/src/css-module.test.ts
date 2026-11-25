@@ -82,4 +82,28 @@ describe('cssModuleRule', () => {
 
     expect(out.ok).toBe(false);
   });
+  describe('a plain class styled through a descendant selector', () => {
+    const PAGE = `import './Hero.css';\n\nexport const Hero = () => (\n  <section className="hero">\n    <p className="lead">x</p>\n  </section>\n);\n`;
+    const SHEET = '.hero{padding:8px}\n.hero .lead{color:#333}\n';
+    const sheets = { 'src/Hero.jsx': PAGE, 'src/Hero.css': SHEET };
+    const lead = { file: 'src/Hero.jsx', line: 5, col: 5 };
+
+    it('edits the descendant rule that styles the class', async () => {
+      const out = await cssModuleRule(files(sheets), lead, { color: 'red' }, undefined, Scope.Class);
+
+      expect(out.ok && out.changes[0].after).toContain('.hero .lead{color:red}');
+    });
+
+    it('edits it in element scope when the class is used once', async () => {
+      const out = await cssModuleRule(files(sheets), lead, { color: 'red' }, undefined, Scope.Element);
+
+      expect(out.ok && out.changes[0].after).toContain('.hero .lead{color:red}');
+    });
+
+    it('keeps a minified rule on one line', async () => {
+      const out = await cssModuleRule(files(sheets), lead, { color: 'red' }, undefined, Scope.Class);
+
+      expect(out.ok && out.changes[0].after).toBe('.hero{padding:8px}\n.hero .lead{color:red}\n');
+    });
+  });
 });

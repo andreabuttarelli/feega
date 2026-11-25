@@ -282,8 +282,11 @@ export function keepPreviews(doc) {
 }
 
 export function clearPreview(doc, source, state) {
-  previewsOf(doc).delete(keyOf(source, undefined, state));
-  previewsOf(doc).delete(keyOf(source, 'svg', state));
+  const all = previewsOf(doc);
+  const suffix = state ? `${STATE_KEY}${state}` : '';
+  const inState = (key) => key.endsWith(suffix) && (state || !key.includes(STATE_KEY));
+  const own = (key) => key === keyOf(source, undefined, state) || (key.startsWith(`${source}${INNER_KEY}`) && inState(key));
+  [...all.keys()].filter(own).forEach((key) => all.delete(key));
   render(doc);
 }
 

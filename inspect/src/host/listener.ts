@@ -67,7 +67,7 @@ const within = (dir: string, root: string) => dir === root || dir.startsWith(roo
 
 export async function portsServing(appRoot: string, lsof: Lsof = SYSTEM_LSOF, own: ReadonlySet<number>): Promise<number[]> {
   const ports = byPid(await lsof.listening())
-    .filter(([pid]) => !own.has(pid))
+    .filter(([pid]) => pid !== process.pid && !own.has(pid))
     .map(([pid, addr]) => [pid, Number(addr.slice(addr.lastIndexOf(':') + 1))] as const);
   if (!ports.length) {
     return [];
