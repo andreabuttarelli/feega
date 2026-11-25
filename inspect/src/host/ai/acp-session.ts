@@ -30,6 +30,21 @@ const configsOf = (options: SessionConfigOption[] | null | undefined): ConfigVie
     o.type === 'select' && o.category && CATEGORIES.has(o.category) ? [{ id: o.id, name: o.name, category: o.category as ConfigCategory, current: o.currentValue, values: valuesOf(o) }] : []
   );
 
+const SESSION_MODEL_ID = 'model';
+const SET_MODEL_METHOD = 'session/set_model';
+
+type SessionModels = { currentModelId: string; availableModels: { modelId: string; name: string; description?: string | null }[] };
+
+enum ConfigSource {
+  Option = 'option',
+  Model = 'model'
+}
+
+const modelsOf = (models: SessionModels | null | undefined): ConfigView | null =>
+  models?.availableModels.length
+    ? { id: SESSION_MODEL_ID, name: 'Model', category: ConfigCategory.Model, current: models.currentModelId, values: models.availableModels.map((m) => ({ id: m.modelId, name: m.name, description: m.description ?? '' })) }
+    : null;
+
 const messageOf = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
 export const openAcpAgent = async (launch: Launch, deps: AgentDeps): Promise<AgentSession> => {
@@ -40,15 +55,23 @@ export const openAcpAgent = async (launch: Launch, deps: AgentDeps): Promise<Age
   let sessionId = '';
   let available: ModeView[] = [];
   let configs: ConfigView[] = [];
+  let models: ConfigView | null = null;
   let replaying = false;
 
   const modeChanged = (current: string) => deps.emit({ kind: AgentEventKind.Modes, available, current });
 
+  const shown = (): ConfigView[] => (models && !configs.some((c) => c.category === ConfigCategory.Model) ? [models, ...configs] : configs);
+
+  const announceConfig = () => {
+    const options = shown();
+    if (options.length) {
+      deps.emit({ kind: AgentEventKind.Config, options });
+    }
+  };
+
   const configChanged = (options: SessionConfigOption[] | null | undefined) => {
     configs = configsOf(options);
-    if (configs.length) {
-      deps.emit({ kind: AgentEventKind.Config, options: configs });
-    }
+    announceConfig();
   };
 
   const toolOf = (update: ToolCall | ToolCallUpdate): ToolView => {
@@ -138,7 +161,7 @@ export const openAcpAgent = async (launch: Launch, deps: AgentDeps): Promise<Age
     replaying = true;
     try {
       const response = await connection.agent.request(methods.agent.session.load, { sessionId: id, cwd: deps.cwd, mcpServers: [] });
-      return { sessionId: id, modes: response.modes, configOptions: response.configOptions };
+      return { sessionId: id, modes: response.modes, configOptions: response.configOptions, models: (response as { models?: SessionModels }).models };
     } catch {
       return null;
     } finally {
@@ -153,16 +176,30 @@ export const openAcpAgent = async (launch: Launch, deps: AgentDeps): Promise<Age
     available = created.modes.availableModes.map((m) => ({ id: m.id, name: m.name, description: m.description ?? '' }));
     modeChanged(created.modes.currentModeId);
   }
+  models = modelsOf((created as { models?: SessionModels }).models);
   configChanged(created.configOptions);
 
-  const setConfig = async (id: string, value: string) => {
+  const setOption = async (id: string, value: string) => {
     const response = await connection.agent.request(methods.agent.session.setConfigOption, { sessionId, configId: id, value });
     configChanged(response.configOptions);
   };
 
-  for (const { id } of [...configs]) {
+  const setModel = async (_id: string, value: string) => {
+    const rawRequest = connection.agent.request as unknown as (method: string, params: object) => Promise<unknown>;
+    await rawRequest.call(connection.agent, SET_MODEL_METHOD, { sessionId, modelId: value });
+    models = models && { ...models, current: value };
+    announceConfig();
+  };
+
+  const setters: Record<ConfigSource, (id: string, value: string) => Promise<void>> = { [ConfigSource.Option]: setOption, [ConfigSource.Model]: setModel };
+
+  const sourceOf = (id: string) => (models && shown().includes(models) && models.id === id ? ConfigSource.Model : ConfigSource.Option);
+
+  const setConfig = (id: string, value: string) => setters[sourceOf(id)](id, value);
+
+  for (const { id } of [...shown()]) {
     const wanted = deps.preferred[id];
-    const option = configs.find((c) => c.id === id);
+    const option = shown().find((c) => c.id === id);
     if (wanted !== undefined && option && option.current !== wanted && option.values.some((v) => v.id === wanted)) {
       await setConfig(id, wanted).catch(() => undefined);
     }

@@ -25,6 +25,8 @@ const configOptions = () => [
   { id: 'mode', name: 'Mode', category: 'mode', type: 'select', currentValue: 'default', options: MODES.map((m) => ({ value: m.id, name: m.name })) },
   { id: 'fast', name: 'Fast mode', category: 'speed', type: 'boolean', currentValue: false }
 ];
+const SESSION_MODELS = process.argv.includes('models');
+const sessionModels = () => ({ currentModelId: chosen.model, availableModels: MODELS.map((m) => ({ modelId: m.value, name: m.name, description: m.description })) });
 const WRITTEN = 'written by the agent\n';
 
 const chunk = (text) => ({ sessionId: SESSION, update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text } } });
@@ -114,14 +116,24 @@ const app = agent({ name: 'fake' })
     if (!signedIn) {
       throw new RequestError(AUTH_REQUIRED, 'Authentication required');
     }
+    if (SESSION_MODELS) {
+      return { sessionId: SESSION, modes: { currentModeId: 'default', availableModes: MODES }, models: sessionModels() };
+    }
     return { sessionId: SESSION, modes: { currentModeId: 'default', availableModes: MODES }, configOptions: configOptions() };
   })
   .onRequest(methods.agent.session.load, async (cx) => {
     await cx.client.notify(methods.client.session.update, chunk('replayed history'));
+    if (SESSION_MODELS) {
+      return { modes: { currentModeId: 'plan', availableModes: MODES }, models: sessionModels() };
+    }
     return { modes: { currentModeId: 'plan', availableModes: MODES }, configOptions: configOptions() };
   })
   .onRequest(methods.agent.session.setMode, async (cx) => {
     await cx.client.notify(methods.client.session.update, { sessionId: SESSION, update: { sessionUpdate: 'current_mode_update', currentModeId: cx.params.modeId } });
+    return {};
+  })
+  .onRequest('session/set_model', (params) => params, (cx) => {
+    chosen.model = cx.params.modelId;
     return {};
   })
   .onRequest(methods.agent.session.setConfigOption, (cx) => {
