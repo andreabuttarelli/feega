@@ -1050,12 +1050,12 @@ pre {
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: min(460px, 100%);
-  gap: 12px;
+  width: min(560px, 100%);
+  gap: 20px;
 }
 
 .onb-hero {
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
 
 .onb .onb-title {
@@ -1081,9 +1081,9 @@ pre {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 24px;
   width: 100%;
-  margin-top: 12px;
+  margin-top: 20px;
 }
 
 .onb-signed {
@@ -1093,7 +1093,7 @@ pre {
 
 .onb-agents {
   display: flex;
-  gap: 16px;
+  gap: 24px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -1103,7 +1103,7 @@ pre {
 .onb-support {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 10px;
   width: 100%;
   margin: 12px 0 0;
   padding: 0;
@@ -1114,13 +1114,18 @@ pre {
 .onb-ways li {
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-height: 44px;
+  gap: 16px;
+  min-height: 72px;
+  padding: 14px 16px 14px 20px;
+  border: 1px solid var(--sx-line);
+  border-radius: var(--sx-radius-xl);
+  background: var(--sx-grey-1);
 }
 
 .onb-text {
   display: flex;
   flex-direction: column;
+  gap: 4px;
 }
 
 .onb-label {
@@ -1134,7 +1139,7 @@ pre {
 
 .onb-actions {
   display: flex;
-  gap: 4px;
+  gap: 8px;
   margin-left: auto;
 }
 
@@ -1168,7 +1173,7 @@ pre {
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  margin-top: 24px;
+  margin-top: 40px;
 }
 
 .onb-dots,
@@ -1213,6 +1218,9 @@ pre {
 .onb-faq {
   width: 100%;
   margin-top: 8px;
+  padding: 0 20px;
+  border: 1px solid var(--sx-line);
+  border-radius: var(--sx-radius-xl);
   text-align: left;
 }
 
@@ -1222,7 +1230,7 @@ pre {
   justify-content: space-between;
   gap: 8px;
   width: 100%;
-  padding: 6px 0;
+  padding: 18px 0;
   color: var(--sx-ink-2);
   font-size: 13px;
   text-align: left;
@@ -1255,8 +1263,13 @@ pre {
   margin: 0;
   overflow: hidden;
   color: var(--sx-ink-3);
+  padding-bottom: 0;
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.6;
+}
+
+.onb-faq.open .onb-answer p {
+  padding-bottom: 18px;
 }
 
 .onb-snackbar {
