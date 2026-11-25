@@ -142,7 +142,7 @@ export function installBridge(win, { nested = false, emit = null, twin = null } 
       const target = targetOf(doc, request);
       settleForced(doc);
       const tagged = target?.closest(`[${SOURCE_ATTR}]`);
-      const outside = nested && (!tagged || tagged.hasAttribute(GHOST_ATTR));
+      const outside = nested && (!tagged || tagged.hasAttribute(GHOST_ATTR) || tagged === doc.body || tagged === doc.documentElement);
       const inspected = target && !outside ? inspectElement(target, { maxHtml: request.maxHtml, twin }) : null;
       reply({ type: INSPECT_RESULT, id: request.id, result: inspected && { ...inspected, states: tagged ? statesOf(tagged) : [] } });
     }
