@@ -1349,9 +1349,11 @@ pre {
 }
 
 .onb-band {
-  width: 100%;
-  height: 200px;
-  border-radius: var(--sx-radius-xl);
+  position: fixed;
+  inset: auto 0 0;
+  z-index: -1;
+  height: clamp(140px, 24vh, 260px);
+  pointer-events: none;
   background: url('pixel-band.png') center / cover no-repeat;
   image-rendering: pixelated;
 }
