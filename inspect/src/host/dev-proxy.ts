@@ -20,8 +20,13 @@ export function withBridge(html: string): string {
   return html.replace(/<body([^>]*)>/, `<body$1>${SCRIPT}`);
 }
 
+const bridgeFileOf = (url: string | undefined): string | null => {
+  const name = url?.startsWith(BRIDGE_PATH) ? url.slice(BRIDGE_PATH.length).split('?')[0] : '';
+  return BRIDGE_FILES.has(name) ? name : null;
+};
+
 async function serveBridge(dir: string, name: string, res: ServerResponse) {
-  const body = BRIDGE_FILES.has(name) ? await readFile(join(dir, name)).catch(() => null) : null;
+  const body = await readFile(join(dir, name)).catch(() => null);
   if (!body) {
     res.writeHead(404, feegaHeaders(FeegaServer.Proxy)).end();
     return;
@@ -51,8 +56,9 @@ function forward(target: URL, req: IncomingMessage, res: ServerResponse) {
 export async function devProxy(targetUrl: string, bridgeDir: string): Promise<{ url: string; close: () => void }> {
   const target = new URL(targetUrl);
   const server = createServer((req, res) => {
-    if (req.url?.startsWith(BRIDGE_PATH)) {
-      serveBridge(bridgeDir, req.url.slice(BRIDGE_PATH.length).split('?')[0], res);
+    const bridgeFile = bridgeFileOf(req.url);
+    if (bridgeFile) {
+      serveBridge(bridgeDir, bridgeFile, res);
       return;
     }
     forward(target, req, res);
