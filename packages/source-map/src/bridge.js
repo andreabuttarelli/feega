@@ -5,6 +5,7 @@ import { missingFontsOf } from './missing-fonts.js';
 import { trackRects } from './track.js';
 import { keepScroll } from './reload-restore.js';
 import { applyTheme, keepTheme, themeNow, watchScheme } from './theme-switch.js';
+import { watchPageMount } from './page-mount.js';
 import { FORCED_REBUILD_MS, forceState, forcedNow, keepForced, settleForced, statesOf } from './forced-state.js';
 
 export const INSPECT = 'feega:inspect';
@@ -46,6 +47,9 @@ const THEME_REBUILD_MS = 100;
 
 export function installBridge(win, { nested = false, emit = null, twin = null } = {}) {
   if (win[INSTALLED]) {
+    return;
+  }
+  if (!nested && watchPageMount(win)) {
     return;
   }
   win[INSTALLED] = true;

@@ -1,9 +1,10 @@
 import { GHOST_ATTR, SOURCE_ATTR } from './runtime.js';
 import { mountOf } from './framework-meta.js';
+import { fileOf, rootOf, taggedParent } from './component-root.js';
+import { mountUrlFor } from './mount-hosts.js';
 import { FocusMode, MOUNT_STATUS, Status } from './mount-protocol.js';
 
 export const FOCUSED = 'feega:focused';
-const MOUNT_ROUTE = '/__feega/mount';
 const NESTED_HOST = Symbol.for('feega.nested-host');
 const NO_MOUNT_PAGE = 'The dev server has no mount page';
 
@@ -21,25 +22,8 @@ const STYLESHEETS = 'link[rel~="stylesheet"], style';
 export const CANVAS_CSS = `html{min-height:100%;background-color:${CHECKER_LIGHT}!important;background-image:conic-gradient(${CHECKER_DARK} 25%,transparent 0 50%,${CHECKER_DARK} 0 75%,transparent 0)!important;background-size:${CHECKER_PX * 2}px ${CHECKER_PX * 2}px!important}body{display:flex!important;flex-wrap:wrap;align-items:center;align-content:center;justify-content:center;gap:${GAP_PX}px;box-sizing:border-box;min-height:100vh;margin:0!important;padding:${PADDING_PX}px!important;background:transparent!important}`;
 
 const nameOfFile = (file) => file.split('/').pop().replace(/\.[^.]+$/, '');
-const fileOf = (attr) => attr.slice(0, attr.lastIndexOf(':', attr.lastIndexOf(':') - 1));
-const taggedParent = (element) => element.parentElement?.closest(`[${SOURCE_ATTR}]`) ?? null;
-const bySource = (doc, source) => [...doc.querySelectorAll(`[${SOURCE_ATTR}=${JSON.stringify(source)}]`)];
 const attrsOf = (element) => Object.fromEntries([...element.attributes].filter(({ name }) => name !== SOURCE_ATTR).map(({ name, value }) => [name, value]));
 const attrText = (attrs) => Object.entries(attrs).map(([name, value]) => ` ${name}="${value.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}"`).join('');
-
-function componentRoot(element) {
-  const file = fileOf(element.getAttribute(SOURCE_ATTR));
-  let root = element;
-  for (let up = taggedParent(root); up && fileOf(up.getAttribute(SOURCE_ATTR)) === file; up = taggedParent(up)) {
-    root = up;
-  }
-  return root;
-}
-
-function rootOf(doc, source, index = 0) {
-  const element = bySource(doc, source)[index];
-  return element ? componentRoot(element) : null;
-}
 
 function ruleText(sheet) {
   try {
@@ -101,13 +85,13 @@ export function focusPage(doc, source, index) {
   return { count: 1, rootAttr: root.getAttribute(SOURCE_ATTR), htmlAttrs: attrsOf(doc.documentElement), bodyAttrs: attrsOf(doc.body), head: headOf(doc), body: ghostTree(doc, root) };
 }
 
-function mountUrlOf(root) {
+function mountUrlOf(win, root, { source, index }) {
   const mount = mountOf(root);
   if (!mount) {
     return null;
   }
   const file = fileOf(root.getAttribute(SOURCE_ATTR));
-  return `${MOUNT_ROUTE}?${new URLSearchParams({ file, name: mount.name || nameOfFile(file), props: JSON.stringify(mount.props) })}`;
+  return mountUrlFor(win, { file, name: mount.name || nameOfFile(file), props: mount.props, source, index });
 }
 
 const pathFrom = (root, element) => {
@@ -220,7 +204,7 @@ export function focusTab(win, { install, prepare, report }) {
     wanted = null;
     if (!frame || source !== request.source || index !== request.index) {
       drop();
-      const mountUrl = failed.has(request.source) || request.mount === false ? null : mountUrlOf(rootOf(win.document, request.source, request.index));
+      const mountUrl = failed.has(request.source) || request.mount === false ? null : mountUrlOf(win, rootOf(win.document, request.source, request.index), request);
       create(parts, mountUrl);
       source = request.source;
       index = request.index;

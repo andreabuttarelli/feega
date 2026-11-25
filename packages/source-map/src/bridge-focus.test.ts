@@ -161,6 +161,16 @@ describe('focus tab', () => {
       expect(up).toContainEqual({ type: 'feega:focused', count: 1, mode: 'mount' });
     });
 
+    it('reopens the page itself when the app is Next.js, which has no mount route', () => {
+      const { win, send, frame } = reactive();
+      (win as unknown as Record<string, unknown>).next = { version: '15.0.0' };
+      send({ type: 'feega:focus', source: 'src/Card.tsx:5:7', index: 0 });
+
+      const src = frame()!.getAttribute('src')!;
+      expect(src.startsWith(`${win.location.pathname}${win.location.search}#feega-mount=`)).toBe(true);
+      expect(JSON.parse(decodeURIComponent(src.split('#feega-mount=')[1]))).toMatchObject({ file: 'src/Card.tsx', name: 'Card', source: 'src/Card.tsx:5:7', index: 0 });
+    });
+
     it('tells the view when the component is up, with what it learned about it', () => {
       const { up, send, status } = reactive();
       send({ type: 'feega:focus', source: 'src/Card.tsx:5:7' });

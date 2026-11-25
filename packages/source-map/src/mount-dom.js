@@ -57,3 +57,16 @@ export const svelteMount = ({ mount, unmount }, Target) => (host, props) => {
   const instance = mount(Target, { target: host, props });
   return () => unmount(instance);
 };
+
+export const astroMount = (renderUrl) => (host, props, fail) => {
+  const url = `${renderUrl}&props=${encodeURIComponent(JSON.stringify(props))}`;
+  let live = true;
+  fetch(url)
+    .then((response) => (response.ok ? response.text() : Promise.reject(new Error(`Astro could not render it (${response.status})`))))
+    .then((html) => live && host.insertAdjacentHTML('beforeend', html))
+    .catch((error) => live && fail(String(error?.message ?? error)));
+  return () => {
+    live = false;
+    host.replaceChildren();
+  };
+};
