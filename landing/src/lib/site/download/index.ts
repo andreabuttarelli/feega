@@ -1,4 +1,4 @@
-import { DESKTOP_INSTALL_COMMAND, FEEGA_VERSION, NODE_REQUIREMENT, NPX_COMMAND, VSCODE_REQUIREMENT } from '../links';
+import { DESKTOP_DMGS, DESKTOP_INSTALL_COMMAND, DESKTOP_LINUX, DESKTOP_LINUX_FILE, DESKTOP_WINDOWS, FEEGA_VERSION, NODE_REQUIREMENT, NPX_COMMAND, VSCODE_REQUIREMENT } from '../links';
 
 export const DOWNLOAD_PAGE = {
   heading: 'download feega',
@@ -13,12 +13,18 @@ export const DOWNLOAD_PAGE = {
   },
   desktop: {
     heading: 'desktop app (beta)',
-    lead: 'a standalone app for macOS. one tab per folder, no editor needed.',
-    terminalLabel: 'install from the terminal',
+    lead: 'a standalone app for macOS, Windows and Linux. one tab per folder, no editor needed. it updates itself.',
+    terminalLabel: 'or install from the terminal',
     command: DESKTOP_INSTALL_COMMAND,
-    terminalNote: 'downloads the app and opens it. macOS does not block it.',
-    dmgLabel: 'or download the dmg',
-    dmgNote: 'macOS blocks the dmg: open system settings, privacy & security, then press open anyway.'
+    terminalNote: 'macOS and Linux. downloads the app; on macOS it also opens it.',
+    downloadsLabel: 'download for your system',
+    macNote: 'signed and notarized by Apple.',
+    windowsNote: 'Windows may show "Windows protected your PC": click More info, then Run anyway.',
+    linuxNote: 'make it executable, then run it:',
+    linuxCommand: `chmod +x ${DESKTOP_LINUX_FILE} && ./${DESKTOP_LINUX_FILE}`,
+    mac: { name: 'macOS', files: DESKTOP_DMGS.map((d) => ({ label: d.arch, href: d.href, target: `dmg_${d.arch.toLowerCase().replace(' ', '_')}` })) },
+    windows: { name: 'Windows', badge: 'beta', files: [{ label: 'installer (.exe)', href: DESKTOP_WINDOWS.href, target: 'windows_exe' }] },
+    linux: { name: 'Linux', files: [{ label: 'AppImage', href: DESKTOP_LINUX.href, target: 'linux_appimage' }] }
   },
   requirements: {
     heading: 'requirements',

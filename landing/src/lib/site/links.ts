@@ -10,7 +10,7 @@ export const COFFEE_URL = 'https://buy.stripe.com/5kQ00k2A97C08sd94LeME07';
 
 export const EXTENSION_PUBLISHED = true;
 
-export const DESKTOP_PUBLISHED = false;
+export const DESKTOP_PUBLISHED = true;
 
 export const DESKTOP_RELEASE_URL = `${GITHUB_URL}/releases/download/desktop-latest`;
 
@@ -20,6 +20,12 @@ export const DESKTOP_DMGS = [
   { arch: 'Apple silicon', href: `${DESKTOP_RELEASE_URL}/Feega-mac-arm64.dmg` },
   { arch: 'Intel', href: `${DESKTOP_RELEASE_URL}/Feega-mac-x64.dmg` }
 ] as const;
+
+export const DESKTOP_WINDOWS = { href: `${DESKTOP_RELEASE_URL}/Feega-win-x64.exe` } as const;
+
+export const DESKTOP_LINUX_FILE = 'Feega-linux-x64.AppImage';
+
+export const DESKTOP_LINUX = { href: `${DESKTOP_RELEASE_URL}/${DESKTOP_LINUX_FILE}` } as const;
 
 export const DOWNLOAD_PATH = '/download';
 

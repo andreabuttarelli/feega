@@ -1,15 +1,21 @@
 <script lang="ts">
   import { browserEnv, installOptions, Outcome, runOption, type InstallOption } from './install';
   import { EDITOR_ICONS } from './editor-icons';
-  import CommandField from './CommandField.svelte';
   import { eventAttrs } from './analytics/attrs';
   import { installOptionAttrs } from './analytics/nav';
-  import { APPLE_ICON } from './social-icons';
-  import { DESKTOP_DMGS, DESKTOP_INSTALL_COMMAND, DESKTOP_PUBLISHED, DOWNLOAD_PATH } from './links';
+  import { APPLE_ICON, LINUX_ICON, WINDOWS_ICON } from './social-icons';
+  import { DESKTOP_DMGS, DESKTOP_LINUX, DESKTOP_PUBLISHED, DESKTOP_WINDOWS, DOWNLOAD_PATH } from './links';
+  import type { DesktopDownload } from './desktop-download';
 
-  let { label, place }: { label: string; place: string } = $props();
+  let { download, place }: { download: DesktopDownload; place: string } = $props();
 
   const options = installOptions().filter((o) => !o.soon);
+
+  const DESKTOP_ITEMS = [
+    ...DESKTOP_DMGS.map((dmg) => ({ icon: APPLE_ICON, label: `mac · ${dmg.arch.toLowerCase()}`, href: dmg.href, target: `dmg ${dmg.arch.toLowerCase()}` })),
+    { icon: WINDOWS_ICON, label: 'windows · beta', href: DESKTOP_WINDOWS.href, target: 'windows_exe' },
+    { icon: LINUX_ICON, label: 'linux · appimage', href: DESKTOP_LINUX.href, target: 'linux_appimage' }
+  ];
   let open = $state(false);
   let copied = $state(false);
   let root: HTMLDivElement;
@@ -36,13 +42,20 @@
 <svelte:window onkeydown={onKey} onpointerdown={onPointer} />
 
 <div class="split" bind:this={root}>
-  <a class="main" href={DOWNLOAD_PATH} {...eventAttrs('download_click', { target: 'download_page', place })}>{label}</a>
+  <a class="main" href={download.href} {...eventAttrs('download_click', { target: download.target, place })}>{#if download.icon}<span class="os">{@html download.icon}</span>{/if}{download.label}</a>
   <button class="chev" type="button" aria-label="More ways to install" aria-haspopup="menu" aria-expanded={open} onclick={() => (open = !open)}>
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
   </button>
 
   {#if open}
     <div class="menu" role="menu">
+      {#if DESKTOP_PUBLISHED}
+        <p class="section"><img src="/img/feega-desktop.png" alt="" width="20" height="20" />desktop app</p>
+        {#each DESKTOP_ITEMS as item (item.target)}
+          <a role="menuitem" href={item.href} {...eventAttrs('download_click', { target: item.target, place })}><span class="logo">{@html item.icon}</span><span>{item.label}</span></a>
+        {/each}
+        <p class="section">editor extension</p>
+      {/if}
       {#each options as option (option.label)}
         <button role="menuitem" type="button" onclick={() => choose(option)} {...installOptionAttrs(option, place)}>
           <span class="logo">{@html EDITOR_ICONS[option.label] ?? ''}</span>
@@ -50,15 +63,7 @@
           {#if option.command && copied}<span class="done">copied</span>{/if}
         </button>
       {/each}
-      {#if DESKTOP_PUBLISHED}
-        <p class="section"><img src="/img/feega-desktop.png" alt="" width="20" height="20" />desktop app (beta)</p>
-        <div class="field"><CommandField command={DESKTOP_INSTALL_COMMAND} /></div>
-        {#each DESKTOP_DMGS as dmg (dmg.arch)}
-          <a role="menuitem" href={dmg.href} {...eventAttrs('download_click', { target: `dmg ${dmg.arch.toLowerCase()}`, place })}><span class="logo">{@html APPLE_ICON}</span><span>dmg · {dmg.arch.toLowerCase()}</span></a>
-        {/each}
-        <p class="hint">macOS blocks the dmg. allow it in privacy & security, open anyway.</p>
-      {/if}
-      <a role="menuitem" class="all" href={DOWNLOAD_PATH} {...eventAttrs('download_click', { target: 'download_page', place })}>All download options →</a>
+      <a role="menuitem" class="all" href={DOWNLOAD_PATH} {...eventAttrs('download_click', { target: 'download_page', place })}>all download options →</a>
     </div>
   {/if}
 </div>
@@ -157,6 +162,12 @@
     font-size: 13px;
   }
 
+  .section:first-child {
+    margin-top: 2px;
+    padding-top: 0;
+    border-top: 0;
+  }
+
   .section {
     display: flex;
     align-items: center;
@@ -175,9 +186,6 @@
     line-height: 1.35;
   }
 
-  .field {
-    margin: 2px 4px 6px;
-  }
 
   .section img {
     border-radius: 4px;
@@ -188,5 +196,18 @@
     border-top: 1px solid rgb(255 255 255 / 0.1);
     border-radius: 0;
     color: rgb(255 255 255 / 0.7);
+  }
+
+  .os {
+    display: inline-flex;
+    width: 1.05em;
+    height: 1.05em;
+    margin-right: 0.45em;
+    vertical-align: -0.15em;
+  }
+
+  .os :global(svg) {
+    width: 100%;
+    height: 100%;
   }
 </style>

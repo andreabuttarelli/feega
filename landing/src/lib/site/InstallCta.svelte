@@ -1,11 +1,21 @@
 <script lang="ts">
-  import { primaryCta, secondaryCtas, starCta } from './install';
+  import { onMount } from 'svelte';
+  import { secondaryCtas, starCta } from './install';
+  import { detectOs, downloadFor, Os } from './desktop-download';
+  import { DOWNLOAD_PATH } from './links';
   import InstallMenu from './InstallMenu.svelte';
   import { eventAttrs } from './analytics/attrs';
 
   let { id }: { id: string } = $props();
 
-  const primary = primaryCta();
+  let os = $state(Os.Unknown);
+
+  const download = $derived(downloadFor(os));
+
+  onMount(() => {
+    os = detectOs(navigator.userAgent);
+  });
+
   const secondary = secondaryCtas();
 
   const HERO_FACTS = ['free, forever', 'every edit a diff', 'no AI inside, no credits'] as const;
@@ -13,7 +23,7 @@
 
 <div class="install" data-agent-id={id}>
   <div class="buttons">
-    <InstallMenu label={primary.label} place={id} />
+    <InstallMenu {download} place={id} />
     <a class="star" href={starCta.href} {...eventAttrs('github_click', { place: id })}>{starCta.label}</a>
   </div>
   <p class="more">

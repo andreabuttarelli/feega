@@ -89,12 +89,13 @@ describe('llms.txt', () => {
 });
 
 describe('llms surfaces', () => {
-  it('states editors, terminal, desktop and Cloud as coming soon, without a download link', () => {
+  it('states editors and terminal as available, the desktop app on three systems with the download page, and Cloud as coming soon, without a direct asset link', () => {
     for (const text of [llmsTxt(), llmsFullTxt()]) {
       expect(text).toContain('## Where it runs');
       expect(text).toMatch(/Cursor, Windsurf and VSCodium/);
       expect(text).toContain('`npx feega`');
-      expect(text).toMatch(/Desktop app: coming soon/);
+      expect(text).toMatch(/Desktop app: macOS, Windows \(beta\) and Linux, at https:\/\/www\.feega\.app\/download/);
+      expect(text).not.toMatch(/Desktop app: coming soon/);
       expect(text).toMatch(/Feega Cloud: coming soon/);
       expect(text).not.toMatch(/\.dmg|desktop-latest/);
     }
