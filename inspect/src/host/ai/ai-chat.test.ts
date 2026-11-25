@@ -73,7 +73,8 @@ function setup({ flags = [], confirmed = true, saved = [], ready = [], failing }
     now: () => ++clock,
     newId: () => `chat-${++ids}`,
     created: (chats, live) => void created.push([chats, live]),
-    configured: (category, value) => void configured.push([category, value])
+    configured: (category, value) => void configured.push([category, value]),
+    mcp: () => [{ name: 'feega', command: '/usr/bin/node', args: ['/ext/mcp.cjs'], env: { FEEGA_PROJECT: root } }]
   });
   const rows = (): ChatRow[] => sent.flatMap((m) => (m.kind === ToView.AiChats ? [m.chats] : [])).at(-1) ?? [];
   const snapshot = () => sent.flatMap((m) => (m.kind === ToView.AiChat ? [m] : [])).at(-1);
@@ -109,6 +110,57 @@ describe('the context the agent receives', () => {
 
     const reply = t.events().flatMap((e) => (e.kind === AgentEventKind.Text ? [e.text] : [])).join('');
     expect(reply).toBe('echo');
+    t.chat.close();
+  });
+});
+
+describe('what the agent can see', () => {
+  const said = (t: ReturnType<typeof setup>) => t.events().flatMap((e) => (e.kind === AgentEventKind.Text ? [e.text] : [])).join('');
+
+  it('starts the agent with the editor tools', async () => {
+    const t = setup();
+
+    await t.chat.start(AcpId.OpenCode);
+    await t.chat.send('mcp', null);
+    await done(t, 1);
+
+    expect(JSON.parse(said(t))).toMatchObject([{ name: 'feega', command: '/usr/bin/node' }]);
+    t.chat.close();
+  });
+
+  it('sends the screenshots with the message', async () => {
+    const t = setup({ flags: ['images'] });
+
+    await t.chat.start(AcpId.OpenCode);
+    await t.chat.send('seen', null, ['iVBORw0K']);
+    await done(t, 1);
+
+    expect(said(t)).toBe('image/png:iVBORw0K');
+    t.chat.close();
+  });
+
+  it('tells the panel whether the agent takes images', async () => {
+    const takes = setup({ flags: ['images'] });
+    const refuses = setup();
+
+    await takes.chat.start(AcpId.OpenCode);
+    await refuses.chat.start(AcpId.OpenCode);
+
+    const imagesOf = (t: ReturnType<typeof setup>) => t.sent.flatMap((m) => (m.kind === ToView.AiState && m.state === AiState.Ready ? [m.images] : [])).at(-1);
+    expect(imagesOf(takes)).toBe(true);
+    expect(imagesOf(refuses)).toBe(false);
+    takes.chat.close();
+    refuses.chat.close();
+  });
+
+  it('keeps the screenshots out of the saved chat', async () => {
+    const t = setup({ flags: ['images'] });
+
+    await t.chat.start(AcpId.OpenCode);
+    await t.chat.send('hello', null, ['iVBORw0K']);
+    await done(t, 1);
+
+    expect(JSON.stringify(t.saved())).not.toContain('iVBORw0K');
     t.chat.close();
   });
 });

@@ -243,6 +243,7 @@ export enum ToHost {
   AiOpen = 'ai-open',
   AiRename = 'ai-rename',
   AiDelete = 'ai-delete',
+  AgentAnswer = 'agent-answer',
   AiRetry = 'ai-retry',
   Usage = 'usage'
 }
@@ -264,6 +265,11 @@ export type ChangeRow = { id: number; at: string; prop: string; value: string; s
 export type Prefs = { size: string; custom: number | null; barClosed: boolean; route?: string; anchor?: string; dock?: { edge: string; offset: number }; barWidth?: number; leftWidth?: number; leftClosed?: boolean; layers?: Record<string, { hidden: string[]; locked: string[] }> };
 
 export type ChatRow = { id: string; agent: AcpId; title: string; updatedAt: number; running: boolean };
+
+export enum AgentAsk {
+  Screenshot = 'screenshot',
+  Context = 'context'
+}
 
 export enum AdapterState {
   Installing = 'installing',
@@ -316,6 +322,7 @@ export enum ToView {
   AiPolicy = 'ai-policy',
   AiChats = 'ai-chats',
   AiChat = 'ai-chat',
+  AgentAsk = 'agent-ask',
   Adapters = 'adapters'
 }
 
@@ -429,7 +436,7 @@ export type HostMessage =
   | { kind: ToHost.Cursor; at: Point | null }
   | { kind: ToHost.AiList }
   | { kind: ToHost.AiStart; agent: AcpId }
-  | { kind: ToHost.AiSend; text: string; context: string | null }
+  | { kind: ToHost.AiSend; text: string; context: string | null; images: string[] }
   | { kind: ToHost.AiCancel }
   | { kind: ToHost.Usage; event: WebviewUsage; dims?: WebviewUsageDims }
   | { kind: ToHost.AiAnswer; id: string; optionId: string | null }
@@ -439,7 +446,8 @@ export type HostMessage =
   | { kind: ToHost.AiOpen; chat: string }
   | { kind: ToHost.AiRename; chat: string; title: string }
   | { kind: ToHost.AiDelete; chat: string }
-  | { kind: ToHost.AiRetry };
+  | { kind: ToHost.AiRetry }
+  | { kind: ToHost.AgentAnswer; id: number; png: string | null; text: string | null };
 
 export type Authored = HostMessage & { by?: Author };
 
@@ -474,12 +482,13 @@ export type ViewMessage =
   | { kind: ToView.PropsPreview; ask: ApplyAsk; reason: string; files: DiffFile[]; by?: Author }
   | { kind: ToView.Peers; peers: Present[] }
   | { kind: ToView.AiAgents; agents: AcpAgent[] }
-  | { kind: ToView.AiState; state: AiState; agent?: AcpId; chat?: string }
+  | { kind: ToView.AiState; state: AiState; agent?: AcpId; chat?: string; images?: boolean }
   | { kind: ToView.AiEvent; event: AgentEvent; chat?: string }
   | { kind: ToView.AiPolicy; policy: Policy }
   | { kind: ToView.AiChats; chats: ChatRow[]; active: string | null }
+  | { kind: ToView.AgentAsk; id: number; ask: AgentAsk; selection: boolean }
   | { kind: ToView.Adapters; rows: AdapterRow[] }
-  | { kind: ToView.AiChat; chat: string | null; agent?: AcpId; state: AiState; items: Item[]; modes: ModeView[]; mode: string | null; configs: ConfigView[] };
+  | { kind: ToView.AiChat; chat: string | null; agent?: AcpId; state: AiState; items: Item[]; modes: ModeView[]; mode: string | null; configs: ConfigView[]; images?: boolean };
 
 export const INSPECT = 'feega:inspect';
 export const INSPECT_RESULT = 'feega:inspect:result';
@@ -492,6 +501,8 @@ export const LOCATION = 'feega:location';
 export const BRIDGE_READY = 'feega:source-map:ready';
 export const MODE = 'feega:mode';
 export const HIDE = 'feega:hide';
+export const CAPTURE = 'feega:capture';
+export const CAPTURED = 'feega:captured';
 export const PALETTE = 'feega:palette';
 export const PALETTE_RESULT = 'feega:palette:result';
 export const TREE = 'feega:tree';

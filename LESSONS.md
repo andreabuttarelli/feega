@@ -1400,6 +1400,14 @@ non solo con la build.
 
 **Signal:** `/__feega/mount` answers 404 on Nuxt while Vue and Svelte on plain Vite mount fine. **Move:** Nuxt's own server answers before the Vite middlewares that `feegaSource` registers, so the mount routes are unreachable; the tab falls back by design. Serving them there needs a Nitro dev handler in the Nuxt layer.
 
+## Screenshot of one element comes out without its own background
+
+**Signal:** the selection crop shows the page colour where the element has its own background, while the whole-tab shot is right. **Move:** `backgroundColor` in `modern-screenshot` is painted on the cloned root, so on an element it overwrites the element's own background. Pass it only for the whole tab (`captureTab` in `packages/source-map/src/capture.js`). Check capture changes in a real browser, not jsdom.
+
+## An ACP `mcpServers` entry with a bare `node` is refused
+
+**Signal:** the agent answers `-32602` to `session/new`. **Move:** `command` must be an absolute path: use `process.execPath` with `ELECTRON_RUN_AS_NODE=1` (`editorMcp` in `inspect/src/host/ai/editor-mcp.ts`), which also runs inside the VS Code extension host.
+
 ## Worktree tests cannot find `@feega/*` or the ACP sdk
 
 **Signal:** `Failed to load url @feega/live-edit/...` in a new worktree whose `node_modules` is a symlink to the main checkout. The symlinks under `@feega` resolve to the main checkout's `packages/`, which may be another branch and lacks the new modules. **Move:** make `node_modules` a real folder of per-entry symlinks and link each `@feega/<name>` to this worktree's `packages/<name>`; install missing dependencies such as `@agentclientprotocol/sdk` outside the repo and link them.

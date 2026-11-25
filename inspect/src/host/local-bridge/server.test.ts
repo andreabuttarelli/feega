@@ -12,7 +12,7 @@ afterEach(async () => {
 });
 
 async function get(path: string, token?: string) {
-  open ??= await startBridge({ selection: () => 'Feega selection\nsource: src/Card.svelte:4:2', changes: () => [row] });
+  open ??= await startBridge({ selection: () => 'Feega selection\nsource: src/Card.svelte:4:2', changes: () => [row], screenshot: async (selection) => (selection ? 'cropped' : 'whole'), context: async () => 'Feega page\npage: /' });
   return fetch(`http://127.0.0.1:${open.port}${path}`, { headers: token === undefined ? {} : { authorization: `Bearer ${token}` } });
 }
 
@@ -29,6 +29,27 @@ describe('bridge', () => {
     const reply = await get('/changes', open!.token);
 
     expect(await reply.json()).toEqual({ changes: [row] });
+  });
+
+  it('serves the screenshot of the whole tab', async () => {
+    await get('/screenshot');
+    const reply = await get('/screenshot', open!.token);
+
+    expect(await reply.json()).toEqual({ png: 'whole' });
+  });
+
+  it('serves the screenshot of the selection only when asked', async () => {
+    await get('/screenshot');
+    const reply = await get('/screenshot?selection=1', open!.token);
+
+    expect(await reply.json()).toEqual({ png: 'cropped' });
+  });
+
+  it('serves the context block of the composer', async () => {
+    await get('/context');
+    const reply = await get('/context', open!.token);
+
+    expect(await reply.json()).toEqual({ context: 'Feega page\npage: /' });
   });
 
   it('refuses a request without the token', async () => {

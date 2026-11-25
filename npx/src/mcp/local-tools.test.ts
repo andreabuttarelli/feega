@@ -3,6 +3,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { describe, expect, it } from 'vitest';
 import type { EditorEntry, EditorRegistry } from '../../../inspect/src/host/local-bridge/editors';
 import { localTools } from './local-tools';
+import { Picture } from './tools';
 import { mcpServer } from './server';
 import type { CloudDeps } from './tools';
 
@@ -66,6 +67,40 @@ describe('local tools', () => {
     await tools.feega_selection.run({ project: '/work/blog' });
 
     expect(asked[0].url).toBe('http://127.0.0.1:4002/selection');
+  });
+
+  it('feega_screenshot returns the picture of the tab the user sees', async () => {
+    const { tools, asked } = rig([shop], { 4001: { png: 'iVBORw0K' } });
+
+    expect(await tools.feega_screenshot.run({})).toEqual(new Picture('iVBORw0K'));
+    expect(asked).toEqual([{ url: 'http://127.0.0.1:4001/screenshot', auth: 'Bearer tk-shop' }]);
+  });
+
+  it('feega_screenshot crops to the selection when asked', async () => {
+    const { tools, asked } = rig([shop], { 4001: { png: 'iVBORw0K' } });
+    await tools.feega_screenshot.run({ selection: true });
+
+    expect(asked[0].url).toBe('http://127.0.0.1:4001/screenshot?selection=1');
+  });
+
+  it('feega_screenshot says so when the editor could not draw the tab', async () => {
+    const { tools } = rig([shop], { 4001: { png: null } });
+
+    await expect(tools.feega_screenshot.run({})).rejects.toThrow('Feega could not capture the tab');
+  });
+
+  it('hands the picture to the agent as an image, not as text', async () => {
+    const { connect: ready } = rig([shop], { 4001: { png: 'iVBORw0K' } });
+    const result = (await (await ready).callTool({ name: 'feega_screenshot', arguments: {} })) as { content: { type: string; data?: string; mimeType?: string }[] };
+
+    expect(result.content).toEqual([{ type: 'image', data: 'iVBORw0K', mimeType: 'image/png' }]);
+  });
+
+  it('feega_context returns the block the composer shows', async () => {
+    const { tools, asked } = rig([shop], { 4001: { context: 'Feega page\npage: /' } });
+
+    expect(await tools.feega_context.run({})).toEqual({ context: 'Feega page\npage: /' });
+    expect(asked[0].url).toBe('http://127.0.0.1:4001/context');
   });
 
   it('feega_editors lists the running editors without tokens', async () => {

@@ -53,7 +53,7 @@ out.modes = modes ? `${modes.available.map((m: any) => m.id).join(',')} (current
 if (String(out.handshake).startsWith('ok')) {
   if (process.env.MODE) { await send({ kind: (ToHost as any).AiMode, id: process.env.MODE } as any); await sleep(500); out.modeSet = process.env.MODE; }
   const n0 = events().length;
-  await send({ kind: ToHost.AiSend, text: 'make this heading smaller', context: 'Feega selection\nsource: src/App.jsx:4:7\nelement: <h1 style="font-size:48px">Hello Feega</h1>\nOnly edit src/App.jsx. Be brief.' });
+  await send({ kind: ToHost.AiSend, text: 'make this heading smaller', context: 'Feega selection\nsource: src/App.jsx:4:7\nelement: <h1 style="font-size:48px">Hello Feega</h1>\nOnly edit src/App.jsx. Be brief.', images: [] });
   const done = await until(() => events().slice(n0).some((e) => e.kind === AgentEventKind.Done || e.kind === AgentEventKind.Failed), 240000);
   const ev = events().slice(n0);
   const text = ev.flatMap((e) => (e.kind === AgentEventKind.Text ? [e.text] : [])).join('');
@@ -74,7 +74,7 @@ if (String(out.handshake).startsWith('ok')) {
   }
   const n1 = events().length;
   if (done && out.end !== 'TIMEOUT' && !String(out.end).includes('failed')) {
-    void send({ kind: ToHost.AiSend, text: 'Count from 1 to 300, one number per line, in your reply. Do not use tools.', context: null });
+    void send({ kind: ToHost.AiSend, text: 'Count from 1 to 300, one number per line, in your reply. Do not use tools.', context: null, images: [] });
     await until(() => events().length > n1, 60000);
     await sleep(1500);
     await send({ kind: ToHost.AiCancel });

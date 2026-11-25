@@ -1,7 +1,7 @@
 import type { PropControl, Variant } from './prop-controls';
 import type { ElementState } from '@feega/live-edit/element-state';
 import type { Apply } from '@feega/live-edit/themes';
-import { BRIDGE_READY, INSPECT, INSPECT_RESULT, LOCAL_ORIGIN, LOCATION, MODE, PREVIEW, PREVIEW_CLEAR, PREVIEW_CLEAR_ALL, PREVIEW_SETTLE, PREVIEW_SETTLED, SCROLL, SCROLLED, REVEAL, FOCUS, FOCUS_CANVAS, FOCUS_ZOOM, FOCUS_ZOOMED, FOCUSED, MOUNT_PROPS, MOUNT_STATUS, HIDE, PALETTE, PALETTE_RESULT, type Palette, TREE, TREE_RESULT, type LayerNode, TEXT_DONE, TEXT_EDIT, TEXT_RESTORE, TRACK, TRACKED, LEAVE, FORCE, THEME, type Slot, type Mode, type Move, type Pick, type Source } from '../messages';
+import { BRIDGE_READY, CAPTURE, CAPTURED, INSPECT, INSPECT_RESULT, LOCAL_ORIGIN, LOCATION, MODE, PREVIEW, PREVIEW_CLEAR, PREVIEW_CLEAR_ALL, PREVIEW_SETTLE, PREVIEW_SETTLED, SCROLL, SCROLLED, REVEAL, FOCUS, FOCUS_CANVAS, FOCUS_ZOOM, FOCUS_ZOOMED, FOCUSED, MOUNT_PROPS, MOUNT_STATUS, HIDE, PALETTE, PALETTE_RESULT, type Palette, TREE, TREE_RESULT, type LayerNode, TEXT_DONE, TEXT_EDIT, TEXT_RESTORE, TRACK, TRACKED, LEAVE, FORCE, THEME, type Slot, type Mode, type Move, type Pick, type Source } from '../messages';
 
 export enum FocusMode {
   Mount = 'mount',
@@ -13,6 +13,8 @@ export type ZoomRequest = { mode: 'fit' } | { mode: 'set' | 'by'; value: number 
 export type MountStatus = { status: 'ready' | 'error'; reason?: string; controls: PropControl[] | null; props: Record<string, unknown> };
 
 type Inspected = { source: Source; component: Source | null; html: string; rect: Pick['rect']; styles: Record<string, string>; inherited?: Record<string, string>; classes: string; rem: number; viewport: number; ownText: boolean; inlineText: boolean; elements: number; name: string; parentWidth: number; instances: number; instanceIndex: number; usage: Pick['usage']; classCount: number; ancestors: Pick['ancestors']; inner?: string; page?: Pick['page']; attributes?: Pick['attributes']; states?: string[] };
+
+export const CAPTURE_TIMEOUT_MS = 10000;
 
 const TAG = /^<([a-zA-Z][\w-]*)/;
 const SOURCE_ATTR = 'data-feega-src';
@@ -46,6 +48,7 @@ enum Target {
 
 export function pageBridge(frame: () => HTMLIFrameElement | null, on: PageEvents) {
   const waiting = new Map<number, (pick: Pick | null) => void>();
+  const drawing = new Map<number, (png: string | null) => void>();
   let next = 0;
   let inFocus = false;
 
@@ -101,6 +104,11 @@ export function pageBridge(frame: () => HTMLIFrameElement | null, on: PageEvents
       on.text(data.source, data.text, data.was);
       return;
     }
+    if (data?.type === CAPTURED) {
+      drawing.get(data.id)?.(data.png ?? null);
+      drawing.delete(data.id);
+      return;
+    }
     if (event.data?.type !== INSPECT_RESULT) {
       return;
     }
@@ -124,7 +132,17 @@ export function pageBridge(frame: () => HTMLIFrameElement | null, on: PageEvents
     });
   }
 
+  function capture(source: Source | null, index = 0): Promise<string | null> {
+    const id = ++next;
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => (drawing.delete(id), resolve(null)), CAPTURE_TIMEOUT_MS);
+      drawing.set(id, (png) => (clearTimeout(timer), resolve(png)));
+      send({ type: CAPTURE, id, selector: source ? selectorOf(source) : undefined, index });
+    });
+  }
+
   return {
+    capture,
     at: (x: number, y: number) => inspect({ x, y }),
     move: (from: Source, move: Move) => inspect({ from: sourceText(from), move }),
     again: (source: Source, index?: number) => inspect({ selector: selectorOf(source), index }),

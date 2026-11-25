@@ -6,6 +6,7 @@ import { trackRects } from './track.js';
 import { keepScroll } from './reload-restore.js';
 import { applyTheme, keepTheme, themeNow, watchScheme } from './theme-switch.js';
 import { watchPageMount } from './page-mount.js';
+import { CAPTURE, CAPTURED, captureTab, loadRenderer } from './capture.js';
 import { FORCED_REBUILD_MS, forceState, forcedNow, keepForced, settleForced, statesOf } from './forced-state.js';
 
 export const INSPECT = 'feega:inspect';
@@ -47,7 +48,7 @@ const TREE_REFRESH_MS = 150;
 const TREE_ATTRIBUTES = ['class', 'id', 'style', SOURCE_ATTR];
 const THEME_REBUILD_MS = 100;
 
-export function installBridge(win, { nested = false, emit = null, twin = null } = {}) {
+export function installBridge(win, { nested = false, emit = null, twin = null, render = null } = {}) {
   if (win[INSTALLED]) {
     return;
   }
@@ -125,6 +126,13 @@ export function installBridge(win, { nested = false, emit = null, twin = null } 
     [FOCUS_CANVAS]: (request) => tab.canvas(request),
     [FOCUS_ZOOM]: (request) => tab.zoom(request),
     [LEAVE]: () => scroll.leave(),
+    [CAPTURE]: (request) => {
+      const answer = reply;
+      captured(win, request, render).then(
+        (png) => answer({ type: CAPTURED, id: request.id, png }),
+        (error) => answer({ type: CAPTURED, id: request.id, error: error?.message ?? String(error) })
+      );
+    },
     [TRACK]: (request) => tracker.follow(request.slot, request.source, request.index),
     [TREE]: () => {
       treeWanted = true;
@@ -172,6 +180,10 @@ export function installBridge(win, { nested = false, emit = null, twin = null } 
     reportRoutes(win);
   }
   toParent({ type: READY, path: win.location.pathname + win.location.search, restored: scroll.restored });
+}
+
+async function captured(win, request, render) {
+  return captureTab(win, request, render ?? (await loadRenderer()));
 }
 
 function reportRoutes(win) {

@@ -43,7 +43,7 @@ function setup(installed: string[] = ['/bin/opencode'], confirmed = true) {
   const open: OpenAgent = (launch, deps) => (launched.push(launch), openAcpAgent({ command: process.execPath, args: [FAKE] }, deps));
   const platform = {
     version: '1',
-    launcher: '',
+    launcher: '/ext/dist/launcher',
     send: (message: ViewMessage) => void sent.push(message),
     receive: (h: (message: HostMessage) => unknown) => void (handle = h),
     settings: () => ({}),
@@ -75,7 +75,7 @@ describe('the AI panel in the session', () => {
     const { send, events, states, session } = setup();
 
     await send({ kind: ToHost.AiStart, agent: AcpId.OpenCode });
-    await send({ kind: ToHost.AiSend, text: 'hello', context: null });
+    await send({ kind: ToHost.AiSend, text: 'hello', context: null, images: [] });
     await eventually(() => events().some((e) => e.kind === AgentEventKind.Done));
 
     expect(events().filter((e) => e.kind === AgentEventKind.Text).map((e) => (e.kind === AgentEventKind.Text ? e.text : '')).join('')).toBe('Hello');
@@ -88,7 +88,7 @@ describe('the AI panel in the session', () => {
     writeFileSync(join(dir, 'ctx.txt'), 'x');
 
     await send({ kind: ToHost.AiStart, agent: AcpId.OpenCode });
-    await send({ kind: ToHost.AiSend, text: 'read ctx.txt', context: `Feega selection\nsource: src/Page.svelte:1:1` });
+    await send({ kind: ToHost.AiSend, text: 'read ctx.txt', context: `Feega selection\nsource: src/Page.svelte:1:1`, images: [] });
     await eventually(() => events().some((e) => e.kind === AgentEventKind.Done || e.kind === AgentEventKind.Failed));
 
     expect(events().some((e) => e.kind === AgentEventKind.Text && e.text === 'x')).toBe(true);
@@ -99,7 +99,7 @@ describe('the AI panel in the session', () => {
     const { send, events, sent, session, read } = setup();
     await send({ kind: ToHost.AiStart, agent: AcpId.OpenCode });
 
-    await send({ kind: ToHost.AiSend, text: 'write src/Page.svelte', context: null });
+    await send({ kind: ToHost.AiSend, text: 'write src/Page.svelte', context: null, images: [] });
     await eventually(() => events().some((e) => e.kind === AgentEventKind.Permission));
     const ask = events().find((e) => e.kind === AgentEventKind.Permission)!;
     expect(read('src/Page.svelte')).toBe('<h1>Hi</h1>\n');
@@ -116,12 +116,24 @@ describe('the AI panel in the session', () => {
     const { send, sent, dir, session } = setup();
 
     await send({ kind: ToHost.AiStart, agent: AcpId.OpenCode });
-    await send({ kind: ToHost.AiSend, text: 'echo', context: 'Feega page\npage: /pricing' });
+    await send({ kind: ToHost.AiSend, text: 'echo', context: 'Feega page\npage: /pricing', images: [] });
     await eventually(() => sent.some((m) => m.kind === ToView.AiEvent && m.event.kind === AgentEventKind.Done));
 
     const reply = sent.flatMap((m) => (m.kind === ToView.AiEvent && m.event.kind === AgentEventKind.Text ? [m.event.text] : [])).join('');
     expect(reply).toContain('page: /pricing');
     expect(reply).toContain(`project: ${dir}`);
+    await session.stop();
+  });
+
+  it('starts the agent with the Feega tools of this project', async () => {
+    const { send, sent, dir, session } = setup();
+
+    await send({ kind: ToHost.AiStart, agent: AcpId.OpenCode });
+    await send({ kind: ToHost.AiSend, text: 'mcp', context: null, images: [] });
+    await eventually(() => sent.some((m) => m.kind === ToView.AiEvent && m.event.kind === AgentEventKind.Done));
+
+    const reply = sent.flatMap((m) => (m.kind === ToView.AiEvent && m.event.kind === AgentEventKind.Text ? [m.event.text] : [])).join('');
+    expect(JSON.parse(reply)).toEqual([{ name: 'feega', command: process.execPath, args: ['/ext/dist/launcher/mcp.cjs'], env: expect.arrayContaining([{ name: 'FEEGA_PROJECT', value: dir }, { name: 'ELECTRON_RUN_AS_NODE', value: '1' }]) }]);
     await session.stop();
   });
 
@@ -156,7 +168,7 @@ describe('the AI panel in the session', () => {
 
 const turn = async (t: ReturnType<typeof setup>, prompt: string) => {
   await t.send({ kind: ToHost.AiStart, agent: AcpId.OpenCode });
-  await t.send({ kind: ToHost.AiSend, text: prompt, context: null });
+  await t.send({ kind: ToHost.AiSend, text: prompt, context: null, images: [] });
   await eventually(() => t.events().some((e) => e.kind === AgentEventKind.Done));
 };
 
