@@ -5,7 +5,9 @@ export enum View {
   Focus = 'focus'
 }
 
-export type Focus = { name: string; source: Source; index: number };
+export type FocusUsage = { at: Source; which: { index: number; count: number } };
+
+export type Focus = { name: string; source: Source; index: number; usage: FocusUsage | null };
 
 type Row = Omit<LayerNode, 'tag' | 'display' | 'direction' | 'position' | 'children'>;
 
@@ -21,13 +23,13 @@ const ESCAPE = 'escape';
 
 const nameOfFile = (file: string) => file.split('/').pop()!.replace(/\.[^.]+$/, '');
 
-export const focusOf = (pick: Pick): Focus | null => (pick.component ? { name: nameOfFile(pick.source.file), source: pick.source, index: pick.instanceIndex } : null);
+export const focusOf = (pick: Pick): Focus | null => (pick.component ? { name: nameOfFile(pick.source.file), source: pick.source, index: pick.instanceIndex, usage: { at: pick.component, which: pick.usage } } : null);
 
 export function rowFocus(node: Row): Focus | null {
   if (!node.component || !node.source) {
     return null;
   }
-  return { name: node.name, source: node.source, index: node.instance };
+  return { name: node.name, source: node.source, index: node.instance, usage: null };
 }
 
 export function focusKeyOf(key: string, state: { focused: boolean; available: boolean }): FocusKey | null {

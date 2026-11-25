@@ -40,6 +40,7 @@
   import FocusTabs from './FocusTabs.svelte';
   import ComponentProps from './ComponentProps.svelte';
   import { propTally } from './focus-usage';
+  import { applyAskOf } from './apply-plan';
   import { controlsOf, variantsOf, type PropControl, type PropValue } from './prop-controls';
   import { FocusMode } from './page-bridge';
   import { FocusKey, SNAPSHOT_NOTICE, View, focusKeyOf, focusOf, rowFocus, type Focus } from './focus';
@@ -324,7 +325,7 @@
     moved: (path) => (visited(path), bridge.tree()),
     tree: (tree) => ((layers = tree), askPalette()),
     mounted: (status) => {
-      mount = { controls: controlsOf(status.controls, status.props), values: status.props };
+      mount = { controls: controlsOf(status.controls, status.props), values: status.props, touched: mount?.touched ?? [] };
       sendProps();
     },
     focused: (count, mode, reason) => {
@@ -631,6 +632,7 @@
     [ToView.Reload]: () => reloadAfterRestart(),
     [ToView.Impact]: (m) => (m.id === impactId ? (impact = m.impact) : impact),
     [ToView.Preview]: (m) => (held = heldOf(m)),
+    [ToView.PropsPreview]: (m) => (held = heldOf(m)),
     [ToView.Status]: (m) => (problem = { text: m.text }),
     [ToView.Edited]: (m) => {
       const unsavedText = textPending;
@@ -1064,7 +1066,7 @@
     }
   }
 
-  let mount = $state<{ controls: PropControl[]; values: Record<string, unknown> } | null>(null);
+  let mount = $state<{ controls: PropControl[]; values: Record<string, unknown>; touched: string[] } | null>(null);
   let showGrid = $state(false);
   let snapshotReason = $state<string | null>(null);
   const variants = $derived(variantsOf(mount?.controls ?? []));
@@ -1099,7 +1101,7 @@
       propsChanged.add(control.kind);
     }
     const { [name]: _, ...rest } = mount.values;
-    mount = { ...mount, values: value === undefined ? rest : { ...rest, [name]: value } };
+    mount = { ...mount, values: value === undefined ? rest : { ...rest, [name]: value }, touched: mount.touched.includes(name) ? mount.touched : [...mount.touched, name] };
     sendProps();
   }
 
@@ -1112,6 +1114,15 @@
   }
 
   let focus = $state<Focus | null>(null);
+
+  const applyPlan = $derived(focus && mount ? applyAskOf({ focus, controls: mount.controls, values: mount.values, touched: mount.touched }) : null);
+
+  function applyToPage() {
+    if (applyPlan) {
+      const { skipped: _skipped, ...ask } = $state.snapshot(applyPlan);
+      toHost({ kind: ToHost.ApplyProps, ask });
+    }
+  }
   let viewing = $state(View.Page);
   let reopening = false;
   let tabsH = $state(0);
@@ -1541,7 +1552,7 @@
       </Tabs.List>
       <Tabs.Content value={Tab.Properties}>
         {#if mount && viewing === View.Focus && mount.controls.length}
-          <ComponentProps controls={mount.controls} values={mount.values} grid={showGrid} {variants} onchange={setProp} ongrid={setGrid} />
+          <ComponentProps controls={mount.controls} values={mount.values} grid={showGrid} {variants} apply={{ ready: Boolean(applyPlan), usage: Boolean(focus?.usage), skipped: applyPlan?.skipped ?? [] }} onchange={setProp} ongrid={setGrid} onapply={applyToPage} />
         {/if}
         {#if several}
           <div class="what" data-testid="multi-selection">

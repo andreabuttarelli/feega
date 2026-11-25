@@ -1,11 +1,15 @@
 <script lang="ts">
   import { EDITORS, INVALID, Input, type PropControl, type PropValue, type Variants } from './prop-controls';
 
-  type Props = { controls: PropControl[]; values: Record<string, unknown>; grid: boolean; variants: Variants; onchange: (name: string, value: PropValue | undefined) => void; ongrid: (on: boolean) => void };
+  type Apply = { ready: boolean; usage: boolean; skipped: string[] };
+  type Props = { controls: PropControl[]; values: Record<string, unknown>; grid: boolean; variants: Variants; apply: Apply; onchange: (name: string, value: PropValue | undefined) => void; ongrid: (on: boolean) => void; onapply: () => void };
 
-  let { controls, values, grid, variants, onchange, ongrid }: Props = $props();
+  let { controls, values, grid, variants, apply, onchange, ongrid, onapply }: Props = $props();
 
   let invalid = $state<Record<string, boolean>>({});
+
+  const applyTitle = $derived(!apply.usage ? 'Select the instance on the page to write its props back' : !apply.ready ? 'Edit a prop first' : 'Write the edited props into the source where this instance is used');
+  const skippedNote = $derived(apply.skipped.length ? `Not written: ${apply.skipped.join(', ')} (callbacks and children stay in code).` : null);
 
   const shown = $derived(variants.variants?.length ?? 0);
   const note = $derived(variants.dropped.length ? `Showing ${shown} of ${variants.total} combinations. Left out: ${variants.dropped.join(', ')}.` : `${shown} combinations.`);
@@ -25,6 +29,10 @@
     {#if variants.variants}
       <button type="button" class="grid" class:on={grid} aria-pressed={grid} data-testid="variants-toggle" onclick={() => ongrid(!grid)}>Variants</button>
     {/if}
+  </div>
+  <div class="apply">
+    <button type="button" class="grid" data-testid="apply-props" disabled={!apply.ready} title={applyTitle} onclick={onapply}>Apply to page</button>
+    {#if skippedNote}<span class="note" data-testid="apply-skipped">{skippedNote}</span>{/if}
   </div>
   {#if grid && variants.variants}<p class="note" data-testid="variants-note">{note}</p>{/if}
   {#each controls as control (control.name)}
@@ -91,6 +99,18 @@
   .grid.on {
     background: var(--ui-input);
     color: var(--ui-text);
+  }
+
+  .apply {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 0 12px 6px;
+  }
+
+  .grid:disabled {
+    opacity: 0.5;
   }
 
   .note {
