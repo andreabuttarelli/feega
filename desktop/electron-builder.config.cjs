@@ -1,4 +1,4 @@
-const signed = Boolean(process.env.CSC_LINK);
+const signed = process.env.CSC_IDENTITY_AUTO_DISCOVERY === 'true';
 const notarized = signed && Boolean(process.env.APPLE_TEAM_ID);
 
 const config = {
