@@ -4,6 +4,8 @@ import { PixelIcon } from '@feega/pixel-icons/pixel';
 export type Slide = { step: OnboardingStep; icon: PixelIcon; title: string; body: string; more?: string };
 
 export const MCP_COMMAND = 'claude mcp add feega -- npx -y feega mcp';
+export const LOCAL_EMPTY = 'No coding agent found on this machine yet.';
+export const LOCAL_LATER = 'You can connect more agents later from the chat picker.';
 export const SKILL_COMMAND = 'npx skills add andreabuttarelli/feega';
 export const SKILL_TITLE = 'Install the Feega skill';
 export const SKILL_DETAIL = 'Lets your agent drive Feega';
@@ -24,6 +26,12 @@ export const SLIDES: Slide[] = [
     title: 'you design, your agent codes',
     body: 'Same files, your styling: CSS or Tailwind. Undo anything. No AI, no tokens.',
     more: 'Design mode picks and edits. Navigate mode lets you use your app.'
+  },
+  {
+    step: OnboardingStep.LocalAgents,
+    icon: PixelIcon.Cursor,
+    title: 'agents on this machine',
+    body: "Feega's local chat runs on the coding agents installed here."
   },
   {
     step: OnboardingStep.Agents,

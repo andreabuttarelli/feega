@@ -14,7 +14,7 @@
   import { MOVES, Shortcut, isMac, needsBareFocus, shortcutOf, typingIn } from './selection-keys';
   import { Click, NONE, Surface, clickOf, contains, extend, keyOf, only, primary, refOf, siblingsOf, toggle, visibleRows, type Selection } from './selection';
   import type { SupportItem } from '../support';
-  import { AccountState, type AgentId, Mode, Onboarding, OnboardingOutcome, Move, ServerAction, Slot, type ChangeRow, type FontChoice, type LayerNode, type LibraryEntry, type Palette, ServerState, type ServerInfo, Styling, ToHost, ToView, WebviewUsage, type AdapterRow, type Impact, type ImpactAsk, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
+  import { AccountState, type AgentId, Mode, Onboarding, OnboardingOutcome, OnboardingStep, Move, ServerAction, Slot, type ChangeRow, type FontChoice, type LayerNode, type LibraryEntry, type Palette, ServerState, type ServerInfo, Styling, ToHost, ToView, WebviewUsage, type AdapterRow, type Impact, type ImpactAsk, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
   import { fromHost, inVscode, toHost } from './host';
   import { imageSaved } from './image-file.svelte';
   import { iconDrawn, iconsFound } from './icon-search.svelte';
@@ -82,7 +82,7 @@
   import CommentsList from './CommentsList.svelte';
   import AiPanel from './AiPanel.svelte';
   import { answerAsk } from './agent-ask';
-  import { aiHeard } from './ai-state.svelte';
+  import { ai, aiHeard } from './ai-state.svelte';
   import { withImpact } from './ai-context';
   import type { CloudComment, CloudRevisions, CommentDraft } from '../host/cloud-api';
   import { pinIdOf, pinSlot, pinsOf, sourceOfComment, threadsOf } from './comments';
@@ -501,6 +501,13 @@
   function sendComment(draft: CommentDraft) {
     toHost({ kind: ToHost.CommentAdd, draft });
     composing = false;
+  }
+
+  function heardStep(step: OnboardingStep) {
+    toHost({ kind: ToHost.OnboardingStep, step });
+    if (step === OnboardingStep.LocalAgents) {
+      toHost({ kind: ToHost.AiList });
+    }
   }
 
   function copyText(text: string) {
@@ -1749,7 +1756,7 @@
 </main>
 
 {#if onboarding === Onboarding.Pending}
-  <OnboardingDialog {account} {support} {agents} {adapters} oncopy={copyText} onlink={(url) => toHost({ kind: ToHost.External, url })} onaccount={(kind) => toHost({ kind })} onsupport={(item) => toHost({ kind: ToHost.Support, item })} onstep={(step) => toHost({ kind: ToHost.OnboardingStep, step })} ondone={finishOnboarding} />
+  <OnboardingDialog {account} {support} {agents} local={ai.agents} {adapters} oncopy={copyText} onlink={(url) => toHost({ kind: ToHost.External, url })} onaccount={(kind) => toHost({ kind })} onsupport={(item) => toHost({ kind: ToHost.Support, item })} onstep={heardStep} ondone={finishOnboarding} />
 {/if}
 
 <style>

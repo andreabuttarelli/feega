@@ -5,6 +5,7 @@ import { STACKS, Stack } from '../../../cli/lib/scaffold/stacks';
 import { TEMPLATES, TEMPLATE_LABELS, Template } from '../../../cli/lib/scaffold/templates';
 import { Step } from '../../../cli/lib/scaffold/step';
 import { el, pill, run, type View } from './dom';
+import type { AcpAgent } from '../../../inspect/src/host/ai/acp-agents';
 import { onboardingView, skipOnboarding, type OnboardingDeps } from './onboarding';
 import { Link, NodeStatus, TabStatus, UpdateState, type RecentInfo, type ShellState, type TabInfo } from '../main/types';
 
@@ -35,6 +36,7 @@ type Bridge = {
   replayOnboarding: () => Promise<void>;
   openUrl: (url: string) => Promise<void>;
   copy: (text: string) => Promise<void>;
+  detectAgents: () => Promise<AcpAgent[]>;
   onSettings: (listener: () => void) => void;
   onState: (listener: (state: ShellState) => void) => void;
 };
@@ -470,6 +472,7 @@ const onboardingDeps: OnboardingDeps = {
   cancelSignIn: () => bridge.cancelSignIn(),
   openUrl: (url) => bridge.openUrl(url),
   copy: (text) => bridge.copy(text),
+  detectAgents: () => bridge.detectAgents(),
   finish: async () => {
     route = Route.Home;
     await bridge.finishOnboarding();

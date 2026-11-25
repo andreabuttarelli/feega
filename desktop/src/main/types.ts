@@ -71,5 +71,6 @@ export enum Channel {
   FinishOnboarding = 'finish-onboarding',
   ReplayOnboarding = 'replay-onboarding',
   OpenUrl = 'open-url',
-  Copy = 'copy'
+  Copy = 'copy',
+  DetectAgents = 'detect-agents'
 }

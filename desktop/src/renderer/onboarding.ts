@@ -2,8 +2,10 @@ import { pixelSvg } from '@feega/pixel-icons/pixel';
 import { AgentId, OnboardingStep } from '../../../inspect/src/messages';
 import { SUPPORT_ITEMS, type SupportEntry, type SupportItem } from '../../../inspect/src/support';
 import { AGENT_LOGOS } from '../../../inspect/src/webview/agent-logos';
+import type { AcpAgent } from '../../../inspect/src/host/ai/acp-agents';
+import { Detection, overviewOf } from '../../../inspect/src/webview/onboarding-agents';
 import { SNACKBAR_TEXT, copyFeedback, type Feedback } from '../../../inspect/src/webview/onboarding-copy';
-import { FAQ_ANSWER, FAQ_QUESTION, MCP_COMMAND, MCP_DOCS_URL, SKILL_COMMAND, SKILL_DETAIL, SKILL_TITLE, SLIDES } from '../../../inspect/src/webview/onboarding-slides';
+import { LOCAL_EMPTY, LOCAL_LATER, FAQ_ANSWER, FAQ_QUESTION, MCP_COMMAND, MCP_DOCS_URL, SKILL_COMMAND, SKILL_DETAIL, SKILL_TITLE, SLIDES } from '../../../inspect/src/webview/onboarding-slides';
 import type { ShellState } from '../main/types';
 import { el, pill, run, type View } from './dom';
 
@@ -12,6 +14,7 @@ export type OnboardingDeps = {
   cancelSignIn: () => Promise<void>;
   openUrl: (url: string) => Promise<void>;
   copy: (text: string) => Promise<void>;
+  detectAgents: () => Promise<AcpAgent[]>;
   finish: () => Promise<void>;
   changed: () => void;
 };
@@ -27,6 +30,8 @@ const CHEVRON = '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" str
 
 let index = 0;
 let faqOpen = false;
+let local: AcpAgent[] | null = null;
+let detecting = false;
 let feedback: Feedback = { copied: null, snackbar: false };
 let feel: ((key: string) => void) | null = null;
 const ticked = new Set<SupportItem>();
@@ -80,6 +85,32 @@ const faq = () => {
   return root;
 };
 
+const markHtml = (mark: ReturnType<typeof overviewOf>['rows'][number]['mark']) =>
+  mark.logo ? `<svg class="onb-glyph" viewBox="${mark.logo.viewBox}" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="${mark.logo.path}"/></svg>` : `<span class="onb-glyph onb-initial" aria-hidden="true">${mark.initial}</span>`;
+
+const detect = (deps: OnboardingDeps) => {
+  if (local !== null || detecting) {
+    return;
+  }
+  detecting = true;
+  void deps.detectAgents().then((found) => {
+    local = found;
+    detecting = false;
+    deps.changed();
+  });
+};
+
+const localBody = ({ deps }: Ctx) => {
+  detect(deps);
+  if (local === null) {
+    return [];
+  }
+  const overview = overviewOf(local);
+  const empty = overview.none ? [el('p', { class: 'onb-more', text: LOCAL_EMPTY })] : [];
+  const rows = overview.rows.map((row) => el('li', { class: `onb-local-row${row.state === Detection.NotFound ? ' off' : ''}` }, el('span', { class: 'onb-mark', html: markHtml(row.mark) }), el('span', { class: 'onb-local-name', text: row.label }), el('span', { class: 'onb-local-state', text: row.state === Detection.Detected ? 'detected' : 'not found' })));
+  return [...empty, el('ul', { class: 'onb-local' }, ...rows), el('p', { class: 'onb-more', text: LOCAL_LATER })];
+};
+
 const agentsBody = ({ deps }: Ctx) => [
   agentLogos(),
   el(
@@ -127,6 +158,7 @@ const supportBody = ({ deps }: Ctx) => [
 const STEP_BODIES: Record<OnboardingStep, (ctx: Ctx) => HTMLElement[]> = {
   [OnboardingStep.Welcome]: () => [],
   [OnboardingStep.Agent]: () => [],
+  [OnboardingStep.LocalAgents]: localBody,
   [OnboardingStep.Agents]: agentsBody,
   [OnboardingStep.SignIn]: signInBody,
   [OnboardingStep.Support]: supportBody
@@ -145,7 +177,7 @@ const snackbar = () => (feedback.snackbar ? [el('div', { class: 'onb-snackbar', 
 export const skipOnboarding = (deps: OnboardingDeps) => leave(deps);
 
 export const onboardingView = (state: ShellState, deps: OnboardingDeps): View => ({
-  key: `onboarding:${index}:${state.email}:${state.signingIn}:${ticked.size}:${feedback.copied}:${feedback.snackbar}`,
+  key: `onboarding:${index}:${state.email}:${state.signingIn}:${ticked.size}:${feedback.copied}:${feedback.snackbar}:${local?.length ?? -1}`,
   build: () => {
     const slide = SLIDES[index];
     const more = slide.more ? [el('p', { class: 'onb-more', text: slide.more })] : [];

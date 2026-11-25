@@ -2,6 +2,8 @@ import { BrowserWindow, app, clipboard, dialog, ipcMain, nativeImage, nativeThem
 import { basename, join, resolve } from 'node:path';
 import { accountStore } from './account';
 import { SCHEME, acceptDeepLink, linkOfArgv } from './deep-link';
+import { acpAgents } from '../../../inspect/src/host/ai/acp-agents';
+import { machineEnv } from '../../../inspect/src/host/agents';
 import { LINKS } from './links';
 import { onboardingUrlAllowed } from './onboarding-links';
 import { installMenu } from './menu';
@@ -186,6 +188,7 @@ app.whenReady().then(() => {
     settings.replayOnboarding();
     publish();
   });
+  ipcMain.handle(Channel.DetectAgents, () => acpAgents(machineEnv()));
   ipcMain.handle(Channel.Copy, (_event, text: string) => clipboard.writeText(text));
   ipcMain.handle(Channel.OpenUrl, (_event, url: string) => (onboardingUrlAllowed(url) ? shell.openExternal(url) : undefined));
   ipcMain.handle(Channel.DismissInvite, () => {

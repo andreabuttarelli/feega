@@ -6,12 +6,14 @@
   import { AccountState, AdapterState, AgentId, OnboardingOutcome, OnboardingStep, ToHost, type AdapterRow } from '../messages';
   import type { SupportItem } from '../support';
   import { AGENT_LOGOS } from './agent-logos';
-  import { FAQ_ANSWER, FAQ_QUESTION, MCP_COMMAND, MCP_DOCS_URL, SKILL_COMMAND, SKILL_DETAIL, SKILL_TITLE, SLIDES } from './onboarding-slides';
+  import { LOCAL_EMPTY, LOCAL_LATER, FAQ_ANSWER, FAQ_QUESTION, MCP_COMMAND, MCP_DOCS_URL, SKILL_COMMAND, SKILL_DETAIL, SKILL_TITLE, SLIDES } from './onboarding-slides';
   import { SNACKBAR_TEXT, copyFeedback, type Feedback } from './onboarding-copy';
   import Pixel from '@feega/pixel-icons/Pixel.svelte';
+  import { Detection, overviewOf } from './onboarding-agents';
+  import type { AcpAgent } from '../host/ai/acp-agents';
   import SupportList from './SupportList.svelte';
 
-  let { account, support, agents, adapters, onaccount, onsupport, oncopy, onlink, onstep, ondone }: { account: { state: AccountState; email?: string }; support: SupportItem[]; agents: AgentId[]; adapters: AdapterRow[]; onaccount: (kind: ToHost.SignIn | ToHost.CancelSignIn) => void; onsupport: (item: SupportItem) => void; oncopy: (text: string) => void; onlink: (url: string) => void; onstep: (step: OnboardingStep) => void; ondone: (outcome: OnboardingOutcome) => void } = $props();
+  let { account, support, agents, local, adapters, onaccount, onsupport, oncopy, onlink, onstep, ondone }: { account: { state: AccountState; email?: string }; support: SupportItem[]; agents: AgentId[]; local: AcpAgent[]; adapters: AdapterRow[]; onaccount: (kind: ToHost.SignIn | ToHost.CancelSignIn) => void; onsupport: (item: SupportItem) => void; oncopy: (text: string) => void; onlink: (url: string) => void; onstep: (step: OnboardingStep) => void; ondone: (outcome: OnboardingOutcome) => void } = $props();
 
   const STATUS: Record<AdapterState, string> = { [AdapterState.Installing]: 'Downloading…', [AdapterState.Ready]: 'Ready', [AdapterState.Failed]: 'Could not download' };
 
@@ -32,6 +34,8 @@
 
   const slide = $derived(SLIDES[index]);
   const last = $derived(index === SLIDES.length - 1);
+  const overview = $derived(overviewOf(local));
+  const listing = $derived(slide.step === OnboardingStep.LocalAgents);
   const connecting = $derived(slide.step === OnboardingStep.Agents);
   const signing = $derived(slide.step === OnboardingStep.SignIn);
 
@@ -82,6 +86,24 @@
       <h2 id="onb-title">{slide.title}</h2>
       <p id="onb-body">{slide.body}</p>
       {#if slide.more}<p class="more">{slide.more}</p>{/if}
+
+      {#if listing}
+        {#if overview.none}<p class="more" data-testid="onboarding-local-empty">{LOCAL_EMPTY}</p>{/if}
+        <ul class="local" data-testid="onboarding-local">
+          {#each overview.rows as row (row.id)}
+            <li class="local-row" class:off={row.state === Detection.NotFound} data-testid="onboarding-local-{row.id}" data-state={row.state}>
+              {#if row.mark.logo}
+                <svg class="glyph" width="14" height="14" viewBox={row.mark.logo.viewBox} fill="currentColor" aria-hidden="true"><path d={row.mark.logo.path} /></svg>
+              {:else}
+                <span class="glyph initial" aria-hidden="true">{row.mark.initial}</span>
+              {/if}
+              <span class="local-name">{row.label}</span>
+              <span class="local-state">{row.state === Detection.Detected ? 'detected' : 'not found'}</span>
+            </li>
+          {/each}
+        </ul>
+        <p class="more">{LOCAL_LATER}</p>
+      {/if}
 
       {#if connecting}
         <ul class="agents" data-testid="onboarding-agents">
@@ -243,6 +265,61 @@
   .more {
     color: var(--ui-text-3);
     font-size: var(--ui-text-xs);
+  }
+
+  .local {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: 200px;
+    margin: 12px 0 0;
+    padding: 0;
+    overflow-y: auto;
+    list-style: none;
+    text-align: left;
+  }
+
+  .local-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 28px;
+    padding: 0 8px;
+    border-radius: var(--ui-radius-sm);
+    color: var(--ui-text);
+    font-size: var(--ui-text-xs);
+  }
+
+  .local-row.off {
+    color: var(--ui-text-3);
+  }
+
+  .local-name {
+    flex: 1;
+  }
+
+  .local-state {
+    color: var(--ui-text-3);
+  }
+
+  .local-row:not(.off) .local-state {
+    color: #30d158;
+  }
+
+  .glyph {
+    flex: none;
+  }
+
+  .initial {
+    display: inline-grid;
+    place-items: center;
+    width: 14px;
+    height: 14px;
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-input);
+    color: var(--ui-text-2);
+    font-size: 9px;
+    font-weight: 600;
   }
 
   .agents {
