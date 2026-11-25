@@ -50,7 +50,7 @@ describe('capturing the tab', () => {
     await captureTab(win, { selector: `[data-feega-src="${CARD}"]`, index: 1 }, render);
 
     expect(drawn[0].node.textContent).toBe('Two');
-    expect(drawn[0].options).not.toHaveProperty('width');
+    expect(drawn[0].options).toEqual({});
   });
 
   it('draws the whole page when the selection is not on it', async () => {

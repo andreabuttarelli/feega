@@ -31,7 +31,7 @@ const selected = (doc, { selector, index }) => {
 export async function captureTab(win, request, render) {
   const doc = win.document;
   const element = selected(doc, request);
-  const options = element ? { backgroundColor: backdropOf(win) } : tabOptions(win);
+  const options = element ? {} : tabOptions(win);
   const url = await render(element ?? doc.documentElement, options);
   return url.startsWith(PNG_PREFIX) ? url.slice(PNG_PREFIX.length) : url;
 }
