@@ -134,6 +134,7 @@ describe('UNKNOWN_CAUSES', () => {
     ['<div className={styles.a + " b"}>', true],
     ['<span className="a b">', false],
     ['<div class="a b">', false],
+    ['<h1 class="site-display" class:compact={size === Compact}>', false],
     ['<div>', false]
   ])('classOpen(%s) -> computed %s', (open, computed) => {
     expect(classOpen(open)).toBe(computed);

@@ -12,6 +12,7 @@ export type Probe = (ask: ImpactAsk) => Promise<string[] | null>;
 type Facts = { file: string; open: string | null; ask: ImpactAsk; writes: string[] | null };
 
 const LITERAL_CLASS = /\s(?:class|className)=(?:"[^"{}]*"|\{\s*(?:"[^"]*"|'[^']*'|\w+\.\w+|\w+\[['"][^'"]+['"]\])\s*\})/g;
+const CLASS_DIRECTIVE = /\sclass:[\w-]+(?:=\{[^{}]*\})?/g;
 const COMPUTED_CLASS = /\s(?::class|v-bind:class|class:[\w-]+|(?:class|className)=(?:\{|"[^"]*\{|'[^']*\{))|\{\s*\.\.\./;
 const CSS_VARIABLE = /^\s*var\(\s*--/;
 const MODULE_SHEET = /\.module\.css$/;
@@ -19,7 +20,11 @@ const SHEET = /\.css$/;
 const COMPONENT_TAG = /^<(?:[A-Z]|\w+\.)/;
 const PASCAL_BREAK = /[-_.\s]+(\w)/g;
 
-export const classOpen = (open: string): boolean => COMPUTED_CLASS.test(open.replace(LITERAL_CLASS, ''));
+export function classOpen(open: string): boolean {
+  const withoutLiterals = open.replace(LITERAL_CLASS, '');
+  const hasLiteral = withoutLiterals !== open;
+  return COMPUTED_CLASS.test(hasLiteral ? withoutLiterals.replace(CLASS_DIRECTIVE, '') : withoutLiterals);
+}
 
 export const UNKNOWN_CAUSES: { reason: string; hits: (facts: Facts) => boolean }[] = [
   { reason: 'the element is not where the page says', hits: (f) => f.open === null },
