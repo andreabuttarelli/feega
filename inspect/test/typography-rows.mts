@@ -38,11 +38,18 @@ for (const width of WIDTHS) {
     labels.add(Math.round((await row.locator('.label').boundingBox())!.x));
   }
   assert.equal(labels.size, 1, `${width}: one label column`);
+  const fieldWidth = async (name: string, selector: string) => Math.round((await section.locator(`[data-row=${name}] ${selector}`).first().boundingBox())!.width);
+  const family = await fieldWidth('font-family', '.font-field');
+  assert.equal(family, await fieldWidth('font-size', '.field'), `${width}: the font family spans the same width as the other fields`);
+  assert.equal(family, await fieldWidth('font-weight', 'button.select'), `${width}: the font family and weight share a width`);
   const clipped = await section.evaluate((el) => [...el.querySelectorAll('.row')].filter((r) => r.scrollWidth > r.clientWidth + 1).map((r) => r.getAttribute('data-row')));
   assert.deepEqual(clipped, [], `${width}: no row clips its content`);
   const cutLabels = await section.evaluate((el) => [...el.querySelectorAll('.label')].filter((l) => l.scrollWidth > l.clientWidth).map((l) => l.textContent));
   assert.deepEqual(cutLabels, [], `${width}: no label is cut`);
   await section.screenshot({ path: join(SHOTS, `typography-${width}.png`) });
+  if (width === 320) {
+    await section.locator('[data-row=font-family]').screenshot({ path: join(SHOTS, 'font-width-320.png') });
+  }
   console.log('ok', width);
 }
 
