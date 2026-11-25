@@ -1,10 +1,11 @@
 import { readFile } from 'node:fs/promises';
-import { isAbsolute, relative } from 'node:path';
+import { basename, isAbsolute, relative } from 'node:path';
 import { inside } from '@feega/live-edit/live-ask';
 import { AdapterState, AiState, ToView, type AdapterRow, type ChatRow, type ViewMessage } from '../../messages';
 import type { AgentEnv } from '../agents';
 import { AcpId, acpAgents, launchOf } from './acp-agents';
 import type { Adapters } from './adapters';
+import { alertOf, type AlertSink } from './agent-alert';
 import { isPolicy, type Policy } from './permission-policy';
 import { AgentEventKind, type AgentEvent, type AgentFiles, type AgentSession, type ConfigView, type McpServerSpec, type ModeView, type OpenAgent } from './agent-session';
 import { turnWatch, type TurnWatch } from './turn-changes';
@@ -42,6 +43,7 @@ export type AiChatDeps = {
   created: (chats: number, live: number) => void;
   configured: (category: string, value: string) => void;
   mcp: () => McpServerSpec[];
+  alerts: AlertSink;
 };
 
 const messageOf = (error: unknown): string => (error instanceof Error ? error.message : String(error));
@@ -141,7 +143,12 @@ export function aiChat(deps: AiChatDeps) {
       record.configs = event.options;
     }
     post({ kind: ToView.AiEvent, event, chat: record.id });
+    const alert = alertOf(event, { agent: labelOf(record.agent), project: basename(deps.root()), chat: record.id });
+    if (alert) {
+      void deps.alerts.raise(alert);
+    }
     if (event.kind === AgentEventKind.Done || event.kind === AgentEventKind.Failed) {
+      deps.alerts.clear(record.id);
       chat.busy = false;
       chat.live = event.kind === AgentEventKind.Failed ? null : chat.live;
       record.updatedAt = deps.now();
@@ -373,6 +380,7 @@ export function aiChat(deps: AiChatDeps) {
     const name = ask?.kind === ItemKind.Permission ? (ask.options.find((o) => o.id === optionId)?.name ?? 'Cancelled') : '';
     chat.record.items = answered(chat.record.items, id, name);
     chat.live?.answer(id, optionId);
+    deps.alerts.clear(chat.record.id);
   }
 
   return {

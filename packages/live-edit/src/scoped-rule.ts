@@ -37,6 +37,10 @@ function freeClass(source: string, base: string): string {
 
 const ruleText = (selector: string, all: Map<string, string>, indent = RULE_INDENT) => `${indent}${selector} {\n${[...all].map(([p, v]) => `${indent}${DECL_INDENT.slice(RULE_INDENT.length)}${p}: ${v};`).join('\n')}\n${indent}}`;
 
+const MINIFIED_BODY = /^\S[^\n]*$/;
+
+const inlineRule = (selector: string, all: Map<string, string>, indent: string) => `${indent}${selector}{${[...all].map(([p, v]) => `${p}:${v}`).join(';')}}`;
+
 const MIN_WIDTH = /min-width:\s*([\d.]+)px/;
 const MAX_WIDTH = /max-width:\s*([\d.]+)px/;
 
@@ -135,7 +139,8 @@ export function selectorInBody(body: string, selector: string, css: Map<string, 
     return body.slice(0, found.index!) + body.slice(found.index! + found[0].length).replace(/^\n(?=\s*\n)/, '');
   }
   if (found) {
-    return body.slice(0, found.index!) + found[1] + ruleText(selector, all, found[2]) + body.slice(found.index! + found[0].length);
+    const text = MINIFIED_BODY.test(found[3]) ? inlineRule(selector, all, found[2]) : ruleText(selector, all, found[2]);
+    return body.slice(0, found.index!) + found[1] + text + body.slice(found.index! + found[0].length);
   }
   if (!all.size) {
     return body;
@@ -175,6 +180,14 @@ const reach = (file: string, inner: string) => (INNER_REACH[file.slice(file.last
 export enum Scope {
   Element = 'element',
   Class = 'class'
+}
+
+export function ruleSelector(body: string, name: string): string | null {
+  if (hasRule(body, `.${name}`)) {
+    return `.${name}`;
+  }
+  const chains = [...body.matchAll(new RegExp(`(?:^|\\n)[ \\t]*((?:[^{},@:\\n]*[\\s>+~])?\\.${escaped(name)})\\s*\\{`, 'g'))];
+  return chains.pop()?.[1] ?? null;
 }
 
 export const hasRule = (body: string, selector: string) => new RegExp(`(^|\\n)[ \\t]*${escaped(selector)}\\s*\\{`).test(body);

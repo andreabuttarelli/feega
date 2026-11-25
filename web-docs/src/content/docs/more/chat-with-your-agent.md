@@ -62,6 +62,18 @@ The screenshot is drawn inside your page and goes from the editor to the agent o
 - **Stop** cancels the current turn.
 - Files the agent writes land in the **Changes** tab as one change each, marked with the agent's name. [Undo them](/editing/undo-and-changes/) like any other change.
 
+## Notifications
+
+When an agent finishes a turn or asks for permission and you are not looking at Feega, Feega tells you. The message names the agent and the project, never code or your prompt: "Claude Code finished in shop", "Claude Code needs permission to run a command". Stopping a turn yourself sends nothing.
+
+You are not looking when the panel is hidden or the window is in the background. In the desktop app, another tab being active counts too.
+
+- **VS Code:** a message with an **Open** button. Permission requests show as a warning. **Open** brings the panel forward and opens the chat.
+- **`npx feega`:** a browser notification. The browser asks for permission the first time. Clicking it focuses the tab and opens the chat.
+- **Desktop app:** a system notification. The dock icon shows a badge while a permission request waits, and clears it when you answer. Clicking the notification focuses the window, switches to the tab and opens the chat.
+
+Turn them off in the Feega menu under Settings, or with [`feegaInspect.notifications`](/more/settings/). `feegaInspect.notifyFinished` and `feegaInspect.notifyPermission` switch each kind off on its own.
+
 ## Chats
 
 Every chat is saved on your machine, per project, with its agent, mode and messages. Close Feega and reopen it: the chats are still there.

@@ -47,4 +47,15 @@ describe('setAttributes', () => {
     const out = await setAttributes(reading({ 'a.svelte': '<main><p/></main>\n' }), { file: 'a.svelte', line: 1, col: 1 }, { a: '1' }, 'Scene');
     expect(out.ok).toBe(false);
   });
+
+  it('writes a number as a brace expression, replacing a string or a brace', async () => {
+    const files = { 'a.tsx': 'const a = (\n  <main>\n    <Gradient uSpeed="0.1" uDensity={1} />\n  </main>\n);\n' };
+    const out = await setAttributes(reading(files), { file: 'a.tsx', line: 2, col: 3 }, {}, 'Gradient', { uSpeed: 0.3, uDensity: 2.5, uStrength: 4 });
+    expect(out.ok && out.change.after).toBe('const a = (\n  <main>\n    <Gradient uSpeed={0.3} uDensity={2.5} uStrength={4} />\n  </main>\n);\n');
+  });
+
+  it('refuses a number that is not finite', async () => {
+    const out = await setAttributes(reading({ 'a.tsx': '<Gradient />\n' }), { file: 'a.tsx', line: 1, col: 1 }, {}, undefined, { uSpeed: Number.NaN });
+    expect(out.ok).toBe(false);
+  });
 });

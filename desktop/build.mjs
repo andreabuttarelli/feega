@@ -16,6 +16,7 @@ const node = { bundle: true, platform: 'node', format: 'cjs', target: 'node20', 
 
 await build({ ...node, entryPoints: [here('src/main/main.ts')], outfile: here('dist/main.cjs') });
 await build({ ...node, entryPoints: [here('src/main/preload.ts')], outfile: here('dist/preload.cjs') });
+await build({ ...node, entryPoints: [here('src/main/view-preload.ts')], outfile: here('dist/view-preload.cjs') });
 await build({ bundle: true, platform: 'browser', format: 'iife', target: 'chrome130', entryPoints: [here('src/renderer/renderer.ts')], outfile: here('dist/renderer/renderer.js') });
 
 await mkdir(here('dist/renderer'), { recursive: true });
