@@ -174,12 +174,38 @@ describe('handleUsage', () => {
     expect(rows).toHaveLength(1);
   });
 
+  it.each(['focus_props_changed', 'focus_variants_shown'])('accepts the %s event', async (name) => {
+    const { rows, sink } = recorder();
+    const res = await handleUsage(post({ events: [event({ event: name })] }), freshClient(), sink);
+
+    expect(res.status).toBe(204);
+    expect(rows).toHaveLength(1);
+  });
+
+  it('stores the focus mode, the control kind, a prop count and the library category', async () => {
+    const { rows, sink } = recorder();
+    const res = await handleUsage(
+      post({ events: [event({ event: 'focus_opened', variant: 'focus', mode: 'mount', framework: 'next' }), event({ event: 'focus_props_changed', control: 'select', prop_count: 3 }), event({ event: 'library_insert', library_item: 'hero-split', library_category: 'section', tier: 'free' })] }),
+      freshClient(),
+      sink
+    );
+
+    expect(res.status).toBe(204);
+    expect(rows[0]).toMatchObject({ mode: 'mount', framework: 'next' });
+    expect(rows[1]).toMatchObject({ control: 'select', prop_count: 3 });
+    expect(rows[2]).toMatchObject({ library_category: 'section' });
+  });
+
   it.each([
     ['a path as a tool name', { event: 'mcp_tool_call', tool: '/Users/me/app/page.tsx' }],
     ['a class name as a property category', { event: 'edit', prop_category: 'px-4' }],
     ['a free-text config category', { event: 'ai_config_changed', category: 'my secret project' }],
     ['a path as a config choice', { event: 'ai_config_changed', choice: '/Users/me/app' }],
     ['an unknown file extension', { event: 'edit', file_ext: 'secret' }],
+    ['a free-text focus mode', { event: 'focus_opened', mode: 'my Button' }],
+    ['a prop name as a control kind', { event: 'focus_props_changed', control: 'variant' }],
+    ['a negative prop count', { event: 'focus_props_changed', prop_count: -1 }],
+    ['a free-text library category', { event: 'library_insert', library_category: 'my hero' }],
     ['a sentence as an error class', { event: 'error_host', error_class: 'Cannot read file /a/b' }]
   ])('rejects %s', async (_name, over) => {
     const { rows, sink } = recorder();
