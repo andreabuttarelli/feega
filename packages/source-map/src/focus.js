@@ -70,12 +70,25 @@ function carryAttrs(from, to) {
   }
 }
 
-export function carryPage(doc, inner) {
+const INHERITED = ['font-family', 'font-size', 'font-weight', 'font-style', 'line-height', 'letter-spacing', 'color', 'text-transform', 'direction', '-webkit-font-smoothing'];
+
+function carryText(doc, from, to) {
+  const computed = doc.defaultView.getComputedStyle(from);
+  for (const name of INHERITED) {
+    const value = computed.getPropertyValue(name);
+    if (value) {
+      to.style.setProperty(name, value);
+    }
+  }
+}
+
+export function carryPage(doc, inner, root) {
   const base = inner.createElement('base');
   base.setAttribute('href', doc.baseURI);
   inner.head.prepend(base);
   carryAttrs(doc.documentElement, inner.documentElement);
   carryAttrs(doc.body, inner.body);
+  carryText(doc, root?.parentElement ?? doc.body, inner.body);
   const have = new Set([...inner.querySelectorAll(STYLESHEETS)].map(keyOf));
   for (const node of doc.querySelectorAll(STYLESHEETS)) {
     if (!have.has(keyOf(node))) {
@@ -221,7 +234,7 @@ export function focusTab(win, { install, prepare, report }) {
       if (frame === mine) {
         loaded = true;
         if (mode === FocusMode.Mount) {
-          carryPage(win.document, mine.contentDocument);
+          carryPage(win.document, mine.contentDocument, rootOf(win.document, source, index));
           mine.contentDocument.getElementById(CANVAS_ID)?.replaceChildren(canvasCss(scheme));
         }
         install(mine.contentWindow);

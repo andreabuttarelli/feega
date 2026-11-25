@@ -280,6 +280,20 @@ describe('focus tab', () => {
       expect(inner.body.classList.contains('font-sans')).toBe(true);
     });
 
+    it('gives the real component the text styles it inherits on the page, set on a wrapper above it', () => {
+      const { win, send, frame } = reactive();
+      const wrapper = win.document.querySelector('main') as HTMLElement;
+      wrapper.style.fontFamily = 'Brand, serif';
+      wrapper.style.color = 'rgb(1, 2, 3)';
+      send({ type: 'feega:focus', source: 'src/Card.tsx:5:7' });
+      (frame()!.contentWindow as unknown as Record<symbol, boolean>)[Symbol.for('feega.nested-host')] = true;
+      frame()!.dispatchEvent(new (win as unknown as typeof globalThis).Event('load'));
+
+      const body = frame()!.contentDocument!.body;
+      expect(body.style.fontFamily).toContain('Brand');
+      expect(body.style.color).toBe('rgb(1, 2, 3)');
+    });
+
     it('ignores a status from anything but the focus tab', () => {
       const { up, send, win } = reactive();
       send({ type: 'feega:focus', source: 'src/Card.tsx:5:7' });
