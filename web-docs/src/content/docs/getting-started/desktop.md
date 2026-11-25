@@ -39,6 +39,7 @@ Open it and drag Feega to Applications. A browser download is quarantined, so ma
 - **Tabs per folder.** Add a folder with the plus button. Each folder gets its own tab with its own dev server and editor.
 - **Monorepos.** If a folder holds several apps, the tab asks which one to open.
 - **Sign in.** Sign in from the account chip to use your Feega account, or continue without one.
+- **Updates.** When a new version is downloaded, a panel says "Feega <version> is ready". Press **restart now**, or **later** to hide it until the next launch. The "update ready · restart" button stays in the tab bar. With automatic updates off, the panel offers **update** instead. If an update fails, a small row offers **retry**.
 - **Settings.** Open them with Cmd+, :
 
 | Setting | Meaning |

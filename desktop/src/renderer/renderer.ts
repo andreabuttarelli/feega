@@ -7,7 +7,8 @@ import { Step } from '../../../cli/lib/scaffold/step';
 import { el, pill, run, type View } from './dom';
 import type { AcpAgent } from '../../../inspect/src/host/ai/acp-agents';
 import { onboardingView, skipOnboarding, type OnboardingDeps } from './onboarding';
-import { Link, NodeStatus, TabStatus, UpdateState, type RecentInfo, type ShellState, type TabInfo } from '../main/types';
+import { Link, NodeStatus, TabStatus, UpdateState, type RecentInfo, type ShellState, type TabInfo, type UpdateInfo } from '../main/types';
+import { NoticeAction, noticeFor, noticeKey } from './update-notice';
 
 type Bridge = {
   state: () => Promise<ShellState>;
@@ -161,6 +162,7 @@ const UPDATE_HINTS: Record<UpdateState, string> = {
   [UpdateState.Idle]: '',
   [UpdateState.Checking]: 'checking…',
   [UpdateState.Downloading]: 'downloading…',
+  [UpdateState.Available]: 'available',
   [UpdateState.Ready]: 'ready',
   [UpdateState.UpToDate]: 'up to date',
   [UpdateState.Failed]: 'failed'
@@ -170,6 +172,35 @@ const updateHint = (state: ShellState) => UPDATE_HINTS[state.update.state];
 
 const updatePill = (state: ShellState) =>
   state.update.state === UpdateState.Ready ? [el('button', { class: 'update-pill', title: state.update.message, on: run(() => bridge.installUpdate()) }, el('span', { class: 'dot ready' }), el('span', { text: 'update ready · restart' }))] : [];
+
+const dismissedNotices = new Set<string>();
+
+const NOTICE_ACTIONS: Record<NoticeAction, (info: UpdateInfo) => void> = {
+  [NoticeAction.Restart]: () => void bridge.installUpdate(),
+  [NoticeAction.Update]: () => void bridge.installUpdate(),
+  [NoticeAction.Retry]: () => void bridge.checkUpdates(),
+  [NoticeAction.Later]: (info) => {
+    dismissedNotices.add(noticeKey(info));
+    renderNotice(info);
+  }
+};
+
+const NOTICE_PILL: Record<NoticeAction, string> = {
+  [NoticeAction.Restart]: 'primary small',
+  [NoticeAction.Update]: 'primary small',
+  [NoticeAction.Retry]: 'outline small',
+  [NoticeAction.Later]: 'outline small'
+};
+
+const renderNotice = (info: UpdateInfo) => {
+  document.querySelector('.update-notice')?.remove();
+  const notice = noticeFor(info, dismissedNotices);
+  if (!notice) {
+    return;
+  }
+  const actions = notice.actions.map((action) => pill(action, NOTICE_PILL[action], () => NOTICE_ACTIONS[action](info)));
+  document.body.append(el('div', { class: `update-notice${notice.quiet ? ' quiet' : ''}`, role: 'status' }, el('div', { class: 'copy' }, el('div', { class: 'title', text: notice.title }), el('div', { class: 'body', text: notice.body })), el('div', { class: 'actions' }, ...actions)));
+};
 
 const INVITE_TEXT = 'Create a free account to keep your recent projects and get new templates';
 
@@ -255,6 +286,7 @@ const renderBar = (state: ShellState) => {
   if (menuOpen) {
     document.body.append(accountMenu(state));
   }
+  renderNotice(state.update);
 };
 
 const art = (name: string, size: number, extra = '') => el('span', { class: `art ${extra}`.trim(), html: pixelSvg(PIXELS[name], size) });

@@ -1,6 +1,6 @@
 export type View = { key: string; build: () => HTMLElement; patch?: (root: HTMLElement) => void };
 
-export type Props = { class?: string; text?: string; html?: string; on?: () => void; title?: string };
+export type Props = { class?: string; text?: string; html?: string; on?: () => void; title?: string; role?: string };
 
 export const el = (tag: string, props: Props = {}, ...children: (Node | string)[]) => {
   const node = document.createElement(tag);
@@ -13,6 +13,9 @@ export const el = (tag: string, props: Props = {}, ...children: (Node | string)[
   }
   if (props.title) {
     node.title = props.title;
+  }
+  if (props.role) {
+    node.setAttribute('role', props.role);
   }
   if (props.on) {
     node.addEventListener('click', props.on);
