@@ -192,7 +192,7 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     }
     if (ask.page) {
       const out = await pageRule(reader(root), ask.page, ask.css ?? {}, ask.viewport, media, within);
-      return out.ok ? written([out.change], '') : out;
+      return out.ok ? written(out.changes, '') : out;
     }
     const at = liveAtOf(ask.at);
     if (!at || !inside(root, at.file)) {
