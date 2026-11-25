@@ -189,6 +189,42 @@ describe('the ACP session', () => {
     expect(last.map((o) => o.current)).toEqual(['sonnet', 'high']);
   });
 
+  describe('an agent that advertises session models instead of config options', () => {
+    const MODELS_FLAG = ['models'];
+
+    it('shows its models as the model picker', async () => {
+      const { events, session } = await open(Policy.Ask, MODELS_FLAG);
+      sessions.push(session);
+
+      expect(configs(events).at(-1)).toEqual([
+        { id: 'model', name: 'Model', category: ConfigCategory.Model, current: 'sonnet', values: [{ id: 'sonnet', name: 'Sonnet', description: 'Balanced' }, { id: 'haiku', name: 'Haiku', description: 'Fast' }] }
+      ]);
+    });
+
+    it('switches the model and reports the new current value', async () => {
+      const { events, session } = await open(Policy.Ask, MODELS_FLAG);
+      sessions.push(session);
+
+      await session.setConfig('model', 'haiku');
+
+      expect(configs(events).at(-1)?.find((o) => o.id === 'model')?.current).toBe('haiku');
+    });
+
+    it('applies the preferred model the agent offers', async () => {
+      const { events, session } = await open(Policy.Ask, MODELS_FLAG, null, { model: 'haiku' });
+      sessions.push(session);
+
+      expect(configs(events).at(-1)?.map((o) => o.current)).toEqual(['haiku']);
+    });
+
+    it('shows the models of a resumed session', async () => {
+      const { events, session } = await open(Policy.Ask, ['load', ...MODELS_FLAG], 'fake-session');
+      sessions.push(session);
+
+      expect(configs(events).at(-1)?.map((o) => o.id)).toEqual(['model']);
+    });
+  });
+
   it('answers a write itself when the policy allows edits', async () => {
     const { dir, events, written, session } = await open(Policy.Edits);
     sessions.push(session);
