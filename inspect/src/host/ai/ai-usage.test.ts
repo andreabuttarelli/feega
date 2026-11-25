@@ -96,4 +96,24 @@ describe('aiUsage', () => {
 
     expect(t.tracked).toEqual([]);
   });
+
+  it('records the category and the chosen value id, nothing else', () => {
+    const t = setup();
+    t.usage.started('claude');
+    t.usage.configured('model', 'claude-sonnet-4-5[1m]');
+    t.usage.configured('thought_level', 'high');
+
+    expect(t.tracked.slice(2)).toEqual([
+      { kind: UsageKind.AiConfigChanged, extra: { agent: 'claude', category: 'model', choice: 'claude-sonnet-4-5[1m]' } },
+      { kind: UsageKind.AiConfigChanged, extra: { agent: 'claude', category: 'thought_level', choice: 'high' } }
+    ]);
+  });
+
+  it('does not send a value that looks like free text', () => {
+    const t = setup();
+    t.usage.started('claude');
+    t.usage.configured('model', 'my private model for /Users/me/secret project');
+
+    expect(t.tracked.at(-1)?.extra.choice).toBe('other');
+  });
 });

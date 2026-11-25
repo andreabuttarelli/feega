@@ -25,12 +25,12 @@
   import { ai, aiAnswered, aiSaid } from './ai-state.svelte';
   import { ChipIcon, chipView } from './ai-chip';
   import { sendsOnKey } from './ai-keys';
-  import { SUGGESTIONS, agoOf, isDanger, isThinking, markOf, pickerLabel, placeholderOf, statusOf } from './ai-view';
+  import { SUGGESTIONS, agoOf, isDanger, isThinking, markOf, pickerLabel, pickerOf, placeholderOf, statusOf, valueName } from './ai-view';
   import { POLICY_ROWS, type Policy } from '../host/ai/permission-policy';
   import { ItemKind } from '../host/ai/transcript';
   import { lineDiff } from './ai-diff';
   import { markdown } from './ai-markdown';
-  import { ToolStatus } from '../host/ai/agent-session';
+  import { ConfigCategory, ToolStatus, type ConfigView } from '../host/ai/agent-session';
 
   type Props = { context: string | null; tohost: (message: HostMessage) => void };
 
@@ -44,6 +44,7 @@
   let menu = $state(false);
   let input = $state<HTMLTextAreaElement>();
   let permissions = $state(false);
+  let configOpen = $state<string | null>(null);
   let chatsOpen = $state(false);
   let renaming = $state<string | null>(null);
   let draft = $state('');
@@ -59,6 +60,7 @@
   const mark = $derived(current ? markOf(current.id, current.label) : null);
   const thinking = $derived(isThinking(busy, ai.items));
   const danger = $derived(isDanger(ai.policy));
+  const configPickers = $derived([ConfigCategory.Model, ConfigCategory.Effort].flatMap((category) => pickerOf(ai.configs, category) ?? []));
 
   $effect(() => {
     tohost({ kind: ToHost.AiList });
@@ -131,6 +133,11 @@
   function setMode(id: string) {
     tohost({ kind: ToHost.AiMode, id });
     permissions = false;
+  }
+
+  function setConfig(id: string, value: string) {
+    tohost({ kind: ToHost.AiConfig, id, value });
+    configOpen = null;
   }
 
   function onkey(e: KeyboardEvent) {
@@ -292,6 +299,7 @@
     {/if}
     <textarea rows="1" placeholder={placeholderOf(current?.label ?? null)} aria-label="Message" data-testid="ai-input" disabled={!ready} bind:this={input} bind:value={text} onkeydown={onkey}></textarea>
     <div class="send">
+      <div class="pickers">
       <Popover.Root bind:open={permissions}>
         <Popover.Trigger class="perm-trigger {danger ? 'danger' : ''}" data-testid="ai-permissions" aria-label="Permissions">
           {#if danger}<TriangleAlert size={12} />{:else}<ShieldCheck size={12} />{/if}
@@ -318,6 +326,10 @@
           </Popover.Content>
         </Popover.Portal>
       </Popover.Root>
+      {#each configPickers as option (option.id)}
+        {@render configPicker(option)}
+      {/each}
+      </div>
       {#if busy}
         <button type="button" class="round" aria-label="Stop" data-testid="ai-cancel" onclick={() => tohost({ kind: ToHost.AiCancel })}><Square size={10} fill="currentColor" /></button>
       {:else}
@@ -326,6 +338,25 @@
     </div>
   </div>
 </div>
+
+{#snippet configPicker(option: ConfigView)}
+  <Popover.Root open={configOpen === option.id} onOpenChange={(open) => (configOpen = open ? option.id : null)}>
+    <Popover.Trigger class="perm-trigger" data-testid="ai-config" data-category={option.category} aria-label={option.name}>
+      <span>{valueName(option)}</span>
+    </Popover.Trigger>
+    <Popover.Portal>
+      <Popover.Content class="agent-menu" align="end" side="top" sideOffset={4} data-testid="ai-config-menu" data-category={option.category}>
+        <p class="menu-label">{option.name}</p>
+        {#each option.values as value (value.id)}
+          <button type="button" class="agent-option stacked" data-testid="ai-config-option" data-value={value.id} onclick={() => setConfig(option.id, value.id)}>
+            <span class="check">{#if value.id === option.current}<Check size={12} />{/if}</span>
+            <span class="stack"><span>{value.name}</span>{#if value.description}<span class="hint">{value.description}</span>{/if}</span>
+          </button>
+        {/each}
+      </Popover.Content>
+    </Popover.Portal>
+  </Popover.Root>
+{/snippet}
 
 <style>
   .ai {
@@ -956,6 +987,13 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+  }
+
+  .pickers {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    min-width: 0;
   }
 
   :global(.perm-trigger) {

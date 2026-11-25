@@ -36,6 +36,7 @@ Select an element in the preview, then write. The element is attached to your me
 - Replies stream in as the agent writes them, with its plan and tool calls.
 - Before a tool that changes something, the agent asks: **Allow** or **Reject**. A file write shows its diff first.
 - The picker at the bottom left of the message box sets how much it may do without asking. It lists the modes the agent itself offers (for Claude Code: Default, Accept edits, Plan and so on), and Feega's own choice: **Ask every time**, **Allow edits, ask for commands** or **Allow all**. Each project remembers its choice, and the `feegaInspect.aiPermissions` setting sets the default. **Allow all** is tinted as a warning.
+- Next to it, the **Model** and **Effort** pickers show the choices the agent advertises, with its own names (for Codex, "Reasoning effort"). They are hidden when the agent offers none. Each chat remembers its choice and restores it when you reopen the chat; a new chat starts with what you last picked for that agent.
 - **Stop** cancels the current turn.
 - Files the agent writes land in the **Changes** tab as one change each, marked with the agent's name. [Undo them](/editing/undo-and-changes/) like any other change.
 

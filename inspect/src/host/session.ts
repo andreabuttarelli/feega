@@ -141,6 +141,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     now: Date.now,
     newId: randomUUID,
     created: (chats, liveCount) => usage?.track(UsageKind.AiChatCreated, { chat_count: chats, live_count: liveCount }),
+    configured: (category, value) => aiStats?.configured(category, value),
     policy: {
       get: () => policyOf(platform.stored(Stored.AiPolicy), platform.settings()[SettingKey.AiPermissions]),
       set: (policy) => void platform.store(Stored.AiPolicy, policy)
@@ -792,6 +793,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.AiCancel]: () => (aiStats?.cancelled(), ai.cancel()),
     [ToHost.AiAnswer]: (m) => (aiStats?.answered(m.id, m.optionId), ai.answer(m.id, m.optionId)),
     [ToHost.AiMode]: (m) => void ai.setMode(m.id),
+    [ToHost.AiConfig]: (m) => void ai.setConfig(m.id, m.value),
     [ToHost.AiOpen]: (m) => ai.open(m.chat),
     [ToHost.AiRename]: (m) => ai.rename(m.chat, m.title),
     [ToHost.AiDelete]: (m) => void ai.remove(m.chat),

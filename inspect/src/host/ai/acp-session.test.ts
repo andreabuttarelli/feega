@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
-import { AgentEventKind, type AgentEvent, type AgentSession } from './agent-session';
+import { AgentEventKind, ConfigCategory, type AgentEvent, type AgentSession } from './agent-session';
 import { openAcpAgent } from './acp-session';
 import { Policy } from './permission-policy';
 
@@ -20,7 +20,7 @@ const eventually = async (check: () => boolean) => {
   }
 };
 
-const open = async (policy = Policy.Ask, flags: string[] = [], resume: string | null = null) => {
+const open = async (policy = Policy.Ask, flags: string[] = [], resume: string | null = null, preferred: Record<string, string> = {}) => {
   const dir = mkdtempSync(join(tmpdir(), 'acp-'));
   const events: AgentEvent[] = [];
   const written: Record<string, string> = {};
@@ -29,6 +29,7 @@ const open = async (policy = Policy.Ask, flags: string[] = [], resume: string | 
     {
       cwd: dir,
       resume,
+      preferred,
       policy: () => policy,
       emit: (event) => events.push(event),
       files: {
@@ -140,6 +141,52 @@ describe('the ACP session', () => {
     await eventually(() => events.filter((e) => e.kind === AgentEventKind.Modes).length > 1);
 
     expect(events.filter((e) => e.kind === AgentEventKind.Modes).at(-1)).toMatchObject({ current: 'plan' });
+  });
+
+  const configs = (events: AgentEvent[]) => events.flatMap((e) => (e.kind === AgentEventKind.Config ? [e.options] : []));
+
+  it('reports the model and effort options the agent advertises and skips the others', async () => {
+    const { events, session } = await open();
+    sessions.push(session);
+
+    expect(configs(events).at(0)).toEqual([
+      { id: 'model', name: 'Model', category: ConfigCategory.Model, current: 'sonnet', values: [{ id: 'sonnet', name: 'Sonnet', description: 'Balanced' }, { id: 'haiku', name: 'Haiku', description: 'Fast' }] },
+      { id: 'effort', name: 'Effort', category: ConfigCategory.Effort, current: 'medium', values: [{ id: 'low', name: 'Low', description: '' }, { id: 'medium', name: 'Medium', description: '' }, { id: 'high', name: 'High', description: '' }] }
+    ]);
+  });
+
+  it('changes an option and reports the new current value', async () => {
+    const { events, session } = await open();
+    sessions.push(session);
+
+    await session.setConfig('model', 'haiku');
+
+    expect(configs(events).at(-1)?.find((o) => o.id === 'model')?.current).toBe('haiku');
+  });
+
+  it('follows an option the agent changes by itself', async () => {
+    const { events, session } = await open();
+    sessions.push(session);
+
+    await session.send('retune');
+
+    expect(configs(events).at(-1)?.find((o) => o.id === 'effort')?.current).toBe('high');
+  });
+
+  it('applies the preferred values the agent offers', async () => {
+    const { events, session } = await open(Policy.Ask, [], null, { model: 'haiku', effort: 'high' });
+    sessions.push(session);
+
+    const last = configs(events).at(-1) ?? [];
+    expect(last.map((o) => o.current)).toEqual(['haiku', 'high']);
+  });
+
+  it('ignores a preferred value the agent does not offer', async () => {
+    const { events, session } = await open(Policy.Ask, [], null, { model: 'gone', effort: 'high' });
+    sessions.push(session);
+
+    const last = configs(events).at(-1) ?? [];
+    expect(last.map((o) => o.current)).toEqual(['sonnet', 'high']);
   });
 
   it('answers a write itself when the policy allows edits', async () => {

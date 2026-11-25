@@ -1,8 +1,9 @@
 import { spawn } from 'node:child_process';
 import { Readable, Writable } from 'node:stream';
 import { client, methods, ndJsonStream, PROTOCOL_VERSION, type RequestPermissionRequest, type SessionNotification, type ToolCall, type ToolCallContent, type ToolCallUpdate } from '@agentclientprotocol/sdk';
+import type { SessionConfigOption } from '@agentclientprotocol/sdk';
 import { autoAnswer } from './permission-policy';
-import { AgentEventKind, ToolStatus, type AgentDeps, type AgentSession, type DiffView, type Launch, type ModeView, type OptionView, type ToolView } from './agent-session';
+import { AgentEventKind, ConfigCategory, ToolStatus, type AgentDeps, type AgentSession, type ConfigView, type DiffView, type Launch, type ModeView, type OptionView, type ToolView } from './agent-session';
 
 const CLIENT_NAME = 'feega';
 const CANCELLED = { outcome: { outcome: 'cancelled' as const } };
@@ -19,6 +20,16 @@ const STATUSES: Record<string, ToolStatus> = {
 const diffsOf = (content: ToolCallContent[] | null | undefined): DiffView[] =>
   (content ?? []).flatMap((part) => (part.type === 'diff' ? [{ path: part.path, before: part.oldText ?? null, after: part.newText }] : []));
 
+const CATEGORIES = new Set<string>(Object.values(ConfigCategory));
+
+const valuesOf = (option: SessionConfigOption & { type: 'select' }) =>
+  option.options.flatMap((entry) => ('group' in entry ? entry.options : [entry])).map((v) => ({ id: v.value, name: v.name, description: v.description ?? '' }));
+
+const configsOf = (options: SessionConfigOption[] | null | undefined): ConfigView[] =>
+  (options ?? []).flatMap((o) =>
+    o.type === 'select' && o.category && CATEGORIES.has(o.category) ? [{ id: o.id, name: o.name, category: o.category as ConfigCategory, current: o.currentValue, values: valuesOf(o) }] : []
+  );
+
 const messageOf = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
 export const openAcpAgent = async (launch: Launch, deps: AgentDeps): Promise<AgentSession> => {
@@ -28,9 +39,17 @@ export const openAcpAgent = async (launch: Launch, deps: AgentDeps): Promise<Age
   let asked = 0;
   let sessionId = '';
   let available: ModeView[] = [];
+  let configs: ConfigView[] = [];
   let replaying = false;
 
   const modeChanged = (current: string) => deps.emit({ kind: AgentEventKind.Modes, available, current });
+
+  const configChanged = (options: SessionConfigOption[] | null | undefined) => {
+    configs = configsOf(options);
+    if (configs.length) {
+      deps.emit({ kind: AgentEventKind.Config, options: configs });
+    }
+  };
 
   const toolOf = (update: ToolCall | ToolCallUpdate): ToolView => {
     const known = tools.get(update.toolCallId);
@@ -57,6 +76,8 @@ export const openAcpAgent = async (launch: Launch, deps: AgentDeps): Promise<Age
       deps.emit({ kind: AgentEventKind.Tool, tool: toolOf(update) });
     } else if (update.sessionUpdate === 'current_mode_update') {
       modeChanged(update.currentModeId);
+    } else if (update.sessionUpdate === 'config_option_update') {
+      configChanged(update.configOptions);
     } else if (update.sessionUpdate === 'plan') {
       deps.emit({ kind: AgentEventKind.Plan, entries: update.entries.map((e) => ({ content: e.content, status: e.status })) });
     }
@@ -117,7 +138,7 @@ export const openAcpAgent = async (launch: Launch, deps: AgentDeps): Promise<Age
     replaying = true;
     try {
       const response = await connection.agent.request(methods.agent.session.load, { sessionId: id, cwd: deps.cwd, mcpServers: [] });
-      return { sessionId: id, modes: response.modes };
+      return { sessionId: id, modes: response.modes, configOptions: response.configOptions };
     } catch {
       return null;
     } finally {
@@ -131,6 +152,20 @@ export const openAcpAgent = async (launch: Launch, deps: AgentDeps): Promise<Age
   if (created.modes?.availableModes.length) {
     available = created.modes.availableModes.map((m) => ({ id: m.id, name: m.name, description: m.description ?? '' }));
     modeChanged(created.modes.currentModeId);
+  }
+  configChanged(created.configOptions);
+
+  const setConfig = async (id: string, value: string) => {
+    const response = await connection.agent.request(methods.agent.session.setConfigOption, { sessionId, configId: id, value });
+    configChanged(response.configOptions);
+  };
+
+  for (const { id } of [...configs]) {
+    const wanted = deps.preferred[id];
+    const option = configs.find((c) => c.id === id);
+    if (wanted !== undefined && option && option.current !== wanted && option.values.some((v) => v.id === wanted)) {
+      await setConfig(id, wanted).catch(() => undefined);
+    }
   }
 
   const answer = (id: string, optionId: string | null) => {
@@ -158,6 +193,7 @@ export const openAcpAgent = async (launch: Launch, deps: AgentDeps): Promise<Age
       await connection.agent.request(methods.agent.session.setMode, { sessionId, modeId: id });
       modeChanged(id);
     },
+    setConfig,
     close: () => {
       child.removeAllListeners('exit');
       connection.close();

@@ -1,7 +1,7 @@
 import { AgentId, AiState } from '../messages';
 import { AGENT_LOGOS, type AgentLogo } from './agent-logos';
 import { POLICY_ROWS, type Policy } from '../host/ai/permission-policy';
-import type { ModeView } from '../host/ai/agent-session';
+import type { ConfigCategory, ConfigView, ModeView } from '../host/ai/agent-session';
 import { ItemKind, type Item } from '../host/ai/transcript';
 
 export enum Dot {
@@ -60,3 +60,7 @@ export const agoOf = (now: number, then: number): string => {
   const unit = AGO_UNITS.find(([size]) => elapsed >= size);
   return unit ? `${Math.floor(elapsed / unit[0])}${unit[1]}` : 'now';
 };
+
+export const pickerOf = (configs: ConfigView[], category: ConfigCategory): ConfigView | undefined => configs.find((c) => c.category === category);
+
+export const valueName = (option: ConfigView): string => option.values.find((v) => v.id === option.current)?.name ?? option.current;

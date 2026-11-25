@@ -46,6 +46,7 @@ export const heard = (items: Item[], event: AgentEvent): Item[] => {
     case AgentEventKind.Permission:
       return [...items.filter((i) => !(i.kind === ItemKind.Tool && i.tool.id === event.tool.id)), { kind: ItemKind.Permission, id: event.id, tool: event.tool, options: event.options }];
     case AgentEventKind.Modes:
+    case AgentEventKind.Config:
       return items;
     case AgentEventKind.Failed:
       return [...items, { kind: ItemKind.Error, text: event.reason }];
