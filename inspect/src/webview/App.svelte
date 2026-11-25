@@ -683,6 +683,7 @@
     [ToView.AiState]: aiHeard,
     [ToView.AiEvent]: aiHeard,
     [ToView.AiPolicy]: aiHeard,
+    [ToView.AiConsent]: aiHeard,
     [ToView.AiChats]: aiHeard,
     [ToView.AiChat]: aiHeard,
     [ToView.SkillHint]: (m) => (skillHint = m.command),

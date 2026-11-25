@@ -24,9 +24,9 @@ const eventually = async (check: () => boolean) => {
   }
 };
 
-type Options = { flags?: string[]; confirmed?: boolean; saved?: ChatRecord[] };
+type Options = { flags?: string[]; confirmed?: boolean; saved?: ChatRecord[]; granted?: Set<string> };
 
-function setup({ flags = [], confirmed = true, saved = [] }: Options = {}) {
+function setup({ flags = [], confirmed = true, saved = [], granted = new Set<string>() }: Options = {}) {
   const root = mkdtempSync(join(tmpdir(), 'ai-chat-'));
   writeFileSync(join(root, 'a.txt'), 'x');
   const sent: ViewMessage[] = [];
@@ -39,9 +39,10 @@ function setup({ flags = [], confirmed = true, saved = [] }: Options = {}) {
   const open: OpenAgent = (_launch, deps) => (opened.push(deps.resume), openAcpAgent({ command: process.execPath, args: [FAKE, ...flags] }, deps));
   const chat = aiChat({
     root: () => root,
-    env: () => ({ path: ['/bin'], home: '/h', exists: (p) => p === '/bin/opencode' || p === '/bin/grok', appName: '', extensions: [] }),
+    env: () => ({ path: ['/bin'], home: '/h', exists: (p) => p === '/bin/opencode' || p === '/bin/grok' || p === '/bin/claude', appName: '', extensions: [] }),
     open,
     confirm: async () => confirmed,
+    adapters: { granted: (key) => granted.has(key), grant: (key) => void granted.add(key) },
     post: (message) => void sent.push(message),
     write: async () => undefined,
     record: async () => undefined,
@@ -59,6 +60,73 @@ function setup({ flags = [], confirmed = true, saved = [] }: Options = {}) {
 }
 
 const done = (t: ReturnType<typeof setup>, count: number) => eventually(() => t.events().filter((e) => e.kind === AgentEventKind.Done).length >= count);
+
+const consents = (t: ReturnType<typeof setup>) => t.sent.filter((m) => m.kind === ToView.AiConsent);
+
+describe('the adapter consent', () => {
+  it('asks inside the chat and opens nothing until the user allows', async () => {
+    const t = setup();
+
+    const starting = t.chat.start(AcpId.Claude);
+    await eventually(() => consents(t).length === 1);
+
+    expect(consents(t)[0]).toMatchObject({ chat: 'chat-1', agent: AcpId.Claude, label: 'Claude Code' });
+    expect(t.opened).toEqual([]);
+    t.chat.consent(true);
+    await starting;
+    expect(t.opened).toEqual([null]);
+    t.chat.close();
+  });
+
+  it('drops the chat when the user cancels', async () => {
+    const t = setup();
+
+    const starting = t.chat.start(AcpId.Claude);
+    await eventually(() => consents(t).length === 1);
+    t.chat.consent(false);
+    await starting;
+
+    expect(t.opened).toEqual([]);
+    expect(t.rows()).toEqual([]);
+  });
+
+  it('does not ask again once allowed, even after a restart', async () => {
+    const granted = new Set<string>();
+    const first = setup({ granted });
+    const starting = first.chat.start(AcpId.Claude);
+    await eventually(() => consents(first).length === 1);
+    first.chat.consent(true);
+    await starting;
+    first.chat.close();
+
+    const again = setup({ granted });
+    await again.chat.start(AcpId.Claude);
+
+    expect(consents(again)).toEqual([]);
+    expect(again.opened).toEqual([null]);
+    again.chat.close();
+  });
+
+  it('asks again when the adapter version changes', async () => {
+    const t = setup({ granted: new Set(['@agentclientprotocol/claude-agent-acp@0.1.0']) });
+
+    const starting = t.chat.start(AcpId.Claude);
+    await eventually(() => consents(t).length === 1);
+    t.chat.consent(false);
+    await starting;
+
+    expect(t.opened).toEqual([]);
+  });
+
+  it('never asks for an agent that needs no adapter', async () => {
+    const t = setup();
+
+    await t.chat.start(AcpId.OpenCode);
+
+    expect(consents(t)).toEqual([]);
+    t.chat.close();
+  });
+});
 
 describe('the AI chats', () => {
   it('lists a chat titled by its first prompt', async () => {

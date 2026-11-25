@@ -116,12 +116,15 @@ describe('the AI panel in the session', () => {
     expect(failed && failed.kind === AgentEventKind.Failed && failed.reason).toContain('npm i -g opencode-ai');
   });
 
-  it('runs an npx adapter only after the user agrees', async () => {
-    const { send, events, asked, states } = setup(['/home/none/.claude'], false);
+  it('runs an npx adapter only after the user allows it in the chat', async () => {
+    const { send, events, asked, states, sent } = setup(['/home/none/.claude']);
 
-    await send({ kind: ToHost.AiStart, agent: AcpId.Claude });
+    const starting = send({ kind: ToHost.AiStart, agent: AcpId.Claude });
+    await eventually(() => sent.some((m) => m.kind === ToView.AiConsent));
+    await send({ kind: ToHost.AiConsent, allow: false });
+    await starting;
 
-    expect(asked[0]).toContain('@agentclientprotocol/claude-agent-acp');
+    expect(asked).toEqual([]);
     expect(states()).not.toContain(AiState.Ready);
     expect(events()).toEqual([]);
   });
