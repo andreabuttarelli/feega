@@ -1,3 +1,5 @@
+import { MOUNT_STATUS, Status } from './mount-protocol.js';
+
 export const MOUNT_ROUTE = '/__feega/mount';
 export const MODULE_ROUTE = '/__feega/mount-module.js';
 export const PROPS_ROUTE = '/__feega/props';
@@ -33,6 +35,7 @@ export function mountHtml(query: string): string {
 <head>
 <meta charset="utf-8">
 <script>window[${NESTED_HOST}] = true;</script>
+<script>window.addEventListener('error', (event) => window.parent.postMessage({ type: '${MOUNT_STATUS}', status: '${Status.Failed}', reason: String(event.message || 'The component could not load') }, '*'), true);</script>
 </head>
 <body>
 <div id="root"></div>

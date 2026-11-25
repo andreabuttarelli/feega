@@ -179,6 +179,15 @@ describe('focus tab', () => {
       expect(up).toContainEqual({ type: 'feega:focused', count: 1, mode: 'snapshot', reason: 'useTheme must be used within a ThemeProvider' });
     });
 
+    it('falls back to the snapshot when the server has no mount page, as in Next.js', () => {
+      const { win, up, send, frame } = reactive();
+      send({ type: 'feega:focus', source: 'src/Card.tsx:5:7' });
+      frame()!.dispatchEvent(new (win as unknown as typeof globalThis).Event('load'));
+
+      expect(frame()!.srcdoc).toContain('One');
+      expect(up).toContainEqual(expect.objectContaining({ type: 'feega:focused', count: 1, mode: 'snapshot' }));
+    });
+
     it('does not try the real component again for a source that failed', () => {
       const { send, status, frame } = reactive();
       send({ type: 'feega:focus', source: 'src/Card.tsx:5:7' });
@@ -191,6 +200,7 @@ describe('focus tab', () => {
     it('leaves the real component alone when the page changes', async () => {
       const { win, send, frame } = reactive();
       send({ type: 'feega:focus', source: 'src/Card.tsx:5:7' });
+      (frame()!.contentWindow as unknown as Record<symbol, boolean>)[Symbol.for('feega.nested-host')] = true;
       const before = frame()!.getAttribute('src');
       win.document.querySelector('h2')!.textContent = 'Edited';
       await new Promise((resolve) => setTimeout(resolve, 400));
