@@ -1,3 +1,5 @@
+export type View = { key: string; build: () => HTMLElement; patch?: (root: HTMLElement) => void };
+
 export type Props = { class?: string; text?: string; html?: string; on?: () => void; title?: string };
 
 export const el = (tag: string, props: Props = {}, ...children: (Node | string)[]) => {

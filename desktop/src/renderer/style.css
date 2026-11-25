@@ -1045,3 +1045,163 @@ pre {
   width: 16px;
   height: 16px;
 }
+
+.onb-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(460px, 100%);
+  gap: 12px;
+}
+
+.onb-hero {
+  margin-bottom: 8px;
+}
+
+.onb .onb-title {
+  font-size: 40px;
+  text-transform: none;
+  text-wrap: balance;
+}
+
+.onb-body,
+.onb-more {
+  margin: 0;
+  color: var(--sx-ink-2);
+  font-size: var(--sx-fs-small);
+  line-height: 1.5;
+  text-wrap: balance;
+}
+
+.onb-more {
+  color: var(--sx-ink-3);
+}
+
+.onb-extra {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 12px;
+}
+
+.onb-signed {
+  margin: 0;
+  color: var(--sx-ink);
+}
+
+.onb-agents {
+  display: flex;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.onb-ways,
+.onb-support {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+
+.onb-ways li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+}
+
+.onb-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.onb-label {
+  font-weight: 600;
+}
+
+.onb-detail {
+  color: var(--sx-ink-3);
+  font-size: 13px;
+}
+
+.onb-actions {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.onb-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: var(--sx-radius-md);
+  background: var(--sx-grey-1);
+  text-align: left;
+}
+
+.onb-item:hover {
+  background: var(--sx-hover);
+}
+
+.onb-karma {
+  color: var(--sx-ink-3);
+  font-size: 13px;
+}
+
+.onb-item.ticked .onb-karma {
+  color: var(--sx-ink);
+}
+
+.onb-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 24px;
+}
+
+.onb-dots,
+.onb-steps {
+  display: flex;
+  gap: 6px;
+}
+
+.onb-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--sx-grey-2);
+}
+
+.onb-dot.on {
+  background: var(--sx-ink);
+}
+
+.pill.ghost {
+  color: var(--sx-ink-2);
+}
+
+.pill.ghost:hover:not(:disabled) {
+  background: var(--sx-hover);
+  color: var(--sx-ink);
+}
+
+.pill.ghost:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.pill.strong {
+  color: var(--sx-ink);
+}

@@ -4,7 +4,8 @@ import { PIXELS, pixelSvg } from './pixel';
 import { STACKS, Stack } from '../../../cli/lib/scaffold/stacks';
 import { TEMPLATES, TEMPLATE_LABELS, Template } from '../../../cli/lib/scaffold/templates';
 import { Step } from '../../../cli/lib/scaffold/step';
-import { el, pill, run } from './dom';
+import { el, pill, run, type View } from './dom';
+import { onboardingView, skipOnboarding, type OnboardingDeps } from './onboarding';
 import { Link, NodeStatus, TabStatus, UpdateState, type RecentInfo, type ShellState, type TabInfo } from '../main/types';
 
 type Bridge = {
@@ -30,11 +31,12 @@ type Bridge = {
   createProject: (ask: { parent: string; name: string; stack: Stack; template: Template }) => Promise<void>;
   dismissInvite: () => Promise<void>;
   clearProject: () => Promise<void>;
+  finishOnboarding: () => Promise<void>;
+  replayOnboarding: () => Promise<void>;
+  openUrl: (url: string) => Promise<void>;
   onSettings: (listener: () => void) => void;
   onState: (listener: (state: ShellState) => void) => void;
 };
-
-type View = { key: string; build: () => HTMLElement; patch?: (root: HTMLElement) => void };
 
 const bridge = (window as unknown as { feega: Bridge }).feega;
 const bar = document.getElementById('bar') as HTMLElement;
@@ -130,7 +132,7 @@ const showRoute = (next: Route) => {
 };
 
 const syncOverlay = () => {
-  const wanted = menuOpen || route === Route.Settings;
+  const wanted = menuOpen || route === Route.Settings || lastState?.onboarded === false;
   if (wanted !== overlayOn) {
     overlayOn = wanted;
     void bridge.overlay(wanted);
@@ -219,6 +221,7 @@ const settingsPanel = (state: ShellState) => {
     settingRow('open last projects on launch', 'reopen the folders that were open when you quit.', switchEl(reopenOnLaunch, (next) => void bridge.setPreferences({ reopenOnLaunch: next }))),
     settingRow('automatic updates', 'check for a new version on launch and every few hours.', switchEl(automaticUpdates, (next) => void bridge.setPreferences({ automaticUpdates: next }))),
     settingRow('Feega Cloud (beta)', 'share and comment through Feega Cloud. applies to editors opened from now on.', switchEl(cloud, (next) => void bridge.setPreferences({ cloud: next }))),
+    settingRow('onboarding', 'walk through the welcome steps again.', pill('show again', 'outline small', run(() => bridge.replayOnboarding()))),
     settingRow('anonymous usage data', 'counts only, never your code. off starts the editor with FEEGA_TELEMETRY=0.', switchEl(telemetry, (next) => void bridge.setPreferences({ telemetry: next })))
   );
 };
@@ -461,7 +464,21 @@ const TAB_VIEWS: Record<TabStatus, (tab: TabInfo) => View> = {
   [TabStatus.Ready]: (tab) => ({ key: `ready:${tab.id}`, build: () => el('div') })
 };
 
+const onboardingDeps: OnboardingDeps = {
+  signIn: () => bridge.signIn(),
+  cancelSignIn: () => bridge.cancelSignIn(),
+  openUrl: (url) => bridge.openUrl(url),
+  finish: async () => {
+    route = Route.Home;
+    await bridge.finishOnboarding();
+  },
+  changed: () => lastState && render(lastState)
+};
+
 const viewOf = (state: ShellState): View => {
+  if (!state.onboarded) {
+    return onboardingView(state, onboardingDeps);
+  }
   if (state.node.status === NodeStatus.Problem) {
     return nodeView(state);
   }
@@ -498,6 +515,7 @@ const renderMain = (state: ShellState) => {
 
 function render(state: ShellState) {
   lastState = state;
+  syncOverlay();
   renderBar(state);
   renderMain(state);
 }
@@ -510,6 +528,10 @@ document.addEventListener('click', (event) => {
 
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') {
+    if (lastState?.onboarded === false) {
+      skipOnboarding(onboardingDeps);
+      return;
+    }
     if (menuOpen) {
       toggleMenu(false);
       return;
