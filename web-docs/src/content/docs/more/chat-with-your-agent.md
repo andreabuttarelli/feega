@@ -36,7 +36,7 @@ Feega talks to agents over the [Agent Client Protocol](https://agentclientprotoc
 
 Claude Code, Codex and Pi need a small open-source adapter. Feega downloads it once from npm, at an exact pinned version, with your own `npm install` into its own storage folder (the extension's storage in VS Code, the `feega` cache folder for `npx feega`). Nothing is installed globally and no `npx` runs later: the adapter starts directly with Node.
 
-The download happens in the **Connect Feega to your agents** onboarding step, which shows "Feega downloads the Claude Code connector from npm" with its progress, or the first time you open a chat with that agent, which shows **Connecting…**. It needs Node.js with `npm` and a network connection once. If either is missing, the chat shows the reason with a **Retry** button. When Feega updates an adapter version, the old one is deleted.
+The download happens in the **connect Feega to your agents** onboarding step, which shows "Feega downloads the Claude Code connector from npm" with its progress, or the first time you open a chat with that agent, which shows **Connecting…**. It needs Node.js with `npm` and a network connection once. If either is missing, the chat shows the reason with a **Retry** button. When Feega updates an adapter version, the old one is deleted.
 
 ## Talk to the website
 

@@ -4,6 +4,9 @@ import { PIXELS, pixelSvg } from './pixel';
 import { STACKS, Stack } from '../../../cli/lib/scaffold/stacks';
 import { TEMPLATES, TEMPLATE_LABELS, Template } from '../../../cli/lib/scaffold/templates';
 import { Step } from '../../../cli/lib/scaffold/step';
+import { el, pill, run, type View } from './dom';
+import type { AcpAgent } from '../../../inspect/src/host/ai/acp-agents';
+import { onboardingView, skipOnboarding, type OnboardingDeps } from './onboarding';
 import { Link, NodeStatus, TabStatus, UpdateState, type RecentInfo, type ShellState, type TabInfo } from '../main/types';
 
 type Bridge = {
@@ -29,11 +32,14 @@ type Bridge = {
   createProject: (ask: { parent: string; name: string; stack: Stack; template: Template }) => Promise<void>;
   dismissInvite: () => Promise<void>;
   clearProject: () => Promise<void>;
+  finishOnboarding: () => Promise<void>;
+  replayOnboarding: () => Promise<void>;
+  openUrl: (url: string) => Promise<void>;
+  copy: (text: string) => Promise<void>;
+  detectAgents: () => Promise<AcpAgent[]>;
   onSettings: (listener: () => void) => void;
   onState: (listener: (state: ShellState) => void) => void;
 };
-
-type View = { key: string; build: () => HTMLElement; patch?: (root: HTMLElement) => void };
 
 const bridge = (window as unknown as { feega: Bridge }).feega;
 const bar = document.getElementById('bar') as HTMLElement;
@@ -57,31 +63,6 @@ const FRIENDLY: [RegExp, string][] = [
   [/EADDRINUSE/i, 'a port needed by the dev server is already in use.'],
   [/not found|ENOENT/i, 'something the dev server needs was not found.']
 ];
-
-type Props = { class?: string; text?: string; html?: string; on?: () => void; title?: string };
-
-const el = (tag: string, props: Props = {}, ...children: (Node | string)[]) => {
-  const node = document.createElement(tag);
-  node.className = props.class ?? '';
-  if (props.text !== undefined) {
-    node.textContent = props.text;
-  }
-  if (props.html !== undefined) {
-    node.innerHTML = props.html;
-  }
-  if (props.title) {
-    node.title = props.title;
-  }
-  if (props.on) {
-    node.addEventListener('click', props.on);
-  }
-  node.append(...children);
-  return node;
-};
-
-const run = (action: () => Promise<unknown>) => () => void action();
-
-const pill = (text: string, kind: string, on: () => void) => el('button', { class: `pill ${kind}`, text, on });
 
 const mark = (size: number = MARK_SIZE) => `<svg width="${size}" height="${size}" viewBox="0 0 300 300" fill="${MARK_FILL}">${MARK}</svg>`;
 
@@ -144,6 +125,11 @@ const toggleMenu = (open: boolean) => {
   }
 };
 
+const goHome = () => {
+  showRoute(Route.Home);
+  void bridge.activate(null);
+};
+
 const showRoute = (next: Route) => {
   route = next;
   menuOpen = false;
@@ -154,7 +140,7 @@ const showRoute = (next: Route) => {
 };
 
 const syncOverlay = () => {
-  const wanted = menuOpen || route === Route.Settings;
+  const wanted = menuOpen || route === Route.Settings || lastState?.onboarded === false;
   if (wanted !== overlayOn) {
     overlayOn = wanted;
     void bridge.overlay(wanted);
@@ -243,6 +229,7 @@ const settingsPanel = (state: ShellState) => {
     settingRow('open last projects on launch', 'reopen the folders that were open when you quit.', switchEl(reopenOnLaunch, (next) => void bridge.setPreferences({ reopenOnLaunch: next }))),
     settingRow('automatic updates', 'check for a new version on launch and every few hours.', switchEl(automaticUpdates, (next) => void bridge.setPreferences({ automaticUpdates: next }))),
     settingRow('Feega Cloud (beta)', 'share and comment through Feega Cloud. applies to editors opened from now on.', switchEl(cloud, (next) => void bridge.setPreferences({ cloud: next }))),
+    settingRow('onboarding', 'walk through the welcome steps again.', pill('show again', 'outline small', run(() => bridge.replayOnboarding()))),
     settingRow('anonymous usage data', 'counts only, never your code. off starts the editor with FEEGA_TELEMETRY=0.', switchEl(telemetry, (next) => void bridge.setPreferences({ telemetry: next })))
   );
 };
@@ -261,7 +248,7 @@ const settingsView = (state: ShellState): View => ({
 const renderBar = (state: ShellState) => {
   const known = rendered;
   rendered = new Set(state.tabs.map((t) => t.id));
-  const home = el('button', { class: `home${state.active === null ? ' on' : ''}`, html: mark(), title: 'projects', on: run(() => bridge.activate(null)) });
+  const home = el('button', { class: `home${state.active === null ? ' on' : ''}`, html: mark(), title: 'projects', on: goHome });
   const add = el('button', { class: 'add', html: PLUS, title: 'new project or open folder', on: run(() => bridge.activate(null)) });
   bar.replaceChildren(home, ...state.tabs.map((tab) => tabChip(tab, tab.id === state.active, !known.has(tab.id))), add, el('span', { class: 'grow' }), ...invitePill(state), ...updatePill(state), accountChip(state));
   document.querySelector('.menu')?.remove();
@@ -308,15 +295,19 @@ const openCard = (alone: boolean) =>
   el(
     'button',
     { class: `card open${alone ? ' wide' : ''}`, on: run(() => bridge.pickFolder()) },
-    art('start', alone ? 10 : 6),
+    art('folder', alone ? 10 : 6),
     el('div', {}, el('div', { class: 'name', text: 'open folder' }), el('div', { class: 'hint', text: alone ? OPEN_HINT : OPEN_HINT_SHORT }))
   );
+
+const NEW_PROJECT_LOGOS: Logo[] = ['Next', 'Nuxt', 'Svelte', 'Astro', 'React', 'Vue'];
+
+const logoRow = () => el('span', { class: 'logos', html: NEW_PROJECT_LOGOS.map((logo) => `<svg viewBox="0 0 24 24" fill="currentColor"><path d="${LOGO_PATHS[logo]}"/></svg>`).join('') });
 
 const newProjectCard = (alone: boolean) =>
   el(
     'button',
-    { class: `card open${alone ? ' wide' : ''}`, on: () => showRoute(Route.NewProject) },
-    art('start', alone ? 10 : 6),
+    { class: `card open new${alone ? ' wide' : ''}`, on: () => showRoute(Route.NewProject) },
+    logoRow(),
     el('div', {}, el('div', { class: 'name', text: 'new project' }), el('div', { class: 'hint', text: 'pick a framework and a template. feega sets it up and opens the editor.' }))
   );
 
@@ -327,7 +318,7 @@ const dashboardView = (state: ShellState): View => ({
       'div',
       { class: 'dash' },
       el('div', { class: 'dash-head' }, el('div', {}, el('p', { class: 'kicker', text: 'feega desktop' }), el('h1', { class: 'display page-title', text: 'projects' })), el('div', { class: 'actions' }, pill('open folder', 'outline', run(() => bridge.pickFolder())), pill('new project', 'primary', () => showRoute(Route.NewProject)))),
-      el('div', { class: 'grid' }, newProjectCard(state.recents.length === 0), openCard(state.recents.length === 0), ...state.recents.map(recentCard))
+      el('div', { class: 'grid' }, el('div', { class: 'starts' }, newProjectCard(state.recents.length === 0), openCard(state.recents.length === 0)), ...state.recents.map(recentCard))
     )
 });
 
@@ -342,7 +333,23 @@ type Draft = { stack: Stack; template: Template; name: string; parent: string };
 
 const draft: Draft = { stack: Stack.ReactVite, template: Template.Landing, name: '', parent: '' };
 
-const choiceRow = <T extends string>(options: [T, string][], current: T, choose: (value: T) => void) => el('div', { class: 'choices' }, ...options.map(([value, label]) => el('button', { class: `choice${value === current ? ' on' : ''}`, text: label, on: () => choose(value) })));
+const logoSvg = (logo: Logo) => `<svg viewBox="0 0 24 24" fill="currentColor"><path d="${LOGO_PATHS[logo]}"/></svg>`;
+
+const STACK_LOGO: Record<Stack, Logo> = {
+  [Stack.ReactVite]: 'React',
+  [Stack.Next]: 'Next',
+  [Stack.SvelteKit]: 'Svelte',
+  [Stack.VueVite]: 'Vue',
+  [Stack.Astro]: 'Astro',
+  [Stack.Nuxt]: 'Nuxt'
+};
+
+const choiceRow = <T extends string>(options: [T, string][], current: T, choose: (value: T) => void, logos: Partial<Record<T, Logo>> = {}) =>
+  el('div', { class: 'choices' }, ...options.map(([value, label]) => {
+    const logo = logos[value];
+    const html = logo ? `${logoSvg(logo)}<span>${label}</span>` : `<span>${label}</span>`;
+    return el('button', { class: `choice${value === current ? ' on' : ''}`, html, on: () => choose(value) });
+  }));
 
 const rerender = () => {
   shownKey = '';
@@ -378,7 +385,7 @@ const newProjectView = (state: ShellState): View => ({
       }
       void bridge.createProject({ parent: draft.parent, name: draft.name, stack: draft.stack, template: draft.template }).then(() => showRoute(Route.Home));
     };
-    const frameworks = choiceRow(Object.values(Stack).map((stack): [Stack, string] => [stack, STACKS[stack].label]), draft.stack, (stack) => ((draft.stack = stack), rerender()));
+    const frameworks = choiceRow(Object.values(Stack).map((stack): [Stack, string] => [stack, STACKS[stack].label]), draft.stack, (stack) => ((draft.stack = stack), rerender()), STACK_LOGO);
     const templates = choiceRow(Object.values(Template).map((template): [Template, string] => [template, TEMPLATE_LABELS[template]]), draft.template, (template) => ((draft.template = template), rerender()));
     const folder = el('button', { class: 'pill outline small', text: tidyPath(draft.parent), title: draft.parent, on: run(async () => ((draft.parent = (await bridge.pickParent()) ?? draft.parent), rerender())) });
     return el(
@@ -465,7 +472,23 @@ const TAB_VIEWS: Record<TabStatus, (tab: TabInfo) => View> = {
   [TabStatus.Ready]: (tab) => ({ key: `ready:${tab.id}`, build: () => el('div') })
 };
 
+const onboardingDeps: OnboardingDeps = {
+  signIn: () => bridge.signIn(),
+  cancelSignIn: () => bridge.cancelSignIn(),
+  openUrl: (url) => bridge.openUrl(url),
+  copy: (text) => bridge.copy(text),
+  detectAgents: () => bridge.detectAgents(),
+  finish: async () => {
+    route = Route.Home;
+    await bridge.finishOnboarding();
+  },
+  changed: () => lastState && render(lastState)
+};
+
 const viewOf = (state: ShellState): View => {
+  if (!state.onboarded) {
+    return onboardingView(state, onboardingDeps);
+  }
   if (state.node.status === NodeStatus.Problem) {
     return nodeView(state);
   }
@@ -502,6 +525,7 @@ const renderMain = (state: ShellState) => {
 
 function render(state: ShellState) {
   lastState = state;
+  syncOverlay();
   renderBar(state);
   renderMain(state);
 }
@@ -514,6 +538,10 @@ document.addEventListener('click', (event) => {
 
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') {
+    if (lastState?.onboarded === false) {
+      skipOnboarding(onboardingDeps);
+      return;
+    }
     if (menuOpen) {
       toggleMenu(false);
       return;

@@ -341,6 +341,7 @@ export enum ShareState {
 export enum OnboardingStep {
   Welcome = 'welcome',
   Agent = 'agent',
+  LocalAgents = 'local_agents',
   Agents = 'agents',
   SignIn = 'sign_in',
   Support = 'support'

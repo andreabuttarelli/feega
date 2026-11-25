@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { Channel, type Link, type Preferences, type ShellState } from './types';
 import type { NewProjectAsk } from './project-creator';
+import type { AcpAgent } from '../../../inspect/src/host/ai/acp-agents';
 
 window.addEventListener('DOMContentLoaded', () => {
   document.documentElement.dataset.platform = process.platform;
@@ -31,6 +32,11 @@ contextBridge.exposeInMainWorld('feega', {
   createProject: (ask: Omit<NewProjectAsk, 'parent'> & { parent: string }) => call(Channel.CreateProject, ask),
   dismissInvite: () => call(Channel.DismissInvite),
   clearProject: () => call(Channel.ClearProject),
+  finishOnboarding: () => call(Channel.FinishOnboarding),
+  replayOnboarding: () => call(Channel.ReplayOnboarding),
+  detectAgents: (): Promise<AcpAgent[]> => call(Channel.DetectAgents),
+  copy: (text: string) => call(Channel.Copy, text),
+  openUrl: (url: string) => call(Channel.OpenUrl, url),
   onSettings: (listener: () => void) => ipcRenderer.on(Channel.ShowSettings, () => listener()),
   onState: (listener: (state: ShellState) => void) => ipcRenderer.on(Channel.State, (_event, state) => listener(state))
 });

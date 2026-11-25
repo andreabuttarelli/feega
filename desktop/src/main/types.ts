@@ -34,7 +34,7 @@ export type NodeState = { status: NodeStatus; message: string };
 
 export type ProjectState = { name: string; step: string; line: string; error: string };
 
-export type ShellState = { tabs: TabInfo[]; active: string | null; email: string | null; signingIn: boolean; skipped: boolean; recents: RecentInfo[]; preferences: Preferences; update: UpdateInfo; node: NodeState; project: ProjectState | null; invite: boolean; documents: string };
+export type ShellState = { tabs: TabInfo[]; active: string | null; email: string | null; signingIn: boolean; skipped: boolean; recents: RecentInfo[]; preferences: Preferences; update: UpdateInfo; node: NodeState; project: ProjectState | null; invite: boolean; documents: string; onboarded: boolean };
 
 export enum Link {
   Account = 'account',
@@ -70,5 +70,10 @@ export enum Channel {
   ClearProject = 'clear-project',
   Alert = 'alert',
   AlertClear = 'alert-clear',
-  OpenChat = 'open-chat'
+  OpenChat = 'open-chat',
+  FinishOnboarding = 'finish-onboarding',
+  ReplayOnboarding = 'replay-onboarding',
+  OpenUrl = 'open-url',
+  Copy = 'copy',
+  DetectAgents = 'detect-agents'
 }

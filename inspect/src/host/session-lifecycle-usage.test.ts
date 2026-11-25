@@ -106,7 +106,7 @@ describe('onboarding in the usage stream', () => {
   });
 
   it('keeps the step ids the server accepts', () => {
-    expect(Object.values(OnboardingStep)).toEqual(['welcome', 'agent', 'agents', 'sign_in', 'support']);
+    expect(Object.values(OnboardingStep)).toEqual(['welcome', 'agent', 'local_agents', 'agents', 'sign_in', 'support']);
   });
 });
 
