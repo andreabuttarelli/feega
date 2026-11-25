@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildCatalog } from '../../../packages/library/src/catalog';
-import { Step, scaffoldProject, type ScaffoldPorts } from './scaffold';
+import { scaffoldProject, type ScaffoldPorts } from './scaffold';
+import { Step } from './step';
 import { Stack } from './stacks';
 import { Template } from './templates';
 

@@ -2,15 +2,9 @@ import { join } from 'node:path';
 import type { Catalog } from '../../../packages/library/src/catalog';
 import { planInit, type Files } from '../init';
 import { composeProject, projectName } from './compose';
+import { Step } from './step';
 import { STACKS, Stack } from './stacks';
 import type { Template } from './templates';
-
-export enum Step {
-  Files = 'files',
-  Plugin = 'plugin',
-  Install = 'install',
-  Done = 'done'
-}
 
 export type ScaffoldPorts = {
   occupied: (dir: string) => Promise<boolean>;

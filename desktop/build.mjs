@@ -8,7 +8,7 @@ const CLI = here('../npx/dist/cli.cjs');
 
 const exists = (path) => access(path).then(() => true, () => false);
 
-if (!(await exists(CLI))) {
+if (process.env.FEEGA_REUSE_CLI !== '1' || !(await exists(CLI))) {
   execFileSync('npm', ['run', 'build'], { cwd: here('../npx'), stdio: 'inherit' });
 }
 
