@@ -20,12 +20,18 @@ function setup(files: Record<string, string> = {}, appDir = '') {
 
 describe('pluginCalls', () => {
   it('says whether the app uses TypeScript', async () => {
-    expect(await setup({ 'tsconfig.json': '{}' }).run({ call: PluginCall.Project })).toEqual({ ok: true, value: { typescript: true, publicDir: 'public' } });
-    expect(await setup().run({ call: PluginCall.Project })).toEqual({ ok: true, value: { typescript: false, publicDir: 'public' } });
+    expect(await setup({ 'tsconfig.json': '{}' }).run({ call: PluginCall.Project })).toEqual({ ok: true, value: { typescript: true, publicDir: 'public', packages: {} } });
+    expect(await setup().run({ call: PluginCall.Project })).toEqual({ ok: true, value: { typescript: false, publicDir: 'public', packages: {} } });
   });
 
   it('looks for tsconfig inside the app directory', async () => {
-    expect(await setup({ 'apps/web/tsconfig.json': '{}' }, 'apps/web').run({ call: PluginCall.Project })).toEqual({ ok: true, value: { typescript: true, publicDir: 'public' } });
+    expect(await setup({ 'apps/web/tsconfig.json': '{}' }, 'apps/web').run({ call: PluginCall.Project })).toEqual({ ok: true, value: { typescript: true, publicDir: 'public', packages: {} } });
+  });
+
+  it('lists the packages of the app, dependencies and dev dependencies', async () => {
+    const manifest = JSON.stringify({ dependencies: { react: '^19.0.0' }, devDependencies: { vite: '^6.0.0' } });
+    expect(await setup({ 'apps/web/package.json': manifest }, 'apps/web').run({ call: PluginCall.Project })).toMatchObject({ value: { packages: { react: '^19.0.0', vite: '^6.0.0' } } });
+    expect(await setup({ 'package.json': '{broken' }).run({ call: PluginCall.Project })).toMatchObject({ value: { packages: {} } });
   });
 
   it('serves static files from static in a SvelteKit app', async () => {
