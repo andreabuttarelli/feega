@@ -55,6 +55,56 @@ describe('focus tab', () => {
     expect(frame()!.srcdoc).not.toContain('#f4f4f6');
   });
 
+  describe('zoom', () => {
+    const zoomed = (up: Record<string, unknown>[]) => up.filter((m) => m.type === 'feega:focus-zoomed').map((m) => m.zoom);
+    const rootVar = (frame: HTMLIFrameElement) => frame.contentDocument!.documentElement.style.getPropertyValue('--feega-zoom');
+
+    it('opens at real size, not fitted', () => {
+      const { send, frame } = bridged();
+      send({ type: 'feega:focus', source: 'src/Card.tsx:5:7', index: 0 });
+
+      expect(rootVar(frame()!)).toBe('');
+      expect(frame()!.srcdoc).toContain('zoom:var(--feega-zoom,1)');
+    });
+
+    it('sets the zoom and says what it is', () => {
+      const { up, send, frame } = bridged();
+      send({ type: 'feega:focus', source: 'src/Card.tsx:5:7', index: 0 });
+      send({ type: 'feega:focus-zoom', mode: 'set', value: 2 });
+
+      expect(zoomed(up)).toEqual([2]);
+      expect(rootVar(frame()!)).toBe('2');
+    });
+
+    it('zooms by a factor and keeps within the limits', () => {
+      const { up, send } = bridged();
+      send({ type: 'feega:focus', source: 'src/Card.tsx:5:7', index: 0 });
+      send({ type: 'feega:focus-zoom', mode: 'by', value: 2 });
+      send({ type: 'feega:focus-zoom', mode: 'by', value: 100 });
+      send({ type: 'feega:focus-zoom', mode: 'set', value: 0.001 });
+
+      expect(zoomed(up)).toEqual([2, 8, 0.1]);
+    });
+
+    it('keeps the zoom when another instance opens', () => {
+      const { win, send, frame } = bridged();
+      send({ type: 'feega:focus', source: 'src/Card.tsx:5:7', index: 0 });
+      send({ type: 'feega:focus-zoom', mode: 'set', value: 2 });
+      send({ type: 'feega:focus', source: 'src/Card.tsx:5:7', index: 1 });
+      frame()!.dispatchEvent(new (win as unknown as typeof globalThis).Event('load'));
+
+      expect(rootVar(frame()!)).toBe('2');
+    });
+
+    it('fits to real size when nothing can be measured', () => {
+      const { up, send } = bridged();
+      send({ type: 'feega:focus', source: 'src/Card.tsx:5:7', index: 0 });
+      send({ type: 'feega:focus-zoom', mode: 'fit' });
+
+      expect(zoomed(up)).toEqual([1]);
+    });
+  });
+
   it('swaps the instance when another one is asked for', () => {
     const { send, frame } = bridged();
     send({ type: 'feega:focus', source: 'src/Card.tsx:5:7', index: 0 });

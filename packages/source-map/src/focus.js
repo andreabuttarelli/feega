@@ -4,6 +4,7 @@ import { fileOf, rootOf, taggedParent } from './component-root.js';
 import { mountUrlFor } from './mount-hosts.js';
 import { FocusMode, MOUNT_STATUS, Status } from './mount-protocol.js';
 import { Why, reasonOf } from './snapshot-reason.js';
+import { fitScale } from './variant-grid.js';
 
 export const FOCUSED = 'feega:focused';
 const NESTED_HOST = Symbol.for('feega.nested-host');
@@ -22,11 +23,16 @@ const SCHEMES = {
   dark: { base: '#1c1c20', checker: '#232328' }
 };
 const DEFAULT_SCHEME = 'light';
+export const FOCUS_ZOOMED = 'feega:focus-zoomed';
+const ZOOM_VAR = '--feega-zoom';
+const NO_ZOOM = 1;
+const MIN_ZOOM = 0.1;
+const MAX_ZOOM = 8;
 const STYLESHEETS = 'link[rel~="stylesheet"], style';
 
 export const canvasCss = (scheme = DEFAULT_SCHEME) => {
   const { base, checker } = SCHEMES[scheme] ?? SCHEMES[DEFAULT_SCHEME];
-  return `html{min-height:100%;background-color:${base}!important;background-image:conic-gradient(${checker} 25%,transparent 0 50%,${checker} 0 75%,transparent 0)!important;background-size:${CHECKER_PX * 2}px ${CHECKER_PX * 2}px!important}body{display:flex!important;flex-wrap:wrap;align-items:center;align-content:center;justify-content:center;gap:${GAP_PX}px;box-sizing:border-box;min-height:100vh;margin:0!important;padding:${PADDING_PX}px!important;background:transparent!important}`;
+  return `html{min-height:100%;background-color:${base}!important;background-image:conic-gradient(${checker} 25%,transparent 0 50%,${checker} 0 75%,transparent 0)!important;background-size:${CHECKER_PX * 2}px ${CHECKER_PX * 2}px!important}body>*{zoom:var(${ZOOM_VAR},1)}body{display:flex!important;flex-wrap:wrap;align-items:center;align-content:center;justify-content:center;gap:${GAP_PX}px;box-sizing:border-box;min-height:100vh;margin:0!important;padding:${PADDING_PX}px!important;background:transparent!important}`;
 };
 
 export const CANVAS_CSS = canvasCss();
@@ -197,6 +203,7 @@ export function focusTab(win, { install, prepare, report }) {
   let timer = null;
   let mode = FocusMode.Snapshot;
   let scheme = DEFAULT_SCHEME;
+  let zoomNow = NO_ZOOM;
   let visible = true;
   let why = null;
   const failed = new Map();
@@ -237,10 +244,29 @@ export function focusTab(win, { install, prepare, report }) {
           carryPage(win.document, mine.contentDocument, rootOf(win.document, source, index));
           mine.contentDocument.getElementById(CANVAS_ID)?.replaceChildren(canvasCss(scheme));
         }
+        mine.contentDocument.documentElement.style.setProperty(ZOOM_VAR, String(zoomNow));
         install(mine.contentWindow);
       }
     });
     win.document.documentElement.append(frame);
+  }
+
+  function showZoom(next) {
+    zoomNow = next;
+    frame?.contentDocument?.documentElement.style.setProperty(ZOOM_VAR, String(zoomNow));
+    report({ type: FOCUS_ZOOMED, zoom: zoomNow });
+  }
+
+  function fitted() {
+    const inner = frame?.contentDocument;
+    if (!inner) {
+      return NO_ZOOM;
+    }
+    inner.documentElement.style.setProperty(ZOOM_VAR, String(NO_ZOOM));
+    const range = inner.createRange();
+    range.selectNodeContents(inner.body);
+    const box = range.getBoundingClientRect?.() ?? { width: 0, height: 0 };
+    return fitScale({ width: box.width, height: box.height }, { width: frame.contentWindow.innerWidth, height: frame.contentWindow.innerHeight }, PADDING_PX);
   }
 
   function drop() {
@@ -308,6 +334,10 @@ export function focusTab(win, { install, prepare, report }) {
     close() {
       drop();
       wanted = null;
+    },
+    zoom({ mode, value }) {
+      const next = { fit: () => fitted(), set: () => value, by: () => zoomNow * value }[mode]?.() ?? NO_ZOOM;
+      showZoom(Math.min(Math.max(next, MIN_ZOOM), MAX_ZOOM));
     },
     canvas(next) {
       scheme = next;

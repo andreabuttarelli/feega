@@ -1,4 +1,5 @@
 const MAX_ZOOM = 4;
+const MIN_ZOOM = 0.1;
 const NO_ZOOM = 1;
 
 const valueText = (value) => (typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value));
@@ -21,10 +22,10 @@ export function gridOf(variants) {
   return { columnName, columns, rows: [...byRow.values()] };
 }
 
-export function fitZoom(box, canvas, padding) {
+export function fitScale(box, canvas, padding) {
   if (!box.width || !box.height) {
     return NO_ZOOM;
   }
   const fit = Math.min((canvas.width - padding * 2) / box.width, (canvas.height - padding * 2) / box.height);
-  return Math.min(Math.max(fit, NO_ZOOM), MAX_ZOOM);
+  return Math.min(Math.max(fit, MIN_ZOOM), MAX_ZOOM);
 }
