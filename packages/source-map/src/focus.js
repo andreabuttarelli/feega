@@ -18,10 +18,12 @@ const REFRESH_MS = 150;
 export const PADDING_PX = 48;
 const GAP_PX = 32;
 const CHECKER_PX = 16;
+export const CANVAS_LIGHT = '#e5e5e5';
+export const CANVAS_DARK = '#2b2b2b';
 const STYLESHEETS = 'link[rel~="stylesheet"], style';
 const SCHEMES = {
-  light: { base: '#ffffff', fill: '#e6e6ea', checker: '#dcdce1' },
-  dark: { base: '#1c1c20', fill: '#1c1c20', checker: '#232328' }
+  light: { base: CANVAS_LIGHT, fill: CANVAS_LIGHT, checker: '#d6d6d6' },
+  dark: { base: CANVAS_DARK, fill: CANVAS_DARK, checker: '#343434' }
 };
 const DEFAULT_SCHEME = 'light';
 export const FOCUS_ZOOMED = 'feega:focus-zoomed';
@@ -62,21 +64,20 @@ function isDark(bg) {
 
 const paletteOf = (scheme) => SCHEMES[scheme] ?? SCHEMES[DEFAULT_SCHEME];
 
-function surfaceOf({ scheme, bg, transparent }) {
+function surfaceOf({ scheme, transparent }) {
   const { base, fill, checker } = paletteOf(scheme);
-  const size = `${CHECKER_PX * 2}px ${CHECKER_PX * 2}px`;
   if (transparent) {
+    const size = `${CHECKER_PX * 2}px ${CHECKER_PX * 2}px`;
     return `background-color:${fill}!important;background-image:conic-gradient(${checker} 25%,transparent 0 50%,${checker} 0 75%,transparent 0)!important;background-size:${size}!important`;
   }
-  const own = bg && isDark(bg) === (scheme === 'dark') ? bg : null;
-  return `background-color:${own ? own.color : base}!important;background-image:${own && own.image ? own.image : NO_IMAGE}!important`;
+  return `background-color:${base}!important;background-image:${NO_IMAGE}!important`;
 }
 
 const LAYOUT_CSS = `body>*{zoom:var(${ZOOM_VAR},1)}body{display:flex!important;flex-wrap:wrap;align-items:center;align-content:center;justify-content:center;gap:${GAP_PX}px;box-sizing:border-box;min-height:100vh;margin:0!important;padding:${PADDING_PX}px!important;background:transparent!important}`;
 
 export const SURFACE_ID = 'feega-focus-surface';
 
-export const surfaceCss = (canvas = {}) => `html{min-height:100%;${surfaceOf({ scheme: DEFAULT_SCHEME, bg: null, transparent: false, ...canvas })}}`;
+export const surfaceCss = (canvas = {}) => `html{min-height:100%;${surfaceOf({ scheme: DEFAULT_SCHEME, transparent: false, ...canvas })}}`;
 
 export const canvasCss = ({ layoutOnly = false, ...canvas } = {}) => (layoutOnly ? LAYOUT_CSS : surfaceCss(canvas) + LAYOUT_CSS);
 
@@ -300,7 +301,7 @@ export function focusTab(win, { install, prepare, report }) {
 
   const canvasNow = () => ({ scheme: chosen ?? (isDark(bg) ? 'dark' : DEFAULT_SCHEME), bg, transparent });
 
-  const surfaceColor = () => (canvasNow().transparent ? paletteOf(canvasNow().scheme).fill : (isDark(bg) === (canvasNow().scheme === 'dark') && bg ? bg.color : paletteOf(canvasNow().scheme).base));
+  const surfaceColor = () => paletteOf(canvasNow().scheme).base;
 
   function putSurface(inner) {
     const style = inner.getElementById(SURFACE_ID) ?? inner.head.appendChild(inner.createElement('style'));

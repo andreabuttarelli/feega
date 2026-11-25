@@ -78,31 +78,33 @@ describe('focus tab', () => {
 
   describe('canvas background', () => {
     const canvas = (srcdoc: string) => srcdoc.match(/<style id="feega-focus-canvas">([^<]*)<\/style>/)![1];
+    const LIGHT = '#e5e5e5';
+    const DARK = '#2b2b2b';
 
-    it('uses the background the component sits on, found above it on the page', () => {
+    it('is light grey when the page behind the component is light or paints nothing', () => {
+      const { send, frame } = bridged();
+      send({ type: 'feega:focus', source: 'src/Card.tsx:5:7', index: 0 });
+
+      expect(canvas(frame()!.srcdoc)).toContain(`background-color:${LIGHT}`);
+      expect(canvas(frame()!.srcdoc)).not.toContain('conic-gradient');
+    });
+
+    it('is dark grey, not the page color, when the page behind is dark', () => {
       const { win, send, frame } = bridged();
       win.document.querySelector('main')!.setAttribute('style', 'background-color: rgb(10, 10, 10)');
       send({ type: 'feega:focus', source: 'src/Card.tsx:5:7', index: 0 });
 
-      expect(canvas(frame()!.srcdoc)).toContain('background-color:rgb(10, 10, 10)');
-      expect(canvas(frame()!.srcdoc)).not.toContain('conic-gradient');
+      expect(canvas(frame()!.srcdoc)).toContain(`background-color:${DARK}`);
+      expect(canvas(frame()!.srcdoc)).not.toContain('rgb(10, 10, 10)');
     });
 
-    it('takes the nearest ancestor that paints, not a farther one', () => {
+    it('judges by the nearest ancestor that paints, not a farther one', () => {
       const { win, send, frame } = bridged();
       win.document.body.setAttribute('style', 'background-color: rgb(1, 1, 1)');
-      win.document.querySelector('main')!.setAttribute('style', 'background-color: rgb(20, 30, 40)');
+      win.document.querySelector('main')!.setAttribute('style', 'background-color: rgb(240, 240, 240)');
       send({ type: 'feega:focus', source: 'src/Card.tsx:5:7', index: 0 });
 
-      expect(canvas(frame()!.srcdoc)).toContain('rgb(20, 30, 40)');
-    });
-
-    it('keeps a background image as well as the color', () => {
-      const { win, send, frame } = bridged();
-      win.document.body.setAttribute('style', 'background-image: linear-gradient(red, blue)');
-      send({ type: 'feega:focus', source: 'src/Card.tsx:5:7', index: 0 });
-
-      expect(canvas(frame()!.srcdoc)).toContain('background-image:linear-gradient(red, blue)');
+      expect(canvas(frame()!.srcdoc)).toContain(`background-color:${LIGHT}`);
     });
 
     it('tells the view when the page behind is dark', () => {
@@ -113,32 +115,28 @@ describe('focus tab', () => {
       expect(up).toContainEqual(expect.objectContaining({ type: 'feega:focused', dark: true }));
     });
 
-    it('is white and not dark when nothing on the page paints', () => {
-      const { up, send, frame } = bridged();
+    it('is not dark when nothing on the page paints', () => {
+      const { up, send } = bridged();
       send({ type: 'feega:focus', source: 'src/Card.tsx:5:7', index: 0 });
 
       expect(up).toContainEqual(expect.objectContaining({ type: 'feega:focused', dark: false }));
-      expect(canvas(frame()!.srcdoc)).toContain('background-color:#ffffff');
     });
 
     it('draws the checkerboard only when asked for a transparent canvas', () => {
-      const { win, send, frame } = bridged();
-      win.document.body.setAttribute('style', 'background-color: rgb(10, 10, 10)');
+      const { send, frame } = bridged();
       send({ type: 'feega:focus', source: 'src/Card.tsx:5:7', index: 0 });
       send({ type: 'feega:focus-canvas', scheme: 'dark', transparent: true });
 
       expect(canvas(frame()!.srcdoc)).toContain('conic-gradient');
     });
 
-    it('swaps to the palette when the scheme is the opposite of the page', () => {
-      const { win, send, frame } = bridged();
-      win.document.body.setAttribute('style', 'background-color: rgb(10, 10, 10)');
+    it('switches between the two greys with the scheme', () => {
+      const { send, frame } = bridged();
       send({ type: 'feega:focus', source: 'src/Card.tsx:5:7', index: 0 });
-      send({ type: 'feega:focus-canvas', scheme: 'light' });
-
-      expect(canvas(frame()!.srcdoc)).toContain('#ffffff');
       send({ type: 'feega:focus-canvas', scheme: 'dark' });
-      expect(canvas(frame()!.srcdoc)).toContain('rgb(10, 10, 10)');
+      expect(canvas(frame()!.srcdoc)).toContain(`background-color:${DARK}`);
+      send({ type: 'feega:focus-canvas', scheme: 'light' });
+      expect(canvas(frame()!.srcdoc)).toContain(`background-color:${LIGHT}`);
     });
   });
 
@@ -381,7 +379,7 @@ describe('focus tab', () => {
       expect(body.style.color).toBe('rgb(1, 2, 3)');
     });
 
-    it('paints the real component on the page background, in a style the mount runtime does not own', () => {
+    it('paints the real component on a grey surface, in a style the mount runtime does not own', () => {
       const { win, send, frame } = reactive();
       win.document.body.setAttribute('style', 'background-color: rgb(10, 10, 10)');
       send({ type: 'feega:focus', source: 'src/Card.tsx:5:7' });
@@ -390,7 +388,7 @@ describe('focus tab', () => {
       const inner = frame()!.contentDocument!;
       inner.head.insertAdjacentHTML('beforeend', `<style id="feega-focus-canvas">${canvasCss({ layoutOnly: true })}</style>`);
 
-      expect(inner.getElementById('feega-focus-surface')!.textContent).toContain('background-color:rgb(10, 10, 10)');
+      expect(inner.getElementById('feega-focus-surface')!.textContent).toContain('background-color:#2b2b2b');
       expect(inner.getElementById('feega-focus-canvas')!.textContent).not.toContain('background-color');
     });
 

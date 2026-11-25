@@ -46,9 +46,9 @@ If the component cannot render alone, for example because its provider lives ins
 
 ## Canvas, light and dark, zoom
 
-The component sits on the real background of your page: Feega walks up from the instance to the first ancestor that paints a color or image and uses it, so white text on a dark site stays readable. The checkerboard button in the tab bar switches to a transparent checkerboard instead.
+The component sits on one of two neutral greys: a dark grey when the background behind the instance on your page is dark, a light grey otherwise, so white text on a dark site stays readable. The checkerboard button in the tab bar switches to a transparent checkerboard instead.
 
-The sun or moon button is always in the tab bar. It starts in the scheme of the page behind the component. With a dark theme in the project it switches to that theme and back, through the same theme preview as the toolbar. Without one it emulates `prefers-color-scheme: dark` in the tab, and the canvas follows the scheme.
+The sun or moon button is always in the tab bar. It starts in the scheme of the page behind the component and also switches the canvas between the two greys. With a dark theme in the project it switches to that theme and back, through the same theme preview as the toolbar. Without one it emulates `prefers-color-scheme: dark` in the tab, and the canvas follows the scheme.
 
 The component opens at its real size, centered. Use Fit, minus, plus and the percentage (it resets to 100%) in the tab bar, or Cmd or Ctrl with the mouse wheel, or pinch on a trackpad. Variants show at the same zoom.
 
