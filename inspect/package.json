@@ -2,7 +2,7 @@
   "name": "feega",
   "displayName": "Feega",
   "description": "Design in your codebase: click any element of your running app, edit it visually, and the change is written to your code. No AI, no tokens.",
-  "version": "0.2.19",
+  "version": "0.3.0",
   "publisher": "andreabuttarelli",
   "license": "Apache-2.0",
   "icon": "images/icon.png",
