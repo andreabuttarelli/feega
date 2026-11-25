@@ -22,9 +22,9 @@ export const DOWNLOAD_PAGE = {
     windowsNote: 'Windows may show "Windows protected your PC": click More info, then Run anyway.',
     linuxNote: 'make it executable, then run it:',
     linuxCommand: `chmod +x ${DESKTOP_LINUX_FILE} && ./${DESKTOP_LINUX_FILE}`,
-    mac: { name: 'macOS', files: DESKTOP_DMGS.map((d) => ({ label: d.arch, href: d.href, target: `dmg_${d.arch.toLowerCase().replace(' ', '_')}` })) },
-    windows: { name: 'Windows', badge: 'beta', files: [{ label: 'installer (.exe)', href: DESKTOP_WINDOWS.href, target: 'windows_exe' }] },
-    linux: { name: 'Linux', files: [{ label: 'AppImage', href: DESKTOP_LINUX.href, target: 'linux_appimage' }] }
+    mac: { name: 'macOS', files: DESKTOP_DMGS.map((d) => ({ label: d.arch, href: d.href, target: d.target })) },
+    windows: { name: 'Windows', badge: 'beta', files: [{ label: 'installer (.exe)', href: DESKTOP_WINDOWS.href, target: DESKTOP_WINDOWS.target }] },
+    linux: { name: 'Linux', files: [{ label: 'AppImage', href: DESKTOP_LINUX.href, target: DESKTOP_LINUX.target }] }
   },
   requirements: {
     heading: 'requirements',

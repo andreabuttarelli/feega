@@ -12,9 +12,9 @@
   const options = installOptions().filter((o) => !o.soon);
 
   const DESKTOP_ITEMS = [
-    ...DESKTOP_DMGS.map((dmg) => ({ icon: APPLE_ICON, label: `mac · ${dmg.arch.toLowerCase()}`, href: dmg.href, target: `dmg ${dmg.arch.toLowerCase()}` })),
-    { icon: WINDOWS_ICON, label: 'windows · beta', href: DESKTOP_WINDOWS.href, target: 'windows_exe' },
-    { icon: LINUX_ICON, label: 'linux · appimage', href: DESKTOP_LINUX.href, target: 'linux_appimage' }
+    ...DESKTOP_DMGS.map((dmg) => ({ icon: APPLE_ICON, label: `mac · ${dmg.arch.toLowerCase()}`, href: dmg.href, target: dmg.target })),
+    { icon: WINDOWS_ICON, label: 'windows · beta', href: DESKTOP_WINDOWS.href, target: DESKTOP_WINDOWS.target },
+    { icon: LINUX_ICON, label: 'linux · appimage', href: DESKTOP_LINUX.href, target: DESKTOP_LINUX.target }
   ];
   let open = $state(false);
   let copied = $state(false);

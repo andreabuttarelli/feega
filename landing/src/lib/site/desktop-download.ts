@@ -21,9 +21,9 @@ const OS_PATTERNS: readonly (readonly [Os, RegExp])[] = [
 ];
 
 const DOWNLOADS: Record<Os, DesktopDownload> = {
-  [Os.Mac]: { label: DOWNLOAD_LABEL, href: DESKTOP_DMGS[0].href, target: 'dmg_apple_silicon', icon: APPLE_ICON },
-  [Os.Windows]: { label: DOWNLOAD_LABEL, href: DESKTOP_WINDOWS.href, target: 'windows_exe', icon: WINDOWS_ICON },
-  [Os.Linux]: { label: DOWNLOAD_LABEL, href: DESKTOP_LINUX.href, target: 'linux_appimage', icon: LINUX_ICON },
+  [Os.Mac]: { label: DOWNLOAD_LABEL, href: DESKTOP_DMGS[0].href, target: DESKTOP_DMGS[0].target, icon: APPLE_ICON },
+  [Os.Windows]: { label: DOWNLOAD_LABEL, href: DESKTOP_WINDOWS.href, target: DESKTOP_WINDOWS.target, icon: WINDOWS_ICON },
+  [Os.Linux]: { label: DOWNLOAD_LABEL, href: DESKTOP_LINUX.href, target: DESKTOP_LINUX.target, icon: LINUX_ICON },
   [Os.Unknown]: { label: DOWNLOAD_LABEL, href: DOWNLOAD_PATH, target: 'download_page', icon: '' }
 };
 
