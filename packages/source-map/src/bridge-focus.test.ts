@@ -219,6 +219,24 @@ describe('focus tab', () => {
       expect(frame()!.srcdoc).toBe('');
     });
 
+    it('carries the page fonts and styles into the real component, which the mount page does not have', () => {
+      const { win, send, frame } = reactive();
+      const head = win.document.head;
+      head.insertAdjacentHTML('beforeend', '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter"><style>@font-face{font-family:Brand;src:url(fonts/brand.woff2)}</style>');
+      win.document.documentElement.className = '__variable_geist';
+      win.document.body.className = 'font-sans';
+      send({ type: 'feega:focus', source: 'src/Card.tsx:5:7' });
+      (frame()!.contentWindow as unknown as Record<symbol, boolean>)[Symbol.for('feega.nested-host')] = true;
+      frame()!.dispatchEvent(new (win as unknown as typeof globalThis).Event('load'));
+
+      const inner = frame()!.contentDocument!;
+      expect(inner.head.querySelector('link[href^="https://fonts.googleapis.com"]')).not.toBeNull();
+      expect(inner.head.innerHTML).toContain('font-family:Brand');
+      expect(inner.head.querySelector('base')?.getAttribute('href')).toBe(win.document.baseURI);
+      expect(inner.documentElement.classList.contains('__variable_geist')).toBe(true);
+      expect(inner.body.classList.contains('font-sans')).toBe(true);
+    });
+
     it('ignores a status from anything but the focus tab', () => {
       const { up, send, win } = reactive();
       send({ type: 'feega:focus', source: 'src/Card.tsx:5:7' });

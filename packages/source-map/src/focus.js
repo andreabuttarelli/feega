@@ -48,6 +48,36 @@ function headOf(doc) {
   return sheets.join('') + (adopted ? `<style>${adopted}</style>` : '');
 }
 
+const keyOf = (node) => node.getAttribute('data-vite-dev-id') ?? node.getAttribute('href') ?? node.textContent;
+
+function carryAttrs(from, to) {
+  for (const { name, value } of from.attributes) {
+    if (name === 'class') {
+      to.classList.add(...from.classList);
+    } else if (!to.hasAttribute(name)) {
+      to.setAttribute(name, value);
+    }
+  }
+}
+
+export function carryPage(doc, inner) {
+  const base = inner.createElement('base');
+  base.setAttribute('href', doc.baseURI);
+  inner.head.prepend(base);
+  carryAttrs(doc.documentElement, inner.documentElement);
+  carryAttrs(doc.body, inner.body);
+  const have = new Set([...inner.querySelectorAll(STYLESHEETS)].map(keyOf));
+  for (const node of doc.querySelectorAll(STYLESHEETS)) {
+    if (!have.has(keyOf(node))) {
+      inner.head.insertAdjacentHTML('beforeend', node.localName === 'style' ? styleOf(doc, node) : node.outerHTML);
+    }
+  }
+  const adopted = (doc.adoptedStyleSheets ?? []).map(ruleText).join('');
+  if (adopted) {
+    inner.head.insertAdjacentHTML('beforeend', `<style>${adopted}</style>`);
+  }
+}
+
 function ghostTree(doc, root) {
   const holder = doc.createElement('div');
   const kept = taggedParent(root);
@@ -178,6 +208,9 @@ export function focusTab(win, { install, prepare, report }) {
       }
       if (frame === mine) {
         loaded = true;
+        if (mode === FocusMode.Mount) {
+          carryPage(win.document, mine.contentDocument);
+        }
         install(mine.contentWindow);
       }
     });
