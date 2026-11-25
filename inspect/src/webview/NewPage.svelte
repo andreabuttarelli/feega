@@ -61,6 +61,25 @@
     position: relative;
   }
 
+  .icon {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    flex: none;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: none;
+    color: var(--ui-text-2);
+    cursor: pointer;
+  }
+
+  .icon:hover,
+  .icon.on {
+    background: var(--ui-input);
+    color: var(--ui-text);
+  }
+
   .panel {
     position: absolute;
     top: calc(100% + 6px);
