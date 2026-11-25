@@ -28,7 +28,7 @@ describe('the ACP agent catalog', () => {
   it('flags the agents that run through an npx adapter', () => {
     const all = acpAgents(envWith([]));
 
-    expect(all.filter((a) => a.adapter).map((a) => a.id)).toEqual([AcpId.Claude, AcpId.Codex]);
+    expect(all.filter((a) => a.adapter).map((a) => a.id)).toEqual([AcpId.Claude, AcpId.Codex, AcpId.Pi]);
   });
 
   it('launches each agent the way its ACP entry says', () => {
@@ -37,5 +37,23 @@ describe('the ACP agent catalog', () => {
     expect(launchOf(AcpId.Grok)).toEqual({ command: 'grok', args: ['agent', 'stdio'] });
     expect(launchOf(AcpId.Claude).command).toBe('npx');
     expect(launchOf(AcpId.Claude).args).toContain('@agentclientprotocol/claude-agent-acp@0.110.0');
+  });
+
+  it('launches the agents added from the ACP list the way their docs say', () => {
+    expect(launchOf(AcpId.Kiro)).toEqual({ command: 'kiro-cli', args: ['acp'] });
+    expect(launchOf(AcpId.Devin)).toEqual({ command: 'devin', args: ['acp'] });
+    expect(launchOf(AcpId.Augment)).toEqual({ command: 'auggie', args: ['--acp'] });
+    expect(launchOf(AcpId.Cline)).toEqual({ command: 'cline', args: ['--acp'] });
+    expect(launchOf(AcpId.Kimi)).toEqual({ command: 'kimi', args: ['acp'] });
+    expect(launchOf(AcpId.Qoder)).toEqual({ command: 'qodercli', args: ['--acp'] });
+    expect(launchOf(AcpId.Droid)).toEqual({ command: 'droid', args: ['exec', '--output-format', 'acp'] });
+    expect(launchOf(AcpId.Vibe)).toEqual({ command: 'vibe-acp', args: [] });
+    expect(launchOf(AcpId.Pi)).toEqual({ command: 'npx', args: ['-y', 'pi-acp@0.0.35'] });
+  });
+
+  it('finds the added agents by their binary', () => {
+    expect(byId(envWith(['/usr/bin/kiro-cli']), AcpId.Kiro).installed).toBe(true);
+    expect(byId(envWith(['/usr/bin/pi']), AcpId.Pi).installed).toBe(true);
+    expect(byId(envWith(['/usr/bin/vibe-acp']), AcpId.Vibe).installed).toBe(true);
   });
 });

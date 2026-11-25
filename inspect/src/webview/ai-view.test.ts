@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { AiState } from '../messages';
 import { ConfigCategory, ToolStatus } from '../host/ai/agent-session';
 import { Policy } from '../host/ai/permission-policy';
+import { AcpId } from '../host/ai/acp-agents';
 import { Dot, agoOf, isDanger, isThinking, markOf, pickerLabel, pickerOf, valueName, placeholderOf, statusOf } from './ai-view';
 import { ItemKind } from '../host/ai/transcript';
 
@@ -27,8 +28,14 @@ describe('the agent mark', () => {
     expect(markOf('claude', 'Claude Code').logo?.label).toBe('Claude Code');
   });
 
-  it('falls back to the initial', () => {
-    expect(markOf('goose', 'Goose')).toEqual({ logo: null, initial: 'G' });
+  it('has a real logo for every agent in the picker', () => {
+    const ids = Object.values(AcpId);
+
+    expect(ids.filter((id) => markOf(id, id).logo === null)).toEqual([]);
+  });
+
+  it('falls back to the initial for an unknown agent', () => {
+    expect(markOf('mystery', 'Mystery')).toEqual({ logo: null, initial: 'M' });
   });
 });
 

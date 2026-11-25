@@ -13,6 +13,7 @@ const OUTSIDE = 'is outside the workspace';
 const NOT_STARTED = 'start an agent first';
 const DELETE_ACTION = 'Delete';
 const FORGOT = "New session — the agent doesn't remember earlier messages";
+const VERSIONED_PACKAGE = /^@?[\w./-]+@\d/;
 const TITLE_MAX = 40;
 const KEPT_CHATS = 50;
 
@@ -41,7 +42,7 @@ export type AiChatDeps = {
   configured: (category: string, value: string) => void;
 };
 
-const adapterPackage = (id: AcpId): string => launchOf(id).args.find((arg) => arg.startsWith('@')) ?? launchOf(id).command;
+const adapterPackage = (id: AcpId): string => launchOf(id).args.find((arg) => VERSIONED_PACKAGE.test(arg)) ?? launchOf(id).command;
 
 const slice = (text: string, from?: number, count?: number): string => {
   if (from === undefined && count === undefined) {
