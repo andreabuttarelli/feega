@@ -8,7 +8,7 @@ import { publishBridge } from './publish';
 const rig = () => {
   let clock = 100;
   const registry = editorRegistry({ dir: mkdtempSync(join(tmpdir(), 'feega-pub-')), alive: () => true });
-  const state = { selection: () => 'ctx', changes: () => [] };
+  const state = { selection: () => 'ctx', changes: () => [], screenshot: async () => null, context: async () => null };
   return { registry, publish: () => publishBridge({ registry, projectRoot: '/work/shop', state, pid: 7, now: () => clock }), tick: (to: number) => (clock = to) };
 };
 

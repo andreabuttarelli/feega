@@ -42,6 +42,17 @@ The download happens in the **Connect Feega to your agents** onboarding step, wh
 
 Select an element in the preview, then write. The element is attached to your message as a chip with its file, line and selector, and how widely it is shared. Remove the chip with the **×** to send the message without it.
 
+## Let the agent see the page
+
+When the agent accepts images, a **camera** button appears next to Send. It attaches a screenshot of the tab you are looking at: the page, or the component in the focus tab. Up to three screenshots go with the next message; remove one with its **×**.
+
+Feega also starts a small local server beside the agent, with two tools the agent can call on its own:
+
+- `feega_screenshot` returns a screenshot of the current tab. Pass `selection` to crop it to the selected element.
+- `feega_context` returns the same block the message box attaches: the selected elements with file, line and selector, plus the page, preview width, breakpoint, theme, state and focused component.
+
+The screenshot is drawn inside your page and goes from the editor to the agent on your machine; Feega does not upload it. Agents that do not accept images get no camera button. The same tools are available to any agent through [`npx feega mcp`](/more/connect-your-agent-via-mcp/).
+
 ## What the agent can do
 
 - Replies stream in as the agent writes them, with its plan and tool calls.

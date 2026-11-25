@@ -45,10 +45,12 @@ They need no sign-in. Open Feega in the project first, with `npx feega` or the V
 | Tool | Returns |
 |---|---|
 | `feega_selection` | The selected element: source file and line, selector, component and view. The same text as **Copy for agent**. |
+| `feega_screenshot` | A screenshot of the tab you are looking at, as an image. Pass `selection` to crop it to the selected element. |
+| `feega_context` | The block the AI tab attaches: selection, page, preview width, breakpoint, theme, state and focused component. Answers even with nothing selected. |
 | `feega_changes` | The visual edits made in this session: property, value, scope and the files each one touched. |
 | `feega_editors` | The Feega editors running on this machine, with their project. |
 
-`feega_selection` and `feega_changes` take an optional `project` folder to ask another editor. With several editors on one project, the one used last answers. When none is running, the tool says to open Feega in the project first, and names the projects that have it open.
+`feega_selection`, `feega_screenshot`, `feega_context` and `feega_changes` take an optional `project` folder to ask another editor. With several editors on one project, the one used last answers. When none is running, the tool says to open Feega in the project first, and names the projects that have it open.
 
 Feega listens on `127.0.0.1` only. Each editor writes its port and a random token to `~/.feega/editors`, readable by your user only, and requests without the token are refused.
 

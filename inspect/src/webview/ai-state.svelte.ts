@@ -4,7 +4,7 @@ import { AgentEventKind, type ConfigView, type ModeView } from '../host/ai/agent
 import { Policy } from '../host/ai/permission-policy';
 import { answered, heard, said, type Item } from '../host/ai/transcript';
 
-export const ai = $state<{ agents: AcpAgent[]; state: AiState; agent: string | null; items: Item[]; modes: ModeView[]; mode: string | null; configs: ConfigView[]; policy: Policy; chats: ChatRow[]; chat: string | null }>({ agents: [], state: AiState.Idle, agent: null, items: [], modes: [], mode: null, configs: [], policy: Policy.Ask, chats: [], chat: null });
+export const ai = $state<{ agents: AcpAgent[]; state: AiState; agent: string | null; items: Item[]; modes: ModeView[]; mode: string | null; configs: ConfigView[]; policy: Policy; chats: ChatRow[]; chat: string | null; images: boolean }>({ agents: [], state: AiState.Idle, agent: null, items: [], modes: [], mode: null, configs: [], policy: Policy.Ask, chats: [], chat: null, images: false });
 
 const mine = (chat: string | undefined): boolean => chat === undefined || chat === ai.chat;
 
@@ -21,9 +21,11 @@ export function aiHeard(message: ViewMessage) {
     ai.modes = message.modes;
     ai.mode = message.mode;
     ai.configs = message.configs;
+    ai.images = message.images ?? false;
   } else if (message.kind === ToView.AiState && mine(message.chat)) {
     ai.state = message.state;
     ai.agent = message.agent ?? null;
+    ai.images = message.images ?? ai.images;
   } else if (message.kind === ToView.AiPolicy) {
     ai.policy = message.policy;
   } else if (message.kind === ToView.AiEvent && mine(message.chat) && message.event.kind === AgentEventKind.Modes) {

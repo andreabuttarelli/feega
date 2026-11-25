@@ -11,6 +11,8 @@ import type { LoopMove } from '@feega/live-edit/move-loop-item';
 import type { Usage } from '@feega/live-edit/move-usage';
 import type { Json } from '@feega/live-edit/prop-syntax';
 import type { StructureOp } from '@feega/live-edit/structure';
+import type { ClassEntry, UseSite } from '@feega/live-edit/class-index';
+import type { ClassTarget } from '@feega/live-edit/class-rule';
 import type { Scope } from '@feega/live-edit/scoped-rule';
 import type { PageTarget } from '@feega/live-edit/page-rule';
 import type { ElementState } from '@feega/live-edit/element-state';
@@ -44,12 +46,17 @@ export type Author = { userId: string; name: string };
 export enum ImpactKind {
   Local = 'local',
   Component = 'component',
+  Class = 'class',
   Unknown = 'unknown'
 }
 
 export type UsageSite = { file: string; line: number };
 
-export type Impact = { kind: ImpactKind.Local } | { kind: ImpactKind.Component; name: string; files: UsageSite[] } | { kind: ImpactKind.Unknown; reason: string };
+export type ClassInfo = Omit<ClassEntry, 'uses'> & { uses: UseSite[]; elements: number; files: number };
+
+export type ClassesView = { at: string; element: ClassInfo[]; inFile: ClassInfo[]; dynamic: boolean };
+
+export type Impact = { kind: ImpactKind.Local } | { kind: ImpactKind.Component; name: string; files: UsageSite[] } | { kind: ImpactKind.Class; name: string; elements: number; files: UsageSite[] } | { kind: ImpactKind.Unknown; reason: string };
 
 export type ReadAsk = { component: string; usage: string; which?: { index: number; count: number } };
 
@@ -102,7 +109,7 @@ export enum Styling {
   Css = 'css'
 }
 
-export type EditAsk = LiveEditAsk & { css?: Record<string, string>; scope?: Scope; inner?: string; page?: PageTarget; state?: ElementState; breakpoint?: string; theme?: string };
+export type EditAsk = LiveEditAsk & { css?: Record<string, string>; scope?: Scope; inner?: string; page?: PageTarget; state?: ElementState; breakpoint?: string; theme?: string; cls?: ClassTarget };
 
 export enum ServerState {
   Detecting = 'detecting',
@@ -200,6 +207,7 @@ export enum ToHost {
   ImageChoose = 'image-choose',
   ImageUpload = 'image-upload',
   Wiring = 'wiring',
+  Classes = 'classes',
   Link = 'link',
   Attribute = 'attribute',
   ApplyProps = 'apply-props',
@@ -236,6 +244,7 @@ export enum ToHost {
   AiOpen = 'ai-open',
   AiRename = 'ai-rename',
   AiDelete = 'ai-delete',
+  AgentAnswer = 'agent-answer',
   AiRetry = 'ai-retry',
   Usage = 'usage'
 }
@@ -254,9 +263,14 @@ export type WebviewUsageDims = Partial<{ variant: string; mode: string; control:
 
 export type ChangeRow = { id: number; at: string; prop: string; value: string; scope: string; files: string[]; time: number; by?: string };
 
-export type Prefs = { size: string; custom: number | null; barClosed: boolean; route?: string; anchor?: string; barWidth?: number; leftWidth?: number; leftClosed?: boolean; layers?: Record<string, { hidden: string[]; locked: string[] }> };
+export type Prefs = { size: string; custom: number | null; barClosed: boolean; route?: string; anchor?: string; dock?: { edge: string; offset: number }; barWidth?: number; leftWidth?: number; leftClosed?: boolean; layers?: Record<string, { hidden: string[]; locked: string[] }> };
 
 export type ChatRow = { id: string; agent: AcpId; title: string; updatedAt: number; running: boolean };
+
+export enum AgentAsk {
+  Screenshot = 'screenshot',
+  Context = 'context'
+}
 
 export enum AdapterState {
   Installing = 'installing',
@@ -291,6 +305,7 @@ export enum ToView {
   SkillHint = 'skill-hint',
   ImageSaved = 'image-saved',
   Wiring = 'wiring',
+  Classes = 'classes',
   Comments = 'comments',
   Share = 'share',
   Library = 'library',
@@ -308,6 +323,7 @@ export enum ToView {
   AiPolicy = 'ai-policy',
   AiChats = 'ai-chats',
   AiChat = 'ai-chat',
+  AgentAsk = 'agent-ask',
   Adapters = 'adapters',
   PageCreated = 'page-created'
 }
@@ -395,6 +411,7 @@ export type HostMessage =
   | { kind: ToHost.ImageChoose }
   | { kind: ToHost.ImageUpload; name: string; data: string }
   | { kind: ToHost.Wiring; at: string; instance?: number }
+  | { kind: ToHost.Classes; at: string }
   | { kind: ToHost.Link; at: string; edit: LinkEdit; instance?: number }
   | { kind: ToHost.Attribute; at: string; name: string; value: string }
   | { kind: ToHost.ApplyProps; ask: ApplyAsk; gate?: Gate }
@@ -422,7 +439,7 @@ export type HostMessage =
   | { kind: ToHost.Cursor; at: Point | null }
   | { kind: ToHost.AiList }
   | { kind: ToHost.AiStart; agent: AcpId }
-  | { kind: ToHost.AiSend; text: string; context: string | null }
+  | { kind: ToHost.AiSend; text: string; context: string | null; images: string[] }
   | { kind: ToHost.AiCancel }
   | { kind: ToHost.Usage; event: WebviewUsage; dims?: WebviewUsageDims }
   | { kind: ToHost.AiAnswer; id: string; optionId: string | null }
@@ -432,7 +449,8 @@ export type HostMessage =
   | { kind: ToHost.AiOpen; chat: string }
   | { kind: ToHost.AiRename; chat: string; title: string }
   | { kind: ToHost.AiDelete; chat: string }
-  | { kind: ToHost.AiRetry };
+  | { kind: ToHost.AiRetry }
+  | { kind: ToHost.AgentAnswer; id: number; png: string | null; text: string | null };
 
 export type Authored = HostMessage & { by?: Author };
 
@@ -454,6 +472,7 @@ export type ViewMessage =
   | { kind: ToView.SkillHint; command: string }
   | { kind: ToView.ImageSaved; url: string }
   | { kind: ToView.Wiring; at: string; instance?: number; wiring: Wiring }
+  | { kind: ToView.Classes; view: ClassesView }
   | { kind: ToView.Comments; enabled: boolean; comments: CloudComment[]; review?: CloudRevisions; error?: string }
   | { kind: ToView.Share; state: ShareState; available: boolean; name: string; canEdit: boolean; url?: string; expiresAt?: string; visitors: Present[]; notice: boolean; error?: string }
   | { kind: ToView.Library; items: LibraryEntry[] }
@@ -467,12 +486,13 @@ export type ViewMessage =
   | { kind: ToView.PropsPreview; ask: ApplyAsk; reason: string; files: DiffFile[]; by?: Author }
   | { kind: ToView.Peers; peers: Present[] }
   | { kind: ToView.AiAgents; agents: AcpAgent[] }
-  | { kind: ToView.AiState; state: AiState; agent?: AcpId; chat?: string }
+  | { kind: ToView.AiState; state: AiState; agent?: AcpId; chat?: string; images?: boolean }
   | { kind: ToView.AiEvent; event: AgentEvent; chat?: string }
   | { kind: ToView.AiPolicy; policy: Policy }
   | { kind: ToView.AiChats; chats: ChatRow[]; active: string | null }
+  | { kind: ToView.AgentAsk; id: number; ask: AgentAsk; selection: boolean }
   | { kind: ToView.Adapters; rows: AdapterRow[] }
-  | { kind: ToView.AiChat; chat: string | null; agent?: AcpId; state: AiState; items: Item[]; modes: ModeView[]; mode: string | null; configs: ConfigView[] };
+  | { kind: ToView.AiChat; chat: string | null; agent?: AcpId; state: AiState; items: Item[]; modes: ModeView[]; mode: string | null; configs: ConfigView[]; images?: boolean };
 
 export const INSPECT = 'feega:inspect';
 export const INSPECT_RESULT = 'feega:inspect:result';
@@ -485,6 +505,8 @@ export const LOCATION = 'feega:location';
 export const BRIDGE_READY = 'feega:source-map:ready';
 export const MODE = 'feega:mode';
 export const HIDE = 'feega:hide';
+export const CAPTURE = 'feega:capture';
+export const CAPTURED = 'feega:captured';
 export const PALETTE = 'feega:palette';
 export const PALETTE_RESULT = 'feega:palette:result';
 export const TREE = 'feega:tree';

@@ -9,7 +9,7 @@ import { readProps } from '@feega/live-edit/read-props';
 import { LiveProp } from '@feega/live-edit/live-fields';
 import { StructureOp } from '@feega/live-edit/structure';
 import type { SupportItem } from '../support';
-import { AccountState, Gate, ImpactKind, Onboarding, OnboardingOutcome, OnboardingStep, ServerAction, ServerState, Styling, ToHost, ToView, WebviewUsage, type Author, type Authored, type EditAsk, type ApplyAsk, type ImpactAsk, type ReadAsk, type HostMessage, type Pick, type Prefs, type ViewMessage } from '../messages';
+import { AccountState, AgentAsk, Gate, ImpactKind, Onboarding, OnboardingOutcome, OnboardingStep, ServerAction, ServerState, Styling, ToHost, ToView, WebviewUsage, type Author, type Authored, type EditAsk, type ApplyAsk, type ImpactAsk, type ReadAsk, type HostMessage, type Pick, type Prefs, type ViewMessage } from '../messages';
 import { SettingKey, StylingChoice } from '../settings';
 import { SignInEnd, signIn } from './sign-in';
 import { addPlugin } from './add-plugin';
@@ -26,7 +26,8 @@ import { shareSession } from './share/share-session';
 import { copyImage } from './image-copy';
 import { fileEdits, type Snapshot, type Written } from './file-edits';
 import { editQueue } from './edit-queue';
-import { impactOf } from './impact';
+import { classOf, classesAt, classIndex } from './classes';
+import { classImpactOf, holdReason, impactOf } from './impact';
 import { usageIndex } from './usages';
 import { fsWatch } from './file-watch';
 import { diffOf } from './diff-preview';
@@ -57,6 +58,8 @@ import { adapters, runNpm } from './ai/adapters';
 import { aiChat, type ChatRecord } from './ai/ai-chat';
 import { policyOf } from './ai/permission-policy';
 import { openAcpAgent } from './ai/acp-session';
+import { editorMcp } from './ai/editor-mcp';
+import { viewAsker } from './view-ask';
 import { machineEnv } from './agents';
 
 const ADAPTER_DIR = 'feega-adapters';
@@ -98,7 +101,8 @@ const WEBVIEW_USAGE: Record<WebviewUsage, UsageKind> = {
 
 const IMPACT_CLASS: Partial<Record<ImpactKind, string>> = {
   [ImpactKind.Local]: 'local',
-  [ImpactKind.Component]: 'shared'
+  [ImpactKind.Component]: 'shared',
+  [ImpactKind.Class]: 'class'
 };
 
 const ONBOARDING_MCP_CHOICE = 'mcp';
@@ -151,6 +155,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     newId: randomUUID,
     created: (chats, liveCount) => usage?.track(UsageKind.AiChatCreated, { chat_count: chats, live_count: liveCount }),
     configured: (category, value) => aiStats?.configured(category, value),
+    mcp: () => [editorMcp(platform.launcher, root)],
     policy: {
       get: () => policyOf(platform.stored(Stored.AiPolicy), platform.settings()[SettingKey.AiPermissions]),
       set: (policy) => void platform.store(Stored.AiPolicy, policy)
@@ -177,7 +182,10 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   let author: Author | undefined;
   const usagesOf = (dir: string) => usageIndex(dir, { watch: platform.watchFiles ?? fsWatch });
   let usages = usagesOf(root);
+  const classesOf = (dir: string) => classIndex(dir, { watch: platform.watchFiles ?? fsWatch });
+  let classes = classesOf(root);
   const post = (message: ViewMessage) => platform.send(message);
+  const viewAsks = viewAsker(post);
   let signedIn = false;
   let editKind = EditKind.Other;
   const usage = platform.usage ? usageSession({ ...platform.usage, facts: () => ({ framework: running?.plan.framework ?? null, signedIn }) }) : null;
@@ -246,6 +254,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
       authors.set(written, author.name);
     }
     usages.invalidate();
+    classes.invalidate();
     await postHistory();
     const saved = ask ? (liveAtOf(ask.at) ?? undefined) : undefined;
     await post(out.ok ? { kind: ToView.Edited, ok: true, fromHistory: replay === Replay.History, written: out.written, saved, note: out.note, select: out.selected } : { kind: ToView.Edited, ok: false, reason: out.reason, at: out.at });
@@ -478,13 +487,24 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   });
 
   let agentContext: string | null = null;
-  const published = platform.localBridge?.(workspace, { selection: () => agentContext, changes: () => edits.history() })?.catch(() => null);
+  const published = platform
+    .localBridge?.(workspace, {
+      selection: () => agentContext,
+      changes: () => edits.history(),
+      screenshot: async (selection) => (await viewAsks.ask(AgentAsk.Screenshot, selection))?.png ?? null,
+      context: async () => (await viewAsks.ask(AgentAsk.Context, false))?.text ?? null
+    })
+    ?.catch(() => null);
 
   async function impact(ask: ImpactAsk) {
-    const found = await impactOf(root, ask, edits.targets, usages);
+    const found = ask.cls ? classImpactOf(classOf(await classes.snapshot(), ask.cls)) : await impactOf(root, ask, edits.targets, usages);
     lastImpact = IMPACT_CLASS[found.kind];
 
     return found;
+  }
+
+  async function classesShown(at: string) {
+    await post({ kind: ToView.Classes, view: await classesAt(root, await classes.snapshot(), at) });
   }
 
   async function impactShown(id: number, ask: ImpactAsk) {
@@ -494,7 +514,8 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   async function held(ask: EditAsk): Promise<boolean> {
     const asked = platform.settings()[SettingKey.PreviewUnknown] !== false && ask.prop !== LiveProp.Text;
     const found = asked ? await impact(ask) : null;
-    if (found?.kind !== ImpactKind.Unknown) {
+    const reason = found && holdReason(found);
+    if (!reason) {
       return false;
     }
     const preview = await edits.preview(ask);
@@ -503,7 +524,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
       return false;
     }
     author && approvals.set(askKey(ask), author);
-    await post({ kind: ToView.Preview, ask, reason: found.reason, files, by: author });
+    await post({ kind: ToView.Preview, ask, reason, files, by: author });
     return true;
   }
 
@@ -601,6 +622,8 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     edits = editsAt(root);
     usages.dispose();
     usages = usagesOf(root);
+    classes.dispose();
+    classes = classesOf(root);
     await platform.store(Stored.App, next);
   }
 
@@ -819,6 +842,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.ImageChoose]: imageChosen,
     [ToHost.ImageUpload]: (m) => imageSaved(m.name, Buffer.from(m.data, 'base64')),
     [ToHost.Wiring]: (m) => wiringShown(m.at, m.instance),
+    [ToHost.Classes]: (m) => classesShown(m.at),
     [ToHost.Link]: (m) => edits.link(m.at, m.edit, m.instance).then((out) => edited(out, null)),
     [ToHost.Attribute]: (m) => edits.attribute(m.at, m.name, m.value).then((out) => edited(out, null)),
     [ToHost.ApplyProps]: (m) => applyProps(m.ask, m.gate),
@@ -847,7 +871,8 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.Cursor]: (m) => sharing.hostPointed(m.at),
     [ToHost.AiList]: ai.list,
     [ToHost.AiStart]: (m) => ((aiAgent = m.agent), aiStats?.started(m.agent), ai.start(m.agent)),
-    [ToHost.AiSend]: (m) => (aiStats?.sent(), void ai.send(m.text, m.context)),
+    [ToHost.AiSend]: (m) => (aiStats?.sent(), void ai.send(m.text, m.context, m.images)),
+    [ToHost.AgentAnswer]: viewAsks.answer,
     [ToHost.AiCancel]: () => (aiStats?.cancelled(), ai.cancel()),
     [ToHost.AiAnswer]: (m) => (aiStats?.answered(m.id, m.optionId), ai.answer(m.id, m.optionId)),
     [ToHost.AiMode]: (m) => void ai.setMode(m.id),
@@ -919,6 +944,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
       close();
       ai.close();
       usages.dispose();
+      classes.dispose();
       pluginList?.stop();
       await sharing.stop();
       await (await published)?.stop();

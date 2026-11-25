@@ -20,7 +20,9 @@ const eventually = async (check: () => boolean) => {
   }
 };
 
-const open = async (policy = Policy.Ask, flags: string[] = [], resume: string | null = null, preferred: Record<string, string> = {}) => {
+const SHOT_SERVER = { name: 'feega', command: '/usr/bin/node', args: ['/ext/mcp.cjs'], env: { FEEGA_PROJECT: '/work/app' } };
+
+const open = async (policy = Policy.Ask, flags: string[] = [], resume: string | null = null, preferred: Record<string, string> = {}, mcp = [SHOT_SERVER]) => {
   const dir = mkdtempSync(join(tmpdir(), 'acp-'));
   const events: AgentEvent[] = [];
   const written: Record<string, string> = {};
@@ -30,6 +32,7 @@ const open = async (policy = Policy.Ask, flags: string[] = [], resume: string | 
       cwd: dir,
       resume,
       preferred,
+      mcp,
       policy: () => policy,
       emit: (event) => events.push(event),
       files: {
@@ -269,5 +272,61 @@ describe('the ACP session', () => {
 
     expect(session.resumed).toBe(false);
     expect(session.id).toBe('fake-session');
+  });
+
+  const said = (events: AgentEvent[]) => events.flatMap((e) => (e.kind === AgentEventKind.Text ? [e.text] : [])).join('');
+
+  describe('tools served by the editor', () => {
+    it('hands the agent the MCP servers of the editor when the session starts', async () => {
+      const { events, session } = await open();
+      sessions.push(session);
+
+      await session.send('mcp');
+
+      expect(JSON.parse(said(events))).toEqual([{ name: 'feega', command: '/usr/bin/node', args: ['/ext/mcp.cjs'], env: [{ name: 'FEEGA_PROJECT', value: '/work/app' }] }]);
+    });
+
+    it('hands them over again when it resumes a session', async () => {
+      const { events, session } = await open(Policy.Ask, ['load'], 'old-session');
+      sessions.push(session);
+
+      await session.send('mcp');
+
+      expect(JSON.parse(said(events))).toHaveLength(1);
+    });
+  });
+
+  describe('screenshots in the prompt', () => {
+    it('reports that the agent takes images when it advertises it', async () => {
+      const { session } = await open(Policy.Ask, ['images']);
+      sessions.push(session);
+
+      expect(session.images).toBe(true);
+    });
+
+    it('reports no images for an agent that does not advertise them', async () => {
+      const { session } = await open();
+      sessions.push(session);
+
+      expect(session.images).toBe(false);
+    });
+
+    it('sends the screenshots as image blocks before the text', async () => {
+      const { events, session } = await open(Policy.Ask, ['images']);
+      sessions.push(session);
+
+      await session.send('seen', ['iVBORw0K', 'AAAA']);
+
+      expect(said(events)).toBe('image/png:iVBORw0K,image/png:AAAA');
+    });
+
+    it('drops the screenshots for an agent that cannot take them', async () => {
+      const { events, session } = await open();
+      sessions.push(session);
+
+      await session.send('seen', ['iVBORw0K']);
+
+      expect(said(events)).toBe('');
+    });
   });
 });

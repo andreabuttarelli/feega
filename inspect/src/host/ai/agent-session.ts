@@ -50,7 +50,8 @@ export type AgentEvent =
 export type AgentSession = {
   id: string;
   resumed: boolean;
-  send: (prompt: string) => Promise<void>;
+  images: boolean;
+  send: (prompt: string, images?: string[]) => Promise<void>;
   cancel: () => Promise<void>;
   answer: (id: string, optionId: string | null) => void;
   setMode: (id: string) => Promise<void>;
@@ -65,6 +66,8 @@ export type AgentFiles = {
 
 export type Launch = { command: string; args: string[]; env?: Record<string, string> };
 
-export type AgentDeps = { cwd: string; resume: string | null; preferred: Record<string, string>; files: AgentFiles; policy: () => Policy; emit: (event: AgentEvent) => void };
+export type McpServerSpec = { name: string; command: string; args: string[]; env: Record<string, string> };
+
+export type AgentDeps = { cwd: string; resume: string | null; preferred: Record<string, string>; mcp: McpServerSpec[]; files: AgentFiles; policy: () => Policy; emit: (event: AgentEvent) => void };
 
 export type OpenAgent = (launch: Launch, deps: AgentDeps) => Promise<AgentSession>;

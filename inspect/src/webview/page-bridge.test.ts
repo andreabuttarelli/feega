@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { BRIDGE_READY, FOCUSED, TRACKED, TREE_RESULT } from '../messages';
-import { pageBridge } from './page-bridge';
+import { BRIDGE_READY, CAPTURED, FOCUSED, TRACKED, TREE_RESULT } from '../messages';
+import { CAPTURE_TIMEOUT_MS, pageBridge } from './page-bridge';
 
 const ORIGIN = 'http://localhost:5173';
 
@@ -123,5 +123,66 @@ describe('the real component in the focus tab', () => {
     bridge.mountProps({ size: 'lg' }, null);
 
     expect(posted).toEqual([{ type: 'feega:mount:props', props: { size: 'lg' }, variants: null, focus: true }]);
+  });
+});
+
+describe('capturing the tab the user is looking at', () => {
+  const frameWith = (posted: unknown[]) => ({ src: `${ORIGIN}/`, contentWindow: { postMessage: (message: unknown) => posted.push(message) } }) as unknown as HTMLIFrameElement;
+  const source = { file: 'src/Card.tsx', line: 4, col: 5 };
+
+  it('asks the page for the whole tab and resolves with its picture', async () => {
+    const post = pageWindow();
+    const posted: { id: number }[] = [];
+    const bridge = pageBridge(() => frameWith(posted), {} as never);
+
+    const png = bridge.capture(null);
+    post({ type: CAPTURED, id: posted[0].id, png: 'iVBORw0K' });
+
+    expect(posted[0]).toMatchObject({ type: 'feega:capture' });
+    expect(await png).toBe('iVBORw0K');
+  });
+
+  it('asks for the selection crop with the selector of the element', () => {
+    pageWindow();
+    const posted: unknown[] = [];
+    const bridge = pageBridge(() => frameWith(posted), {} as never);
+
+    void bridge.capture(source, 2);
+
+    expect(posted[0]).toMatchObject({ selector: '[data-feega-src="src/Card.tsx:4:5"]', index: 2 });
+  });
+
+  it('resolves with nothing when the page says it could not draw', async () => {
+    const post = pageWindow();
+    const posted: { id: number }[] = [];
+    const bridge = pageBridge(() => frameWith(posted), {} as never);
+
+    const png = bridge.capture(null);
+    post({ type: CAPTURED, id: posted[0].id, error: 'tainted canvas' });
+
+    expect(await png).toBeNull();
+  });
+
+  it('asks the focus tab when the focus tab is showing', () => {
+    pageWindow();
+    const posted: unknown[] = [];
+    const bridge = pageBridge(() => frameWith(posted), {} as never);
+
+    bridge.useFocus(true);
+    void bridge.capture(null);
+
+    expect(posted[0]).toMatchObject({ type: 'feega:capture', focus: true });
+  });
+
+  it('gives up with nothing when the page never answers', async () => {
+    vi.useFakeTimers();
+    pageWindow();
+    const bridge = pageBridge(() => frameWith([]), {} as never);
+
+    const png = bridge.capture(null);
+    await vi.advanceTimersByTimeAsync(CAPTURE_TIMEOUT_MS + 1);
+
+    expect(await png).toBeNull();
+    vi.useRealTimers();
   });
 });

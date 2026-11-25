@@ -14,6 +14,8 @@ import { inside, liveAtOf, reader } from '@feega/live-edit/live-ask';
 import { readProps } from '@feega/live-edit/read-props';
 import { diffOf } from '../src/host/diff-preview.ts';
 import { Gate, type ApplyAsk, type ReadAsk } from '../src/messages.ts';
+import { classIndex, classesAt, classOf } from '../src/host/classes.ts';
+import { classImpactOf } from '../src/host/impact.ts';
 import { SETTINGS } from '../src/settings.ts';
 import { searchIcons } from '../src/host/icon-search.ts';
 import { previewQueue } from '../src/host/icon-previews.ts';
@@ -31,7 +33,7 @@ import { Policy } from '../src/host/ai/permission-policy.ts';
 import type { AgentEnv } from '../src/host/agents.ts';
 import type { OpenAgent } from '../src/host/ai/agent-session.ts';
 
-const catalog = buildCatalog();
+const catalog = buildCatalog(fileURLToPath(new URL('../../packages/library/items', import.meta.url)), fileURLToPath(new URL('../../packages/library/tokens.css', import.meta.url)));
 const PANEL_PORT = Number(process.env.PANEL_PORT ?? 5999);
 const dist = fileURLToPath(new URL('../dist/webview/', import.meta.url));
 const launcher = fileURLToPath(new URL('../dist/launcher/', import.meta.url));
@@ -52,6 +54,7 @@ export async function openPanel(appRoot: string, theme = DARK, cloud?: CommentsC
     throw new Error(running.refused);
   }
   const edits = fileEdits(appRoot);
+  const classes = classIndex(appRoot, {});
   const styling = await stylingOf(appRoot);
 
   const server = createServer(async (req, res) => {
@@ -159,9 +162,20 @@ export async function openPanel(appRoot: string, theme = DARK, cloud?: CommentsC
     if (m.kind === ToHost.Picked) {
       picks.get(m.id as number)?.(m.pick ?? null);
     }
+    if (m.kind === ToHost.Classes) {
+      await reply({ kind: ToView.Classes, view: await classesAt(appRoot, await classes.snapshot(), m.at!) });
+    }
+    if (m.kind === ToHost.Impact) {
+      const ask = (m as unknown as { ask: EditAsk }).ask;
+      if (ask.cls) {
+        await reply({ kind: ToView.Impact, id: m.id as number, impact: classImpactOf(classOf(await classes.snapshot(), ask.cls)) });
+      }
+    }
     if (m.kind === ToHost.Edit) {
+      classes.invalidate();
       const out = await edits.edit(m.ask!);
       saves.push(out);
+      await history();
       await reply(out.ok ? { kind: ToView.Edited, ok: true, written: out.written, saved: liveAtOf(m.ask!.at), note: out.note } : { kind: ToView.Edited, ok: false, reason: out.reason, at: out.at });
     }
     if (m.kind === ToHost.ReadProps) {

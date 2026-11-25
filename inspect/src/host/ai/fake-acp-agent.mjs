@@ -97,35 +97,49 @@ const handlers = {
     await cx.client.notify(methods.client.session.update, { sessionId: SESSION, update: { sessionUpdate: 'config_option_update', configOptions: configOptions() } });
     return 'end_turn';
   },
+  mcp: async (cx) => {
+    await cx.client.notify(methods.client.session.update, chunk(JSON.stringify(mcpServers)));
+    return 'end_turn';
+  },
+  seen: async (cx) => {
+    await cx.client.notify(methods.client.session.update, chunk(imagesOf(cx.params.prompt)));
+    return 'end_turn';
+  },
   plan: async (cx) => {
     await cx.client.notify(methods.client.session.update, { sessionId: SESSION, update: { sessionUpdate: 'plan', entries: [{ content: 'step one', priority: 'high', status: 'in_progress' }] } });
     return 'end_turn';
   }
 };
 
+const imagesOf = (prompt) => prompt.filter((block) => block.type === 'image').map((block) => `${block.mimeType}:${block.data}`).join(',');
+
 const textOf = (prompt) => prompt.map((block) => (block.type === 'text' ? block.text : '')).join('\n');
 
 const CAN_LOAD = process.argv.includes('load');
+const TAKES_IMAGES = process.argv.includes('images');
+let mcpServers = [];
 const NEEDS_LOGIN = process.argv.includes('login');
 const AUTH_REQUIRED = -32000;
 let signedIn = !NEEDS_LOGIN;
 
 const app = agent({ name: 'fake' })
-  .onRequest(methods.agent.initialize, () => ({ protocolVersion: PROTOCOL_VERSION, agentCapabilities: { loadSession: CAN_LOAD }, authMethods: NEEDS_LOGIN ? [{ id: 'fake_login', name: 'Fake login' }] : [] }))
+  .onRequest(methods.agent.initialize, () => ({ protocolVersion: PROTOCOL_VERSION, agentCapabilities: { loadSession: CAN_LOAD, promptCapabilities: { image: TAKES_IMAGES } }, authMethods: NEEDS_LOGIN ? [{ id: 'fake_login', name: 'Fake login' }] : [] }))
   .onRequest(methods.agent.authenticate, (cx) => {
     signedIn = cx.params.methodId === 'fake_login';
     return {};
   })
-  .onRequest(methods.agent.session.new, () => {
+  .onRequest(methods.agent.session.new, (cx) => {
     if (!signedIn) {
       throw new RequestError(AUTH_REQUIRED, 'Authentication required');
     }
+    mcpServers = cx.params.mcpServers;
     if (SESSION_MODELS) {
       return { sessionId: SESSION, modes: { currentModeId: 'default', availableModes: MODES }, models: sessionModels() };
     }
     return { sessionId: SESSION, modes: { currentModeId: 'default', availableModes: MODES }, configOptions: configOptions() };
   })
   .onRequest(methods.agent.session.load, async (cx) => {
+    mcpServers = cx.params.mcpServers;
     await cx.client.notify(methods.client.session.update, chunk('replayed history'));
     if (SESSION_MODELS) {
       return { modes: { currentModeId: 'plan', availableModes: MODES }, models: sessionModels() };

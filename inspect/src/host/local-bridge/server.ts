@@ -8,7 +8,7 @@ const HTTP_UNAUTHORIZED = 401;
 const HTTP_NOT_FOUND = 404;
 const TOKEN_BYTES = 24;
 
-export type BridgeState = { selection: () => string | null; changes: () => ChangeRow[] };
+export type BridgeState = { selection: () => string | null; changes: () => ChangeRow[]; screenshot: (selection: boolean) => Promise<string | null>; context: () => Promise<string | null> };
 
 export type Bridge = { host: string; port: number; token: string; close: () => Promise<void> };
 
@@ -18,22 +18,25 @@ const bearerOf = (request: IncomingMessage) => (request.headers.authorization ??
 
 export async function startBridge(state: BridgeState): Promise<Bridge> {
   const token = randomBytes(TOKEN_BYTES).toString('hex');
-  const routes: Record<string, () => unknown> = {
+  const routes: Record<string, (query: URLSearchParams) => unknown> = {
     '/selection': () => ({ context: state.selection() }),
-    '/changes': () => ({ changes: state.changes() })
+    '/changes': () => ({ changes: state.changes() }),
+    '/screenshot': async (query) => ({ png: await state.screenshot(query.get('selection') === '1') }),
+    '/context': async () => ({ context: await state.context() })
   };
 
-  const server = createServer((request, response) => {
+  const server = createServer(async (request, response) => {
     if (!sameToken(bearerOf(request), token)) {
       response.writeHead(HTTP_UNAUTHORIZED).end();
       return;
     }
-    const route = routes[new URL(request.url ?? '/', 'http://x').pathname];
+    const url = new URL(request.url ?? '/', 'http://x');
+    const route = routes[url.pathname];
     if (!route) {
       response.writeHead(HTTP_NOT_FOUND).end();
       return;
     }
-    response.writeHead(HTTP_OK, { 'content-type': 'application/json' }).end(JSON.stringify(route()));
+    response.writeHead(HTTP_OK, { 'content-type': 'application/json' }).end(JSON.stringify(await route(url.searchParams)));
   });
 
   await new Promise<void>((resolve, reject) => server.once('error', reject).listen(0, HOST, resolve));

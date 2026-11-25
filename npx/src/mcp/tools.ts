@@ -7,6 +7,10 @@ export const BILLING_URL = `${CLOUD_BASE}/app/settings/billing`;
 
 export type CloudDeps = { api: CloudApi; share: ShareHost; editors: Editors; cwd: string };
 
+export class Picture {
+  constructor(readonly png: string) {}
+}
+
 export type Tool = { description: string; input: z.ZodRawShape; run: (input: any) => Promise<unknown> };
 
 const FAILURE_TEXT: Record<CloudFailure, (error: CloudError) => string> = {
