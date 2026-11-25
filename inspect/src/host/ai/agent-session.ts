@@ -39,6 +39,8 @@ export type AgentEvent =
   | { kind: AgentEventKind.Failed; reason: string };
 
 export type AgentSession = {
+  id: string;
+  resumed: boolean;
   send: (prompt: string) => Promise<void>;
   cancel: () => Promise<void>;
   answer: (id: string, optionId: string | null) => void;
@@ -53,6 +55,6 @@ export type AgentFiles = {
 
 export type Launch = { command: string; args: string[] };
 
-export type AgentDeps = { cwd: string; files: AgentFiles; policy: () => Policy; emit: (event: AgentEvent) => void };
+export type AgentDeps = { cwd: string; resume: string | null; files: AgentFiles; policy: () => Policy; emit: (event: AgentEvent) => void };
 
 export type OpenAgent = (launch: Launch, deps: AgentDeps) => Promise<AgentSession>;

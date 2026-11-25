@@ -1,15 +1,28 @@
 import { readFile } from 'node:fs/promises';
 import { isAbsolute, relative } from 'node:path';
 import { inside } from '@feega/live-edit/live-ask';
-import { AiState, ToView, type ViewMessage } from '../../messages';
+import { AiState, ToView, type ChatRow, type ViewMessage } from '../../messages';
 import type { AgentEnv } from '../agents';
 import { AcpId, acpAgents, launchOf } from './acp-agents';
 import { isPolicy, type Policy } from './permission-policy';
-import { AgentEventKind, type AgentEvent, type AgentFiles, type AgentSession, type OpenAgent } from './agent-session';
+import { AgentEventKind, type AgentEvent, type AgentFiles, type AgentSession, type ModeView, type OpenAgent } from './agent-session';
+import { answered, heard as transcribed, said, ItemKind, type Item } from './transcript';
 
 const OUTSIDE = 'is outside the workspace';
 const NOT_STARTED = 'start an agent first';
 const ADAPTER_ACTION = 'Run adapter';
+const DELETE_ACTION = 'Delete';
+const FORGOT = "New session — the agent doesn't remember earlier messages";
+const TITLE_MAX = 40;
+const KEPT_CHATS = 50;
+
+export const MAX_LIVE = 4;
+
+export type ChatRecord = { id: string; agent: AcpId; title: string; createdAt: number; updatedAt: number; sessionId: string | null; mode: string | null; modes: ModeView[]; items: Item[] };
+
+export type ChatStore = { load: () => ChatRecord[]; save: (records: ChatRecord[]) => void };
+
+type Chat = { record: ChatRecord; live: AgentSession | null; busy: boolean; opening: boolean };
 
 export type AiChatDeps = {
   root: () => string;
@@ -19,6 +32,10 @@ export type AiChatDeps = {
   post: (message: ViewMessage) => unknown;
   write: (path: string, content: string, agent: string) => Promise<void>;
   policy: { get: () => Policy; set: (policy: Policy) => void };
+  store: ChatStore;
+  now: () => number;
+  newId: () => string;
+  created: (chats: number, live: number) => void;
 };
 
 const adapterPackage = (id: AcpId): string => launchOf(id).args.find((arg) => arg.startsWith('@')) ?? launchOf(id).command;
@@ -31,15 +48,43 @@ const slice = (text: string, from?: number, count?: number): string => {
   return text.split('\n').slice(start, count === undefined ? undefined : start + count).join('\n');
 };
 
+const titleOf = (text: string): string => (text.length > TITLE_MAX ? `${text.slice(0, TITLE_MAX).trimEnd()}…` : text);
+
 export function aiChat(deps: AiChatDeps) {
   const { post } = deps;
   const adapted = new Set<AcpId>();
-  let current: { id: AcpId; label: string; session: AgentSession } | null = null;
+  const chats = new Map<string, Chat>();
+  let active: string | null = null;
+  let loaded = false;
 
-  const state = (next: AiState) => post({ kind: ToView.AiState, state: next, agent: current?.id });
-  const emit = (event: AgentEvent) => post({ kind: ToView.AiEvent, event });
+  const current = (): Chat | undefined => (active ? chats.get(active) : undefined);
 
-  const failed = (reason: string) => emit({ kind: AgentEventKind.Failed, reason });
+  const stateOf = (chat: Chat): AiState => (chat.opening ? AiState.Starting : chat.busy ? AiState.Busy : AiState.Ready);
+
+  const live = (): Chat[] => [...chats.values()].filter((c) => c.live);
+
+  const rows = (): ChatRow[] =>
+    [...chats.values()]
+      .sort((a, b) => b.record.updatedAt - a.record.updatedAt)
+      .map(({ record, busy }) => ({ id: record.id, agent: record.agent, title: record.title, updatedAt: record.updatedAt, running: busy }));
+
+  const postChats = () => post({ kind: ToView.AiChats, chats: rows(), active });
+
+  const persist = () => deps.store.save([...chats.values()].map((c) => c.record).sort((a, b) => b.updatedAt - a.updatedAt).slice(0, KEPT_CHATS));
+
+  const state = (chat: Chat, next: AiState = stateOf(chat)) => {
+    post({ kind: ToView.AiState, state: next, agent: chat.record.agent, chat: chat.record.id });
+    postChats();
+  };
+
+  const snapshot = (chat: Chat | undefined) =>
+    post(
+      chat
+        ? { kind: ToView.AiChat, chat: chat.record.id, agent: chat.record.agent, state: stateOf(chat), items: chat.record.items, modes: chat.record.modes, mode: chat.record.mode }
+        : { kind: ToView.AiChat, chat: null, state: AiState.Idle, items: [], modes: [], mode: null }
+    );
+
+  const failed = (reason: string, chat?: string) => post({ kind: ToView.AiEvent, event: { kind: AgentEventKind.Failed, reason }, chat });
 
   const inRoot = (path: string): string => {
     const rel = isAbsolute(path) ? relative(deps.root(), path) : path;
@@ -54,60 +99,176 @@ export function aiChat(deps: AiChatDeps) {
     write: (path, content) => deps.write(inRoot(path), content, label())
   });
 
-  const closed = () => {
-    current?.session.close();
-    current = null;
+  const heard = (chat: Chat, event: AgentEvent) => {
+    const { record } = chat;
+    record.items = transcribed(record.items, event);
+    if (event.kind === AgentEventKind.Modes) {
+      record.modes = event.available;
+      record.mode = event.current;
+    }
+    post({ kind: ToView.AiEvent, event, chat: record.id });
+    if (event.kind === AgentEventKind.Done || event.kind === AgentEventKind.Failed) {
+      chat.busy = false;
+      chat.live = event.kind === AgentEventKind.Failed ? null : chat.live;
+      record.updatedAt = deps.now();
+      persist();
+      state(chat);
+    }
   };
 
-  const heard = (event: AgentEvent) => {
-    emit(event);
-    if (event.kind === AgentEventKind.Done) {
-      state(AiState.Ready);
+  const room = (): boolean => {
+    if (live().length < MAX_LIVE) {
+      return true;
     }
-    if (event.kind === AgentEventKind.Failed) {
-      current = null;
-      state(AiState.Idle);
+    const idle = live().find((c) => !c.busy && c.record.id !== active);
+    idle?.live?.close();
+    if (idle) {
+      idle.live = null;
     }
+    return idle !== undefined;
   };
 
-  async function start(id: AcpId) {
-    const agent = acpAgents(deps.env()).find((a) => a.id === id);
+  async function connect(chat: Chat): Promise<boolean> {
+    const { record } = chat;
+    const agent = acpAgents(deps.env()).find((a) => a.id === record.agent);
     if (!agent) {
-      return;
+      return false;
     }
     if (!agent.installed) {
-      failed(`${agent.label} is not installed. Install it with: ${agent.install}`);
-      return;
+      failed(`${agent.label} is not installed. Install it with: ${agent.install}`, record.id);
+      return false;
     }
-    if (agent.adapter && !adapted.has(id) && !(await deps.confirm(`Feega will run ${adapterPackage(id)} with npx to talk to ${agent.label}. Continue?`, ADAPTER_ACTION))) {
-      return;
+    if (agent.adapter && !adapted.has(agent.id) && !(await deps.confirm(`Feega will run ${adapterPackage(agent.id)} with npx to talk to ${agent.label}. Continue?`, ADAPTER_ACTION))) {
+      return false;
     }
-    adapted.add(id);
-    closed();
-    state(AiState.Starting);
+    if (!room()) {
+      failed(`${MAX_LIVE} chats are already working. Stop one or wait for it to finish.`, record.id);
+      return false;
+    }
+    adapted.add(agent.id);
+    chat.opening = true;
+    state(chat);
     try {
-      const session = await deps.open(launchOf(id), { cwd: deps.root(), files: files(() => agent.label), policy: deps.policy.get, emit: heard });
-      current = { id, label: agent.label, session };
-      state(AiState.Ready);
+      const session = await deps.open(launchOf(agent.id), { cwd: deps.root(), resume: record.sessionId, files: files(() => agent.label), policy: deps.policy.get, emit: (event) => heard(chat, event) });
+      chat.live = session;
+      if (record.items.length && !session.resumed) {
+        record.items = [...record.items, { kind: ItemKind.Note, text: FORGOT }];
+      }
+      record.sessionId = session.id;
+      return true;
     } catch (error) {
-      failed(error instanceof Error ? error.message : String(error));
-      state(AiState.Idle);
+      failed(error instanceof Error ? error.message : String(error), record.id);
+      return false;
+    } finally {
+      chat.opening = false;
     }
   }
 
+  function load() {
+    if (loaded) {
+      return;
+    }
+    loaded = true;
+    deps.store.load().forEach((record) => chats.set(record.id, { record, live: null, busy: false, opening: false }));
+    active = rows()[0]?.id ?? null;
+  }
+
+  async function start(agent: AcpId) {
+    load();
+    const now = deps.now();
+    const chat: Chat = { record: { id: deps.newId(), agent, title: '', createdAt: now, updatedAt: now, sessionId: null, mode: null, modes: [], items: [] }, live: null, busy: false, opening: true };
+    chats.set(chat.record.id, chat);
+    active = chat.record.id;
+    snapshot(chat);
+    if (!(await connect(chat))) {
+      chats.delete(chat.record.id);
+      active = rows()[0]?.id ?? null;
+      snapshot(current());
+      postChats();
+      return;
+    }
+    persist();
+    deps.created(chats.size, live().length);
+    state(chat);
+  }
+
   async function send(text: string, context: string | null) {
-    if (!current) {
+    const chat = current();
+    if (!chat) {
       failed(NOT_STARTED);
       return;
     }
-    state(AiState.Busy);
-    await current.session.send(context ? `${context}\n\n${text}` : text);
+    const { record } = chat;
+    const resumedFresh = !chat.live;
+    if (!chat.live && !(await connect(chat))) {
+      state(chat);
+      return;
+    }
+    record.items = said(record.items, text, context);
+    record.title ||= titleOf(text);
+    record.updatedAt = deps.now();
+    chat.busy = true;
+    if (resumedFresh) {
+      snapshot(chat);
+    }
+    state(chat);
+    persist();
+    await chat.live!.send(context ? `${context}\n\n${text}` : text);
+  }
+
+  function open(id: string) {
+    const chat = chats.get(id);
+    if (!chat) {
+      return;
+    }
+    active = id;
+    snapshot(chat);
+    postChats();
+  }
+
+  function rename(id: string, title: string) {
+    const chat = chats.get(id);
+    if (!chat || !title.trim()) {
+      return;
+    }
+    chat.record.title = title.trim();
+    persist();
+    postChats();
+  }
+
+  async function remove(id: string) {
+    const chat = chats.get(id);
+    if (!chat || !(await deps.confirm(`Delete "${chat.record.title || 'this chat'}"?`, DELETE_ACTION))) {
+      return;
+    }
+    chat.live?.close();
+    chats.delete(id);
+    persist();
+    if (active === id) {
+      active = null;
+      snapshot(undefined);
+    }
+    postChats();
+  }
+
+  function answer(id: string, optionId: string | null) {
+    const chat = current();
+    if (!chat) {
+      return;
+    }
+    const ask = chat.record.items.find((i) => i.kind === ItemKind.Permission && i.id === id);
+    const name = ask?.kind === ItemKind.Permission ? (ask.options.find((o) => o.id === optionId)?.name ?? 'Cancelled') : '';
+    chat.record.items = answered(chat.record.items, id, name);
+    chat.live?.answer(id, optionId);
   }
 
   return {
     list: () => {
+      load();
       post({ kind: ToView.AiPolicy, policy: deps.policy.get() });
       post({ kind: ToView.AiAgents, agents: acpAgents(deps.env()) });
+      snapshot(current());
+      postChats();
     },
     setPolicy: (policy: Policy) => {
       if (isPolicy(policy)) {
@@ -115,11 +276,14 @@ export function aiChat(deps: AiChatDeps) {
         post({ kind: ToView.AiPolicy, policy });
       }
     },
-    setMode: async (id: string) => void (await current?.session.setMode(id)),
+    setMode: async (id: string) => void (await current()?.live?.setMode(id)),
     start,
     send,
-    cancel: async () => void (await current?.session.cancel()),
-    answer: (id: string, optionId: string | null) => current?.session.answer(id, optionId),
-    close: closed
+    open,
+    rename,
+    remove,
+    cancel: async () => void (await current()?.live?.cancel()),
+    answer,
+    close: () => live().forEach((c) => (c.live?.close(), (c.live = null)))
   };
 }

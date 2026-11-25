@@ -47,3 +47,16 @@ export const pickerLabel = (modes: ModeView[], mode: string | null, policy: Poli
 };
 
 export const isDanger = (policy: Policy): boolean => POLICY_ROWS.find((row) => row.id === policy)?.danger ?? false;
+
+const AGO_UNITS: [number, string][] = [
+  [7 * 86_400_000, 'w'],
+  [86_400_000, 'd'],
+  [3_600_000, 'h'],
+  [60_000, 'm']
+];
+
+export const agoOf = (now: number, then: number): string => {
+  const elapsed = now - then;
+  const unit = AGO_UNITS.find(([size]) => elapsed >= size);
+  return unit ? `${Math.floor(elapsed / unit[0])}${unit[1]}` : 'now';
+};

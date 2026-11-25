@@ -28,6 +28,7 @@ export const openAcpAgent = async (launch: Launch, deps: AgentDeps): Promise<Age
   let asked = 0;
   let sessionId = '';
   let available: ModeView[] = [];
+  let replaying = false;
 
   const modeChanged = (current: string) => deps.emit({ kind: AgentEventKind.Modes, available, current });
 
@@ -45,6 +46,9 @@ export const openAcpAgent = async (launch: Launch, deps: AgentDeps): Promise<Age
   };
 
   const updated = ({ update }: SessionNotification) => {
+    if (replaying) {
+      return;
+    }
     if (update.sessionUpdate === 'agent_message_chunk' && update.content.type === 'text') {
       deps.emit({ kind: AgentEventKind.Text, text: update.content.text });
     } else if (update.sessionUpdate === 'agent_thought_chunk' && update.content.type === 'text') {
@@ -101,12 +105,28 @@ export const openAcpAgent = async (launch: Launch, deps: AgentDeps): Promise<Age
     return false;
   };
 
-  const created = await newSession().catch(async (error) => {
-    if ((error as { code?: number }).code !== AUTH_REQUIRED || !(await signedIn())) {
-      throw error;
+  const fresh = () =>
+    newSession().catch(async (error) => {
+      if ((error as { code?: number }).code !== AUTH_REQUIRED || !(await signedIn())) {
+        throw error;
+      }
+      return newSession();
+    });
+
+  const loaded = async (id: string) => {
+    replaying = true;
+    try {
+      const response = await connection.agent.request(methods.agent.session.load, { sessionId: id, cwd: deps.cwd, mcpServers: [] });
+      return { sessionId: id, modes: response.modes };
+    } catch {
+      return null;
+    } finally {
+      replaying = false;
     }
-    return newSession();
-  });
+  };
+
+  const resumed = deps.resume !== null && hello.agentCapabilities?.loadSession === true ? await loaded(deps.resume) : null;
+  const created = resumed ?? (await fresh());
   sessionId = created.sessionId;
   if (created.modes?.availableModes.length) {
     available = created.modes.availableModes.map((m) => ({ id: m.id, name: m.name, description: m.description ?? '' }));
@@ -119,6 +139,8 @@ export const openAcpAgent = async (launch: Launch, deps: AgentDeps): Promise<Age
   };
 
   return {
+    id: sessionId,
+    resumed: resumed !== null,
     send: async (prompt) => {
       try {
         const done = await connection.agent.request(methods.agent.session.prompt, { sessionId, prompt: [{ type: 'text', text: prompt }] });

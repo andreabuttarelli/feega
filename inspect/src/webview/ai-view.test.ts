@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { AiState } from '../messages';
 import { ToolStatus } from '../host/ai/agent-session';
 import { Policy } from '../host/ai/permission-policy';
-import { Dot, isDanger, isThinking, markOf, pickerLabel, placeholderOf, statusOf } from './ai-view';
+import { Dot, agoOf, isDanger, isThinking, markOf, pickerLabel, placeholderOf, statusOf } from './ai-view';
 import { ItemKind } from '../host/ai/transcript';
 
 describe('the agent status', () => {
@@ -60,5 +60,19 @@ describe('the permission picker', () => {
   it('warns only for Allow all', () => {
     expect(isDanger(Policy.All)).toBe(true);
     expect(isDanger(Policy.Edits)).toBe(false);
+  });
+});
+
+describe('agoOf', () => {
+  const now = Date.UTC(2026, 10, 25, 12);
+
+  it.each([
+    [30_000, 'now'],
+    [5 * 60_000, '5m'],
+    [3 * 3_600_000, '3h'],
+    [2 * 86_400_000, '2d'],
+    [40 * 86_400_000, '5w']
+  ])('says how long ago %i ms was', (elapsed, label) => {
+    expect(agoOf(now, now - elapsed)).toBe(label);
   });
 });

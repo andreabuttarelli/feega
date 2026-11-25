@@ -22,7 +22,8 @@ import { entriesOf, insertAskOf } from '../src/host/library.ts';
 import { buildCatalog } from '../../packages/library/src/catalog.ts';
 import type { AddPlace } from '@feega/live-edit/add-node';
 import type { AcpId } from '../src/host/ai/acp-agents.ts';
-import { aiChat } from '../src/host/ai/ai-chat.ts';
+import { randomUUID } from 'node:crypto';
+import { aiChat, type ChatRecord } from '../src/host/ai/ai-chat.ts';
 import { Policy } from '../src/host/ai/permission-policy.ts';
 import type { AgentEnv } from '../src/host/agents.ts';
 import type { OpenAgent } from '../src/host/ai/agent-session.ts';
@@ -85,6 +86,7 @@ export async function openPanel(appRoot: string, theme = DARK, cloud?: CommentsC
     }
   });
   let aiPolicy = Policy.Ask;
+  let aiStored: ChatRecord[] = [];
   const ai = aiOverride
     ? aiChat({
         ...aiOverride,
@@ -92,6 +94,10 @@ export async function openPanel(appRoot: string, theme = DARK, cloud?: CommentsC
         confirm: async () => true,
         post: reply,
         policy: { get: () => aiPolicy, set: (next) => (aiPolicy = next) },
+        store: { load: () => aiStored, save: (records) => void (aiStored = records) },
+        now: Date.now,
+        newId: randomUUID,
+        created: () => undefined,
         write: async (path, content, agent) => {
           await edits.agentWrite(path, content, agent);
           await history();
@@ -124,6 +130,15 @@ export async function openPanel(appRoot: string, theme = DARK, cloud?: CommentsC
     }
     if (m.kind === ToHost.AiPolicy) {
       ai?.setPolicy((m as unknown as { policy: Policy }).policy);
+    }
+    if (m.kind === ToHost.AiOpen) {
+      ai?.open((m as unknown as { chat: string }).chat);
+    }
+    if (m.kind === ToHost.AiRename) {
+      ai?.rename((m as unknown as { chat: string }).chat, (m as unknown as { title: string }).title);
+    }
+    if (m.kind === ToHost.AiDelete) {
+      await ai?.remove((m as unknown as { chat: string }).chat);
     }
     if (m.kind === ToHost.AiCancel) {
       await ai?.cancel();

@@ -20,7 +20,7 @@ const eventually = async (check: () => boolean) => {
   }
 };
 
-const open = async (policy = Policy.Ask, ...flags: string[]) => {
+const open = async (policy = Policy.Ask, flags: string[] = [], resume: string | null = null) => {
   const dir = mkdtempSync(join(tmpdir(), 'acp-'));
   const events: AgentEvent[] = [];
   const written: Record<string, string> = {};
@@ -28,6 +28,7 @@ const open = async (policy = Policy.Ask, ...flags: string[]) => {
     { command: process.execPath, args: [FAKE, ...flags] },
     {
       cwd: dir,
+      resume,
       policy: () => policy,
       emit: (event) => events.push(event),
       files: {
@@ -161,11 +162,29 @@ describe('the ACP session', () => {
   });
 
   it('signs in with the login method the agent offers when it asks for authentication', async () => {
-    const { events, session } = await open(Policy.Ask, 'login');
+    const { events, session } = await open(Policy.Ask, ['login']);
     sessions.push(session);
 
     await session.send('hello');
 
     expect(events.at(-1)).toEqual({ kind: AgentEventKind.Done, reason: 'end_turn' });
+  });
+
+  it('resumes the agent session without replaying its history into the transcript', async () => {
+    const { events, session } = await open(Policy.Ask, ['load'], 'old-session');
+    sessions.push(session);
+
+    expect(session.resumed).toBe(true);
+    expect(session.id).toBe('old-session');
+    expect(events.some((e) => e.kind === AgentEventKind.Text)).toBe(false);
+    expect(events.find((e) => e.kind === AgentEventKind.Modes)).toMatchObject({ current: 'plan' });
+  });
+
+  it('starts a new session when the agent cannot load one', async () => {
+    const { session } = await open(Policy.Ask, [], 'old-session');
+    sessions.push(session);
+
+    expect(session.resumed).toBe(false);
+    expect(session.id).toBe('fake-session');
   });
 });
