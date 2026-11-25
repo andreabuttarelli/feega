@@ -1411,3 +1411,7 @@ non solo con la build.
 ## Worktree tests cannot find `@feega/*` or the ACP sdk
 
 **Signal:** `Failed to load url @feega/live-edit/...` in a new worktree whose `node_modules` is a symlink to the main checkout. The symlinks under `@feega` resolve to the main checkout's `packages/`, which may be another branch and lacks the new modules. **Move:** make `node_modules` a real folder of per-entry symlinks and link each `@feega/<name>` to this worktree's `packages/<name>`; install missing dependencies such as `@agentclientprotocol/sdk` outside the repo and link them.
+
+## `npx feega` attaches to itself
+
+**Signal:** the log says "attaching to the dev server already running on http://localhost:N/" with no dev server running, and the editor shows "The page has no Feega source map". **Move:** the editor's own listener runs in the CLI process, in the app folder; `portsServing` excludes only spawned child pids, so it must also exclude `process.pid` (`inspect/src/host/listener.ts`).

@@ -28,4 +28,11 @@ describe('portsServing', () => {
     const found = await portsServing(n('/w/app'), { listening: async () => LISTEN, cwds: async () => CWDS }, new Set([101]));
     expect(found).toEqual([4000]);
   });
+
+  it('salta le porte del processo stesso, come il secondo listener dell editor', async () => {
+    const own = `p${process.pid}\nn127.0.0.1:5555\n`;
+    const cwds = `p${process.pid}\nfcwd\nn${n('/w/app')}\n`;
+    const found = await portsServing(n('/w/app'), { listening: async () => own, cwds: async () => cwds }, new Set());
+    expect(found).toEqual([]);
+  });
 });
