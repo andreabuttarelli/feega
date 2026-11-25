@@ -107,11 +107,18 @@ const MAX_IDENTIFIER = 64;
 export const identifierOf = (value: string): string => value.replace(/[^A-Za-z0-9_.:-]/g, '-').replace(/^[^A-Za-z0-9]+/, '').slice(0, MAX_IDENTIFIER) || OTHER;
 
 const VARIANTS = ['focus', 'variant'];
+const FOCUS_MODES = ['mount', 'snapshot'];
+const CONTROL_KINDS = ['select', 'toggle', 'text', 'number', 'children'];
+
+const countOf = (value: number | undefined) => (Number.isInteger(value) && value! >= 0 ? { prop_count: value! } : {});
 
 export const webviewDimsOf = (dims: WebviewUsageDims = {}): UsageDims => ({
   ...(dims.state === undefined ? {} : { state: stateOf(dims.state) }),
   ...(dims.breakpoint === undefined ? {} : { breakpoint: dims.breakpoint === BASE ? BASE : breakpointOf(dims.breakpoint) }),
   ...(dims.variant !== undefined && VARIANTS.includes(dims.variant) ? { variant: dims.variant } : {}),
+  ...(dims.mode !== undefined && FOCUS_MODES.includes(dims.mode) ? { mode: dims.mode } : {}),
+  ...(dims.control !== undefined && CONTROL_KINDS.includes(dims.control) ? { control: dims.control } : {}),
+  ...countOf(dims.prop_count),
   ...(dims.error_class === undefined ? {} : { error_class: identifierOf(dims.error_class) }),
   ...(dims.area === undefined ? {} : { area: 'webview' })
 });

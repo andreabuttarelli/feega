@@ -48,6 +48,8 @@ export enum UsageKind {
   StateSwitch = 'state_switch',
   CopyForAgent = 'copy_for_agent',
   FocusOpened = 'focus_opened',
+  FocusPropsChanged = 'focus_props_changed',
+  FocusVariantsShown = 'focus_variants_shown',
   AiAgentChosen = 'ai_agent_chosen',
   AiSessionStarted = 'ai_session_started',
   AiChatCreated = 'ai_chat_created',
@@ -83,6 +85,10 @@ export type UsageDims = Partial<{
   agent: string;
   category: string;
   library_item: string;
+  library_category: string;
+  mode: string;
+  control: string;
+  prop_count: number;
   tool: string;
   error_class: string;
   action: string;

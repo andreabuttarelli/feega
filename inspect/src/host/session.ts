@@ -84,6 +84,8 @@ const STRUCTURE_TARGETS: Partial<Record<EditKind, string>> = {
 const WEBVIEW_USAGE: Record<WebviewUsage, UsageKind> = {
   [WebviewUsage.CopyForAgent]: UsageKind.CopyForAgent,
   [WebviewUsage.FocusOpened]: UsageKind.FocusOpened,
+  [WebviewUsage.FocusPropsChanged]: UsageKind.FocusPropsChanged,
+  [WebviewUsage.FocusVariantsShown]: UsageKind.FocusVariantsShown,
   [WebviewUsage.StateSwitch]: UsageKind.StateSwitch,
   [WebviewUsage.BreakpointSwitch]: UsageKind.BreakpointSwitch,
   [WebviewUsage.ErrorWebview]: UsageKind.ErrorWebview
@@ -314,7 +316,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     const out: Written = ready.ok ? await edits.library(m.at, m.place, ready.item, ask.tokens) : ready;
     await edited(out, null);
     if (out.ok) {
-      usage?.track(UsageKind.LibraryInsert, { tier: ask.pro ? 'pro' : 'free', library_item: identifierOf(m.id) });
+      usage?.track(UsageKind.LibraryInsert, { tier: ask.pro ? 'pro' : 'free', library_item: identifierOf(m.id), library_category: ask.category });
     }
     if (!ready.ok && ready.refusal) {
       void proPrompted(ready.refusal);
