@@ -9,7 +9,7 @@ const CLI = here('../npx/dist/cli.cjs');
 const exists = (path) => access(path).then(() => true, () => false);
 
 if (process.env.FEEGA_REUSE_CLI !== '1' || !(await exists(CLI))) {
-  execFileSync('npm', ['run', 'build'], { cwd: here('../npx'), stdio: 'inherit' });
+  execFileSync('npm', ['run', 'build'], { cwd: here('../npx'), stdio: 'inherit', shell: process.platform === 'win32' });
 }
 
 const node = { bundle: true, platform: 'node', format: 'cjs', target: 'node20', external: ['electron', 'electron-updater'], define: { __FEEGA_VERSION__: JSON.stringify('desktop') } };
