@@ -6,8 +6,9 @@
   import { installOptionAttrs } from './analytics/nav';
   import { APPLE_ICON } from './social-icons';
   import { DESKTOP_DMGS, DESKTOP_INSTALL_COMMAND, DESKTOP_PUBLISHED, DOWNLOAD_PATH } from './links';
+  import type { DesktopDownload } from './desktop-download';
 
-  let { label, place }: { label: string; place: string } = $props();
+  let { download, place }: { download: DesktopDownload; place: string } = $props();
 
   const options = installOptions().filter((o) => !o.soon);
   let open = $state(false);
@@ -36,7 +37,7 @@
 <svelte:window onkeydown={onKey} onpointerdown={onPointer} />
 
 <div class="split" bind:this={root}>
-  <a class="main" href={DOWNLOAD_PATH} {...eventAttrs('download_click', { target: 'download_page', place })}>{label}</a>
+  <a class="main" href={download.href} {...eventAttrs('download_click', { target: download.target, place })}>{download.label}</a>
   <button class="chev" type="button" aria-label="More ways to install" aria-haspopup="menu" aria-expanded={open} onclick={() => (open = !open)}>
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
   </button>
@@ -56,7 +57,6 @@
         {#each DESKTOP_DMGS as dmg (dmg.arch)}
           <a role="menuitem" href={dmg.href} {...eventAttrs('download_click', { target: `dmg ${dmg.arch.toLowerCase()}`, place })}><span class="logo">{@html APPLE_ICON}</span><span>dmg · {dmg.arch.toLowerCase()}</span></a>
         {/each}
-        <p class="hint">macOS blocks the dmg. allow it in privacy & security, open anyway.</p>
       {/if}
       <a role="menuitem" class="all" href={DOWNLOAD_PATH} {...eventAttrs('download_click', { target: 'download_page', place })}>All download options →</a>
     </div>

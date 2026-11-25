@@ -7,11 +7,16 @@
   import { DOWNLOAD_PAGE } from '$lib/site/download';
   import CommandField from '$lib/site/CommandField.svelte';
   import { eventAttrs } from '$lib/site/analytics/attrs';
-  import { APPLE_ICON } from '$lib/site/social-icons';
+  import { APPLE_ICON, LINUX_ICON, WINDOWS_ICON } from '$lib/site/social-icons';
 
   const editors = installOptions().filter((o) => !o.command);
   const terminal = DOWNLOAD_PAGE.terminal;
   const desktop = DOWNLOAD_PAGE.desktop;
+  const systems = [
+    { ...desktop.mac, icon: APPLE_ICON, note: desktop.macNote },
+    { ...desktop.windows, icon: WINDOWS_ICON, note: desktop.windowsNote },
+    { ...desktop.linux, icon: LINUX_ICON, note: desktop.linuxNote, command: desktop.linuxCommand }
+  ];
 
   const copy = (text: string) => navigator.clipboard?.writeText(text);
 
@@ -58,17 +63,19 @@
       <h3>{desktop.terminalLabel}</h3>
       <CommandField command={desktop.command} />
       <p class="note">{desktop.terminalNote}</p>
-      <h3>{desktop.dmgLabel}</h3>
-      <ul class="dmgs">
-        {#each DESKTOP_DMGS as dmg (dmg.arch)}
-          <li class="card dmg">
-            <span class="logo">{@html APPLE_ICON}</span>
-            <span class="name">{dmg.arch}</span>
-            <a class="install" href={dmg.href} {...eventAttrs('download_click', { target: `dmg_${dmg.arch.toLowerCase().replace(' ', '_')}`, place: 'download_page' })}>download</a>
+      <h3>{desktop.downloadsLabel}</h3>
+      <ul class="systems">
+        {#each systems as system (system.name)}
+          <li class="system">
+            <p class="system-head"><span class="logo">{@html system.icon}</span><span class="name">{system.name}</span>{#if 'badge' in system}<span class="badge">{system.badge}</span>{/if}</p>
+            {#each system.files as file (file.target)}
+              <a class="install" href={file.href} {...eventAttrs('download_click', { target: file.target, place: 'download_page' })}>{file.label}</a>
+            {/each}
+            <p class="note">{system.note}</p>
+            {#if 'command' in system}<CommandField command={system.command} />{/if}
           </li>
         {/each}
       </ul>
-      <p class="note">{desktop.dmgNote}</p>
     {/if}
 
     <h2>{DOWNLOAD_PAGE.requirements.heading}</h2>
@@ -141,7 +148,6 @@
   }
 
   .cards,
-  .dmgs,
   .reqs {
     display: grid;
     gap: 12px;
@@ -161,8 +167,54 @@
     background: #000;
   }
 
-  .dmg {
-    grid-template-columns: 28px 1fr auto;
+  .systems {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .system {
+    min-width: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 12px;
+    padding: 16px;
+    border: 1px solid var(--site-line);
+    border-radius: var(--ui-radius-md, 6px);
+    background: #000;
+  }
+
+  .system-head {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex: 1 0 100%;
+    margin: 0;
+  }
+
+  .system .note {
+    flex: 1 0 100%;
+    margin: 0;
+    font-size: 15px;
+  }
+
+  .system > :global(div) {
+    flex: 1 0 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .badge {
+    padding: 2px 10px;
+    border: 1px solid var(--site-line);
+    border-radius: 999px;
+    font-size: 13px;
+    opacity: 0.8;
   }
 
   .titled {
@@ -246,8 +298,7 @@
       font-size: 26px;
     }
 
-    .cards,
-    .dmgs {
+    .cards {
       grid-template-columns: repeat(2, 1fr);
     }
   }
