@@ -19,6 +19,7 @@ const EDIT_KIND_OF: Partial<Record<ToHost, EditKind>> = {
   [ToHost.IconGet]: EditKind.Image,
   [ToHost.Link]: EditKind.Attribute,
   [ToHost.Attribute]: EditKind.Attribute,
+  [ToHost.ApplyProps]: EditKind.Attribute,
   [ToHost.LibraryInsert]: EditKind.Template
 };
 
