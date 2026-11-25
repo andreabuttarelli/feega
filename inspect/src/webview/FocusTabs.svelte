@@ -1,12 +1,35 @@
 <script lang="ts">
   import ComponentIcon from '@lucide/svelte/icons/component';
+  import Grid from '@lucide/svelte/icons/grid-2x2';
   import House from '@lucide/svelte/icons/house';
-  import X from '@lucide/svelte/icons/x';
+  import Minus from '@lucide/svelte/icons/minus';
   import Moon from '@lucide/svelte/icons/moon';
+  import Plus from '@lucide/svelte/icons/plus';
+  import Scan from '@lucide/svelte/icons/scan';
   import Sun from '@lucide/svelte/icons/sun';
-  import { Scheme, View } from './focus';
+  import X from '@lucide/svelte/icons/x';
+  import { REAL_SIZE, Scheme, View } from './focus';
+  import type { ZoomRequest } from './page-bridge';
 
-  let { name, active, onselect, onclose, notice = null, scheme = null, onscheme, height = $bindable(0) }: { name: string; active: View; onselect: (view: View) => void; onclose: () => void; notice?: string | null; scheme?: Scheme | null; onscheme: (scheme: Scheme) => void; height?: number } = $props();
+  type Props = {
+    name: string;
+    active: View;
+    onselect: (view: View) => void;
+    onclose: () => void;
+    notice?: string | null;
+    scheme: Scheme;
+    onscheme: (scheme: Scheme) => void;
+    transparent?: boolean;
+    ontransparent?: () => void;
+    zoom?: number;
+    onzoom?: (request: ZoomRequest) => void;
+    onstep?: (direction: 1 | -1) => void;
+    height?: number;
+  };
+
+  let { name, active, onselect, onclose, notice = null, scheme, onscheme, transparent = false, ontransparent = () => undefined, zoom = REAL_SIZE, onzoom = () => undefined, onstep = () => undefined, height = $bindable(0) }: Props = $props();
+
+  const percent = $derived(`${Math.round(zoom * 100)}%`);
 </script>
 
 <div class="tabs" role="tablist" data-testid="focus-tabs" bind:clientHeight={height}>
@@ -16,11 +39,20 @@
     <button type="button" class="close" data-testid="focus-exit" title="Close (Esc)" aria-label="Close {name}" onclick={onclose}><X size={14} /></button>
   </span>
   {#if notice}<span class="notice" data-testid="focus-notice">{notice}</span>{/if}
-  {#if scheme}
-    <button type="button" class="scheme" class:push={!notice} data-testid="focus-scheme" data-scheme={scheme} title={scheme === Scheme.Dark ? 'Showing the dark theme' : 'Showing the light theme'} aria-label="Switch between light and dark" onclick={() => onscheme(scheme === Scheme.Dark ? Scheme.Light : Scheme.Dark)}>
-      {#if scheme === Scheme.Dark}<Moon size={13} />{:else}<Sun size={13} />{/if}
+  <span class="tools" class:push={!notice}>
+    {#if active === View.Focus}
+      <span class="zoom" data-testid="focus-zoom">
+        <button type="button" data-testid="zoom-fit" title="Fit to the canvas" aria-label="Fit to the canvas" onclick={() => onzoom({ mode: 'fit' })}><Scan size={14} /></button>
+        <button type="button" data-testid="zoom-out" title="Zoom out" aria-label="Zoom out" onclick={() => onstep(-1)}><Minus size={14} /></button>
+        <button type="button" class="readout" data-testid="zoom-reset" title="Real size" aria-label="Real size" onclick={() => onzoom({ mode: 'set', value: REAL_SIZE })}>{percent}</button>
+        <button type="button" data-testid="zoom-in" title="Zoom in" aria-label="Zoom in" onclick={() => onstep(1)}><Plus size={14} /></button>
+      </span>
+    {/if}
+    <button type="button" class="scheme" data-testid="focus-scheme" data-scheme={scheme} title={scheme === Scheme.Dark ? 'Dark: switch to light' : 'Light: switch to dark'} aria-label="Switch between light and dark" onclick={() => onscheme(scheme === Scheme.Dark ? Scheme.Light : Scheme.Dark)}>
+      {#if scheme === Scheme.Dark}<Moon size={14} />{:else}<Sun size={14} />{/if}
     </button>
-  {/if}
+    <button type="button" class="scheme" class:on={transparent} aria-pressed={transparent} data-testid="focus-transparent" title="Show a transparent checkerboard behind the component" aria-label="Transparent canvas" onclick={ontransparent}><Grid size={14} /></button>
+  </span>
 </div>
 
 <style>
@@ -89,23 +121,47 @@
     color: var(--ui-text-muted, inherit);
   }
 
-  .scheme {
+  .tools {
     display: flex;
     align-items: center;
     align-self: center;
-    justify-content: center;
-    width: 24px;
-    height: 22px;
+    gap: 2px;
     margin-bottom: 4px;
     margin-left: 6px;
+  }
+
+  .tools.push {
+    margin-left: auto;
+  }
+
+  .zoom {
+    display: flex;
+    align-items: center;
+    margin-right: 6px;
+  }
+
+  .zoom button,
+  .scheme {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 4px;
     border-radius: var(--ui-radius-sm, 4px);
     color: var(--ui-text);
   }
 
-  .scheme.push {
-    margin-left: auto;
+  .readout {
+    min-width: 44px;
+    font-variant-numeric: tabular-nums;
   }
 
+  .scheme.on {
+    background: var(--ui-input);
+  }
+
+  .zoom button:hover,
   .scheme:hover,
   .close:hover {
     background: var(--ui-divider);

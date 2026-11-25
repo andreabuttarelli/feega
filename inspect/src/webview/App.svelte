@@ -44,7 +44,7 @@
   import { readAskOf, withUsage, type Mounted } from './usage-values';
   import { controlsOf, variantsOf, type PropControl, type PropValue } from './prop-controls';
   import { FocusMode } from './page-bridge';
-  import { FocusKey, Scheme, View, focusKeyOf, focusOf, rowFocus, schemeOf, snapshotNoticeOf, themeOfScheme, type Focus } from './focus';
+  import { FocusKey, Scheme, View, focusKeyOf, focusOf, REAL_SIZE, rowFocus, schemeApplyOf, schemeOf, snapshotNoticeOf, stepZoom, themeOfScheme, wheelFactor, type Focus } from './focus';
   import { hasSourceInfo } from './source-info';
   import ChangesList from './ChangesList.svelte';
   import DeviceBar from './DeviceBar.svelte';
@@ -330,7 +330,9 @@
       sendProps();
       askUsageProps();
     },
-    focused: (count, mode, reason, detail) => {
+    zoomed: (zoom) => (zoomNow = zoom),
+    focused: (count, mode, reason, detail, dark) => {
+      pageDark = dark ?? false;
       snapshotNotice = mode === FocusMode.Snapshot ? snapshotNoticeOf(reason, detail) : null;
       if (mode === FocusMode.Snapshot) {
         mount = null;
@@ -570,18 +572,40 @@
 
   function showTheme() {
     const plain = $state.snapshot(themes);
-    bridge.theme(plain.map((t) => t.apply), activeApply(plain, themeName));
-    bridge.canvas(schemeOf(plain, themeName));
+    const emulating = viewing === View.Focus && userScheme !== null;
+    bridge.theme(plain.map((t) => t.apply), emulating ? schemeApplyOf(plain, themeName, userScheme!) : activeApply(plain, themeName));
+    bridge.canvas(userScheme, transparentCanvas);
   }
 
-  const scheme = $derived(schemeOf(themes, themeName));
+  let userScheme = $state<Scheme | null>(null);
+  let pageDark = $state(false);
+  let transparentCanvas = $state(false);
+  let zoomNow = $state(REAL_SIZE);
   const darkThemeName = $derived(themeOfScheme(themes, Scheme.Dark));
+  const shownScheme = $derived(userScheme ?? (darkThemeName ? schemeOf(themes, themeName) : pageDark ? Scheme.Dark : Scheme.Light));
 
   function switchScheme(next: Scheme) {
+    userScheme = next;
     const name = themeOfScheme(themes, next);
-    if (name) {
+    if (darkThemeName && name) {
       chooseTheme(name);
+      return;
     }
+    showTheme();
+  }
+
+  function toggleTransparent() {
+    transparentCanvas = !transparentCanvas;
+    showTheme();
+  }
+
+  function wheelOnFocus(e: WheelEvent) {
+    if (viewing === View.Focus && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      bridge.zoom({ mode: 'by', value: wheelFactor(e.deltaY) });
+      return;
+    }
+    bridge.scroll(e.deltaX / fit.scale, e.deltaY / fit.scale);
   }
 
   function chooseTheme(name: string) {
@@ -1193,8 +1217,12 @@
     showGrid = false;
     snapshotNotice = null;
     usageAsked = false;
+    userScheme = null;
+    pageDark = false;
+    transparentCanvas = false;
     bridge.useFocus(true);
     bridge.focus(next.source, true, next.index);
+    bridge.zoom({ mode: 'set', value: REAL_SIZE });
   }
 
   function exitFocus() {
@@ -1208,6 +1236,9 @@
     showGrid = false;
     snapshotNotice = null;
     usageAsked = false;
+    userScheme = null;
+    pageDark = false;
+    transparentCanvas = false;
     viewing = View.Page;
     bridge.useFocus(false);
     bridge.focus(null);
@@ -1470,14 +1501,14 @@
       {#if share?.available}<SharePanel view={share} onstart={(name, canEdit) => toHost({ kind: ToHost.ShareStart, name, canEdit })} onstop={() => toHost({ kind: ToHost.ShareStop })} onkick={(userId) => toHost({ kind: ToHost.ShareKick, userId })} onrole={(userId, role) => toHost({ kind: ToHost.ShareRole, userId, role })} />{/if}
       <button type="button" class="icon" class:on={!barClosed} title="Properties (⌘\)" onclick={toggleBar} data-testid="bar-toggle"><PanelRight size={15} /></button>
     </header>
-    {#if focus}<FocusTabs name={focus.name} active={viewing} notice={snapshotNotice} scheme={darkThemeName ? scheme : null} onscheme={switchScheme} onselect={showTab} onclose={exitFocus} bind:height={tabsH} />{/if}
+    {#if focus}<FocusTabs name={focus.name} active={viewing} notice={snapshotNotice} scheme={shownScheme} onscheme={switchScheme} transparent={transparentCanvas} ontransparent={toggleTransparent} zoom={zoomNow} onzoom={(request) => bridge.zoom(request)} onstep={(direction) => bridge.zoom({ mode: 'set', value: stepZoom(zoomNow, direction) })} onselect={showTab} onclose={exitFocus} bind:height={tabsH} />{/if}
 
     <div class="backdrop" role="presentation" bind:clientWidth={stage.w} bind:clientHeight={stage.h} onpointermove={resizeFrame} onpointerup={endDrag}>
       <div class="frame" class:framed={size !== Size.Full} style={`width:${fit.width * fit.scale}px;height:${fit.height * fit.scale}px`}>
         {#if url}<iframe bind:this={frame} src={start} title="App" data-testid="app-frame" style={`width:${fit.width}px;height:${fit.height}px;transform:scale(${fit.scale})`}></iframe>{/if}
         {#if restarting}<div class="restarting" data-testid="restarting" role="status"><span class="server-dot-inline amber"></span>Restarting dev server…</div>{/if}
         {#if mode === Mode.Design && bridged && !editing}
-          <div class="overlay" role="presentation" onpointerdown={pressOverlay} onpointermove={(e) => (pointed(e), dragOverlay(e))} onpointerleave={() => ((hover = null), toHost({ kind: ToHost.Cursor, at: null }))} onclick={onPick} oncontextmenu={onMenu} ondragover={overAdd} ondragleave={() => (addSpot = null)} ondrop={dropAdd} ondblclick={onDouble} onwheel={(e) => bridge.scroll(e.deltaX / fit.scale, e.deltaY / fit.scale)}>
+          <div class="overlay" role="presentation" onpointerdown={pressOverlay} onpointermove={(e) => (pointed(e), dragOverlay(e))} onpointerleave={() => ((hover = null), toHost({ kind: ToHost.Cursor, at: null }))} onclick={onPick} oncontextmenu={onMenu} ondragover={overAdd} ondragleave={() => (addSpot = null)} ondrop={dropAdd} ondblclick={onDouble} onwheel={wheelOnFocus}>
             {#if hover && !lostSlots[Slot.Hovered]}<div class="outline hover" style={box(hover)}></div>{/if}
             {#if addSpot}
               <div class="drop-line box" data-testid="add-outline" style={`left:${addSpot.outline.x * fit.scale - 1}px;top:${addSpot.outline.y * fit.scale - 1}px;width:${Math.max(2, addSpot.outline.w * fit.scale)}px;height:${Math.max(2, addSpot.outline.h * fit.scale)}px`}></div>

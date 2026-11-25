@@ -1,4 +1,4 @@
-import { DEFAULT_THEME, type Theme } from '@feega/live-edit/themes';
+import { DEFAULT_THEME, ThemeKind, type Apply, type Theme } from '@feega/live-edit/themes';
 import type { LayerNode, Pick, Source } from '../messages';
 
 export enum View {
@@ -75,3 +75,23 @@ const DARK_THEME = /dark/i;
 export const themeOfScheme = (themes: Theme[], scheme: Scheme): string | null => (scheme === Scheme.Light ? DEFAULT_THEME : (themes.find((theme) => DARK_THEME.test(theme.name))?.name ?? null));
 
 export const schemeOf = (themes: Theme[], active: string): Scheme => (DARK_THEME.test(active) && themes.some((theme) => theme.name === active) ? Scheme.Dark : Scheme.Light);
+
+const MEDIA_DARK: Apply = { kind: ThemeKind.Media, target: 'html', value: 'dark' };
+
+export const schemeApplyOf = (themes: Theme[], active: string, scheme: Scheme): Apply | null => {
+  const dark = themeOfScheme(themes, Scheme.Dark);
+  if (scheme === Scheme.Dark && dark === null) {
+    return MEDIA_DARK;
+  }
+  return themes.find((theme) => theme.name === (scheme === Scheme.Dark && dark ? dark : active))?.apply ?? null;
+};
+
+export const MIN_ZOOM = 0.1;
+export const MAX_ZOOM = 8;
+export const REAL_SIZE = 1;
+const ZOOM_STEP = 0.25;
+const WHEEL_SPEED = 0.01;
+
+export const stepZoom = (zoom: number, direction: 1 | -1): number => Math.min(Math.max(zoom + direction * ZOOM_STEP, MIN_ZOOM), MAX_ZOOM);
+
+export const wheelFactor = (deltaY: number): number => Math.exp(-deltaY * WHEEL_SPEED);

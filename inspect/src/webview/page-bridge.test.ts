@@ -91,7 +91,18 @@ describe('the real component in the focus tab', () => {
     post({ type: FOCUSED, count: 1, mode: 'mount' });
     post({ type: FOCUSED, count: 1, mode: 'snapshot', reason: 'mount_error', detail: 'provider' });
 
-    expect(seen).toEqual([[1, 'mount', undefined, undefined], [1, 'snapshot', 'mount_error', 'provider']]);
+    expect(seen).toEqual([[1, 'mount', undefined, undefined, undefined], [1, 'snapshot', 'mount_error', 'provider', undefined]]);
+  });
+
+  it('hands over whether the page behind the focus is dark, and the zoom it reports', () => {
+    const post = pageWindow();
+    const seen: unknown[] = [];
+    pageBridge(() => null, { focused: (...args: unknown[]) => seen.push(args), zoomed: (zoom: number) => seen.push(zoom) } as never);
+
+    post({ type: FOCUSED, count: 1, mode: 'mount', dark: true });
+    post({ type: 'feega:focus-zoomed', zoom: 2 });
+
+    expect(seen).toEqual([[1, 'mount', undefined, undefined, true], 2]);
   });
 
   it('hands over what the mounted component reports', () => {

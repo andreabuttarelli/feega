@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Pick, Source } from '../messages';
-import { FocusKey, Scheme, focusKeyOf, focusOf, rowFocus, schemeOf, snapshotNoticeOf, themeOfScheme } from './focus';
+import { FocusKey, Scheme, focusKeyOf, focusOf, rowFocus, schemeApplyOf, schemeOf, snapshotNoticeOf, stepZoom, themeOfScheme, wheelFactor } from './focus';
 
 const CARD: Source = { file: 'src/components/ProductCard.tsx', line: 4, col: 5 };
 
@@ -107,5 +107,39 @@ describe('the light and dark switch', () => {
 
   it('matches names like Dark mode or night', () => {
     expect(themeOfScheme([{ name: 'default' }, { name: 'Dark Mode' }] as never[], Scheme.Dark)).toBe('Dark Mode');
+  });
+});
+
+describe('the switch without a dark theme', () => {
+  const themes = [{ name: 'default', apply: { kind: 'default', target: 'html', value: '' } }, { name: 'sepia', apply: { kind: 'class', target: 'html', value: 'sepia' } }] as never[];
+
+  it('emulates the dark color scheme in the focus tab', () => {
+    expect(schemeApplyOf(themes, 'default', Scheme.Dark)).toEqual({ kind: 'media', target: 'html', value: 'dark' });
+  });
+
+  it('leaves the theme that is on when the scheme is light', () => {
+    expect(schemeApplyOf(themes, 'sepia', Scheme.Light)).toEqual({ kind: 'class', target: 'html', value: 'sepia' });
+    expect(schemeApplyOf(themes, 'default', Scheme.Light)).toEqual({ kind: 'default', target: 'html', value: '' });
+  });
+
+  it('uses the project dark theme when there is one', () => {
+    const withDark = [...themes, { name: 'dark', apply: { kind: 'class', target: 'html', value: 'dark' } }] as never[];
+
+    expect(schemeApplyOf(withDark, 'dark', Scheme.Dark)).toEqual({ kind: 'class', target: 'html', value: 'dark' });
+  });
+});
+
+describe('zoom', () => {
+  it('steps through round values', () => {
+    expect(stepZoom(1, 1)).toBe(1.25);
+    expect(stepZoom(1, -1)).toBe(0.75);
+    expect(stepZoom(0.1, -1)).toBe(0.1);
+    expect(stepZoom(8, 1)).toBe(8);
+  });
+
+  it('turns a wheel delta into a factor, down zooms out', () => {
+    expect(wheelFactor(-10)).toBeGreaterThan(1);
+    expect(wheelFactor(10)).toBeLessThan(1);
+    expect(wheelFactor(0)).toBe(1);
   });
 });
