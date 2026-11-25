@@ -308,15 +308,19 @@ const openCard = (alone: boolean) =>
   el(
     'button',
     { class: `card open${alone ? ' wide' : ''}`, on: run(() => bridge.pickFolder()) },
-    art('start', alone ? 10 : 6),
+    art('folder', alone ? 10 : 6),
     el('div', {}, el('div', { class: 'name', text: 'open folder' }), el('div', { class: 'hint', text: alone ? OPEN_HINT : OPEN_HINT_SHORT }))
   );
+
+const NEW_PROJECT_LOGOS: Logo[] = ['Next', 'Nuxt', 'Svelte', 'Astro', 'React', 'Vue'];
+
+const logoRow = () => el('span', { class: 'logos', html: NEW_PROJECT_LOGOS.map((logo) => `<svg viewBox="0 0 24 24" fill="currentColor"><path d="${LOGO_PATHS[logo]}"/></svg>`).join('') });
 
 const newProjectCard = (alone: boolean) =>
   el(
     'button',
-    { class: `card open${alone ? ' wide' : ''}`, on: () => showRoute(Route.NewProject) },
-    art('start', alone ? 10 : 6),
+    { class: `card open new${alone ? ' wide' : ''}`, on: () => showRoute(Route.NewProject) },
+    logoRow(),
     el('div', {}, el('div', { class: 'name', text: 'new project' }), el('div', { class: 'hint', text: 'pick a framework and a template. feega sets it up and opens the editor.' }))
   );
 
@@ -327,7 +331,7 @@ const dashboardView = (state: ShellState): View => ({
       'div',
       { class: 'dash' },
       el('div', { class: 'dash-head' }, el('div', {}, el('p', { class: 'kicker', text: 'feega desktop' }), el('h1', { class: 'display page-title', text: 'projects' })), el('div', { class: 'actions' }, pill('open folder', 'outline', run(() => bridge.pickFolder())), pill('new project', 'primary', () => showRoute(Route.NewProject)))),
-      el('div', { class: 'grid' }, newProjectCard(state.recents.length === 0), openCard(state.recents.length === 0), ...state.recents.map(recentCard))
+      el('div', { class: 'grid' }, el('div', { class: 'starts' }, newProjectCard(state.recents.length === 0), openCard(state.recents.length === 0)), ...state.recents.map(recentCard))
     )
 });
 
@@ -342,7 +346,23 @@ type Draft = { stack: Stack; template: Template; name: string; parent: string };
 
 const draft: Draft = { stack: Stack.ReactVite, template: Template.Landing, name: '', parent: '' };
 
-const choiceRow = <T extends string>(options: [T, string][], current: T, choose: (value: T) => void) => el('div', { class: 'choices' }, ...options.map(([value, label]) => el('button', { class: `choice${value === current ? ' on' : ''}`, text: label, on: () => choose(value) })));
+const logoSvg = (logo: Logo) => `<svg viewBox="0 0 24 24" fill="currentColor"><path d="${LOGO_PATHS[logo]}"/></svg>`;
+
+const STACK_LOGO: Record<Stack, Logo> = {
+  [Stack.ReactVite]: 'React',
+  [Stack.Next]: 'Next',
+  [Stack.SvelteKit]: 'Svelte',
+  [Stack.VueVite]: 'Vue',
+  [Stack.Astro]: 'Astro',
+  [Stack.Nuxt]: 'Nuxt'
+};
+
+const choiceRow = <T extends string>(options: [T, string][], current: T, choose: (value: T) => void, logos: Partial<Record<T, Logo>> = {}) =>
+  el('div', { class: 'choices' }, ...options.map(([value, label]) => {
+    const logo = logos[value];
+    const html = logo ? `${logoSvg(logo)}<span>${label}</span>` : `<span>${label}</span>`;
+    return el('button', { class: `choice${value === current ? ' on' : ''}`, html, on: () => choose(value) });
+  }));
 
 const rerender = () => {
   shownKey = '';
@@ -378,7 +398,7 @@ const newProjectView = (state: ShellState): View => ({
       }
       void bridge.createProject({ parent: draft.parent, name: draft.name, stack: draft.stack, template: draft.template }).then(() => showRoute(Route.Home));
     };
-    const frameworks = choiceRow(Object.values(Stack).map((stack): [Stack, string] => [stack, STACKS[stack].label]), draft.stack, (stack) => ((draft.stack = stack), rerender()));
+    const frameworks = choiceRow(Object.values(Stack).map((stack): [Stack, string] => [stack, STACKS[stack].label]), draft.stack, (stack) => ((draft.stack = stack), rerender()), STACK_LOGO);
     const templates = choiceRow(Object.values(Template).map((template): [Template, string] => [template, TEMPLATE_LABELS[template]]), draft.template, (template) => ((draft.template = template), rerender()));
     const folder = el('button', { class: 'pill outline small', text: tidyPath(draft.parent), title: draft.parent, on: run(async () => ((draft.parent = (await bridge.pickParent()) ?? draft.parent), rerender())) });
     return el(

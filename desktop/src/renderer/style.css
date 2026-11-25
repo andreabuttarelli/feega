@@ -992,3 +992,56 @@ pre {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.starts {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+  gap: 14px;
+}
+
+.card.open.new {
+  background: var(--sx-tint-blue);
+  border-color: rgb(0 77 255 / 0.35);
+}
+
+.card.open.new:hover {
+  background: rgb(0 77 255 / 0.18);
+  border-color: var(--sx-blue);
+}
+
+.logos {
+  display: flex;
+  gap: 14px;
+  color: #6f94ff;
+  transition: transform 260ms var(--ease);
+}
+
+.logos svg {
+  width: 28px;
+  height: 28px;
+}
+
+.card.open.new:hover .logos {
+  transform: translateY(-3px);
+}
+
+.pill.primary {
+  background: var(--sx-blue);
+  color: #fff;
+}
+
+.pill.primary:hover {
+  background: #2a6bff;
+}
+
+.choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.choice svg {
+  width: 16px;
+  height: 16px;
+}
