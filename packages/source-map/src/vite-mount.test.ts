@@ -89,3 +89,17 @@ describe('the mount route', () => {
     expect((await fetch(`${base}/__feega/mount?file=../x.tsx&name=A`)).status).toBe(400);
   });
 });
+
+describe('the mount route under a base', () => {
+  it('points the page at the module under the base, as behind Nuxt', async () => {
+    const based = await createServer({ root, configFile: false, base: '/_nuxt/', logLevel: 'silent', server: { middlewareMode: true, hmr: false }, optimizeDeps: { noDiscovery: true }, plugins: [feegaSource()] });
+    const server = listen(based.middlewares).listen(0);
+    const port = (server.address() as AddressInfo).port;
+    const html = await (await fetch(`http://127.0.0.1:${port}/__feega/mount?file=src/Card.tsx&name=Card`)).text();
+    server.close();
+    await based.close();
+
+    expect(html).toContain('src="/_nuxt/__feega/mount-module.js?file=src/Card.tsx');
+    expect(html).not.toContain('/_nuxt/_nuxt');
+  });
+});

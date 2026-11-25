@@ -3,6 +3,7 @@ import { MOUNT_STATUS, Status } from './mount-protocol.js';
 export const MOUNT_ROUTE = '/__feega/mount';
 export const MODULE_ROUTE = '/__feega/mount-module.js';
 export const PROPS_ROUTE = '/__feega/props';
+export const ASTRO_ROUTE = '/__feega/astro';
 export const PROVIDERS_QUERY = 'feega-providers';
 export const NESTED_HOST = "Symbol.for('feega.nested-host')";
 
@@ -72,3 +73,13 @@ startDomMount({ mountInto: ${mounter}(library, mod), mod: { default: mod }, ...$
 
 export const vueModule = (request: MountRequest, page: MountPage) => domModule(request, page, 'vue', 'vueMount');
 export const svelteModule = (request: MountRequest, page: MountPage) => domModule(request, page, 'svelte', 'svelteMount');
+
+export function astroModule({ file, name, props }: MountRequest, { domRuntimeUrl }: MountPage): string {
+  const controlsUrl = `${PROPS_ROUTE}?${new URLSearchParams({ file, name })}`;
+  const renderUrl = `${ASTRO_ROUTE}?${new URLSearchParams({ file })}`;
+  const start = JSON.stringify({ name, file, props, controlsUrl });
+
+  return `import { startDomMount, astroMount } from ${JSON.stringify(domRuntimeUrl)};
+startDomMount({ mountInto: astroMount(${JSON.stringify(renderUrl)}), mod: { default: true }, ...${start} });
+`;
+}

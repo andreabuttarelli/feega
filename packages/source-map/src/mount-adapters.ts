@@ -1,14 +1,15 @@
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { controlsOf, type PropControl } from './component-props.ts';
-import { reactModule, svelteModule, vueModule, type MountPage, type MountRequest } from './mount-page.ts';
+import { astroModule, reactModule, svelteModule, vueModule, type MountPage, type MountRequest } from './mount-page.ts';
 import { svelteControlsOf } from './svelte-props.ts';
 import { vueControlsOf } from './vue-props.ts';
 
 export enum MountFramework {
   React = 'react',
   Vue = 'vue',
-  Svelte = 'svelte'
+  Svelte = 'svelte',
+  Astro = 'astro'
 }
 
 export type MountAdapter = {
@@ -42,12 +43,14 @@ export const ADAPTERS: Record<MountFramework, MountAdapter> = {
       return compiler && svelteControlsOf(code, compiler);
     },
     seedsProps: true
-  }
+  },
+  [MountFramework.Astro]: { module: astroModule, controls: () => null, seedsProps: false }
 };
 
 const BY_EXTENSION: [RegExp, MountFramework][] = [
   [/\.vue$/, MountFramework.Vue],
-  [/\.svelte$/, MountFramework.Svelte]
+  [/\.svelte$/, MountFramework.Svelte],
+  [/\.astro$/, MountFramework.Astro]
 ];
 
 export const adapterOf = (file: string): MountAdapter => ADAPTERS[BY_EXTENSION.find(([extension]) => extension.test(file))?.[1] ?? MountFramework.React];

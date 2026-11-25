@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PROPS_ROUTE, mountHtml, reactModule, mountRequestOf } from './mount-page.ts';
+import { ASTRO_ROUTE, PROPS_ROUTE, astroModule, mountHtml, reactModule, mountRequestOf } from './mount-page.ts';
 
 const RUNTIME = '/@fs/x/mount-runtime.js';
 
@@ -69,5 +69,17 @@ describe('reactModule', () => {
 
   it('starts with no providers when the project has none', () => {
     expect(reactModule(request, page)).toContain('const providers = null;');
+  });
+});
+
+describe('astroModule', () => {
+  const page = { runtimeUrl: RUNTIME, domRuntimeUrl: '/@fs/x/mount-dom.js', componentUrl: '/src/Card.astro', providersUrl: null };
+
+  it('asks the dev server to render the Astro component with the props', () => {
+    const code = astroModule({ file: 'src/Card.astro', name: 'Card', props: { size: 'sm' } }, page);
+
+    expect(code).toContain(`${ASTRO_ROUTE}?file=src%2FCard.astro`);
+    expect(code).toContain('astroMount');
+    expect(code).toContain('"size":"sm"');
   });
 });

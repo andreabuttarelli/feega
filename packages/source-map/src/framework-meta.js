@@ -63,11 +63,18 @@ const plainProps = (props) => Object.fromEntries(Object.entries(props ?? {}).fla
   return kept === undefined ? [] : [[name, kept]];
 }));
 
-export function reactMountOf(element) {
+function componentFiberOf(element) {
   let fiber = fiberOf(element);
   while (fiber && !COMPONENT_TAGS.has(fiber.tag)) {
     fiber = fiber.return;
   }
+  return fiber;
+}
+
+export const reactTypeOf = (element) => componentFiberOf(element)?.type ?? null;
+
+export function reactMountOf(element) {
+  const fiber = componentFiberOf(element);
   return fiber ? { name: componentName(fiber.type), props: plainProps(fiber.memoizedProps) } : null;
 }
 
@@ -80,7 +87,13 @@ function svelteMountOf(element) {
   return element.__svelte_meta ? { name: '', props: {} } : null;
 }
 
-const MOUNTERS = [reactMountOf, vueMountOf, svelteMountOf];
+const ASTRO_FILE = /\.astro:\d+:\d+$/;
+
+function astroMountOf(element) {
+  return ASTRO_FILE.test(element.getAttribute(SOURCE_ATTR) ?? '') ? { name: '', props: {} } : null;
+}
+
+const MOUNTERS = [reactMountOf, vueMountOf, svelteMountOf, astroMountOf];
 
 export function mountOf(element) {
   for (const read of MOUNTERS) {

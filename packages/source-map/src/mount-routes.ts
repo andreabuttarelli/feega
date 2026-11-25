@@ -3,11 +3,13 @@ import { readFile } from 'node:fs/promises';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { join, resolve, sep } from 'node:path';
 import type { ViteDevServer } from 'vite';
+import { renderAstro } from './astro-render.ts';
 import { adapterOf, seededProps } from './mount-adapters.ts';
-import { MODULE_ROUTE, MOUNT_ROUTE, PROPS_ROUTE, PROVIDERS_QUERY, mountHtml, mountRequestOf } from './mount-page.ts';
+import { ASTRO_ROUTE, MODULE_ROUTE, MOUNT_ROUTE, PROPS_ROUTE, PROVIDERS_QUERY, mountHtml, mountRequestOf } from './mount-page.ts';
 import { fsUrl } from './source-id.ts';
 
 const BAD_REQUEST = 400;
+const SERVER_ERROR = 500;
 const RUNTIME_FILE = 'mount-runtime.js';
 const DOM_RUNTIME_FILE = 'mount-dom.js';
 const ENTRY_SCRIPT = /<script\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi;
@@ -75,7 +77,21 @@ export function mountRoutes(server: ViteDevServer, { root, runtimeDir }: Routes)
     reply(res, 200, 'text/html', await server.transformIndexHtml(MOUNT_ROUTE, mountHtml(url.search.slice(1))));
   }
 
+  async function astro(req: IncomingMessage, res: ServerResponse) {
+    const request = mountRequestOf(urlOf(req));
+    if (!request || !inside(root(), request.file)) {
+      reply(res, BAD_REQUEST, 'text/plain', 'bad request');
+      return;
+    }
+    try {
+      reply(res, 200, 'text/html', await renderAstro(server, root(), request.file, request.props));
+    } catch (error) {
+      reply(res, SERVER_ERROR, 'text/plain', String((error as Error)?.message ?? error));
+    }
+  }
+
   server.middlewares.use(PROPS_ROUTE, (req, res, next) => void props(req, res).catch(next));
+  server.middlewares.use(ASTRO_ROUTE, (req, res, next) => void astro(req, res).catch(next));
   server.middlewares.use(MOUNT_ROUTE, (req, res, next) => void mount(req, res).catch(next));
 
   return {

@@ -7,6 +7,11 @@ describe('adapterOf', () => {
     expect(adapterOf('src/Card.vue')).toBe(ADAPTERS[MountFramework.Vue]);
     expect(adapterOf('src/lib/Card.svelte')).toBe(ADAPTERS[MountFramework.Svelte]);
     expect(adapterOf('src/Card.tsx')).toBe(ADAPTERS[MountFramework.React]);
+    expect(adapterOf('src/components/Card.astro')).toBe(ADAPTERS[MountFramework.Astro]);
+  });
+
+  it('describes no props for an Astro component', () => {
+    expect(ADAPTERS[MountFramework.Astro].controls('---\n---\n<p />', 'Card.astro', 'Card', '/')).toBeNull();
   });
 });
 

@@ -1,7 +1,7 @@
 import { JSDOM } from 'jsdom';
 import { describe, expect, it } from 'vitest';
 import { ICON_ATTR, SOURCE_ATTR } from './runtime.js';
-import { stampSources } from './framework-meta.js';
+import { mountOf, stampSources } from './framework-meta.js';
 
 const docOf = (html: string) => new JSDOM(`<body>${html}</body>`).window.document;
 
@@ -47,5 +47,17 @@ describe('stampSources', () => {
     (doc.querySelector('path') as any).__svelte_meta = { loc: { file: 'node_modules/@lucide/svelte/dist/Icon.svelte', line: 20, column: 4 } };
     stampSources(doc);
     expect(doc.querySelector('path')!.hasAttribute(SOURCE_ATTR)).toBe(false);
+  });
+});
+
+describe('mountOf', () => {
+  it('mounts an element rendered by an Astro component, which has no props to read', () => {
+    const doc = docOf(`<h1 ${SOURCE_ATTR}="src/Card.astro:4:3">a</h1>`);
+
+    expect(mountOf(doc.querySelector('h1')!)).toEqual({ name: '', props: {} });
+  });
+
+  it('does not mount a plain element of a page', () => {
+    expect(mountOf(docOf(`<h1 ${SOURCE_ATTR}="src/index.html:4:3">a</h1>`).querySelector('h1')!)).toBeNull();
   });
 });
