@@ -4,7 +4,7 @@ import { scanProject } from './project-scan';
 
 export type Watch = (root: string, changed: () => void) => { dispose: () => void };
 
-const SOURCE = /\.(tsx|jsx|ts|js|svelte|vue|astro|mjs|html)$|(^|\/)(tsconfig|jsconfig|package)\.json$/;
+const SOURCE = /\.(tsx|jsx|ts|js|svelte|vue|astro|mjs|html|css)$|(^|\/)(tsconfig|jsconfig|package)\.json$/;
 const IGNORED_DIR = /(^|\/)(node_modules|\.git|dist|build|\.next|\.nuxt|\.svelte-kit|\.output|coverage)(\/|$)/;
 const POLL_MS = 2000;
 
@@ -27,8 +27,8 @@ export const fsWatch: Watch = (root, changed) => {
 };
 
 async function signatureOf(root: string): Promise<string> {
-  const { sources } = await scanProject(root, Infinity);
-  const stamps = sources.map((path) => {
+  const { sheets, sources } = await scanProject(root, Infinity);
+  const stamps = [...sources, ...sheets].map((path) => {
     try {
       return `${path}:${statSync(path).mtimeMs}`;
     } catch {

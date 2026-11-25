@@ -31,7 +31,13 @@
   import Interactions from './Interactions.svelte';
   import Attributes from './Attributes.svelte';
   import { wiringState } from './wiring-state.svelte';
+  import ClassesSection from './ClassesSection.svelte';
+  import { classesState, classOfKey } from './classes-state.svelte';
+  import { editingLabel, editTarget } from './class-view';
   import ModeSwitch from './ModeSwitch.svelte';
+  import CloseButton from './CloseButton.svelte';
+  import DockTab from './DockTab.svelte';
+  import { dockedEdge, isDocked, slideAway, tabBox, type Docked } from './dock';
   import FeegaMenu from './FeegaMenu.svelte';
   import OnboardingDialog from './Onboarding.svelte';
   import ServerPopover from './ServerPopover.svelte';
@@ -155,6 +161,7 @@
   let baseline = $state<Styles | null>(null);
   const writtenState = $derived(elementState === ElementState.Default ? undefined : elementState);
   const TOAST_MS = 2500;
+  let noSourceDismissed = $state(false);
   let toast = $state<string | null>(null);
   let toastTimer: ReturnType<typeof setTimeout> | undefined;
   function showToast(text: string) {
@@ -226,6 +233,8 @@
   let canUndo = $state(false);
   let canRedo = $state(false);
   let scope = $state(Scope.Element);
+  const classInfo = $derived(classOfKey(classesState.view, classesState.targetKey));
+  const classTarget = $derived(classInfo ? editTarget(classInfo) : null);
   let layersOpen = $state<Record<string, boolean>>({ '(html):0:0': true, '(page):0:0': true });
   const layerDrag = $state<{ source: Source | null; name: string; component: boolean; parentFile: string | null; hint: { id: string; place: AddPlace } | null }>({ source: null, name: '', component: false, parentFile: null, hint: null });
 
@@ -276,6 +285,7 @@
     savePrefs();
   }
   let anchor = $state<Anchor>(DEFAULT_ANCHOR);
+  let docked = $state<Docked | null>(null);
   let bar = $state({ w: 0, h: 0 });
   let toolbarH = $state(0);
   let moving = $state<{ dx: number; dy: number; x: number; y: number } | null>(null);
@@ -633,7 +643,7 @@
   }
 
   function savePrefs() {
-    toHost({ kind: ToHost.Prefs, prefs: { size, custom, barClosed, route, anchor, barWidth, leftWidth, leftClosed, layers: layerFlags.saved() } });
+    toHost({ kind: ToHost.Prefs, prefs: { size, custom, barClosed, route, anchor, dock: docked ?? undefined, barWidth, leftWidth, leftClosed, layers: layerFlags.saved() } });
   }
 
   function restore(prefs: Prefs | null) {
@@ -646,6 +656,7 @@
     barClosed = prefs.barClosed;
     route = prefs.route ?? route;
     anchor = isAnchor(prefs.anchor) ? prefs.anchor : anchor;
+    docked = isDocked(prefs.dock) ? prefs.dock : null;
     barWidth = prefs.barWidth ?? barWidth;
     leftWidth = prefs.leftWidth ?? leftWidth;
     leftClosed = prefs.leftClosed ?? leftClosed;
@@ -738,6 +749,7 @@
     [ToView.IconResults]: (m) => iconsFound({ id: m.id, library: m.library, hits: m.hits, error: m.error ?? '' }),
     [ToView.IconPreview]: (m) => iconDrawn(m.name, m.svg),
     [ToView.ImageSaved]: (m) => (imageSaved.url = m.url),
+    [ToView.Classes]: (m) => (classesState.view = m.view),
     [ToView.Wiring]: (m) => Object.assign(wiringState, { at: m.at, instance: m.instance, wiring: m.wiring }),
     [ToView.Pick]: (m) => bridge.at(m.x, m.y).then((pick) => (setSingle(pick), toHost({ kind: ToHost.Picked, id: m.id, pick }))),
     [ToView.Change]: (m) => {
@@ -784,8 +796,14 @@
     if (!moving) {
       return;
     }
-    anchor = nearestAnchor({ x: moving.x, y: moving.y }, area, bar);
+    docked = dockedEdge({ x: moving.x, y: moving.y }, area, bar);
+    anchor = docked ? anchor : nearestAnchor({ x: moving.x, y: moving.y }, area, bar);
     moving = null;
+    savePrefs();
+  }
+
+  function undock() {
+    docked = null;
     savePrefs();
   }
 
@@ -882,7 +900,7 @@
 
   function askOf(row: Row, value: string, token?: string) {
     const { prop, side, family, value: written } = row.change(value);
-    return { at: sourceText(picked!.source), prop, side, family, value: written, token, rem: picked!.rem, viewport: picked!.viewport, css: kebab(row.preview(value)), scope, inner: picked!.inner, page: picked!.page, state: writtenState, breakpoint: target, theme: writtenThemeName };
+    return { at: sourceText(picked!.source), prop, side, family, value: written, token, rem: picked!.rem, viewport: picked!.viewport, css: kebab(row.preview(value)), scope, cls: classTarget ?? undefined, inner: picked!.inner, page: picked!.page, state: writtenState, breakpoint: target, theme: writtenThemeName };
   }
 
   function change(row: Row, value: string, token?: string) {
@@ -1259,10 +1277,15 @@
 
   let impact = $state<Impact | null>(null);
   let impactId = 0;
+
+  $effect(() => {
+    void pickedAt;
+    classesState.targetKey = null;
+  });
   let held = $state<Held | null>(null);
 
   const impactAsk = $derived(
-    picked ? { at: sourceText(picked.source), scope, inner: picked.inner, page: picked.page, state: writtenState, breakpoint: target, theme: writtenThemeName } : null
+    picked ? { at: sourceText(picked.source), scope, cls: classTarget ?? undefined, inner: picked.inner, page: picked.page, state: writtenState, breakpoint: target, theme: writtenThemeName } : null
   );
   const impactKey = $derived(JSON.stringify(impactAsk));
 
@@ -1566,9 +1589,10 @@
           </form>
         </div>
       {/if}
-      {#if bridged && !hasSourceInfo(layers)}
+      {#if bridged && !noSourceDismissed && !hasSourceInfo(layers)}
         <div class="notice nosource" data-testid="no-source">
           <span>This page has no source info</span>
+          <CloseButton onclose={() => (noSourceDismissed = true)} />
           <button type="button" class="link" data-action="add-plugin" onclick={() => toHost({ kind: ToHost.AddPlugin })}>Add the Feega plugin</button>
           <button type="button" class="link" data-action={ServerAction.RestartUnderFeega} onclick={() => toHost({ kind: ToHost.Server, action: ServerAction.RestartUnderFeega })}>Let Feega start the server</button>
         </div>
@@ -1581,16 +1605,18 @@
           <button type="button" class="link" data-action="skill-hint-copy" onclick={() => toHost({ kind: ToHost.Copy, text: skillHint! })}>Copy command</button>
           <button type="button" class="link" data-action="skill-hint-never" onclick={() => (toHost({ kind: ToHost.SkillHintNever }), (skillHint = null))}>Don't show again</button>
           <button type="button" class="link" data-action="skill-hint-dismiss" onclick={() => (toHost({ kind: ToHost.SkillHintDismiss }), (skillHint = null))}>Dismiss</button>
+          <CloseButton onclose={() => (toHost({ kind: ToHost.SkillHintDismiss }), (skillHint = null))} />
         </div>
       {/if}
       {#if fontNotice}
         <div class="notice missingfont" data-testid="font-notice">
           <MissingFont missing={fontNotice} project={palette.fonts.filter((name) => !palette.missing.some((m) => m.family === name))} onreplace={replaceFont} onload={loadFont} />
           <button type="button" class="link" onclick={() => dismissedFonts.add(fontNotice!.family)}>Dismiss</button>
+          <CloseButton onclose={() => dismissedFonts.add(fontNotice!.family)} />
         </div>
       {/if}
-      {#if toast}<div class="toast" role="status">{toast}</div>{/if}
-      <div class="float" class:moving bind:clientWidth={bar.w} bind:clientHeight={bar.h} style={`left:${barAt.x}px;top:${barAt.y}px`} data-anchor={anchor}>
+      {#if toast}<div class="toast" role="status"><span>{toast}</span><CloseButton onclose={() => (toast = null)} /></div>{/if}
+      <div class="float" class:moving class:docked={!!docked} inert={!!docked} style:--away={docked ? slideAway(docked.edge) : 'none'} bind:clientWidth={bar.w} bind:clientHeight={bar.h} style={`left:${barAt.x}px;top:${barAt.y}px`} data-anchor={anchor}>
         <button type="button" class="grip" title="Drag to move (arrow keys)" aria-label="Move the bar" onpointerdown={grabBar} onpointermove={dragBar} onpointerup={dropBar} onkeydown={onHandleKey}>
           <svg width="8" height="12" viewBox="0 0 8 12" aria-hidden="true">{#each [0, 1, 2] as row (row)}{#each [0, 1] as col (col)}<circle cx={2 + col * 4} cy={2 + row * 4} r="1.1" fill="currentColor" />{/each}{/each}</svg>
         </button>
@@ -1598,6 +1624,8 @@
         <button type="button" class="icon" title="Undo (⌘Z)" disabled={!canUndo} onclick={() => toHost({ kind: ToHost.Undo })}><Undo2 size={14} /></button>
         <button type="button" class="icon" title="Redo (⇧⌘Z)" disabled={!canRedo} onclick={() => toHost({ kind: ToHost.Redo })}><Redo2 size={14} /></button>
       </div>
+
+      {#if docked}<DockTab edge={docked.edge} box={tabBox(docked, area)} onrestore={undock} />{/if}
 
       {#if barClosed && picked}
         <button type="button" class="pill" onclick={toggleBar} data-testid="selection-pill">&lt;{picked.tag}&gt; {fileName(picked.source)} · Edit</button>
@@ -1612,6 +1640,7 @@
             <button type="button" class="link" onclick={() => toHost({ kind: ToHost.Open, at: saved! })}>{saved ? `Saved to ${fileName(saved)}` : ''}</button>
             {#if warning}<span class="warn">{warning}</span>{/if}
           {/if}
+          <CloseButton onclose={() => ((problem = null), (saved = null), (warning = ''))} />
         </div>
       {/if}
     </div>
@@ -1646,17 +1675,25 @@
         {:else if picked}
           <div class="what" data-testid="selection">
             <Breadcrumb pick={picked} onselect={select} state={elementState} />
-            <ImpactLabel {impact} instances={picked.instances} detachable={detachState(picked).show} detachReason={detachState(picked).reason} ondetach={detach} onopen={(at) => toHost({ kind: ToHost.Open, at })} />
+            <ImpactLabel {impact} instances={picked.instances} detachable={!classInfo && detachState(picked).show} detachReason={detachState(picked).reason} ondetach={detach} onopen={(at) => toHost({ kind: ToHost.Open, at })} />
             <span class="where">{#if picked.component}in {picked.component.file.split('/').pop()} · {/if}<button type="button" class="link" onclick={() => toHost({ kind: ToHost.Open, at: picked!.source })}>{picked.source.file.split('/').pop()}:{picked.source.line}</button> · <button type="button" class="link" data-testid="copy-for-agent" title="Copy file, selector and view for your coding agent" onclick={copyForAgent}>Copy for agent</button>{#if cloudOn} · <button type="button" class="link" data-testid="comment-start" title="Comment on this element (C)" onclick={startComment}>Comment</button>{/if}</span>
             {#if authored(picked.classes)}<code class="classes">{authored(picked.classes)}</code>{/if}
           </div>
           <BreakpointBar badge={reachBadge} theme={themeBadge(themeName)} items={reachItems(breakpoints)} choice={reach} onchoose={(id) => (reach = id)} />
+          {#if classInfo}
+            <div class="scope editing" data-testid="class-editing">
+              <span class="editing-label">{editingLabel(classInfo)}</span>
+              <button type="button" class="on" data-action="class-stop" onclick={() => (classesState.targetKey = null)}>This element</button>
+            </div>
+          {:else}
           <div class="scope" role="radiogroup" aria-label="Edit scope" data-testid="scope">
             <button type="button" class:on={scope === Scope.Element} onclick={() => (scope = Scope.Element)} title="Only this element (every instance of its component: {picked.instances})">This element{picked.instances > 1 ? ` ×${picked.instances}` : ''}</button>
             <button type="button" class:on={scope === Scope.Class} disabled={!picked.classCount || styling === Styling.Tailwind} onclick={() => (scope = Scope.Class)} title={styling === Styling.Tailwind ? 'Class scope needs CSS rules, not Tailwind' : `Every element with this class: ${picked.classCount}`}>All .{picked.classes.split(' ')[0] || 'class'}{picked.classCount ? ` (${picked.classCount})` : ''}</button>
           </div>
+          {/if}
           {#if held}<PreviewBar {held} onapply={applyHeld} oncancel={cancelHeld} onmute={muteHeld} />{/if}
           <Properties pick={picked} {breakpoints} {scales} {palette} {elementState} {baseline} onstate={chooseState} onpreview={preview} onchange={change} onsavevar={saveVar} onhint={(h) => (hint = h)} onfont={pickFont} onfontreplace={replaceFont} onfontload={loadFont} onnotice={showToast} />
+          <ClassesSection pick={picked} {changes} onselect={select} />
           <Attributes pick={picked} {palette} />
           <PluginSections {plugins} {palette} />
           <Interactions pick={picked} {changes} />
@@ -1983,6 +2020,9 @@
     box-shadow: 0 0 0 1px var(--ui-divider), 0 4px 12px rgb(0 0 0 / 0.15);
     color: var(--ui-text);
     font-size: var(--ui-text-xs);
+    display: flex;
+    align-items: center;
+    gap: 6px;
   }
 
   .width-label {
@@ -2007,7 +2047,10 @@
     z-index: 5;
     transition:
       left 180ms cubic-bezier(0.16, 1, 0.3, 1),
-      top 180ms cubic-bezier(0.16, 1, 0.3, 1);
+      top 180ms cubic-bezier(0.16, 1, 0.3, 1),
+      transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
+      opacity 180ms ease,
+      visibility 180ms;
     display: flex;
     align-items: center;
     gap: 6px;
@@ -2020,6 +2063,13 @@
 
   .float.moving {
     transition: none;
+  }
+
+  .float.docked {
+    visibility: hidden;
+    opacity: 0;
+    transform: var(--away);
+    pointer-events: none;
   }
 
   .grip {
@@ -2073,6 +2123,10 @@
     background: var(--ui-float);
     box-shadow: 0 0 0 1px var(--ui-divider);
     font-size: var(--ui-text-sm);
+  }
+
+  .notice :global(.close) {
+    align-self: flex-end;
   }
 
   .notice.nosource {
@@ -2149,6 +2203,22 @@
     padding: 2px;
     border-radius: var(--ui-radius-md);
     background: var(--ui-input);
+  }
+
+  .editing-label {
+    flex: 1;
+    align-self: center;
+    padding: 0 8px;
+    overflow: hidden;
+    color: var(--ui-accent);
+    font-size: var(--ui-text-xs);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .scope.editing button {
+    flex: 0 0 auto;
+    padding: 0 8px;
   }
 
   .scope button {

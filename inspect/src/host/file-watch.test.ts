@@ -25,6 +25,7 @@ describe('WATCHED', () => {
     ['src/lib/Button.svelte', true],
     ['tsconfig.json', true],
     ['package.json', true],
+    ['src/app.css', true],
     ['node_modules/react/index.js', false],
     ['.git/index', false],
     ['dist/app.js', false],
