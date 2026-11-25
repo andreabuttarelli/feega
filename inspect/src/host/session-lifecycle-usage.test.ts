@@ -138,6 +138,7 @@ describe('library in the usage stream', () => {
     const sent = t.sent.find((e) => e.event === 'library_insert');
     expect(sent?.tier).toBe(tier);
     expect(sent?.library_item).toBe(id);
+    expect(sent?.library_category).toBe('section');
   });
 });
 

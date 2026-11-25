@@ -97,4 +97,11 @@ describe('webviewDimsOf', () => {
     expect(webviewDimsOf({ breakpoint: 'weird', variant: '/Users/me' })).toEqual({ breakpoint: 'custom' });
     expect(webviewDimsOf(undefined)).toEqual({});
   });
+
+  it('keeps focus mode, control kind and a prop count, and drops anything else', () => {
+    expect(webviewDimsOf({ mode: 'mount', control: 'select', prop_count: 3 })).toEqual({ mode: 'mount', control: 'select', prop_count: 3 });
+    expect(webviewDimsOf({ mode: 'snapshot' })).toEqual({ mode: 'snapshot' });
+    expect(webviewDimsOf({ mode: '/Users/me', control: 'label', prop_count: -1 })).toEqual({});
+    expect(webviewDimsOf({ prop_count: 1.5 })).toEqual({});
+  });
 });

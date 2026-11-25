@@ -91,6 +91,18 @@ describe('product events in the session', () => {
     expect(t.sent.find((e) => e.event === 'error_webview')).toMatchObject({ error_class: 'TypeError', area: 'webview' });
   });
 
+  it('focus mode reports its mode, prop changes report a control kind and a count, the grid reports itself', async () => {
+    const t = setup();
+    await t.send({ kind: ToHost.Usage, event: WebviewUsage.FocusOpened, dims: { variant: 'focus', mode: 'mount' } });
+    await t.send({ kind: ToHost.Usage, event: WebviewUsage.FocusPropsChanged, dims: { control: 'select', prop_count: 2 } });
+    await t.send({ kind: ToHost.Usage, event: WebviewUsage.FocusVariantsShown });
+    await t.session.stop();
+
+    expect(t.sent.find((e) => e.event === 'focus_opened')).toMatchObject({ variant: 'focus', mode: 'mount' });
+    expect(t.sent.find((e) => e.event === 'focus_props_changed')).toMatchObject({ control: 'select', prop_count: 2 });
+    expect(t.sent.map((e) => e.event)).toContain('focus_variants_shown');
+  });
+
   it('reports nothing of an AI chat the user never started', async () => {
     const t = setup();
     await t.send({ kind: ToHost.AiCancel });

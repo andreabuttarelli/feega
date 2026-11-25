@@ -39,6 +39,7 @@
   import LayersTree from './LayersTree.svelte';
   import FocusTabs from './FocusTabs.svelte';
   import ComponentProps from './ComponentProps.svelte';
+  import { propTally } from './focus-usage';
   import { controlsOf, variantsOf, type PropControl, type PropValue } from './prop-controls';
   import { FocusMode } from './page-bridge';
   import { FocusKey, SNAPSHOT_NOTICE, View, focusKeyOf, focusOf, rowFocus, type Focus } from './focus';
@@ -332,6 +333,7 @@
         mount = null;
       }
       if (count > 0) {
+        reportFocusOpened(mode);
         reopening = false;
         return;
       }
@@ -1073,9 +1075,28 @@
     }
   }
 
+  const propsChanged = propTally();
+  let focusReported = false;
+
+  function reportFocusOpened(mode: FocusMode) {
+    if (focusReported) {
+      return;
+    }
+    focusReported = true;
+    toHost({ kind: ToHost.Usage, event: WebviewUsage.FocusOpened, dims: { variant: 'focus', mode } });
+  }
+
+  function reportPropsChanged() {
+    propsChanged.drain().forEach((dims) => toHost({ kind: ToHost.Usage, event: WebviewUsage.FocusPropsChanged, dims }));
+  }
+
   function setProp(name: string, value: PropValue | undefined) {
     if (!mount) {
       return;
+    }
+    const control = mount.controls.find((c) => c.name === name);
+    if (control) {
+      propsChanged.add(control.kind);
     }
     const { [name]: _, ...rest } = mount.values;
     mount = { ...mount, values: value === undefined ? rest : { ...rest, [name]: value } };
@@ -1084,6 +1105,9 @@
 
   function setGrid(on: boolean) {
     showGrid = on;
+    if (on) {
+      toHost({ kind: ToHost.Usage, event: WebviewUsage.FocusVariantsShown });
+    }
     sendProps();
   }
 
@@ -1121,7 +1145,8 @@
     if (!next) {
       return;
     }
-    toHost({ kind: ToHost.Usage, event: WebviewUsage.FocusOpened, dims: { variant: 'focus' } });
+    reportPropsChanged();
+    focusReported = false;
     focus = next;
     viewing = View.Focus;
     reopening = false;
@@ -1136,6 +1161,7 @@
     if (!focus) {
       return;
     }
+    reportPropsChanged();
     const wasFocused = viewing === View.Focus;
     focus = null;
     mount = null;
