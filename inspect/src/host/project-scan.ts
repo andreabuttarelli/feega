@@ -1,7 +1,7 @@
 import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
-const SKIPPED_DIRS = new Set(['node_modules', '.git', 'dist', 'build', '.next', '.nuxt', '.svelte-kit', '.output', 'coverage']);
+export const SKIPPED_DIRS = new Set(['node_modules', '.git', 'dist', 'build', '.next', '.nuxt', '.svelte-kit', '.output', 'coverage']);
 const SOURCE_FILE = /\.(tsx|jsx|ts|js|svelte|vue|astro|html)$/;
 const MAX_FILES = 200;
 const MAX_DEPTH = 6;

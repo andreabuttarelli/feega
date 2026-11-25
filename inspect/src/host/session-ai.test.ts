@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -53,7 +53,7 @@ function setup(installed: string[] = ['/bin/opencode'], confirmed = true) {
   const session = inspectSession(platform, dir);
   const events = () => sent.flatMap((m) => (m.kind === ToView.AiEvent ? [m.event] : []));
   const states = () => sent.flatMap((m) => (m.kind === ToView.AiState ? [m.state] : []));
-  return { dir, session, send: (m: HostMessage) => handle(m), sent, events, states, asked, read: (p: string) => readFileSync(join(dir, p), 'utf8') };
+  return { dir, session, send: (m: HostMessage) => handle(m), sent, events, states, asked, read: (p: string) => readFileSync(join(dir, p), 'utf8'), exists: (p: string) => existsSync(join(dir, p)), changes: () => (sent.flatMap((m) => (m.kind === ToView.History ? [m.changes] : [])).at(-1) ?? []) };
 }
 
 describe('the AI panel in the session', () => {
@@ -124,5 +124,61 @@ describe('the AI panel in the session', () => {
     expect(asked[0]).toContain('@agentclientprotocol/claude-agent-acp');
     expect(states()).not.toContain(AiState.Ready);
     expect(events()).toEqual([]);
+  });
+});
+
+const turn = async (t: ReturnType<typeof setup>, prompt: string) => {
+  await t.send({ kind: ToHost.AiStart, agent: AcpId.OpenCode });
+  await t.send({ kind: ToHost.AiSend, text: prompt, context: null });
+  await eventually(() => t.events().some((e) => e.kind === AgentEventKind.Done));
+};
+
+describe('files an agent changes without asking us', () => {
+  it('lists an edit made straight on disk and undoes it', async () => {
+    const t = setup();
+
+    await turn(t, 'disk src/Page.svelte');
+
+    expect(t.read('src/Page.svelte')).toBe('written by the agent\n');
+    expect(t.changes()).toMatchObject([{ prop: 'agent', value: 'OpenCode', files: ['src/Page.svelte'] }]);
+    await t.send({ kind: ToHost.Undo });
+    expect(t.read('src/Page.svelte')).toBe('<h1>Hi</h1>\n');
+    await t.session.stop();
+  });
+
+  it('lists a file created straight on disk and removes it on undo', async () => {
+    const t = setup();
+
+    await turn(t, 'disk src/Fresh.svelte');
+
+    expect(t.changes()).toMatchObject([{ value: 'OpenCode', files: ['src/Fresh.svelte'] }]);
+    await t.send({ kind: ToHost.Undo });
+    expect(t.exists('src/Fresh.svelte')).toBe(false);
+    await t.session.stop();
+  });
+
+  it('lists a file deleted straight on disk and brings it back on undo', async () => {
+    const t = setup();
+
+    await turn(t, 'diskRemove src/Page.svelte');
+
+    expect(t.exists('src/Page.svelte')).toBe(false);
+    expect(t.changes()).toMatchObject([{ value: 'OpenCode', files: ['src/Page.svelte'] }]);
+    await t.send({ kind: ToHost.Undo });
+    expect(t.read('src/Page.svelte')).toBe('<h1>Hi</h1>\n');
+    await t.session.stop();
+  });
+
+  it('lists a file once when the agent writes both ways', async () => {
+    const t = setup();
+
+    await turn(t, 'mixed src/Page.svelte');
+
+    expect(t.changes().map((c) => c.files)).toEqual([['src/Direct.txt'], ['src/Page.svelte']]);
+    await t.send({ kind: ToHost.Undo });
+    await t.send({ kind: ToHost.Undo });
+    expect(t.read('src/Page.svelte')).toBe('<h1>Hi</h1>\n');
+    expect(t.exists('src/Direct.txt')).toBe(false);
+    await t.session.stop();
   });
 });
