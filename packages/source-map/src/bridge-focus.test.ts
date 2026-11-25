@@ -177,6 +177,21 @@ describe('focus tab', () => {
     expect(reply.result).toBeNull();
   });
 
+  it.each(['body', 'html'])('a layout that tags %s does not make it selectable in the focus tab', async (selector) => {
+    const { win, up, send, frame } = bridged();
+    win.document.body.setAttribute('data-feega-src', 'src/layout.tsx:4:7');
+    win.document.documentElement.setAttribute('data-feega-src', 'src/layout.tsx:3:5');
+    send({ type: 'feega:focus', source: 'src/Card.tsx:5:7', index: 1 });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    frame()!.contentDocument!.write(frame()!.srcdoc);
+    frame()!.dispatchEvent(new (win as unknown as typeof globalThis).Event('load'));
+    send({ type: 'feega:inspect', id: 10, selector, focus: true });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    const reply = up.find((m) => m.type === 'feega:inspect:result' && m.id === 10) as { result: unknown };
+    expect(reply.result).toBeNull();
+  });
+
   it('reports zero and opens nothing for a component that is not on the page', () => {
     const { up, send, frame } = bridged();
     send({ type: 'feega:focus', source: 'src/Gone.tsx:1:1' });

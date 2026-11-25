@@ -73,9 +73,11 @@ export function deepestAt(doc, x, y) {
 }
 
 export function inspectElement(element, { maxHtml = DEFAULT_MAX_HTML, twin = null } = {}) {
-  const tagged = element.closest(`[${SOURCE_ATTR}]`);
+  const closest = element.closest(`[${SOURCE_ATTR}]`);
+  const tagged = closest && !isPageElement(closest) ? closest : null;
   if (!tagged) {
-    return pageTargetOf(element) ? inspectPage(element, maxHtml) : null;
+    const page = closest ?? element;
+    return pageTargetOf(page) ? inspectPage(page, maxHtml) : null;
   }
   const svg = untaggedSvg(element, tagged);
   if (svg) {
@@ -317,7 +319,11 @@ const MAX_ANCESTORS = 12;
 export const GHOST_ATTR = 'data-feega-ghost';
 
 const isGhost = (element) => element?.hasAttribute(GHOST_ATTR) ?? false;
-const taggedParent = (element) => element.parentElement?.closest(`[${SOURCE_ATTR}]`) ?? null;
+const isPageElement = (element) => element === element.ownerDocument.body || element === element.ownerDocument.documentElement;
+const taggedParent = (element) => {
+  const parent = element.parentElement?.closest(`[${SOURCE_ATTR}]`) ?? null;
+  return parent && isPageElement(parent) ? null : parent;
+};
 const shownParent = (element) => {
   const parent = taggedParent(element);
   return isGhost(parent) ? null : parent;
@@ -431,7 +437,7 @@ function pageNode(element, source, children) {
 }
 
 export function treeOf(doc, { bare = false } = {}) {
-  const roots = [...doc.querySelectorAll(`[${SOURCE_ATTR}]`)].filter((e) => !isGhost(e) && !shownParent(e));
+  const roots = [...doc.querySelectorAll(`[${SOURCE_ATTR}]`)].filter((e) => !isPageElement(e) && !isGhost(e) && !shownParent(e));
   const budget = { left: MAX_TREE_NODES, instances: instanceIndexes(doc) };
   const inHead = (e) => Boolean(doc.head?.contains(e));
   const head = foldedOf(roots.filter(inHead), 1, budget);
