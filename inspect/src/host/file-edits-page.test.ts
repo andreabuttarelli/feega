@@ -4,6 +4,8 @@ import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { reader } from '@feega/live-edit/live-ask';
 import { buildCatalog } from '../../../packages/library/src/catalog';
+import { LiveProp } from '@feega/live-edit/live-fields';
+import { PageTarget } from '@feega/live-edit/page-rule';
 import { fileEdits } from './file-edits';
 import { newPage } from './new-page';
 
@@ -37,5 +39,23 @@ describe('new page on disk', () => {
     await edits.undo();
 
     expect(existsSync(join(root, 'src/routes/pricing/+page.svelte'))).toBe(false);
+  });
+});
+
+describe('page style in a new global block', () => {
+  it('tells the caller a style block was created, not on the second edit', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'page-'));
+    mkdirSync(join(root, 'src/layouts'), { recursive: true });
+    writeFileSync(join(root, 'package.json'), '{}');
+    writeFileSync(join(root, 'src/layouts/Layout.astro'), '<html><body><slot /></body></html>\n');
+    const edits = fileEdits(root);
+    const ask = { at: 'page', prop: LiveProp.Color, value: '#111111', page: PageTarget.Body, css: { 'background-color': '#111111' } };
+
+    const first = await edits.edit(ask);
+    const second = await edits.edit({ ...ask, value: '#222222', css: { 'background-color': '#222222' } });
+
+    expect(first).toMatchObject({ ok: true, created: true });
+    expect(second).toMatchObject({ ok: true });
+    expect(second.ok && second.created).toBeFalsy();
   });
 });

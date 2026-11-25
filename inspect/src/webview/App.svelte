@@ -328,6 +328,9 @@
         showToast('Page reloaded · scroll and selection kept');
       }
       bridged = true;
+      if (injected) {
+        bridge.preview(injected.source, injected.css, injected.inner, injected.state);
+      }
       toHost({ kind: ToHost.PreviewReady });
       server = ServerState.Running;
       restarting = false;
@@ -533,6 +536,17 @@
     frame.src = new URL(route, url).toString();
   }
 
+  let injected: { source: Source; css: Record<string, string>; inner?: string; state?: ElementState } | null = null;
+
+  function injectWritten(css: Record<string, string>) {
+    if (!picked) {
+      reloadAfterRestart();
+      return;
+    }
+    injected = { source: picked.source, css, inner: picked.inner, state: writtenState };
+    bridge.preview(injected.source, css, injected.inner, injected.state);
+  }
+
   function go(path: string | null) {
     if (path === null || !url) {
       return;
@@ -711,6 +725,10 @@
       problem = null;
       saved = m.saved ?? null;
       warning = m.note ?? '';
+      injected = null;
+      if (m.inject) {
+        injectWritten(m.inject);
+      }
       if (m.note) {
         showToast(m.note);
       }
