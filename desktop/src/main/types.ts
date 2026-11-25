@@ -17,6 +17,7 @@ export enum UpdateState {
   Idle = 'idle',
   Checking = 'checking',
   Downloading = 'downloading',
+  Available = 'available',
   Ready = 'ready',
   UpToDate = 'up-to-date',
   Failed = 'failed'

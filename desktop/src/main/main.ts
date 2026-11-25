@@ -11,7 +11,7 @@ import { pidFile } from './pid-file';
 import { frameworkOf } from './project-info';
 import { inviteWanted, settingsStore } from './store';
 import { tabHost } from './tabs';
-import { updateController } from './updates/controller';
+import { CheckMode, updateController } from './updates/controller';
 import pkg from '../../package.json';
 import { platformRow } from './platform';
 import { Channel, NodeStatus, type Link, type NodeState, type Preferences, type ProjectState, type ShellState } from './types';
@@ -146,7 +146,7 @@ app.whenReady().then(() => {
   ipcMain.handle(Channel.RetryTab, (_event, id: string) => void tabs.retry(id));
   ipcMain.handle(Channel.ChooseApp, (_event, id: string, app: string) => tabs.choose(id, app));
   ipcMain.handle(Channel.Activate, (_event, id: string | null) => tabs.activate(id));
-  const menu = () => installMenu({ showSettings: () => window.webContents.send(Channel.ShowSettings), checkUpdates: () => void updates.check(true), cloud: settings.get().preferences.cloud, setCloud });
+  const menu = () => installMenu({ showSettings: () => window.webContents.send(Channel.ShowSettings), checkUpdates: () => void updates.check(CheckMode.Manual), cloud: settings.get().preferences.cloud, setCloud });
   const setCloud = (on: boolean) => {
     settings.prefer({ cloud: on });
     menu();
@@ -206,7 +206,7 @@ app.whenReady().then(() => {
   ipcMain.handle(Channel.CheckNode, checkRuntime);
   ipcMain.handle(Channel.OpenLink, (_event, link: Link) => shell.openExternal(LINKS[link]));
   ipcMain.handle(Channel.Overlay, (_event, open: boolean) => tabs.overlay(open));
-  ipcMain.handle(Channel.CheckUpdates, () => updates.check(true));
+  ipcMain.handle(Channel.CheckUpdates, () => updates.check(CheckMode.Manual));
   ipcMain.handle(Channel.InstallUpdate, () => updates.install());
   ipcMain.handle(Channel.Quit, () => app.quit());
 
