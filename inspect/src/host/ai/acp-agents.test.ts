@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AgentEnv } from '../agents';
-import { AcpId, acpAgents, launchOf } from './acp-agents';
+import { AcpId, acpAgents, adapterOf, launchOf } from './acp-agents';
 
 const envWith = (held: string[]): AgentEnv => ({ path: ['/usr/bin'], home: '/home/me', exists: (p) => held.includes(p), appName: 'Visual Studio Code', extensions: [] });
 
@@ -35,8 +35,8 @@ describe('the ACP agent catalog', () => {
     expect(launchOf(AcpId.OpenCode)).toEqual({ command: 'opencode', args: ['acp'] });
     expect(launchOf(AcpId.Gemini)).toEqual({ command: 'gemini', args: ['--acp'] });
     expect(launchOf(AcpId.Grok)).toEqual({ command: 'grok', args: ['agent', 'stdio'] });
-    expect(launchOf(AcpId.Claude).command).toBe('npx');
-    expect(launchOf(AcpId.Claude).args).toContain('@agentclientprotocol/claude-agent-acp@0.110.0');
+    expect(launchOf(AcpId.Claude)).toBeNull();
+    expect(adapterOf(AcpId.Claude)).toEqual({ pkg: '@agentclientprotocol/claude-agent-acp', version: '0.110.0' });
   });
 
   it('launches the agents added from the ACP list the way their docs say', () => {
@@ -48,7 +48,7 @@ describe('the ACP agent catalog', () => {
     expect(launchOf(AcpId.Qoder)).toEqual({ command: 'qodercli', args: ['--acp'] });
     expect(launchOf(AcpId.Droid)).toEqual({ command: 'droid', args: ['exec', '--output-format', 'acp'] });
     expect(launchOf(AcpId.Vibe)).toEqual({ command: 'vibe-acp', args: [] });
-    expect(launchOf(AcpId.Pi)).toEqual({ command: 'npx', args: ['-y', 'pi-acp@0.0.35'] });
+    expect(adapterOf(AcpId.Pi)).toEqual({ pkg: 'pi-acp', version: '0.0.35' });
   });
 
   it('finds the added agents by their binary', () => {

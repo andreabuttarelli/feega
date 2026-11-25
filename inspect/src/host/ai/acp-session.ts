@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { isAbsolute } from 'node:path';
 import { Readable, Writable } from 'node:stream';
 import { client, methods, ndJsonStream, PROTOCOL_VERSION, type RequestPermissionRequest, type SessionNotification, type ToolCall, type ToolCallContent, type ToolCallUpdate } from '@agentclientprotocol/sdk';
 import type { SessionConfigOption } from '@agentclientprotocol/sdk';
@@ -48,7 +49,7 @@ const modelsOf = (models: SessionModels | null | undefined): ConfigView | null =
 const messageOf = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
 export const openAcpAgent = async (launch: Launch, deps: AgentDeps): Promise<AgentSession> => {
-  const child = spawn(launch.command, launch.args, { cwd: deps.cwd, stdio: ['pipe', 'pipe', 'ignore'], shell: process.platform === 'win32' });
+  const child = spawn(launch.command, launch.args, { cwd: deps.cwd, env: { ...process.env, ...launch.env }, stdio: ['pipe', 'pipe', 'ignore'], shell: process.platform === 'win32' && !isAbsolute(launch.command) });
   const tools = new Map<string, ToolView>();
   const asking = new Map<string, (optionId: string | null) => void>();
   let asked = 0;

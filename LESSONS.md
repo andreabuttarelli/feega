@@ -1399,3 +1399,7 @@ non solo con la build.
 ## Nuxt focus tab always falls back to the snapshot
 
 **Signal:** `/__feega/mount` answers 404 on Nuxt while Vue and Svelte on plain Vite mount fine. **Move:** Nuxt's own server answers before the Vite middlewares that `feegaSource` registers, so the mount routes are unreachable; the tab falls back by design. Serving them there needs a Nitro dev handler in the Nuxt layer.
+
+## Worktree tests cannot find `@feega/*` or the ACP sdk
+
+**Signal:** `Failed to load url @feega/live-edit/...` in a new worktree whose `node_modules` is a symlink to the main checkout. The symlinks under `@feega` resolve to the main checkout's `packages/`, which may be another branch and lacks the new modules. **Move:** make `node_modules` a real folder of per-entry symlinks and link each `@feega/<name>` to this worktree's `packages/<name>`; install missing dependencies such as `@agentclientprotocol/sdk` outside the repo and link them.
