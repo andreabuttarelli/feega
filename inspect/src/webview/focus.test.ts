@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Pick, Source } from '../messages';
-import { FocusKey, focusKeyOf, focusOf, rowFocus, snapshotNoticeOf } from './focus';
+import { FocusKey, Scheme, focusKeyOf, focusOf, rowFocus, schemeOf, snapshotNoticeOf, themeOfScheme } from './focus';
 
 const CARD: Source = { file: 'src/components/ProductCard.tsx', line: 4, col: 5 };
 
@@ -84,5 +84,28 @@ describe('snapshotNoticeOf', () => {
 
   it('says nothing when there is no reason', () => {
     expect(snapshotNoticeOf(null)).toBeNull();
+  });
+});
+
+describe('the light and dark switch', () => {
+  const themes = [{ name: 'default' }, { name: 'dark' }, { name: 'sepia' }] as never[];
+
+  it('is not offered when the project has no dark theme', () => {
+    expect(themeOfScheme([{ name: 'default' }, { name: 'sepia' }] as never[], Scheme.Dark)).toBeNull();
+  });
+
+  it('switches to the dark theme of the project, and back to the default', () => {
+    expect(themeOfScheme(themes, Scheme.Dark)).toBe('dark');
+    expect(themeOfScheme(themes, Scheme.Light)).toBe('default');
+  });
+
+  it('reads the scheme from the theme that is on', () => {
+    expect(schemeOf(themes, 'dark')).toBe(Scheme.Dark);
+    expect(schemeOf(themes, 'default')).toBe(Scheme.Light);
+    expect(schemeOf(themes, 'sepia')).toBe(Scheme.Light);
+  });
+
+  it('matches names like Dark mode or night', () => {
+    expect(themeOfScheme([{ name: 'default' }, { name: 'Dark Mode' }] as never[], Scheme.Dark)).toBe('Dark Mode');
   });
 });

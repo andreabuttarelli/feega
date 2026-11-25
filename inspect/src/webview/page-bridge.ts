@@ -1,7 +1,7 @@
 import type { PropControl, Variant } from './prop-controls';
 import type { ElementState } from '@feega/live-edit/element-state';
 import type { Apply } from '@feega/live-edit/themes';
-import { BRIDGE_READY, INSPECT, INSPECT_RESULT, LOCAL_ORIGIN, LOCATION, MODE, PREVIEW, PREVIEW_CLEAR, PREVIEW_CLEAR_ALL, PREVIEW_SETTLE, PREVIEW_SETTLED, SCROLL, SCROLLED, REVEAL, FOCUS, FOCUSED, MOUNT_PROPS, MOUNT_STATUS, HIDE, PALETTE, PALETTE_RESULT, type Palette, TREE, TREE_RESULT, type LayerNode, TEXT_DONE, TEXT_EDIT, TEXT_RESTORE, TRACK, TRACKED, LEAVE, FORCE, THEME, type Slot, type Mode, type Move, type Pick, type Source } from '../messages';
+import { BRIDGE_READY, INSPECT, INSPECT_RESULT, LOCAL_ORIGIN, LOCATION, MODE, PREVIEW, PREVIEW_CLEAR, PREVIEW_CLEAR_ALL, PREVIEW_SETTLE, PREVIEW_SETTLED, SCROLL, SCROLLED, REVEAL, FOCUS, FOCUS_CANVAS, FOCUSED, MOUNT_PROPS, MOUNT_STATUS, HIDE, PALETTE, PALETTE_RESULT, type Palette, TREE, TREE_RESULT, type LayerNode, TEXT_DONE, TEXT_EDIT, TEXT_RESTORE, TRACK, TRACKED, LEAVE, FORCE, THEME, type Slot, type Mode, type Move, type Pick, type Source } from '../messages';
 
 export enum FocusMode {
   Mount = 'mount',
@@ -133,6 +133,7 @@ export function pageBridge(frame: () => HTMLIFrameElement | null, on: PageEvents
     mode: (mode: Mode) => send({ type: MODE, mode }),
     reveal: (source: Source, index = 0) => send({ type: REVEAL, source: sourceText(source), index }),
     focus: (source: Source | null, shown = true, index?: number) => send({ type: FOCUS, source: source ? sourceText(source) : null, shown, index }, Target.Page),
+    canvas: (scheme: string) => send({ type: FOCUS_CANVAS, scheme }, Target.Page),
     mountProps: (props: Record<string, unknown>, variants: Variant[] | null) => send({ type: MOUNT_PROPS, props, variants }, Target.Focus),
     useFocus: (on: boolean) => (inFocus = on),
     scroll: (dx: number, dy: number) => send({ type: SCROLL, dx, dy }),

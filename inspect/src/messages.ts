@@ -480,6 +480,7 @@ export const SCROLLED = 'feega:scrolled';
 export const REVEAL = 'feega:reveal';
 export const FOCUS = 'feega:focus';
 export const FOCUSED = 'feega:focused';
+export const FOCUS_CANVAS = 'feega:focus-canvas';
 export const MOUNT_STATUS = 'feega:mount:status';
 export const MOUNT_PROPS = 'feega:mount:props';
 export const TEXT_EDIT = 'feega:text:edit';

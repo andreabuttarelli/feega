@@ -44,7 +44,7 @@
   import { readAskOf, withUsage, type Mounted } from './usage-values';
   import { controlsOf, variantsOf, type PropControl, type PropValue } from './prop-controls';
   import { FocusMode } from './page-bridge';
-  import { FocusKey, View, focusKeyOf, focusOf, rowFocus, snapshotNoticeOf, type Focus } from './focus';
+  import { FocusKey, Scheme, View, focusKeyOf, focusOf, rowFocus, schemeOf, snapshotNoticeOf, themeOfScheme, type Focus } from './focus';
   import { hasSourceInfo } from './source-info';
   import ChangesList from './ChangesList.svelte';
   import DeviceBar from './DeviceBar.svelte';
@@ -571,6 +571,17 @@
   function showTheme() {
     const plain = $state.snapshot(themes);
     bridge.theme(plain.map((t) => t.apply), activeApply(plain, themeName));
+    bridge.canvas(schemeOf(plain, themeName));
+  }
+
+  const scheme = $derived(schemeOf(themes, themeName));
+  const darkThemeName = $derived(themeOfScheme(themes, Scheme.Dark));
+
+  function switchScheme(next: Scheme) {
+    const name = themeOfScheme(themes, next);
+    if (name) {
+      chooseTheme(name);
+    }
   }
 
   function chooseTheme(name: string) {
@@ -1459,7 +1470,7 @@
       {#if share?.available}<SharePanel view={share} onstart={(name, canEdit) => toHost({ kind: ToHost.ShareStart, name, canEdit })} onstop={() => toHost({ kind: ToHost.ShareStop })} onkick={(userId) => toHost({ kind: ToHost.ShareKick, userId })} onrole={(userId, role) => toHost({ kind: ToHost.ShareRole, userId, role })} />{/if}
       <button type="button" class="icon" class:on={!barClosed} title="Properties (⌘\)" onclick={toggleBar} data-testid="bar-toggle"><PanelRight size={15} /></button>
     </header>
-    {#if focus}<FocusTabs name={focus.name} active={viewing} notice={snapshotNotice} onselect={showTab} onclose={exitFocus} bind:height={tabsH} />{/if}
+    {#if focus}<FocusTabs name={focus.name} active={viewing} notice={snapshotNotice} scheme={darkThemeName ? scheme : null} onscheme={switchScheme} onselect={showTab} onclose={exitFocus} bind:height={tabsH} />{/if}
 
     <div class="backdrop" role="presentation" bind:clientWidth={stage.w} bind:clientHeight={stage.h} onpointermove={resizeFrame} onpointerup={endDrag}>
       <div class="frame" class:framed={size !== Size.Full} style={`width:${fit.width * fit.scale}px;height:${fit.height * fit.scale}px`}>

@@ -1,3 +1,4 @@
+import { DEFAULT_THEME, type Theme } from '@feega/live-edit/themes';
 import type { LayerNode, Pick, Source } from '../messages';
 
 export enum View {
@@ -63,3 +64,14 @@ export function focusKeyOf(key: string, state: { focused: boolean; available: bo
   }
   return pressed === FOCUS_LETTER && state.available ? FocusKey.Enter : null;
 }
+
+export enum Scheme {
+  Light = 'light',
+  Dark = 'dark'
+}
+
+const DARK_THEME = /dark/i;
+
+export const themeOfScheme = (themes: Theme[], scheme: Scheme): string | null => (scheme === Scheme.Light ? DEFAULT_THEME : (themes.find((theme) => DARK_THEME.test(theme.name))?.name ?? null));
+
+export const schemeOf = (themes: Theme[], active: string): Scheme => (DARK_THEME.test(active) && themes.some((theme) => theme.name === active) ? Scheme.Dark : Scheme.Light);
