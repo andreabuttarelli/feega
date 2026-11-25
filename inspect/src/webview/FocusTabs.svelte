@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ComponentIcon from '@lucide/svelte/icons/component';
+  import House from '@lucide/svelte/icons/house';
   import X from '@lucide/svelte/icons/x';
   import Moon from '@lucide/svelte/icons/moon';
   import Sun from '@lucide/svelte/icons/sun';
@@ -8,9 +10,9 @@
 </script>
 
 <div class="tabs" role="tablist" data-testid="focus-tabs" bind:clientHeight={height}>
-  <button type="button" role="tab" aria-selected={active === View.Page} class:on={active === View.Page} data-testid="tab-page" onclick={() => onselect(View.Page)}>Page</button>
+  <button type="button" role="tab" aria-selected={active === View.Page} class:on={active === View.Page} data-testid="tab-page" onclick={() => onselect(View.Page)}><House size={14} />Page</button>
   <span class="tab" class:on={active === View.Focus}>
-    <button type="button" role="tab" aria-selected={active === View.Focus} data-testid="tab-focus" onclick={() => onselect(View.Focus)}>{name}</button>
+    <button type="button" role="tab" aria-selected={active === View.Focus} data-testid="tab-focus" onclick={() => onselect(View.Focus)}><ComponentIcon size={14} />{name}</button>
     <button type="button" class="close" data-testid="focus-exit" title="Close (Esc)" aria-label="Close {name}" onclick={onclose}><X size={11} /></button>
   </span>
   {#if notice}<span class="notice" data-testid="focus-notice">{notice}</span>{/if}
@@ -44,6 +46,7 @@
   .tab {
     display: flex;
     align-items: center;
+    gap: 5px;
     height: 26px;
     padding: 0 10px;
     border-radius: var(--ui-radius-md) var(--ui-radius-md) 0 0;
@@ -55,6 +58,9 @@
   }
 
   .tab > button:first-child {
+    display: flex;
+    align-items: center;
+    gap: 5px;
     height: 100%;
     padding: 0;
     font-weight: 600;
