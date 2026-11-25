@@ -122,7 +122,7 @@ export function installBridge(win, { nested = false, emit = null, twin = null } 
     [PALETTE]: () => reply({ type: PALETTE_RESULT, ...paletteOf(doc), missing: missingFontsOf(doc) }),
     [HIDE]: (request) => hidePreview(doc, request.source, request.hidden),
     [FOCUS]: (request) => (request.source === null ? tab.close() : reply({ type: FOCUSED, ...tab.open(request) })),
-    [FOCUS_CANVAS]: (request) => tab.canvas(request.scheme),
+    [FOCUS_CANVAS]: (request) => tab.canvas(request),
     [FOCUS_ZOOM]: (request) => tab.zoom(request),
     [LEAVE]: () => scroll.leave(),
     [TRACK]: (request) => tracker.follow(request.slot, request.source, request.index),

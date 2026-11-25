@@ -19,40 +19,10 @@ describe('focus tab', () => {
     const { up, send, frame } = bridged();
     send({ type: 'feega:focus', source: 'src/Card.tsx:5:7', index: 1 });
 
-    expect(up).toContainEqual({ type: 'feega:focused', count: 1, mode: 'snapshot', reason: 'unsupported_framework' });
+    expect(up).toContainEqual({ type: 'feega:focused', count: 1, mode: 'snapshot', dark: false, reason: 'unsupported_framework' });
     expect(frame()!.srcdoc).toContain('Two');
     expect(frame()!.srcdoc).not.toContain('One');
     expect(frame()!.srcdoc).not.toContain('Footer');
-  });
-
-  it('paints the canvas dark when the view asks for the dark scheme, and light again after', () => {
-    const { send, frame } = bridged();
-    send({ type: 'feega:focus', source: 'src/Card.tsx:5:7', index: 0 });
-    const canvas = () => frame()!.srcdoc.match(/<style id="feega-focus-canvas">([^<]*)<\/style>/)![1];
-    const light = canvas();
-
-    send({ type: 'feega:focus-canvas', scheme: 'dark' });
-    const dark = frame()!.srcdoc.match(/<style id="feega-focus-canvas">([^<]*)<\/style>/)![1];
-
-    expect(dark).not.toBe(light);
-    expect(dark).toContain('#1c1c20');
-    send({ type: 'feega:focus-canvas', scheme: 'light' });
-    expect(canvas()).toBe(light);
-  });
-
-  it('keeps the scheme when another instance opens', () => {
-    const { send, frame } = bridged();
-    send({ type: 'feega:focus-canvas', scheme: 'dark' });
-    send({ type: 'feega:focus', source: 'src/Card.tsx:5:7', index: 1 });
-
-    expect(frame()!.srcdoc).toContain('#1c1c20');
-  });
-
-  it('draws a subtle checker darker than the old light one', () => {
-    const { send, frame } = bridged();
-    send({ type: 'feega:focus', source: 'src/Card.tsx:5:7', index: 0 });
-
-    expect(frame()!.srcdoc).not.toContain('#f4f4f6');
   });
 
   describe('zoom', () => {
@@ -102,6 +72,72 @@ describe('focus tab', () => {
       send({ type: 'feega:focus-zoom', mode: 'fit' });
 
       expect(zoomed(up)).toEqual([1]);
+    });
+  });
+
+  describe('canvas background', () => {
+    const canvas = (srcdoc: string) => srcdoc.match(/<style id="feega-focus-canvas">([^<]*)<\/style>/)![1];
+
+    it('uses the background the component sits on, found above it on the page', () => {
+      const { win, send, frame } = bridged();
+      win.document.querySelector('main')!.setAttribute('style', 'background-color: rgb(10, 10, 10)');
+      send({ type: 'feega:focus', source: 'src/Card.tsx:5:7', index: 0 });
+
+      expect(canvas(frame()!.srcdoc)).toContain('background-color:rgb(10, 10, 10)');
+      expect(canvas(frame()!.srcdoc)).not.toContain('conic-gradient');
+    });
+
+    it('takes the nearest ancestor that paints, not a farther one', () => {
+      const { win, send, frame } = bridged();
+      win.document.body.setAttribute('style', 'background-color: rgb(1, 1, 1)');
+      win.document.querySelector('main')!.setAttribute('style', 'background-color: rgb(20, 30, 40)');
+      send({ type: 'feega:focus', source: 'src/Card.tsx:5:7', index: 0 });
+
+      expect(canvas(frame()!.srcdoc)).toContain('rgb(20, 30, 40)');
+    });
+
+    it('keeps a background image as well as the color', () => {
+      const { win, send, frame } = bridged();
+      win.document.body.setAttribute('style', 'background-image: linear-gradient(red, blue)');
+      send({ type: 'feega:focus', source: 'src/Card.tsx:5:7', index: 0 });
+
+      expect(canvas(frame()!.srcdoc)).toContain('background-image:linear-gradient(red, blue)');
+    });
+
+    it('tells the view when the page behind is dark', () => {
+      const { win, up, send } = bridged();
+      win.document.body.setAttribute('style', 'background-color: rgb(10, 10, 10)');
+      send({ type: 'feega:focus', source: 'src/Card.tsx:5:7', index: 0 });
+
+      expect(up).toContainEqual(expect.objectContaining({ type: 'feega:focused', dark: true }));
+    });
+
+    it('is white and not dark when nothing on the page paints', () => {
+      const { up, send, frame } = bridged();
+      send({ type: 'feega:focus', source: 'src/Card.tsx:5:7', index: 0 });
+
+      expect(up).toContainEqual(expect.objectContaining({ type: 'feega:focused', dark: false }));
+      expect(canvas(frame()!.srcdoc)).toContain('background-color:#ffffff');
+    });
+
+    it('draws the checkerboard only when asked for a transparent canvas', () => {
+      const { win, send, frame } = bridged();
+      win.document.body.setAttribute('style', 'background-color: rgb(10, 10, 10)');
+      send({ type: 'feega:focus', source: 'src/Card.tsx:5:7', index: 0 });
+      send({ type: 'feega:focus-canvas', scheme: 'dark', transparent: true });
+
+      expect(canvas(frame()!.srcdoc)).toContain('conic-gradient');
+    });
+
+    it('swaps to the palette when the scheme is the opposite of the page', () => {
+      const { win, send, frame } = bridged();
+      win.document.body.setAttribute('style', 'background-color: rgb(10, 10, 10)');
+      send({ type: 'feega:focus', source: 'src/Card.tsx:5:7', index: 0 });
+      send({ type: 'feega:focus-canvas', scheme: 'light' });
+
+      expect(canvas(frame()!.srcdoc)).toContain('#ffffff');
+      send({ type: 'feega:focus-canvas', scheme: 'dark' });
+      expect(canvas(frame()!.srcdoc)).toContain('rgb(10, 10, 10)');
     });
   });
 
@@ -156,7 +192,7 @@ describe('focus tab', () => {
     win.document.body.insertAdjacentHTML('beforeend', '<aside data-feega-src="src/Late.tsx:1:1"><b data-feega-src="src/Late.tsx:2:3">late</b></aside>');
     await new Promise((resolve) => setTimeout(resolve, 400));
 
-    expect(up).toContainEqual({ type: 'feega:focused', count: 1, mode: 'snapshot', reason: 'unsupported_framework' });
+    expect(up).toContainEqual({ type: 'feega:focused', count: 1, mode: 'snapshot', dark: false, reason: 'unsupported_framework' });
     expect(frame()!.srcdoc).toContain('late');
   });
 
@@ -251,7 +287,7 @@ describe('focus tab', () => {
       expect(url.searchParams.get('file')).toBe('src/Card.tsx');
       expect(url.searchParams.get('name')).toBe('Card');
       expect(JSON.parse(url.searchParams.get('props')!)).toEqual({ size: 'sm', onClick: { $fn: true } });
-      expect(up).toContainEqual({ type: 'feega:focused', count: 1, mode: 'mount' });
+      expect(up).toContainEqual({ type: 'feega:focused', count: 1, mode: 'mount', dark: false });
     });
 
     it('reopens the page itself when the app is Next.js, which has no mount route', () => {
@@ -279,7 +315,7 @@ describe('focus tab', () => {
 
       expect(frame()!.srcdoc).toContain('One');
       expect(frame()!.getAttribute('src')).toBeNull();
-      expect(up).toContainEqual({ type: 'feega:focused', count: 1, mode: 'snapshot', reason: 'mount_error', detail: 'provider' });
+      expect(up).toContainEqual({ type: 'feega:focused', count: 1, mode: 'snapshot', dark: false, reason: 'mount_error', detail: 'provider' });
     });
 
     it('falls back to the snapshot when the server has no mount page, as in Next.js', () => {

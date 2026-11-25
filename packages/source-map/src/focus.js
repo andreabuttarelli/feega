@@ -18,9 +18,10 @@ const REFRESH_MS = 150;
 export const PADDING_PX = 48;
 const GAP_PX = 32;
 const CHECKER_PX = 16;
+const STYLESHEETS = 'link[rel~="stylesheet"], style';
 const SCHEMES = {
-  light: { base: '#e6e6ea', checker: '#dcdce1' },
-  dark: { base: '#1c1c20', checker: '#232328' }
+  light: { base: '#ffffff', fill: '#e6e6ea', checker: '#dcdce1' },
+  dark: { base: '#1c1c20', fill: '#1c1c20', checker: '#232328' }
 };
 const DEFAULT_SCHEME = 'light';
 export const FOCUS_ZOOMED = 'feega:focus-zoomed';
@@ -28,12 +29,51 @@ const ZOOM_VAR = '--feega-zoom';
 const NO_ZOOM = 1;
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 8;
-const STYLESHEETS = 'link[rel~="stylesheet"], style';
+const DARK_LUMINANCE = 0.5;
+const RGB = /^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)(?:[\s,/]+([\d.]+%?))?\s*\)$/i;
+const NO_IMAGE = 'none';
+const NO_IMAGES = new Set([NO_IMAGE, '']);
 
-export const canvasCss = (scheme = DEFAULT_SCHEME) => {
-  const { base, checker } = SCHEMES[scheme] ?? SCHEMES[DEFAULT_SCHEME];
-  return `html{min-height:100%;background-color:${base}!important;background-image:conic-gradient(${checker} 25%,transparent 0 50%,${checker} 0 75%,transparent 0)!important;background-size:${CHECKER_PX * 2}px ${CHECKER_PX * 2}px!important}body>*{zoom:var(${ZOOM_VAR},1)}body{display:flex!important;flex-wrap:wrap;align-items:center;align-content:center;justify-content:center;gap:${GAP_PX}px;box-sizing:border-box;min-height:100vh;margin:0!important;padding:${PADDING_PX}px!important;background:transparent!important}`;
-};
+function rgbaOf(text) {
+  const match = RGB.exec(text.trim());
+  if (!match) {
+    return null;
+  }
+  const alpha = match[4] === undefined ? 1 : match[4].endsWith('%') ? parseFloat(match[4]) / 100 : Number(match[4]);
+  return { r: Number(match[1]), g: Number(match[2]), b: Number(match[3]), alpha };
+}
+
+const paints = (style) => (rgbaOf(style.backgroundColor)?.alpha ?? 0) > 0 || !NO_IMAGES.has(style.backgroundImage);
+
+function pageBackground(doc, root) {
+  for (let node = root?.parentElement; node; node = node.parentElement) {
+    const style = doc.defaultView.getComputedStyle(node);
+    if (paints(style)) {
+      return { color: style.backgroundColor, image: style.backgroundImage };
+    }
+  }
+  return null;
+}
+
+function isDark(bg) {
+  const rgba = bg && rgbaOf(bg.color);
+  return Boolean(rgba) && rgba.alpha > 0 && (0.2126 * rgba.r + 0.7152 * rgba.g + 0.0722 * rgba.b) / 255 < DARK_LUMINANCE;
+}
+
+const paletteOf = (scheme) => SCHEMES[scheme] ?? SCHEMES[DEFAULT_SCHEME];
+
+function surfaceOf({ scheme, bg, transparent }) {
+  const { base, fill, checker } = paletteOf(scheme);
+  const size = `${CHECKER_PX * 2}px ${CHECKER_PX * 2}px`;
+  if (transparent) {
+    return `background-color:${fill}!important;background-image:conic-gradient(${checker} 25%,transparent 0 50%,${checker} 0 75%,transparent 0)!important;background-size:${size}!important`;
+  }
+  const own = bg && isDark(bg) === (scheme === 'dark') ? bg : null;
+  return `background-color:${own ? own.color : base}!important;background-image:${own && own.image ? own.image : NO_IMAGE}!important`;
+}
+
+export const canvasCss = ({ scheme = DEFAULT_SCHEME, bg = null, transparent = false } = {}) =>
+  `html{min-height:100%;${surfaceOf({ scheme, bg, transparent })}}body>*{zoom:var(${ZOOM_VAR},1)}body{display:flex!important;flex-wrap:wrap;align-items:center;align-content:center;justify-content:center;gap:${GAP_PX}px;box-sizing:border-box;min-height:100vh;margin:0!important;padding:${PADDING_PX}px!important;background:transparent!important}`;
 
 export const CANVAS_CSS = canvasCss();
 
@@ -164,8 +204,8 @@ const pathFrom = (root, element) => {
   return path;
 };
 
-const documentOf = ({ htmlAttrs, bodyAttrs, head, body }, scheme) =>
-  `<!doctype html><html${attrText(htmlAttrs)}><head><meta charset="utf-8">${head}<style id="${CANVAS_ID}">${canvasCss(scheme)}</style></head><body${attrText(bodyAttrs)}>${body}</body></html>`;
+const documentOf = ({ htmlAttrs, bodyAttrs, head, body }, canvas) =>
+  `<!doctype html><html${attrText(htmlAttrs)}><head><meta charset="utf-8">${head}<style id="${CANVAS_ID}">${canvasCss(canvas)}</style></head><body${attrText(bodyAttrs)}>${body}</body></html>`;
 
 function setAttrs(element, attrs) {
   for (const { name } of [...element.attributes]) {
@@ -202,7 +242,9 @@ export function focusTab(win, { install, prepare, report }) {
   let loaded = false;
   let timer = null;
   let mode = FocusMode.Snapshot;
-  let scheme = DEFAULT_SCHEME;
+  let chosen = null;
+  let transparent = false;
+  let bg = null;
   let zoomNow = NO_ZOOM;
   let visible = true;
   let why = null;
@@ -217,7 +259,7 @@ export function focusTab(win, { install, prepare, report }) {
     if (loaded) {
       patch(frame.contentDocument, last, parts);
     } else {
-      frame.srcdoc = documentOf(parts, scheme);
+      frame.srcdoc = documentOf(parts, canvasNow());
     }
     last = parts;
   }
@@ -225,13 +267,13 @@ export function focusTab(win, { install, prepare, report }) {
   function create(parts, mountUrl) {
     frame = win.document.createElement('iframe');
     frame.id = FRAME_ID;
-    frame.style.cssText = `position:fixed;inset:0;width:100%;height:100%;border:0;z-index:${LAYER};background:${(SCHEMES[scheme] ?? SCHEMES[DEFAULT_SCHEME]).base}`;
+    frame.style.cssText = `position:fixed;inset:0;width:100%;height:100%;border:0;z-index:${LAYER};background:${surfaceColor()}`;
     const mine = frame;
     mode = mountUrl ? FocusMode.Mount : FocusMode.Snapshot;
     if (mountUrl) {
       mine.setAttribute('src', mountUrl);
     } else {
-      mine.srcdoc = documentOf(parts, scheme);
+      mine.srcdoc = documentOf(parts, canvasNow());
     }
     mine.addEventListener('load', () => {
       if (frame === mine && mode === FocusMode.Mount && !mine.contentWindow[NESTED_HOST]) {
@@ -242,13 +284,30 @@ export function focusTab(win, { install, prepare, report }) {
         loaded = true;
         if (mode === FocusMode.Mount) {
           carryPage(win.document, mine.contentDocument, rootOf(win.document, source, index));
-          mine.contentDocument.getElementById(CANVAS_ID)?.replaceChildren(canvasCss(scheme));
+          mine.contentDocument.getElementById(CANVAS_ID)?.replaceChildren(canvasCss(canvasNow()));
         }
         mine.contentDocument.documentElement.style.setProperty(ZOOM_VAR, String(zoomNow));
         install(mine.contentWindow);
       }
     });
     win.document.documentElement.append(frame);
+  }
+
+  const canvasNow = () => ({ scheme: chosen ?? (isDark(bg) ? 'dark' : DEFAULT_SCHEME), bg, transparent });
+
+  const surfaceColor = () => (canvasNow().transparent ? paletteOf(canvasNow().scheme).fill : (isDark(bg) === (canvasNow().scheme === 'dark') && bg ? bg.color : paletteOf(canvasNow().scheme).base));
+
+  function paintCanvas() {
+    const style = frame?.contentDocument?.getElementById(CANVAS_ID);
+    if (style) {
+      style.textContent = canvasCss(canvasNow());
+    }
+    if (frame) {
+      frame.style.background = surfaceColor();
+    }
+    if (frame && mode === FocusMode.Snapshot && !loaded && last) {
+      frame.srcdoc = documentOf(last, canvasNow());
+    }
   }
 
   function showZoom(next) {
@@ -291,6 +350,7 @@ export function focusTab(win, { install, prepare, report }) {
       drop();
       const mountUrl = failed.has(request.source) || request.mount === false ? null : mountUrlOf(win, rootOf(win.document, request.source, request.index), request);
       why = mountUrl || request.mount === false ? (failed.get(request.source) ?? null) : (failed.get(request.source) ?? UNSUPPORTED);
+      bg = pageBackground(win.document, rootOf(win.document, request.source, request.index));
       create(parts, mountUrl);
       source = request.source;
       index = request.index;
@@ -299,7 +359,7 @@ export function focusTab(win, { install, prepare, report }) {
       update(parts);
     }
     show(request.shown !== false);
-    return { count: parts.count, mode, ...(mode === FocusMode.Snapshot && why) };
+    return { count: parts.count, mode, dark: isDark(bg), ...(mode === FocusMode.Snapshot && why) };
   }
 
   function fallBack(reason) {
@@ -307,7 +367,7 @@ export function focusTab(win, { install, prepare, report }) {
     failed.set(source, reasonOf(reason));
     drop();
     const { count } = open(request);
-    report({ type: FOCUSED, count, mode, ...why });
+    report({ type: FOCUSED, count, mode, dark: isDark(bg), ...why });
   }
 
   function refresh() {
@@ -315,7 +375,7 @@ export function focusTab(win, { install, prepare, report }) {
     if (!frame) {
       const { count } = wanted ? open(wanted) : { count: 0 };
       if (count) {
-        report({ type: FOCUSED, count, mode, ...(mode === FocusMode.Snapshot && why) });
+        report({ type: FOCUSED, count, mode, dark: isDark(bg), ...(mode === FocusMode.Snapshot && why) });
       }
       return;
     }
@@ -340,17 +400,9 @@ export function focusTab(win, { install, prepare, report }) {
       showZoom(Math.min(Math.max(next, MIN_ZOOM), MAX_ZOOM));
     },
     canvas(next) {
-      scheme = next;
-      const style = frame?.contentDocument?.getElementById(CANVAS_ID);
-      if (style) {
-        style.textContent = canvasCss(scheme);
-      }
-      if (frame) {
-        frame.style.background = (SCHEMES[scheme] ?? SCHEMES[DEFAULT_SCHEME]).base;
-      }
-      if (frame && mode === FocusMode.Snapshot && !loaded) {
-        frame.srcdoc = documentOf(last, scheme);
-      }
+      chosen = next.scheme ?? chosen;
+      transparent = Boolean(next.transparent);
+      paintCanvas();
     },
     twin(element) {
       const root = frame?.contentDocument?.querySelector(`[${SOURCE_ATTR}=${JSON.stringify(last?.rootAttr)}]`);
