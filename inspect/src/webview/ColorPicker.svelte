@@ -4,6 +4,7 @@
   import type { ColourPick, Palette } from '../messages';
   import { ColourFormat, formatColour, hexToHsv, hsvToRgb, parseRgba, rgbaCss, type Hsv } from './colour-math';
   import { liveColour } from './colour-live';
+  import { tokenPick } from './colour-theme';
 
   type Props = { value: string; palette: Palette; onchange: (pick: ColourPick) => void; onpreview?: (css: string) => void; onsave?: (name: string, css: string) => void };
 
@@ -13,7 +14,6 @@
   const HUE_STEP = 2;
   const COARSE = 10;
   const FORMATS = Object.values(ColourFormat);
-  const THEME_PREFIX = '--color-';
 
   let hsv = $state<Hsv>({ h: 0, s: 0, v: 0 });
   let alpha = $state(1);
@@ -84,11 +84,20 @@
     }
   }
 
-  const tokenPick = (name: string) => ({ css: `var(${name})`, token: name.startsWith(THEME_PREFIX) ? name.slice(THEME_PREFIX.length) : `[var(${name})]` });
   const shortName = (name: string) => name.replace(/^--(color-)?/, '');
 </script>
 
 <div class="picker" data-testid="colour-picker">
+  {#if palette.tokens.length}
+    <div class="group">
+      <span class="group-title">Project</span>
+      <div class="swatches">
+        {#each palette.tokens as t (t.name)}
+          <button type="button" class="chip" title={`${t.name}: ${t.value}`} aria-label={t.name} style={`background:${t.value}`} onclick={() => onchange(tokenPick(t.name))}></button>
+        {/each}
+      </div>
+    </div>
+  {/if}
   <div
     class="square"
     bind:this={square}
@@ -121,16 +130,6 @@
     </select>
   </div>
 
-  {#if palette.tokens.length}
-    <div class="group">
-      <span class="group-title">Project</span>
-      <div class="swatches">
-        {#each palette.tokens as t (t.name)}
-          <button type="button" class="chip" title={`${t.name}: ${t.value}`} aria-label={t.name} style={`background:${t.value}`} onclick={() => onchange(tokenPick(t.name))}></button>
-        {/each}
-      </div>
-    </div>
-  {/if}
   {#if palette.document.length}
     <div class="group">
       <span class="group-title">Page</span>

@@ -22,7 +22,7 @@ const SUMMARY = 'Feega is a free, open-source (Apache-2.0) tool to design in you
 const SURFACES = [
   '- VS Code extension: the same editor inside VS Code, and inside VS Code-based editors Cursor, Windsurf and VSCodium. VS Code installs from the Visual Studio Marketplace; Cursor, Windsurf and VSCodium install from Open VSX. macOS, Windows and Linux.',
   '- Terminal: `npx feega` in the app folder opens the same editor in your browser, no IDE needed. It finds the app, starts its dev server and opens the editor.',
-  '- Desktop app: coming soon, in beta.',
+  '- Desktop app: macOS, Windows (beta) and Linux, at https://www.feega.app/download. A standalone app, one tab per folder, no editor needed. It updates itself. The macOS build is signed and notarized.',
   '- Feega Cloud: coming soon, paid, €15 per editor a month (€12 a month billed annually, €144 a year), viewers free. It adds GitHub sync, collaboration, sections and templates, and all Pro templates. The extension and npx feega stay free.'
 ].join('\n');
 

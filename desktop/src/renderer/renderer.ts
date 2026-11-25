@@ -1,7 +1,14 @@
 import { LOGO_PATHS, type Logo } from '../../../landing/src/lib/site/codebase/logos';
 import { platformRow } from '../main/platform';
 import { PIXELS, pixelSvg } from './pixel';
-import { Link, TabStatus, UpdateState, type RecentInfo, type ShellState, type TabInfo } from '../main/types';
+import { STACKS, Stack } from '../../../cli/lib/scaffold/stacks';
+import { TEMPLATES, TEMPLATE_LABELS, Template } from '../../../cli/lib/scaffold/templates';
+import { Step } from '../../../cli/lib/scaffold/step';
+import { el, pill, run, type View } from './dom';
+import type { AcpAgent } from '../../../inspect/src/host/ai/acp-agents';
+import { onboardingView, skipOnboarding, type OnboardingDeps } from './onboarding';
+import { Link, NodeStatus, TabStatus, UpdateState, type RecentInfo, type ShellState, type TabInfo, type UpdateInfo } from '../main/types';
+import { NoticeAction, noticeFor, noticeKey } from './update-notice';
 
 type Bridge = {
   state: () => Promise<ShellState>;
@@ -21,11 +28,19 @@ type Bridge = {
   checkUpdates: () => Promise<void>;
   installUpdate: () => Promise<void>;
   quit: () => Promise<void>;
+  checkNode: () => Promise<boolean>;
+  pickParent: () => Promise<string | null>;
+  createProject: (ask: { parent: string; name: string; stack: Stack; template: Template }) => Promise<void>;
+  dismissInvite: () => Promise<void>;
+  clearProject: () => Promise<void>;
+  finishOnboarding: () => Promise<void>;
+  replayOnboarding: () => Promise<void>;
+  openUrl: (url: string) => Promise<void>;
+  copy: (text: string) => Promise<void>;
+  detectAgents: () => Promise<AcpAgent[]>;
   onSettings: (listener: () => void) => void;
   onState: (listener: (state: ShellState) => void) => void;
 };
-
-type View = { key: string; build: () => HTMLElement; patch?: (root: HTMLElement) => void };
 
 const bridge = (window as unknown as { feega: Bridge }).feega;
 const bar = document.getElementById('bar') as HTMLElement;
@@ -42,9 +57,6 @@ const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
 const STAGGER_MS = 50;
-const HERO_TITLE = 'start designing in your codebase';
-const HERO_LEAD = 'edit your running app like in figma. every change lands in your source.';
-const FACTS = ['free, forever', 'every edit a diff', 'no AI, no tokens'];
 
 const FRIENDLY: [RegExp, string][] = [
   [/several apps here/i, 'this folder holds several apps. open one of them directly.'],
@@ -52,31 +64,6 @@ const FRIENDLY: [RegExp, string][] = [
   [/EADDRINUSE/i, 'a port needed by the dev server is already in use.'],
   [/not found|ENOENT/i, 'something the dev server needs was not found.']
 ];
-
-type Props = { class?: string; text?: string; html?: string; on?: () => void; title?: string };
-
-const el = (tag: string, props: Props = {}, ...children: (Node | string)[]) => {
-  const node = document.createElement(tag);
-  node.className = props.class ?? '';
-  if (props.text !== undefined) {
-    node.textContent = props.text;
-  }
-  if (props.html !== undefined) {
-    node.innerHTML = props.html;
-  }
-  if (props.title) {
-    node.title = props.title;
-  }
-  if (props.on) {
-    node.addEventListener('click', props.on);
-  }
-  node.append(...children);
-  return node;
-};
-
-const run = (action: () => Promise<unknown>) => () => void action();
-
-const pill = (text: string, kind: string, on: () => void) => el('button', { class: `pill ${kind}`, text, on });
 
 const mark = (size: number = MARK_SIZE) => `<svg width="${size}" height="${size}" viewBox="0 0 300 300" fill="${MARK_FILL}">${MARK}</svg>`;
 
@@ -108,7 +95,8 @@ const explain = (tab: TabInfo) => {
 
 enum Route {
   Home = 'home',
-  Settings = 'settings'
+  Settings = 'settings',
+  NewProject = 'new-project'
 }
 
 const PORT_MIN = 1024;
@@ -138,6 +126,11 @@ const toggleMenu = (open: boolean) => {
   }
 };
 
+const goHome = () => {
+  showRoute(Route.Home);
+  void bridge.activate(null);
+};
+
 const showRoute = (next: Route) => {
   route = next;
   menuOpen = false;
@@ -148,7 +141,7 @@ const showRoute = (next: Route) => {
 };
 
 const syncOverlay = () => {
-  const wanted = menuOpen || route === Route.Settings;
+  const wanted = menuOpen || route === Route.Settings || lastState?.onboarded === false;
   if (wanted !== overlayOn) {
     overlayOn = wanted;
     void bridge.overlay(wanted);
@@ -169,6 +162,7 @@ const UPDATE_HINTS: Record<UpdateState, string> = {
   [UpdateState.Idle]: '',
   [UpdateState.Checking]: 'checking…',
   [UpdateState.Downloading]: 'downloading…',
+  [UpdateState.Available]: 'available',
   [UpdateState.Ready]: 'ready',
   [UpdateState.UpToDate]: 'up to date',
   [UpdateState.Failed]: 'failed'
@@ -178,6 +172,42 @@ const updateHint = (state: ShellState) => UPDATE_HINTS[state.update.state];
 
 const updatePill = (state: ShellState) =>
   state.update.state === UpdateState.Ready ? [el('button', { class: 'update-pill', title: state.update.message, on: run(() => bridge.installUpdate()) }, el('span', { class: 'dot ready' }), el('span', { text: 'update ready · restart' }))] : [];
+
+const dismissedNotices = new Set<string>();
+
+const NOTICE_ACTIONS: Record<NoticeAction, (info: UpdateInfo) => void> = {
+  [NoticeAction.Restart]: () => void bridge.installUpdate(),
+  [NoticeAction.Update]: () => void bridge.installUpdate(),
+  [NoticeAction.Retry]: () => void bridge.checkUpdates(),
+  [NoticeAction.Later]: (info) => {
+    dismissedNotices.add(noticeKey(info));
+    renderNotice(info);
+  }
+};
+
+const NOTICE_PILL: Record<NoticeAction, string> = {
+  [NoticeAction.Restart]: 'primary small',
+  [NoticeAction.Update]: 'primary small',
+  [NoticeAction.Retry]: 'outline small',
+  [NoticeAction.Later]: 'outline small'
+};
+
+const renderNotice = (info: UpdateInfo) => {
+  document.querySelector('.update-notice')?.remove();
+  const notice = noticeFor(info, dismissedNotices);
+  if (!notice) {
+    return;
+  }
+  const actions = notice.actions.map((action) => pill(action, NOTICE_PILL[action], () => NOTICE_ACTIONS[action](info)));
+  document.body.append(el('div', { class: `update-notice${notice.quiet ? ' quiet' : ''}`, role: 'status' }, el('div', { class: 'copy' }, el('div', { class: 'title', text: notice.title }), el('div', { class: 'body', text: notice.body })), el('div', { class: 'actions' }, ...actions)));
+};
+
+const INVITE_TEXT = 'Create a free account to keep your recent projects and get new templates';
+
+const invitePill = (state: ShellState) =>
+  state.invite
+    ? [el('div', { class: 'invite' }, el('span', { class: 'text', text: INVITE_TEXT, title: INVITE_TEXT }), pill('sign in', 'primary small', run(() => bridge.signIn())), pill('later', 'outline small', run(() => bridge.dismissInvite())))]
+    : [];
 
 const accountMenu = (state: ShellState) => {
   const label = state.email ?? 'guest · not signed in';
@@ -222,13 +252,15 @@ const portControl = (editorPort: number) => {
 };
 
 const settingsPanel = (state: ShellState) => {
-  const { editorPort, reopenOnLaunch, telemetry, automaticUpdates } = state.preferences;
+  const { editorPort, reopenOnLaunch, telemetry, automaticUpdates, cloud } = state.preferences;
   return el(
     'div',
     { class: 'panel' },
     settingRow('editor port', 'port of the first editor. more tabs take the next free one.', portControl(editorPort)),
     settingRow('open last projects on launch', 'reopen the folders that were open when you quit.', switchEl(reopenOnLaunch, (next) => void bridge.setPreferences({ reopenOnLaunch: next }))),
     settingRow('automatic updates', 'check for a new version on launch and every few hours.', switchEl(automaticUpdates, (next) => void bridge.setPreferences({ automaticUpdates: next }))),
+    settingRow('Feega Cloud (beta)', 'share and comment through Feega Cloud. applies to editors opened from now on.', switchEl(cloud, (next) => void bridge.setPreferences({ cloud: next }))),
+    settingRow('onboarding', 'walk through the welcome steps again.', pill('show again', 'outline small', run(() => bridge.replayOnboarding()))),
     settingRow('anonymous usage data', 'counts only, never your code. off starts the editor with FEEGA_TELEMETRY=0.', switchEl(telemetry, (next) => void bridge.setPreferences({ telemetry: next })))
   );
 };
@@ -245,19 +277,16 @@ const settingsView = (state: ShellState): View => ({
 });
 
 const renderBar = (state: ShellState) => {
-  if (!state.email && !state.skipped && state.tabs.length === 0) {
-    bar.replaceChildren(el('span', { class: 'brand', html: `${mark(22)}<span>feega</span>` }), el('span', { class: 'grow' }));
-    return;
-  }
   const known = rendered;
   rendered = new Set(state.tabs.map((t) => t.id));
-  const home = el('button', { class: `home${state.active === null ? ' on' : ''}`, html: mark(), title: 'projects', on: run(() => bridge.activate(null)) });
-  const add = el('button', { class: 'add', html: PLUS, title: 'open folder', on: run(() => bridge.pickFolder()) });
-  bar.replaceChildren(home, ...state.tabs.map((tab) => tabChip(tab, tab.id === state.active, !known.has(tab.id))), add, el('span', { class: 'grow' }), ...updatePill(state), accountChip(state));
+  const home = el('button', { class: `home${state.active === null ? ' on' : ''}`, html: mark(), title: 'projects', on: goHome });
+  const add = el('button', { class: 'add', html: PLUS, title: 'new project or open folder', on: run(() => bridge.activate(null)) });
+  bar.replaceChildren(home, ...state.tabs.map((tab) => tabChip(tab, tab.id === state.active, !known.has(tab.id))), add, el('span', { class: 'grow' }), ...invitePill(state), ...updatePill(state), accountChip(state));
   document.querySelector('.menu')?.remove();
   if (menuOpen) {
     document.body.append(accountMenu(state));
   }
+  renderNotice(state.update);
 };
 
 const art = (name: string, size: number, extra = '') => el('span', { class: `art ${extra}`.trim(), html: pixelSvg(PIXELS[name], size) });
@@ -280,16 +309,6 @@ const badge = (framework: string) => {
   return el('span', { class: 'badge', html: `${icon}<span>${framework}</span>` });
 };
 
-const startView = (state: ShellState): View => ({
-  key: `start:${state.signingIn}`,
-  build: () => {
-    const actions = state.signingIn
-      ? [el('button', { class: 'pill waiting', text: 'waiting for your browser…' }), pill('cancel', 'outline', run(() => bridge.cancelSignIn()))]
-      : [pill('sign in', 'primary', run(() => bridge.signIn())), pill('continue without account', 'outline', run(() => bridge.skip()))];
-    return el('div', { class: 'screen banded' }, el('h1', { class: 'display serif hero-title', text: HERO_TITLE }), el('p', { class: 'lead', text: HERO_LEAD }), el('div', { class: 'actions' }, ...actions), el('ul', { class: 'facts' }, ...FACTS.map((fact) => el('li', { text: fact }))), el('div', { class: 'band' }));
-  }
-});
-
 const recentCard = (recent: RecentInfo, index: number) => {
   const card = el(
     'button',
@@ -308,8 +327,20 @@ const openCard = (alone: boolean) =>
   el(
     'button',
     { class: `card open${alone ? ' wide' : ''}`, on: run(() => bridge.pickFolder()) },
-    art('start', alone ? 10 : 6),
+    art('folder', alone ? 10 : 6),
     el('div', {}, el('div', { class: 'name', text: 'open folder' }), el('div', { class: 'hint', text: alone ? OPEN_HINT : OPEN_HINT_SHORT }))
+  );
+
+const NEW_PROJECT_LOGOS: Logo[] = ['Next', 'Nuxt', 'Svelte', 'Astro', 'React', 'Vue'];
+
+const logoRow = () => el('span', { class: 'logos', html: NEW_PROJECT_LOGOS.map((logo) => `<svg viewBox="0 0 24 24" fill="currentColor"><path d="${LOGO_PATHS[logo]}"/></svg>`).join('') });
+
+const newProjectCard = (alone: boolean) =>
+  el(
+    'button',
+    { class: `card open new${alone ? ' wide' : ''}`, on: () => showRoute(Route.NewProject) },
+    logoRow(),
+    el('div', {}, el('div', { class: 'name', text: 'new project' }), el('div', { class: 'hint', text: 'pick a framework and a template. feega sets it up and opens the editor.' }))
   );
 
 const dashboardView = (state: ShellState): View => ({
@@ -318,10 +349,113 @@ const dashboardView = (state: ShellState): View => ({
     el(
       'div',
       { class: 'dash' },
-      el('div', { class: 'dash-head' }, el('div', {}, el('p', { class: 'kicker', text: 'feega desktop' }), el('h1', { class: 'display page-title', text: 'projects' })), pill('open folder', 'primary', run(() => bridge.pickFolder()))),
-      el('div', { class: 'grid' }, openCard(state.recents.length === 0), ...state.recents.map(recentCard))
+      el('div', { class: 'dash-head' }, el('div', {}, el('p', { class: 'kicker', text: 'feega desktop' }), el('h1', { class: 'display page-title', text: 'projects' })), el('div', { class: 'actions' }, pill('open folder', 'outline', run(() => bridge.pickFolder())), pill('new project', 'primary', () => showRoute(Route.NewProject)))),
+      el('div', { class: 'grid' }, el('div', { class: 'starts' }, newProjectCard(state.recents.length === 0), openCard(state.recents.length === 0)), ...state.recents.map(recentCard))
     )
 });
+
+const STEP_TEXT: Record<Step, string> = {
+  [Step.Files]: 'writing the project',
+  [Step.Plugin]: 'connecting feega to the source',
+  [Step.Install]: 'installing packages',
+  [Step.Done]: 'opening the editor'
+};
+
+type Draft = { stack: Stack; template: Template; name: string; parent: string };
+
+const draft: Draft = { stack: Stack.ReactVite, template: Template.Landing, name: '', parent: '' };
+
+const logoSvg = (logo: Logo) => `<svg viewBox="0 0 24 24" fill="currentColor"><path d="${LOGO_PATHS[logo]}"/></svg>`;
+
+const STACK_LOGO: Record<Stack, Logo> = {
+  [Stack.ReactVite]: 'React',
+  [Stack.Next]: 'Next',
+  [Stack.SvelteKit]: 'Svelte',
+  [Stack.VueVite]: 'Vue',
+  [Stack.Astro]: 'Astro',
+  [Stack.Nuxt]: 'Nuxt'
+};
+
+const choiceRow = <T extends string>(options: [T, string][], current: T, choose: (value: T) => void, logos: Partial<Record<T, Logo>> = {}) =>
+  el('div', { class: 'choices' }, ...options.map(([value, label]) => {
+    const logo = logos[value];
+    const html = logo ? `${logoSvg(logo)}<span>${label}</span>` : `<span>${label}</span>`;
+    return el('button', { class: `choice${value === current ? ' on' : ''}`, html, on: () => choose(value) });
+  }));
+
+const rerender = () => {
+  shownKey = '';
+  if (lastState) {
+    render(lastState);
+  }
+};
+
+const FRAMEWORK_BADGE: Record<Stack, string> = {
+  [Stack.ReactVite]: 'react',
+  [Stack.Next]: 'next',
+  [Stack.SvelteKit]: 'sveltekit',
+  [Stack.VueVite]: 'vue',
+  [Stack.Astro]: 'astro',
+  [Stack.Nuxt]: 'nuxt'
+};
+
+const templateHint = (template: Template) => (TEMPLATES[template].length ? `${TEMPLATES[template].length} library sections` : 'an empty page');
+
+const newProjectView = (state: ShellState): View => ({
+  key: 'new-project',
+  build: () => {
+    draft.parent = draft.parent || state.documents;
+    const name = el('input', { class: 'text-input' }) as HTMLInputElement;
+    name.placeholder = 'my-site';
+    name.value = draft.name;
+    name.addEventListener('input', () => (draft.name = name.value));
+    name.addEventListener('keydown', (event) => event.stopPropagation());
+    const create = () => {
+      if (!draft.name.trim()) {
+        name.focus();
+        return;
+      }
+      void bridge.createProject({ parent: draft.parent, name: draft.name, stack: draft.stack, template: draft.template }).then(() => showRoute(Route.Home));
+    };
+    const frameworks = choiceRow(Object.values(Stack).map((stack): [Stack, string] => [stack, STACKS[stack].label]), draft.stack, (stack) => ((draft.stack = stack), rerender()), STACK_LOGO);
+    const templates = choiceRow(Object.values(Template).map((template): [Template, string] => [template, TEMPLATE_LABELS[template]]), draft.template, (template) => ((draft.template = template), rerender()));
+    const folder = el('button', { class: 'pill outline small', text: tidyPath(draft.parent), title: draft.parent, on: run(async () => ((draft.parent = (await bridge.pickParent()) ?? draft.parent), rerender())) });
+    return el(
+      'div',
+      { class: 'dash' },
+      el('div', { class: 'dash-head' }, el('div', {}, el('p', { class: 'kicker', text: 'feega desktop' }), el('h1', { class: 'display page-title', text: 'new project' })), pill('cancel', 'outline', () => showRoute(Route.Home))),
+      el('div', { class: 'panel form' }, el('div', { class: 'field' }, el('div', { class: 'title', text: 'framework' }), frameworks), el('div', { class: 'field' }, el('div', { class: 'title', text: 'template' }), templates, el('div', { class: 'desc', text: templateHint(draft.template) })), el('div', { class: 'field' }, el('div', { class: 'title', text: 'name' }), name), el('div', { class: 'field' }, el('div', { class: 'title', text: 'folder' }), folder), el('div', { class: 'actions' }, pill('create project', 'primary', create)))
+    );
+  },
+  patch: () => undefined
+});
+
+const creatingView = (state: ShellState): View => ({
+  key: 'creating',
+  build: () => {
+    const project = state.project!;
+    return el('div', { class: 'screen' }, art('start', 8, 'float'), el('h1', { class: 'display load-name', text: project.name }), el('div', { class: 'track' }), el('div', { class: 'line', text: STEP_TEXT[project.step as Step] ?? project.step }), el('div', { class: 'line sub', text: project.line }));
+  },
+  patch: (root) => {
+    const lines = root.querySelectorAll('.line');
+    lines[0].textContent = STEP_TEXT[(state.project?.step ?? '') as Step] ?? '';
+    lines[1].textContent = state.project?.line ?? '';
+  }
+});
+
+const projectFailedView = (state: ShellState): View => ({
+  key: 'project-failed',
+  build: () =>
+    el('div', { class: 'screen' }, art('help', 8), el('div', { class: 'err-title' }, el('span', { class: 'dot failed' }), el('span', { text: 'could not create the project' })), el('h1', { class: 'display load-name', text: state.project!.name }), el('p', { class: 'err-msg', text: state.project!.error }), el('div', { class: 'actions' }, pill('back', 'primary', run(async () => (await bridge.clearProject(), showRoute(Route.NewProject))))))
+});
+
+const nodeView = (state: ShellState): View => ({
+  key: `node:${state.node.message}`,
+  build: () =>
+    el('div', { class: 'screen' }, art('help', 8), el('div', { class: 'err-title' }, el('span', { class: 'dot failed' }), el('span', { text: 'node.js needed' })), el('h1', { class: 'display load-name', text: 'install node.js' }), el('p', { class: 'err-msg', text: state.node.message }), el('div', { class: 'actions' }, pill('install node.js', 'primary', run(() => bridge.openLink(Link.Node))), pill('check again', 'outline', run(() => bridge.checkNode()))))
+});
+
+const checkingView: View = { key: 'checking', build: () => el('div', { class: 'screen' }, art('start', 8, 'float'), el('div', { class: 'track' }), el('div', { class: 'line', text: 'checking node.js' })) };
 
 const loadingView = (tab: TabInfo): View => ({
   key: `loading:${tab.id}`,
@@ -370,7 +504,29 @@ const TAB_VIEWS: Record<TabStatus, (tab: TabInfo) => View> = {
   [TabStatus.Ready]: (tab) => ({ key: `ready:${tab.id}`, build: () => el('div') })
 };
 
+const onboardingDeps: OnboardingDeps = {
+  signIn: () => bridge.signIn(),
+  cancelSignIn: () => bridge.cancelSignIn(),
+  openUrl: (url) => bridge.openUrl(url),
+  copy: (text) => bridge.copy(text),
+  detectAgents: () => bridge.detectAgents(),
+  finish: async () => {
+    route = Route.Home;
+    await bridge.finishOnboarding();
+  },
+  changed: () => lastState && render(lastState)
+};
+
 const viewOf = (state: ShellState): View => {
+  if (!state.onboarded) {
+    return onboardingView(state, onboardingDeps);
+  }
+  if (state.node.status === NodeStatus.Problem) {
+    return nodeView(state);
+  }
+  if (state.project) {
+    return state.project.error ? projectFailedView(state) : creatingView(state);
+  }
   if (route === Route.Settings) {
     return settingsView(state);
   }
@@ -378,7 +534,10 @@ const viewOf = (state: ShellState): View => {
   if (tab) {
     return TAB_VIEWS[tab.status](tab);
   }
-  return !state.email && !state.skipped ? startView(state) : dashboardView(state);
+  if (state.node.status === NodeStatus.Checking && state.tabs.length === 0) {
+    return checkingView;
+  }
+  return route === Route.NewProject ? newProjectView(state) : dashboardView(state);
 };
 
 const renderMain = (state: ShellState) => {
@@ -398,6 +557,7 @@ const renderMain = (state: ShellState) => {
 
 function render(state: ShellState) {
   lastState = state;
+  syncOverlay();
   renderBar(state);
   renderMain(state);
 }
@@ -410,6 +570,10 @@ document.addEventListener('click', (event) => {
 
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') {
+    if (lastState?.onboarded === false) {
+      skipOnboarding(onboardingDeps);
+      return;
+    }
     if (menuOpen) {
       toggleMenu(false);
       return;

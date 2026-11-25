@@ -41,6 +41,7 @@ Prefer the browser? Run `npx feega` in your app folder (Node 20 or newer).
 
 - **Selection sync.** Selecting an element reveals its source beside Feega with the line selected, without taking focus. Coding agents that read the editor selection (Claude Code, Cursor, Copilot, Cline, Codex, Gemini CLI) see it. Turn off with `feegaInspect.syncSelection`.
 - **Copy for agent.** Right-click the element, or use **Copy for agent** in the bar: file:line, selector, component, page, preview width, breakpoint, theme and state go to the clipboard, ready to paste into the agent.
+- **Chat with your agent.** The AI tab talks to the coding agent on your machine. Claude Code, Codex and Pi connect through a small open-source adapter that Feega downloads once from npm (`@agentclientprotocol/claude-agent-acp`, `@agentclientprotocol/codex-acp`, `pi-acp`, exact versions) into the extension's storage, using your own `npm`. It happens in onboarding or on the first chat, and Feega shows it while it runs. Needs Node.js and network access once.
 
 ## Supported frameworks
 
@@ -55,8 +56,10 @@ No account needed. Your code never leaves your machine.
 Feega sends anonymous usage counts so we know how many people use it and how. Each event carries:
 
 - a random install id and a random session id (no account, no user id)
-- the event: `session_start`, `edit` (a change was written to your source), `session_end`
+- the event: `install` (the first run on this machine), `opened` (Feega was opened), `session_start`, `preview_ready` (your page loaded in the preview), `first_edit` (your first edit ever), `edit` (a change was written to your source), `sign_in`, `sign_out` (no email or account id is sent), `session_resume` (you came back after 30 minutes away), `onboarding_started`, `onboarding_step` (which step), `onboarding_finished`, `onboarding_skipped`, `setup_applied`, `setup_failed`, `skill_hint_shown`, `skill_installed`, `library_insert` (free or pro, never which item), `plugin_installed`, `support_action` (which of star, follow_x, discord, coffee or share), `session_end`
+- on `edit`: the kind of change (text, style, image, attribute, structure, template or other)
 - on `session_end`: the session duration and the number of edits
+- the detected framework (for example `next` or `sveltekit`) and whether you are signed in to Feega
 - Feega version, editor (VS Code, Cursor, Windsurf, VSCodium or `npx`), operating system, CPU architecture, and device kind (desktop, web, command line)
 
 The server adds country, region and city from the request, and does not store the IP address.

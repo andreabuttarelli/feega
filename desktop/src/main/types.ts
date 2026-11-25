@@ -11,12 +11,13 @@ export type TabInfo = { id: string; dir: string; name: string; status: TabStatus
 
 export type RecentInfo = { dir: string; name: string; framework: string; at: number };
 
-export type Preferences = { editorPort: number; reopenOnLaunch: boolean; telemetry: boolean; automaticUpdates: boolean };
+export type Preferences = { editorPort: number; reopenOnLaunch: boolean; telemetry: boolean; automaticUpdates: boolean; cloud: boolean };
 
 export enum UpdateState {
   Idle = 'idle',
   Checking = 'checking',
   Downloading = 'downloading',
+  Available = 'available',
   Ready = 'ready',
   UpToDate = 'up-to-date',
   Failed = 'failed'
@@ -24,12 +25,23 @@ export enum UpdateState {
 
 export type UpdateInfo = { state: UpdateState; version: string; message: string };
 
-export type ShellState = { tabs: TabInfo[]; active: string | null; email: string | null; signingIn: boolean; skipped: boolean; recents: RecentInfo[]; preferences: Preferences; update: UpdateInfo };
+export enum NodeStatus {
+  Checking = 'checking',
+  Ready = 'ready',
+  Problem = 'problem'
+}
+
+export type NodeState = { status: NodeStatus; message: string };
+
+export type ProjectState = { name: string; step: string; line: string; error: string };
+
+export type ShellState = { tabs: TabInfo[]; active: string | null; email: string | null; signingIn: boolean; skipped: boolean; recents: RecentInfo[]; preferences: Preferences; update: UpdateInfo; node: NodeState; project: ProjectState | null; invite: boolean; documents: string; onboarded: boolean };
 
 export enum Link {
   Account = 'account',
   Docs = 'docs',
-  Community = 'community'
+  Community = 'community',
+  Node = 'node'
 }
 
 export enum Channel {
@@ -51,5 +63,18 @@ export enum Channel {
   ShowSettings = 'show-settings',
   CheckUpdates = 'check-updates',
   InstallUpdate = 'install-update',
-  Quit = 'quit'
+  Quit = 'quit',
+  CheckNode = 'check-node',
+  PickParent = 'pick-parent',
+  CreateProject = 'create-project',
+  DismissInvite = 'dismiss-invite',
+  ClearProject = 'clear-project',
+  Alert = 'alert',
+  AlertClear = 'alert-clear',
+  OpenChat = 'open-chat',
+  FinishOnboarding = 'finish-onboarding',
+  ReplayOnboarding = 'replay-onboarding',
+  OpenUrl = 'open-url',
+  Copy = 'copy',
+  DetectAgents = 'detect-agents'
 }

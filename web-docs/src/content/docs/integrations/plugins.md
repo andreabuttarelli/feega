@@ -9,6 +9,7 @@ Plugins add controls to Feega Inspect. Two are built in and on by default: **Mes
 **3D object**. You can also install third-party plugins or load one from a folder while you build
 it: see [Write a plugin](/integrations/write-a-plugin/). **Plugins** in the Feega menu lists them
 all and switches any of them on or off.
+A third built-in, [ShaderGradient (community)](/integrations/shadergradient/), edits ShaderGradient props.
 
 Every plugin change goes through the same edit engine as a manual edit. It shows in **Changes**,
 opens in the diff, and **Undo** reverts it in one step.

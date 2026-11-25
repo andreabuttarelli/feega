@@ -34,6 +34,12 @@ export type UpdateHost = {
 
 type Ready = { version: string; bundle: string };
 
+export enum CheckMode {
+  Manual = 'manual',
+  Background = 'background',
+  Detect = 'detect'
+}
+
 const loopbackOverride = (raw: string | undefined): string | null => {
   if (!raw || !urlAllowed(raw)) {
     return null;
@@ -65,12 +71,16 @@ export function updateController(host: UpdateHost) {
     return path;
   };
 
-  const checkDarwin = async (manual: boolean) => {
+  const checkDarwin = async (mode: CheckMode) => {
     const url = loopbackOverride(host.env[OVERRIDE_ENV]) ?? MANIFEST_URL;
     const manifest = parseManifest(JSON.parse(await fetchText(url)));
     const file = manifest ? fileFor(manifest, host.arch) : null;
     if (!manifest || !file || !isNewer(host.version, manifest.version)) {
-      set({ state: manual ? UpdateState.UpToDate : UpdateState.Idle });
+      set({ state: mode === CheckMode.Manual ? UpdateState.UpToDate : UpdateState.Idle });
+      return;
+    }
+    if (mode === CheckMode.Detect) {
+      set({ state: UpdateState.Available, version: manifest.version });
       return;
     }
     set({ state: UpdateState.Downloading, version: manifest.version, message: `downloading ${manifest.version}` });
@@ -102,7 +112,13 @@ export function updateController(host: UpdateHost) {
       autoUpdater.setFeedURL({ provider: 'generic', url: FEED_URL });
       autoUpdater.autoDownload = true;
       autoUpdater.autoInstallOnAppQuit = true;
-      autoUpdater.on('update-available', (found: { version: string }) => set({ state: UpdateState.Downloading, version: found.version, message: `downloading ${found.version}` }));
+      autoUpdater.on('update-available', (found: { version: string }) => {
+        if (!autoUpdater.autoDownload) {
+          set({ state: UpdateState.Available, version: found.version });
+          return;
+        }
+        set({ state: UpdateState.Downloading, version: found.version, message: `downloading ${found.version}` });
+      });
       autoUpdater.on('update-not-available', () => set({ state: UpdateState.UpToDate }));
       autoUpdater.on('update-downloaded', (found: { version: string }) => set({ state: UpdateState.Ready, version: found.version, message: `restart to update to ${found.version}` }));
       autoUpdater.on('error', fail);
@@ -110,20 +126,24 @@ export function updateController(host: UpdateHost) {
     return autoUpdater;
   };
 
-  const check = async (manual: boolean) => {
+  const check = async (mode: CheckMode) => {
     if (busy || ready || strategy === Strategy.None || !host.isPackaged) {
-      if (manual && !host.isPackaged) {
+      if (mode === CheckMode.Manual && !host.isPackaged) {
         set({ state: UpdateState.UpToDate, message: 'development build' });
       }
       return;
     }
     busy = true;
-    set({ state: UpdateState.Checking, message: 'checking' });
+    if (mode === CheckMode.Manual) {
+      set({ state: UpdateState.Checking, message: 'checking' });
+    }
     try {
       if (strategy === Strategy.DarwinSwap) {
-        await checkDarwin(manual);
+        await checkDarwin(mode);
       } else {
-        await wireElectronUpdater().checkForUpdates();
+        const updater = wireElectronUpdater();
+        updater.autoDownload = mode !== CheckMode.Detect;
+        await updater.checkForUpdates();
       }
     } catch (error) {
       fail(error);
@@ -154,6 +174,10 @@ export function updateController(host: UpdateHost) {
     info: () => info,
     check,
     install: async () => {
+      if (info.state === UpdateState.Available) {
+        await check(CheckMode.Background);
+        return;
+      }
       if (strategy === Strategy.DarwinSwap) {
         await swap(true);
         return;
@@ -166,7 +190,7 @@ export function updateController(host: UpdateHost) {
       }
     },
     start: () => {
-      const auto = () => host.enabled() && void check(false);
+      const auto = () => void check(host.enabled() ? CheckMode.Background : CheckMode.Detect);
       setTimeout(auto, FIRST_CHECK_DELAY_MS).unref();
       setInterval(auto, CHECK_EVERY_MS).unref();
     }

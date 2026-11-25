@@ -1,21 +1,32 @@
+import { publishLocal } from './local-bridge/publish';
+import { homedir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import * as vscode from 'vscode';
 import type { HostMessage, Source } from '../messages';
 import { SettingKey, settingsWith } from '../settings';
 import { Column, openTarget, revealColumn } from './open-source';
-import type { Account, AccountStore } from './account';
+import { accountToken, type Account, type AccountStore } from './account';
+import { cloudApi } from './cloud-api';
 import { IMAGE_EXTENSIONS } from './image-copy';
 import { catalogFile } from './library';
 import { pluginsRoot } from '@feega/plugin-store/registry';
+import { machineAgents } from './agents';
 import { deviceOnboardingStore, globalStateOnboardingStore } from './onboarding';
+import { globalStateSupportStore } from './support';
+import { WATCHED, relativeOf, type Watch } from './file-watch';
+import { AlertKind, type AlertPort } from './ai/agent-alert';
 import type { Platform } from './platform';
-import { automated, Device, editorOf, globalStateInstallStore, installIdOf, optedOut, type UsageHost } from './usage';
+import { HintSurface, nodeHintFs } from './skill-hint';
+import { automated, Device, editorOf, globalStateFirstEdit, globalStateInstallStore, installOf, optedOut, type UsageHost } from './usage';
 
 const BEFORE_SCHEME = 'feega-before';
 
 const COLUMNS: Record<Column, vscode.ViewColumn> = { [Column.First]: vscode.ViewColumn.One, [Column.Beside]: vscode.ViewColumn.Beside };
 
+const WEB_URL_VAR = 'FEEGA_WEB_URL';
 const SECRET_KEY = 'feegaInspect.account';
+const OPEN_ACTION = 'Open';
+const SKILL_HINT_NEVER = 'feegaInspect.skillHintNever';
 
 export const DEV_PLUGINS_SETTING = 'feegaInspect.plugins.dev';
 
@@ -25,7 +36,7 @@ const config = () => vscode.workspace.getConfiguration();
 
 export type VsCodeHost = { context: vscode.ExtensionContext; output: vscode.OutputChannel; launcher: string };
 
-export type PanelLike = Pick<vscode.WebviewPanel, 'viewColumn'> & { webview: Pick<vscode.Webview, 'postMessage' | 'onDidReceiveMessage'> };
+export type PanelLike = Pick<vscode.WebviewPanel, 'viewColumn' | 'visible' | 'reveal'> & { webview: Pick<vscode.Webview, 'postMessage' | 'onDidReceiveMessage'> };
 
 export const secretAccountStore = (secrets: Pick<vscode.SecretStorage, 'get' | 'store' | 'delete'>): AccountStore => ({
   read: async () => {
@@ -42,7 +53,7 @@ export const secretAccountStore = (secrets: Pick<vscode.SecretStorage, 'get' | '
 
 export const vsCodeUsage = (context: vscode.ExtensionContext): UsageHost => ({
   identity: () => ({
-    installId: installIdOf(globalStateInstallStore(context.globalState)),
+    ...installOf(globalStateInstallStore(context.globalState)),
     version: String(context.extension.packageJSON.version),
     editor: editorOf(vscode.env.appName),
     os: process.platform,
@@ -50,8 +61,20 @@ export const vsCodeUsage = (context: vscode.ExtensionContext): UsageHost => ({
     device: vscode.env.uiKind === vscode.UIKind.Web ? Device.Web : Device.Desktop
   }),
   enabled: () =>
-    !automated(process.env) && !optedOut(process.env) && context.extensionMode !== vscode.ExtensionMode.Test && vscode.env.isTelemetryEnabled && config().get(SettingKey.Telemetry, true) === true
+    !automated(process.env) && !optedOut(process.env) && context.extensionMode !== vscode.ExtensionMode.Test && vscode.env.isTelemetryEnabled && config().get(SettingKey.Telemetry, true) === true,
+  firstEdit: globalStateFirstEdit(context.globalState)
 });
+
+export const vsCodeWatch: Watch = (root, changed) => {
+  const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(root, '**/*'));
+  const seen = (uri: vscode.Uri) => {
+    if (WATCHED(relativeOf(root, uri.fsPath))) {
+      changed();
+    }
+  };
+  const subscriptions = [watcher.onDidCreate(seen), watcher.onDidChange(seen), watcher.onDidDelete(seen)];
+  return { dispose: () => [...subscriptions, watcher].forEach((d) => d.dispose()) };
+};
 
 export function vsCodePlatform(host: VsCodeHost, panel: PanelLike, befores: Map<string, string>): Platform {
   const { context, output } = host;
@@ -95,6 +118,25 @@ export function vsCodePlatform(host: VsCodeHost, panel: PanelLike, befores: Map<
     return uri ? { name: basename(uri.fsPath), bytes: await vscode.workspace.fs.readFile(uri) } : null;
   }
 
+  const account = secretAccountStore(context.secrets);
+
+  const alertWindows: Record<AlertKind, (text: string, action: string) => Thenable<string | undefined>> = {
+    [AlertKind.Finished]: (text, action) => vscode.window.showInformationMessage(text, action),
+    [AlertKind.Permission]: (text, action) => vscode.window.showWarningMessage(text, action)
+  };
+
+  const alerts: AlertPort = {
+    looking: () => panel.visible && vscode.window.state.focused,
+    show: async (alert) => {
+      const clicked = (await alertWindows[alert.kind](`Feega: ${alert.text}`, OPEN_ACTION)) === OPEN_ACTION;
+      if (clicked) {
+        panel.reveal(undefined, false);
+      }
+      return clicked;
+    },
+    clear: () => undefined
+  };
+
   return {
     version: String(context.extension.packageJSON.version),
     launcher: host.launcher,
@@ -120,11 +162,19 @@ export function vsCodePlatform(host: VsCodeHost, panel: PanelLike, befores: Map<
     sourceControl: () => vscode.commands.executeCommand('workbench.view.scm'),
     notify: (text) => vscode.window.showInformationMessage(`Feega: ${text}`),
     warn: async (text, action) => (await vscode.window.showWarningMessage(`Feega: ${text}`, ...(action ? [action] : []))) === action,
+    alerts,
     pickImage,
     library: catalogFile(join(dirname(host.launcher), 'library.json')),
-    account: secretAccountStore(context.secrets),
+    watchFiles: vsCodeWatch,
+    proFiles: (id, framework) => cloudApi({ base: process.env[WEB_URL_VAR], token: () => accountToken(account) }).libraryPro(id, framework),
+    account,
     onboarding: deviceOnboardingStore(globalStateOnboardingStore(context.globalState)),
+    support: globalStateSupportStore(context.globalState),
+    localBridge: publishLocal,
+    adapterDir: join(context.globalStorageUri.fsPath, 'adapters'),
+    agents: () => machineAgents(vscode.env.appName, vscode.extensions.all.map((extension) => extension.id.toLowerCase())),
     usage: vsCodeUsage(context),
+    skillHint: { fs: nodeHintFs, home: homedir(), surface: HintSurface.Panel, never: () => context.globalState.get(SKILL_HINT_NEVER) === true, setNever: async () => context.globalState.update(SKILL_HINT_NEVER, true) },
     plugins: { root: pluginsRoot(), dev: () => config().get<string[]>(DEV_PLUGINS_SETTING, []), approve: approveInModal }
   };
 }

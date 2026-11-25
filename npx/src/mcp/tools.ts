@@ -7,6 +7,10 @@ export const BILLING_URL = `${CLOUD_BASE}/app/settings/billing`;
 
 export type CloudDeps = { api: CloudApi; share: ShareHost; editors: Editors; cwd: string };
 
+export class Picture {
+  constructor(readonly png: string) {}
+}
+
 export type Tool = { description: string; input: z.ZodRawShape; run: (input: any) => Promise<unknown> };
 
 const FAILURE_TEXT: Record<CloudFailure, (error: CloudError) => string> = {
@@ -90,6 +94,26 @@ export function cloudTools({ api, share, editors, cwd }: CloudDeps): Record<stri
       description: 'List comments left on a shared session, each with file:line:column, selector, author and text, so the code can be fixed. Without a sessionId, lists the sessions shared here, or your live ones.',
       input: { sessionId: z.string().optional(), openOnly: z.boolean().default(true).describe('Only unresolved comments') },
       run: async ({ sessionId, openOnly = true }: { sessionId?: string; openOnly?: boolean }) => ({ comments: (await listed(sessionId, openOnly)).map(commentView) })
+    },
+    feega_review: {
+      description: 'Read the review of a shared session: whether the latest round is open, approved or has changes requested, who decided and why, and the comments still unresolved. Act on the feedback, then resolve the comments.',
+      input: { sessionId: z.string().optional().describe('Id returned by feega_share; defaults to the session shared here') },
+      run: async ({ sessionId }: { sessionId?: string }) => {
+        const [id] = await candidates(sessionId);
+        if (!id) {
+          throw new Error('No shared session to review. Share one with feega_share.');
+        }
+        const review = await api.review(id);
+        review.openComments.forEach((c) => sessionOf.set(c.id, c.sessionId));
+        return {
+          sessionId: id,
+          status: review.status,
+          round: review.revision?.number ?? null,
+          summary: review.revision?.summary ?? null,
+          verdicts: (review.revision?.verdicts ?? []).map((v) => ({ reviewer: v.reviewerName, verdict: v.verdict, note: v.note })),
+          unresolved: review.openComments.map(commentView)
+        };
+      }
     },
     feega_resolve: {
       description: 'Mark a comment resolved, with an optional note saying what was changed.',

@@ -1,6 +1,6 @@
 import { JSDOM } from 'jsdom';
 import { describe, expect, it } from 'vitest';
-import { clearPreview, hidePreview, inspectElement, keepPreviews, previewEdit, settlePreview } from './runtime.js';
+import { clearPreview, clearPreviews, hidePreview, inspectElement, keepPreviews, previewEdit, settlePreview } from './runtime.js';
 
 const SOURCE = 'components/Card.tsx:3:5';
 
@@ -128,6 +128,16 @@ describe('a preview survives hot reload until the class lands', () => {
   });
 });
 
+describe('a refused write with an inner preview', () => {
+  it('clearing the element removes the preview made on its inner part too', () => {
+    const win = domOf();
+    previewEdit(win.document, { source: SOURCE, inner: 'path', style: { fill: 'red' } });
+    clearPreview(win.document, SOURCE);
+
+    expect(win.document.getElementById('feega-preview')?.textContent ?? '').not.toContain('red');
+  });
+});
+
 describe('a preview made in an element state', () => {
   it('shows only while that state is forced on the element', () => {
     const win = domOf();
@@ -160,6 +170,17 @@ describe('a preview made in an element state', () => {
     h1.className = 'red';
 
     expect(settlePreview(win.document, SOURCE, 'hover')).toEqual([]);
+    expect(win.document.getElementById('feega-preview')!.textContent).toBe('');
+  });
+});
+
+describe('clearing every preview', () => {
+  it('drops the overrides of all elements, as after an undo', () => {
+    const win = domOf();
+    previewEdit(win.document, { source: SOURCE, style: { fontSize: '40px' } });
+    previewEdit(win.document, { source: SOURCE, state: 'hover', style: { color: 'rgb(9, 9, 9)' } });
+    clearPreviews(win.document);
+
     expect(win.document.getElementById('feega-preview')!.textContent).toBe('');
   });
 });

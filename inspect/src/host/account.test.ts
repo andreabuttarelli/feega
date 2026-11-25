@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { accountOfBody, fileAccountStore, memoryAccountStore } from './account';
+import { accountOfBody, accountToken, fileAccountStore, memoryAccountStore, type Account } from './account';
 
 const jwt = (claims: object) => `h.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.s`;
 const body = { access_token: jwt({ sub: 'u1', email: 'a@b.co' }), refresh_token: 'r', expires_at: 99 };
@@ -54,5 +54,29 @@ describe('memoryAccountStore', () => {
     expect((await store.read())?.user.email).toBe('a@b.co');
     await store.clear();
     expect(await store.read()).toBeNull();
+  });
+});
+
+describe('accountToken', () => {
+  const NOW_S = 1_000;
+  const heldWith = async (expiresAt: number | null) => {
+    const store = memoryAccountStore();
+    if (expiresAt !== null) {
+      await store.write({ access_token: 'jwt', refresh_token: 'r', expires_at: expiresAt, user: { id: 'u1', email: 'a@b.co' } } satisfies Account);
+    }
+
+    return store;
+  };
+
+  it('is the access token while it is valid', async () => {
+    expect(await accountToken(await heldWith(NOW_S + 1), NOW_S)).toBe('jwt');
+  });
+
+  it('is null once the token expired', async () => {
+    expect(await accountToken(await heldWith(NOW_S), NOW_S)).toBeNull();
+  });
+
+  it('is null when nobody is signed in', async () => {
+    expect(await accountToken(await heldWith(null), NOW_S)).toBeNull();
   });
 });

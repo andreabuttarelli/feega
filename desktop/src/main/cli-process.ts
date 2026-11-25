@@ -3,11 +3,11 @@ import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
 import { join } from 'node:path';
 import { killTree } from '../../../inspect/src/host/process-tree';
+import { cliEnv, type EnvOptions } from './cli-env';
 import { type PidFile } from './pid-file';
 import { GracefulStop, platformRow } from './platform';
 
 const EDITOR_READY = /editor ready on (https?:\/\/\S+)/;
-const STOP_ON_STDIN_END = 'FEEGA_STOP_ON_STDIN_END';
 const GRACE_MS = 4000;
 const TAIL_LINES = 4;
 
@@ -43,9 +43,11 @@ export async function freePort(from: number = AUTO): Promise<number> {
   return freePort(AUTO);
 }
 
-const bundledCli = () => (app.isPackaged ? join(process.resourcesPath, 'npx', 'cli.cjs') : join(__dirname, '..', '..', 'npx', 'dist', 'cli.cjs'));
+export const bundledDir = () => (app.isPackaged ? join(process.resourcesPath, 'npx') : join(__dirname, '..', '..', 'npx', 'dist'));
 
-export type CliOptions = { editorPort: number; telemetry: boolean };
+const bundledCli = () => join(bundledDir(), 'cli.cjs');
+
+export type CliOptions = EnvOptions;
 
 export async function startCli(dir: string, pids: PidFile, options: CliOptions, events: CliEvents) {
   const port = await freePort(options.editorPort);
@@ -56,7 +58,7 @@ export async function startCli(dir: string, pids: PidFile, options: CliOptions, 
     detached: row.detached,
     windowsHide: row.windowsHide,
     stdio: ['pipe', 'pipe', 'pipe'],
-    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', [STOP_ON_STDIN_END]: '1', FORCE_COLOR: '0', ...(options.telemetry ? {} : { FEEGA_TELEMETRY: '0' }) }
+    env: cliEnv(process.env, options, app.getPath('userData'))
   });
 
   if (child.pid) {

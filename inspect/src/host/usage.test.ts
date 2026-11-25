@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
+import { OnboardingStep } from '../messages';
 import { SettingKey } from '../settings';
-import { automated, editorOf, installIdOf, nodeUsageEnabled, usageSession, type Identity, type UsageEvent } from './usage';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { automated, EditKind, editorOf, fileFirstEdit, installIdOf, installOf, UsageKind, nodeUsageEnabled, usageSession, type Identity, type UsageEvent, type UsageHost } from './usage';
 
 const identity: Identity = { installId: '3f1c9a52-5b0e-4c1d-9a54-0d2f6f1e7a10', version: '0.2.9', editor: 'vscode', os: 'darwin', arch: 'arm64', device: 'desktop' };
 
-function setup(enabled = () => true) {
+function setup(enabled = () => true, extra: Partial<UsageHost> = {}) {
   const sent: UsageEvent[][] = [];
   let clock = 1_000;
   let tick: (() => void) | null = null;
@@ -15,7 +19,8 @@ function setup(enabled = () => true) {
       send: async (events) => void sent.push(events),
       now: () => clock,
       every: (_ms, run) => ((tick = run), () => (tick = null)),
-      newId: () => '7d9e1c40-2b6a-4f43-8a2e-5c1b9d0e4f77'
+      newId: () => '7d9e1c40-2b6a-4f43-8a2e-5c1b9d0e4f77',
+      ...extra
     }
   );
   return { session, sent, advance: (ms: number) => (clock += ms), tick: () => tick?.(), ticking: () => tick !== null };
@@ -31,8 +36,8 @@ describe('usageSession', () => {
     await t.session.end();
 
     expect(t.sent).toHaveLength(1);
-    expect(t.sent[0].map((e) => e.event)).toEqual(['session_start', 'edit', 'edit', 'session_end']);
-    expect(t.sent[0][3]).toMatchObject({ duration_ms: 90_000, edit_count: 2 });
+    expect(t.sent[0].map((e) => e.event)).toEqual(['opened', 'session_start', 'edit', 'edit', 'session_end']);
+    expect(t.sent[0][4]).toMatchObject({ duration_ms: 90_000, edit_count: 2 });
     expect(t.sent[0][0]).toMatchObject({ install_id: identity.installId, ext_version: '0.2.9', editor: 'vscode', os: 'darwin', arch: 'arm64', device: 'desktop', session_id: '7d9e1c40-2b6a-4f43-8a2e-5c1b9d0e4f77' });
   });
 
@@ -53,7 +58,7 @@ describe('usageSession', () => {
     t.session.edit();
     await t.session.end();
 
-    expect(t.sent.map((batch) => batch.map((e) => e.event))).toEqual([['session_start', 'edit'], ['edit', 'session_end']]);
+    expect(t.sent.map((batch) => batch.map((e) => e.event))).toEqual([['opened', 'session_start', 'edit'], ['edit', 'session_end']]);
   });
 
   it('ends once, and ignores edits after the end', async () => {
@@ -120,6 +125,93 @@ describe('usageSession', () => {
   });
 });
 
+const firstEditFlag = () => {
+  let seen = false;
+  return { seen: () => seen, mark: () => void (seen = true) };
+};
+
+describe('usageSession funnel', () => {
+  it('sends preview_ready once per session', async () => {
+    const t = setup();
+    t.session.begin();
+    t.session.previewReady();
+    t.session.previewReady();
+    await t.session.end();
+
+    expect(t.sent[0].map((e) => e.event)).toEqual(['opened', 'session_start', 'preview_ready', 'session_end']);
+  });
+
+  it('sends first_edit once per install, before the edit', async () => {
+    const firstEdit = firstEditFlag();
+    const t = setup(() => true, { firstEdit });
+    t.session.begin();
+    t.session.edit();
+    t.session.edit();
+    await t.session.end();
+
+    expect(t.sent[0].map((e) => e.event)).toEqual(['opened', 'session_start', 'first_edit', 'edit', 'edit', 'session_end']);
+
+    const next = setup(() => true, { firstEdit });
+    next.session.begin();
+    next.session.edit();
+    await next.session.end();
+
+    expect(next.sent[0].map((e) => e.event)).toEqual(['opened', 'session_start', 'edit', 'session_end']);
+  });
+
+  it('edit events carry the edit kind', async () => {
+    const t = setup();
+    t.session.begin();
+    t.session.edit(EditKind.Style);
+    t.session.edit();
+    await t.session.end();
+
+    expect(t.sent[0].filter((e) => e.event === 'edit').map((e) => e.edit_kind)).toEqual(['style', 'other']);
+  });
+
+  it('every event carries framework and signed_in as known at send time', async () => {
+    let facts = { framework: null as string | null, signedIn: false };
+    const t = setup(() => true, { facts: () => facts });
+    t.session.begin();
+    facts = { framework: 'next', signedIn: true };
+    t.session.edit(EditKind.Text);
+    await t.session.end();
+
+    expect(t.sent[0].every((e) => e.framework === 'next' && e.signed_in === true)).toBe(true);
+  });
+
+  it('omits framework while it is unknown', async () => {
+    const t = setup(() => true, { facts: () => ({ framework: null, signedIn: false }) });
+    t.session.begin();
+    await t.session.end();
+
+    expect(t.sent[0][0]).not.toHaveProperty('framework');
+    expect(t.sent[0][0]).toMatchObject({ signed_in: false });
+  });
+
+  it('sends no funnel event while telemetry is off', async () => {
+    const t = setup(() => false, { firstEdit: firstEditFlag() });
+    t.session.begin();
+    t.session.previewReady();
+    t.session.edit();
+    await t.session.end();
+
+    expect(t.sent).toEqual([]);
+  });
+});
+
+describe('fileFirstEdit', () => {
+  it('is unseen until marked, then stays seen', () => {
+    const path = join(mkdtempSync(join(tmpdir(), 'feega-first-')), 'nested', 'first-edit');
+    const flag = fileFirstEdit(path);
+
+    expect(flag.seen()).toBe(false);
+    flag.mark();
+
+    expect(fileFirstEdit(path).seen()).toBe(true);
+  });
+});
+
 describe('installIdOf', () => {
   it('creates an id once and reuses it', async () => {
     const stored = new Map<string, string>();
@@ -138,6 +230,63 @@ describe('installIdOf', () => {
   });
 });
 
+describe('usageSession product events', () => {
+  const dims = { target: 'tailwind_class', prop_category: 'spacing', file_ext: 'tsx', lines_added: 2, lines_removed: 1, files_count: 1, breakpoint: 'md', state: 'hover', source: 'manual', paths: ['src/Secret.tsx'] };
+
+  it('an edit carries its dimensions and never a path', async () => {
+    const t = setup();
+    t.session.begin();
+    t.session.edit(EditKind.Style, dims);
+    await t.session.end();
+
+    const edit = t.sent[0].find((e) => e.event === 'edit')!;
+    expect(edit).toMatchObject({ edit_kind: 'style', target: 'tailwind_class', prop_category: 'spacing', file_ext: 'tsx', lines_added: 2, breakpoint: 'md', state: 'hover', source: 'manual' });
+    expect(JSON.stringify(t.sent)).not.toContain('Secret');
+  });
+
+  it('the session end totals diffs, lines and distinct files', async () => {
+    const t = setup();
+    t.session.begin();
+    t.session.edit(EditKind.Style, dims);
+    t.session.edit(EditKind.Style, dims);
+    t.session.edit(EditKind.Style, { ...dims, source: 'revert' });
+    await t.session.end();
+
+    expect(t.sent[0].at(-1)).toMatchObject({ event: 'session_end', edit_count: 3, diff_count: 2, lines_added: 4, lines_removed: 2, files_count: 1 });
+  });
+
+  it('track carries dimensions on any event', async () => {
+    const t = setup();
+    t.session.begin();
+    t.session.track(UsageKind.FocusOpened, { variant: 'variant' });
+    await t.session.end();
+
+    expect(t.sent[0].find((e) => e.event === 'focus_opened')).toMatchObject({ variant: 'variant' });
+  });
+
+  it('flushes early when the queue is full and never waits for the send', async () => {
+    const t = setup();
+    t.session.begin();
+    for (let i = 0; i < 50; i++) {
+      t.session.track(UsageKind.ElementSelected);
+    }
+    await Promise.resolve();
+
+    expect(t.sent.length).toBeGreaterThan(0);
+    expect(t.sent.every((batch) => batch.length <= 50)).toBe(true);
+  });
+
+  it('sends nothing while telemetry is off', async () => {
+    const t = setup(() => false);
+    t.session.begin();
+    t.session.track(UsageKind.ElementSelected);
+    t.session.edit(EditKind.Style, dims);
+    await t.session.end();
+
+    expect(t.sent).toEqual([]);
+  });
+});
+
 describe('editorOf', () => {
   it.each([
     ['Visual Studio Code', 'vscode'],
@@ -145,7 +294,8 @@ describe('editorOf', () => {
     ['Cursor', 'cursor'],
     ['Windsurf', 'windsurf'],
     ['VSCodium', 'vscodium'],
-    ['Something Else', 'vscode']
+    ['Void', 'other'],
+    ['Something Else', 'other']
   ])('%s is %s', (appName, expected) => {
     expect(editorOf(appName)).toBe(expected);
   });
@@ -191,5 +341,83 @@ describe('automated runs never send usage', () => {
 
   it.each([['CI=false', { CI: 'false' }], ['CI=0', { CI: '0' }], ['CI empty', { CI: '' }], ['nothing', {}]])('%s is not automation', (_name, env) => {
     expect(automated(env)).toBe(false);
+  });
+});
+
+describe('usageSession account events', () => {
+  const MINUTE = 60_000;
+  const IDLE = 30 * MINUTE;
+  const kinds = (t: ReturnType<typeof setup>) => t.sent.flatMap((b) => b.map((e) => e.event));
+
+  it('sends install before opened on the first run of an install', async () => {
+    const t = setup();
+    t.session.begin();
+    await t.session.end();
+
+    expect(kinds(t).slice(0, 3)).toEqual(['opened', 'session_start', 'session_end']);
+
+    const fresh = setup(() => true, { identity: () => ({ ...identity, firstRun: true }) });
+    fresh.session.begin();
+    await fresh.session.end();
+
+    expect(kinds(fresh).slice(0, 3)).toEqual(['install', 'opened', 'session_start']);
+  });
+
+  it('reports sign in and sign out', async () => {
+    const t = setup();
+    t.session.begin();
+    t.session.signedIn();
+    t.session.signedOut();
+    await t.session.end();
+
+    expect(kinds(t)).toEqual(['opened', 'session_start', 'sign_in', 'sign_out', 'session_end']);
+  });
+
+  it('resumes after the window was away for 30 minutes, not before', async () => {
+    const t = setup();
+    t.session.begin();
+    t.session.away();
+    t.advance(IDLE - 1);
+    t.session.back();
+    t.session.away();
+    t.advance(IDLE);
+    t.session.back();
+    await t.session.end();
+
+    expect(kinds(t).filter((k) => k === 'session_resume')).toHaveLength(1);
+  });
+
+  it('ignores back without away', async () => {
+    const t = setup();
+    t.session.begin();
+    t.advance(IDLE * 2);
+    t.session.back();
+    await t.session.end();
+
+    expect(kinds(t)).not.toContain('session_resume');
+  });
+});
+
+describe('installOf', () => {
+  it('flags the creation of the id, once', () => {
+    const stored = new Map<string, string>();
+    const store = { get: () => stored.get('id'), set: async (id: string) => void stored.set('id', id) };
+
+    expect(installOf(store, () => 'a0000000-0000-4000-8000-000000000000')).toEqual({ installId: 'a0000000-0000-4000-8000-000000000000', firstRun: true });
+    expect(installOf(store, () => 'b0000000-0000-4000-8000-000000000000')).toEqual({ installId: 'a0000000-0000-4000-8000-000000000000', firstRun: false });
+  });
+});
+
+describe('usageSession lifecycle', () => {
+  it('tracks a kind with its step or tier while the session runs', async () => {
+    const t = setup();
+    t.session.track(UsageKind.OnboardingStep, { step: OnboardingStep.SignIn });
+    t.session.begin();
+    t.session.track(UsageKind.OnboardingStep, { step: OnboardingStep.SignIn });
+    t.session.track(UsageKind.LibraryInsert, { tier: 'pro' });
+    await t.session.end();
+
+    expect(t.sent[0].slice(2, 4)).toMatchObject([{ event: 'onboarding_step', step: 'sign_in' }, { event: 'library_insert', tier: 'pro' }]);
+    expect(t.sent[0]).toHaveLength(5);
   });
 });

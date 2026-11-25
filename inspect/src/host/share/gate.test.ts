@@ -12,7 +12,7 @@ describe('editGate', () => {
   it('lets viewers read but never change anything', () => {
     const gate = editGate(() => 0);
 
-    for (const message of [{ kind: ToHost.Ready }, { kind: ToHost.Picked, id: 1, pick: null }, { kind: ToHost.Selected, at: null }, { kind: ToHost.Wiring, at: 'a:1:1' }, { kind: ToHost.Comments }]) {
+    for (const message of [{ kind: ToHost.Ready }, { kind: ToHost.Picked, id: 1, pick: null }, { kind: ToHost.Selected, at: null }, { kind: ToHost.Cursor, at: null }, { kind: ToHost.Wiring, at: 'a:1:1' }, { kind: ToHost.Comments }]) {
       expect(gate.check(viewer, message)).toEqual({ ok: true });
     }
     for (const message of [edit('a:1:1'), { kind: ToHost.Undo }, { kind: ToHost.Redo }, { kind: ToHost.Revert, id: 1 }, { kind: ToHost.Move, from: 'a:1:1', to: 'a:2:1', place: 'before' }, { kind: ToHost.Structure, op: 'delete', at: 'a:1:1' }, { kind: ToHost.ImageUpload, name: 'x', data: '' }]) {

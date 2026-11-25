@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -6,10 +6,11 @@ import { ToHost, ToView, type HostMessage, type ViewMessage } from '../messages'
 import { SettingKey, StylingChoice } from '../settings';
 import { nodePlatform } from './node-platform';
 import { Stored, type Platform } from './platform';
+import { AlertKind } from './ai/agent-alert';
 
 type Wire = { sent: ViewMessage[]; fromView: (message: HostMessage) => void };
 
-const memory = vi.hoisted(() => ({ config: new Map<string, unknown>(), state: new Map<string, unknown>(), handlers: [] as ((m: unknown) => void)[], sent: [] as unknown[] }));
+const memory = vi.hoisted(() => ({ config: new Map<string, unknown>(), state: new Map<string, unknown>(), handlers: [] as ((m: unknown) => void)[], sent: [] as unknown[], shown: [] as [string, string, string][], answer: 'Open' as string | undefined, focused: true, visible: true, revealed: 0 }));
 
 vi.mock('vscode', () => ({
   ViewColumn: { One: 1, Beside: -2 },
@@ -20,7 +21,11 @@ vi.mock('vscode', () => ({
       update: async (key: string, value: unknown) => void memory.config.set(key, value)
     })
   },
-  window: {},
+  window: {
+    state: { get focused() { return memory.focused; } },
+    showInformationMessage: async (text: string, action: string) => (memory.shown.push(['info', text, action]), memory.answer),
+    showWarningMessage: async (text: string, action: string) => (memory.shown.push(['warning', text, action]), memory.answer)
+  },
   commands: {},
   env: {},
   Uri: {}
@@ -29,9 +34,11 @@ vi.mock('vscode', () => ({
 const { vsCodePlatform } = await import('./vscode-platform');
 
 function vsCode(): [Platform, Wire] {
-  const context = { extension: { packageJSON: { version: '1.2.3' } }, workspaceState: { get: (k: string) => memory.state.get(k), update: async (k: string, v: unknown) => void memory.state.set(k, v) } };
+  const context = { globalStorageUri: { fsPath: '/storage' }, extension: { packageJSON: { version: '1.2.3' } }, workspaceState: { get: (k: string) => memory.state.get(k), update: async (k: string, v: unknown) => void memory.state.set(k, v) } };
   const panel = {
     viewColumn: 1,
+    get visible() { return memory.visible; },
+    reveal: () => void memory.revealed++,
     webview: { postMessage: async (m: unknown) => (memory.sent.push(m), true), onDidReceiveMessage: (h: (m: unknown) => void) => (memory.handlers.push(h), { dispose: () => undefined }) }
   };
   memory.config.clear();
@@ -109,10 +116,41 @@ describe('the node platform on disk', () => {
     const cache = mkdtempSync(join(tmpdir(), 'feega-cache-'));
     const make = () => nodePlatform({ root, launcher: '', version: '', transport: { send: () => undefined, receive: () => undefined }, print: () => undefined, launch: async () => false, env: { XDG_CACHE_HOME: cache } });
 
-    await make().store(Stored.Prefs, { size: 'phone' });
+    await make().store(Stored.App, 'web');
 
     expect(existsSync(join(root, '.feega/state.json'))).toBe(false);
-    expect(make().stored(Stored.Prefs)).toEqual({ size: 'phone' });
+    expect(make().stored(Stored.App)).toBe('web');
+  });
+
+  it('forgets the edit history when the editor restarts', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'feega-history-'));
+    const cache = mkdtempSync(join(tmpdir(), 'feega-cache-'));
+    const make = () => nodePlatform({ root, launcher: '', version: '', transport: { send: () => undefined, receive: () => undefined }, print: () => undefined, launch: async () => false, env: { XDG_CACHE_HOME: cache } });
+    const running = make();
+
+    await running.store(Stored.History, { steps: [1], undone: [] });
+
+    expect(running.stored(Stored.History)).toEqual({ steps: [1], undone: [] });
+    expect(make().stored(Stored.History)).toBeUndefined();
+  });
+
+  it('starts with the full preview width but keeps the panel widths', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'feega-prefs-'));
+    const cache = mkdtempSync(join(tmpdir(), 'feega-cache-'));
+    const make = () => nodePlatform({ root, launcher: '', version: '', transport: { send: () => undefined, receive: () => undefined }, print: () => undefined, launch: async () => false, env: { XDG_CACHE_HOME: cache } });
+
+    await make().store(Stored.Prefs, { size: 'phone', custom: 700, barClosed: false, barWidth: 320 });
+
+    expect(make().stored(Stored.Prefs)).toEqual({ size: 'full', custom: null, barClosed: false, barWidth: 320 });
+  });
+
+  it('serves the library catalog that ships next to the launcher', async () => {
+    const dist = mkdtempSync(join(tmpdir(), 'feega-dist-'));
+    mkdirSync(join(dist, 'launcher'));
+    writeFileSync(join(dist, 'library.json'), JSON.stringify({ items: [], tokens: '' }));
+    const platform = nodePlatform({ root: '/app', launcher: join(dist, 'launcher'), version: '', env: {}, transport: { send: () => undefined, receive: () => undefined }, print: () => undefined });
+
+    expect(await platform.library?.()).toEqual({ items: [], tokens: '' });
   });
 
   it('opens a source in VS Code at its line, else prints where it is', async () => {
@@ -126,5 +164,56 @@ describe('the node platform on disk', () => {
 
     expect(launched[0]).toEqual(['code', '-g', `${join('/app', 'src/App.svelte')}:4:2`]);
     expect(printed).toEqual([`${join('/app', 'src/App.svelte')}:4:2`]);
+  });
+});
+
+describe('the alert port', () => {
+  const finished = { kind: AlertKind.Finished, chat: 'c1', text: 'Claude Code finished in shop' };
+  const asking = { kind: AlertKind.Permission, chat: 'c1', text: 'Claude Code needs permission to edit a file' };
+
+  it('vscode: counts as looking only while the panel is visible in a focused window', () => {
+    const [platform] = vsCode();
+
+    memory.visible = true;
+    memory.focused = true;
+    expect(platform.alerts!.looking!()).toBe(true);
+    memory.visible = false;
+    expect(platform.alerts!.looking!()).toBe(false);
+    memory.visible = true;
+    memory.focused = false;
+    expect(platform.alerts!.looking!()).toBe(false);
+  });
+
+  it('vscode: an information message for a finished turn, a warning for a permission, both with Open', async () => {
+    const [platform] = vsCode();
+    memory.shown.length = 0;
+
+    await platform.alerts!.show(finished);
+    await platform.alerts!.show(asking);
+
+    expect(memory.shown).toEqual([['info', `Feega: ${finished.text}`, 'Open'], ['warning', `Feega: ${asking.text}`, 'Open']]);
+  });
+
+  it('vscode: Open brings the panel forward and reports the click', async () => {
+    const [platform] = vsCode();
+    memory.revealed = 0;
+    memory.answer = 'Open';
+
+    expect(await platform.alerts!.show(finished)).toBe(true);
+    expect(memory.revealed).toBe(1);
+
+    memory.answer = undefined;
+    expect(await platform.alerts!.show(finished)).toBe(false);
+    expect(memory.revealed).toBe(1);
+  });
+
+  it('node: sends the alert to the page, which owns the notification', async () => {
+    const [platform, wire] = node();
+
+    expect(await platform.alerts!.show(asking)).toBe(false);
+    platform.alerts!.clear('c1');
+
+    expect(wire.sent).toEqual([{ kind: ToView.Alert, alert: asking }, { kind: ToView.AlertClear, chat: 'c1' }]);
+    expect(platform.alerts!.looking).toBeUndefined();
   });
 });

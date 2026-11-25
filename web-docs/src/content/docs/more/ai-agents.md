@@ -29,3 +29,5 @@ The skill teaches your agent to:
 ## Use it
 
 Ask in plain words: "set this project up for Feega", "start Feega", "build this card so I can tweak it in Feega".
+
+To let the agent read the element you selected in Feega, [connect it via MCP](/more/connect-your-agent-via-mcp/).

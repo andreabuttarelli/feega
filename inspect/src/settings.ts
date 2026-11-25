@@ -1,10 +1,17 @@
+import { POLICY_ROWS, Policy } from './host/ai/permission-policy';
+
 export enum SettingKey {
   Telemetry = 'feegaInspect.telemetry',
   Styling = 'feegaInspect.styling',
   DevCommand = 'feegaInspect.devCommand',
   DefaultSize = 'feegaInspect.defaultSize',
   KeepServerAlive = 'feegaInspect.keepServerAlive',
-  SyncSelection = 'feegaInspect.syncSelection'
+  SyncSelection = 'feegaInspect.syncSelection',
+  PreviewUnknown = 'feegaInspect.previewUnknown',
+  AiPermissions = 'feegaInspect.aiPermissions',
+  Notifications = 'feegaInspect.notifications',
+  NotifyFinished = 'feegaInspect.notifyFinished',
+  NotifyPermission = 'feegaInspect.notifyPermission'
 }
 
 export enum StylingChoice {
@@ -66,7 +73,23 @@ export const SETTINGS: SettingRow[] = [
     label: 'Show the selection in the editor',
     hint: 'Selecting an element reveals its source beside Feega with the line selected, so coding agents that read the editor selection see it.',
     fallback: true
-  }
+  },
+  {
+    key: SettingKey.PreviewUnknown,
+    label: 'Preview edits with unknown impact',
+    hint: 'When Feega cannot tell where an edit will land (global CSS, a class built from props or a function, a CSS variable), it shows the diff and waits for Apply.',
+    fallback: true
+  },
+  {
+    key: SettingKey.AiPermissions,
+    label: 'AI agent permissions',
+    hint: 'Default for new projects: when the AI tab asks before an agent edits a file or runs a command. Each project remembers its own choice.',
+    fallback: Policy.Ask,
+    choices: POLICY_ROWS.map((row) => ({ value: row.id, label: row.name }))
+  },
+  { key: SettingKey.Notifications, label: 'Notifications', hint: 'Tell me when an AI agent needs me while I am in another window or tab. Messages name the agent and the project, never code or prompts.', fallback: true },
+  { key: SettingKey.NotifyFinished, label: 'Notify when an agent finishes', hint: 'Needs Notifications on.', fallback: true },
+  { key: SettingKey.NotifyPermission, label: 'Notify when an agent needs permission', hint: 'Needs Notifications on.', fallback: true }
 ];
 
 export type Settings = Record<SettingKey, SettingValue>;
@@ -79,9 +102,19 @@ export const LINKS = {
   changelog: 'https://feega.app/changelog',
   dashboard: 'https://feega.app/',
   issues: 'https://github.com/andreabuttarelli/feega/issues/new',
-  repo: 'https://github.com/andreabuttarelli/feega',
-  sponsor: 'https://buy.stripe.com/5kQ00k2A97C08sd94LeME07'
+  discord: 'https://discord.gg/PUp37DG6vr'
 };
+
+export type HelpLink = { label: string; url: string };
+
+export function helpLinks(facts: ReportFacts | null): HelpLink[] {
+  return [
+    { label: 'Documentation', url: LINKS.docs },
+    { label: "What's new", url: LINKS.changelog },
+    { label: 'Send feedback', url: LINKS.discord },
+    { label: 'Report a problem', url: facts ? issueUrl(facts) : LINKS.issues }
+  ];
+}
 
 export type ReportFacts = { version: string; framework: string; styling: string };
 

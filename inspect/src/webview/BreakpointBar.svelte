@@ -36,6 +36,22 @@
     border-bottom: 1px solid var(--ui-divider);
   }
 
+  .reach-row :global(.select) {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 28px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-input);
+    box-shadow: none;
+    color: var(--ui-text);
+    font: inherit;
+    font-size: var(--ui-text-sm);
+    cursor: pointer;
+  }
+
   .badge {
     color: var(--ui-accent);
     font-weight: 600;

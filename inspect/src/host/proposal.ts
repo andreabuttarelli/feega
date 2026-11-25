@@ -66,7 +66,7 @@ const attributes: Handler<OpKind.Attributes> = async (deps, op) => {
   if (typeof at === 'string') {
     return refused(at);
   }
-  const near = at ? await setAttributes(deps.read, at, op.set, op.tag) : null;
+  const near = at ? await setAttributes(deps.read, at, op.set, op.tag, op.numbers) : null;
   if (near?.ok || !op.tag) {
     return near ? written(near) : refused('no element given');
   }
@@ -74,7 +74,7 @@ const attributes: Handler<OpKind.Attributes> = async (deps, op) => {
   if (usages.length !== 1) {
     return refused(usages.length ? `<${op.tag}> is used in ${usages.length} places: select the one to change in its own file` : `cannot find <${op.tag}> in the project`);
   }
-  return written(await setAttributes(deps.read, usages[0], op.set));
+  return written(await setAttributes(deps.read, usages[0], op.set, undefined, op.numbers));
 };
 
 const dependency: Handler<OpKind.Dependency> = async (deps, op) => {

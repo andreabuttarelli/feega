@@ -36,14 +36,9 @@ describe('npx feega arguments', () => {
     expect(argsOf(['--port', 'x'], '/w')).toEqual({ run: Run.Error, reason: 'the port must be a number' });
   });
 
-  it('the mcp command serves the Cloud tools over stdio when Cloud is on', () => {
-    expect(argsOf(['mcp'], '/w', true)).toEqual({ run: Run.Mcp });
-  });
-
-  it('with Cloud off the mcp command does not exist and the help does not name it', () => {
-    expect(argsOf(['mcp'], resolve('/w'))).toMatchObject({ run: Run.Editor, dir: resolve('/w', 'mcp') });
-    expect(usageOf(false)).not.toMatch(/mcp|Cloud/i);
-    expect(usageOf(true)).toMatch(/npx feega mcp/);
+  it('the mcp command is always available and named in the help', () => {
+    expect(argsOf(['mcp'], '/w')).toEqual({ run: Run.Mcp });
+    expect(usageOf()).toMatch(/npx feega mcp/);
   });
 
   it('a folder named mcp is still a folder after a flag', () => {

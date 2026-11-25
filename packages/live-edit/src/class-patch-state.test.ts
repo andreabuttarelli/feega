@@ -31,6 +31,12 @@ describe('tailwind edits in a state', () => {
     expect(await classOf('<button className="bg-white hover:bg-blue-500">', ElementState.Hover, '')).toBe('bg-white');
   });
 
+  it('never writes an empty arbitrary value', async () => {
+    const out = await stylePatch(async () => '<button className="bg-white">\n', AT, { prop: LiveProp.Fill, value: '[]', state: ElementState.Hover });
+
+    expect(out).toEqual({ files: [], skipped: [] });
+  });
+
   it('writes focus-visible and disabled variants', async () => {
     expect(await classOf('<button className="p-2">', ElementState.FocusVisible, 'red-500')).toBe('p-2 focus-visible:bg-red-500');
     expect(await classOf('<button className="p-2">', ElementState.Disabled, 'red-500')).toBe('p-2 disabled:bg-red-500');

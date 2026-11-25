@@ -1,6 +1,6 @@
 import { basename } from 'node:path';
-import type { Present, VisitorRole } from '../../../../packages/share-protocol/src/frame';
-import { ShareState, ToView, type ViewMessage } from '../../messages';
+import { HOST_PEER, type Point, type Present, type VisitorRole } from '../../../../packages/share-protocol/src/frame';
+import { ShareState, ToView, type Source, type ViewMessage } from '../../messages';
 import { CloudError, CloudFailure } from '../cloud-api';
 import { Stored, type Platform } from '../platform';
 import { Ended } from './client';
@@ -43,8 +43,9 @@ export function shareSession({ platform, workspace, appUrl, post }: ShareSession
   let live: { id: string; url: string; expiresAt: string } | null = null;
   let visitors: Present[] = [];
   let error: string | undefined;
+  let hostSignal: { selection?: string; cursor?: Point } = {};
   const control = port?.control({
-    onPresence: (present) => ((visitors = present), show()),
+    onPresence: (present) => ((visitors = present), show(), showPeers()),
     onEnded: (why) => ((state = ShareState.Idle), (live = null), (visitors = []), (error = ENDED_TEXT[why]), show())
   });
 
@@ -60,6 +61,14 @@ export function shareSession({ platform, workspace, appUrl, post }: ShareSession
     notice: !platform.stored<boolean>(Stored.ShareNotice),
     error
   });
+
+  const hostPeer = (): Present[] => (hostSignal.selection || hostSignal.cursor ? [{ userId: HOST_PEER, name: 'Host', role: 'editor', ...hostSignal }] : []);
+
+  const showPeers = async () => void (state === ShareState.Live && (await post({ kind: ToView.Peers, peers: [...visitors, ...hostPeer()] })));
+
+  const hostSelected = (at: Source | null) => ((hostSignal = { ...hostSignal, selection: at ? `${at.file}:${at.line}:${at.col}` : undefined }), showPeers());
+
+  const hostPointed = (at: Point | null) => ((hostSignal = { ...hostSignal, cursor: at ?? undefined }), showPeers());
 
   const show = async () => void (await post(view()));
 
@@ -108,5 +117,5 @@ export function shareSession({ platform, workspace, appUrl, post }: ShareSession
     await show();
   }
 
-  return { show, start, stop, setRole, kick: (userId: string) => live && control?.kick(live.id, userId) };
+  return { show, start, stop, setRole, hostSelected, hostPointed, kick: (userId: string) => live && control?.kick(live.id, userId) };
 }

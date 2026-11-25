@@ -25,5 +25,6 @@ await build({
 });
 await cp(`${INSPECT_DIST}webview`, here('dist/webview'), { recursive: true });
 await cp(`${INSPECT_DIST}launcher`, here('dist/launcher'), { recursive: true });
+await cp(`${INSPECT_DIST}library.json`, here('dist/library.json'));
 await writeFile(here('dist/package.json'), `${JSON.stringify({ ...manifest, version, bin: { feega: 'cli.cjs' }, files: undefined }, null, 2)}\n`);
 await cp(here('README.md'), here('dist/README.md'));

@@ -5,7 +5,7 @@
   "author": "Feega",
   "homepage": "https://feega.app",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.3.0",
   "main": "dist/main.cjs",
   "scripts": {
     "build": "node build.mjs",
