@@ -1,5 +1,5 @@
 import { stampSources } from './framework-meta.js';
-import { SOURCE_ATTR, rectOf, deepestAt, clearPreview, clearPreviews, hidePreview, paletteOf, relativeOf, treeOf, inspectElement, keepPreviews, previewEdit, settlePreview } from './runtime.js';
+import { SOURCE_ATTR, GHOST_ATTR, rectOf, deepestAt, clearPreview, clearPreviews, hidePreview, paletteOf, relativeOf, treeOf, inspectElement, keepPreviews, previewEdit, settlePreview } from './runtime.js';
 import { FOCUSED, focusTab } from './focus.js';
 import { missingFontsOf } from './missing-fonts.js';
 import { trackRects } from './track.js';
@@ -139,8 +139,9 @@ export function installBridge(win, { nested = false, emit = null, twin = null } 
       stampSources(doc);
       const target = targetOf(doc, request);
       settleForced(doc);
-      const inspected = target ? inspectElement(target, { maxHtml: request.maxHtml, twin }) : null;
       const tagged = target?.closest(`[${SOURCE_ATTR}]`);
+      const outside = nested && (!tagged || tagged.hasAttribute(GHOST_ATTR));
+      const inspected = target && !outside ? inspectElement(target, { maxHtml: request.maxHtml, twin }) : null;
       reply({ type: INSPECT_RESULT, id: request.id, result: inspected && { ...inspected, states: tagged ? statesOf(tagged) : [] } });
     }
   };

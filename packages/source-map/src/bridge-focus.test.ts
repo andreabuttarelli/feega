@@ -79,6 +79,19 @@ describe('focus tab', () => {
     expect(reply.result.usage).toEqual({ index: 1, count: 2 });
   });
 
+  it.each(['body', 'html'])('selects nothing when the canvas background (%s) is clicked in the focus tab', async (selector) => {
+    const { win, up, send, frame } = bridged();
+    send({ type: 'feega:focus', source: 'src/Card.tsx:5:7', index: 1 });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    frame()!.contentDocument!.write(frame()!.srcdoc);
+    frame()!.dispatchEvent(new (win as unknown as typeof globalThis).Event('load'));
+    send({ type: 'feega:inspect', id: 9, selector, focus: true });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    const reply = up.find((m) => m.type === 'feega:inspect:result' && m.id === 9) as { result: unknown };
+    expect(reply.result).toBeNull();
+  });
+
   it('reports zero and opens nothing for a component that is not on the page', () => {
     const { up, send, frame } = bridged();
     send({ type: 'feega:focus', source: 'src/Gone.tsx:1:1' });
