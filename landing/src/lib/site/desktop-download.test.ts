@@ -30,13 +30,13 @@ describe('downloadFor', () => {
     expect(downloadFor(Os.Linux).href).toMatch(/\/desktop-latest\/Feega-linux-x64\.AppImage$/);
   });
 
-  it('labels each system', () => {
-    expect(downloadFor(Os.Mac).label).toBe('download for mac');
-    expect(downloadFor(Os.Windows).label).toBe('download for windows');
-    expect(downloadFor(Os.Linux).label).toBe('download for linux');
+  it('offers a free download on every system', () => {
+    expect(downloadFor(Os.Mac).label).toBe('download for free');
+    expect(downloadFor(Os.Windows).label).toBe('download for free');
+    expect(downloadFor(Os.Linux).label).toBe('download for free');
   });
 
   it('sends an unknown system to the download page', () => {
-    expect(downloadFor(Os.Unknown)).toMatchObject({ label: 'download', href: '/download' });
+    expect(downloadFor(Os.Unknown)).toMatchObject({ label: 'download for free', href: '/download' });
   });
 });

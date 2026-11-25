@@ -27,7 +27,6 @@
     <a class="star" href={starCta.href} {...eventAttrs('github_click', { place: id })}>{starCta.label}</a>
   </div>
   <p class="more">
-    <a href={DOWNLOAD_PATH} {...eventAttrs('download_click', { target: 'download_page', place: id })}>other platforms</a>
     {#each secondary as cta (cta.label)}<a href={cta.href}>{cta.label}</a>{/each}
   </p>
   <ul class="facts">
