@@ -6,7 +6,7 @@ import { LINKS } from './links';
 import { installMenu } from './menu';
 import { pidFile } from './pid-file';
 import { frameworkOf } from './project-info';
-import { inviteWanted, settingsStore } from './store';
+import { settingsStore } from './store';
 import { tabHost } from './tabs';
 import { updateController } from './updates/controller';
 import pkg from '../../package.json';
@@ -88,7 +88,6 @@ app.whenReady().then(() => {
     update: updates.info(),
     node,
     project,
-    invite: inviteWanted(settings.get(), account.email()),
     documents: app.getPath('documents')
   });
 
@@ -169,15 +168,10 @@ app.whenReady().then(() => {
       return;
     }
     project = null;
-    settings.created();
     openDir(out.dir);
   });
   ipcMain.handle(Channel.ClearProject, () => {
     project = null;
-    publish();
-  });
-  ipcMain.handle(Channel.DismissInvite, () => {
-    settings.dismissInvite();
     publish();
   });
   const checkRuntime = async () => {

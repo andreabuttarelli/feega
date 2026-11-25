@@ -978,17 +978,3 @@ pre {
   white-space: nowrap;
   color: var(--sx-ink-3);
 }
-.invite {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  margin-right: 12px;
-  font-size: 13px;
-  color: var(--sx-ink-2);
-}
-.invite .text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
