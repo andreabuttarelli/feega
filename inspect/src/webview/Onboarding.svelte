@@ -6,6 +6,7 @@
   import type { SupportItem } from '../support';
   import { AGENT_LOGOS } from './agent-logos';
   import { MCP_COMMAND, MCP_DOCS_URL, SLIDES } from './onboarding-slides';
+  import Pixel from '@feega/pixel-icons/Pixel.svelte';
   import SupportList from './SupportList.svelte';
 
   let { account, support, agents, onaccount, onsupport, oncopy, onlink, onstep, ondone }: { account: { state: AccountState; email?: string }; support: SupportItem[]; agents: AgentId[]; onaccount: (kind: ToHost.SignIn | ToHost.CancelSignIn) => void; onsupport: (item: SupportItem) => void; oncopy: (text: string) => void; onlink: (url: string) => void; onstep: (step: OnboardingStep) => void; ondone: (outcome: OnboardingOutcome) => void } = $props();
@@ -61,6 +62,7 @@
     <button type="button" class="close" aria-label="Close" title="Close" data-testid="onboarding-close" onclick={() => ondone(OnboardingOutcome.Skipped)}><X size={14} /></button>
 
     <div class="body">
+      <div class="hero" data-testid="onboarding-icon"><Pixel icon={slide.icon} size={6} /></div>
       <h2 id="onb-title">{slide.title}</h2>
       <p id="onb-body">{slide.body}</p>
       {#if slide.more}<p class="more">{slide.more}</p>{/if}
@@ -106,9 +108,6 @@
         <div class="account">
           <SupportList done={support} onact={onsupport} />
           <button type="button" class="primary" data-primary data-testid="onboarding-finish" onclick={() => ondone(OnboardingOutcome.Finished)}>Start designing</button>
-          {#if support.length === 0}
-            <button type="button" class="ghost" data-testid="onboarding-later" onclick={() => ondone(OnboardingOutcome.Finished)}>maybe later</button>
-          {/if}
         </div>
       {/if}
     </div>
@@ -120,7 +119,9 @@
       </div>
       <div class="steps">
         <button type="button" class="ghost" data-testid="onboarding-back" disabled={index === 0} onclick={() => (index -= 1)}>back</button>
-        <button type="button" class="ghost next" data-testid="onboarding-next" disabled={last} onclick={() => (index += 1)} data-primary>next</button>
+        {#if !last}
+          <button type="button" class="ghost next" data-testid="onboarding-next" onclick={() => (index += 1)} data-primary>next</button>
+        {/if}
       </div>
     </footer>
   </div>
@@ -178,6 +179,12 @@
     gap: 8px;
     padding: 32px 24px 16px;
     text-align: center;
+  }
+
+  .hero {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 8px;
   }
 
   h2 {
@@ -297,6 +304,11 @@
     align-items: center;
     gap: 4px;
     margin-top: 12px;
+  }
+
+  .account :global(.support) {
+    width: 100%;
+    margin-bottom: 12px;
   }
 
   .signed {
