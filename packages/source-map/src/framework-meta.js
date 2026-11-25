@@ -58,19 +58,38 @@ function plainProp(value) {
   }
 }
 
+const plainProps = (props) => Object.fromEntries(Object.entries(props ?? {}).flatMap(([name, value]) => {
+  const kept = plainProp(value);
+  return kept === undefined ? [] : [[name, kept]];
+}));
+
 export function reactMountOf(element) {
   let fiber = fiberOf(element);
   while (fiber && !COMPONENT_TAGS.has(fiber.tag)) {
     fiber = fiber.return;
   }
-  if (!fiber) {
-    return null;
+  return fiber ? { name: componentName(fiber.type), props: plainProps(fiber.memoizedProps) } : null;
+}
+
+function vueMountOf(element) {
+  const instance = element.__vueParentComponent;
+  return instance ? { name: '', props: plainProps(instance.props) } : null;
+}
+
+function svelteMountOf(element) {
+  return element.__svelte_meta ? { name: '', props: {} } : null;
+}
+
+const MOUNTERS = [reactMountOf, vueMountOf, svelteMountOf];
+
+export function mountOf(element) {
+  for (const read of MOUNTERS) {
+    const mount = read(element);
+    if (mount) {
+      return mount;
+    }
   }
-  const props = Object.fromEntries(Object.entries(fiber.memoizedProps ?? {}).flatMap(([name, value]) => {
-    const kept = plainProp(value);
-    return kept === undefined ? [] : [[name, kept]];
-  }));
-  return { name: componentName(fiber.type), props };
+  return null;
 }
 
 function stackSource(stack) {

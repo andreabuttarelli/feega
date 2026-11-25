@@ -1,1 +1,1 @@
-["bridge.js", "framework-meta.js", "runtime.js", "track.js", "reload-restore.js", "forced-state.js", "theme-switch.js", "missing-fonts.js", "focus.js", "mount-runtime.js", "mount-protocol.js"]
+["bridge.js", "framework-meta.js", "runtime.js", "track.js", "reload-restore.js", "forced-state.js", "theme-switch.js", "missing-fonts.js", "focus.js", "mount-runtime.js", "mount-dom.js", "mount-protocol.js"]

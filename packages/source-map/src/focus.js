@@ -1,5 +1,5 @@
 import { GHOST_ATTR, SOURCE_ATTR } from './runtime.js';
-import { reactMountOf } from './framework-meta.js';
+import { mountOf } from './framework-meta.js';
 import { FocusMode, MOUNT_STATUS, Status } from './mount-protocol.js';
 
 export const FOCUSED = 'feega:focused';
@@ -20,6 +20,7 @@ const STYLESHEETS = 'link[rel~="stylesheet"], style';
 
 export const CANVAS_CSS = `html{min-height:100%;background-color:${CHECKER_LIGHT}!important;background-image:conic-gradient(${CHECKER_DARK} 25%,transparent 0 50%,${CHECKER_DARK} 0 75%,transparent 0)!important;background-size:${CHECKER_PX * 2}px ${CHECKER_PX * 2}px!important}body{display:flex!important;flex-wrap:wrap;align-items:center;align-content:center;justify-content:center;gap:${GAP_PX}px;box-sizing:border-box;min-height:100vh;margin:0!important;padding:${PADDING_PX}px!important;background:transparent!important}`;
 
+const nameOfFile = (file) => file.split('/').pop().replace(/\.[^.]+$/, '');
 const fileOf = (attr) => attr.slice(0, attr.lastIndexOf(':', attr.lastIndexOf(':') - 1));
 const taggedParent = (element) => element.parentElement?.closest(`[${SOURCE_ATTR}]`) ?? null;
 const bySource = (doc, source) => [...doc.querySelectorAll(`[${SOURCE_ATTR}=${JSON.stringify(source)}]`)];
@@ -101,12 +102,12 @@ export function focusPage(doc, source, index) {
 }
 
 function mountUrlOf(root) {
-  const mount = reactMountOf(root);
-  if (!mount?.name) {
+  const mount = mountOf(root);
+  if (!mount) {
     return null;
   }
   const file = fileOf(root.getAttribute(SOURCE_ATTR));
-  return `${MOUNT_ROUTE}?${new URLSearchParams({ file, name: mount.name, props: JSON.stringify(mount.props) })}`;
+  return `${MOUNT_ROUTE}?${new URLSearchParams({ file, name: mount.name || nameOfFile(file), props: JSON.stringify(mount.props) })}`;
 }
 
 const pathFrom = (root, element) => {

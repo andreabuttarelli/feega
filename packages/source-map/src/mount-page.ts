@@ -7,7 +7,7 @@ export const PROVIDERS_QUERY = 'feega-providers';
 export const NESTED_HOST = "Symbol.for('feega.nested-host')";
 
 export type MountRequest = { file: string; name: string; props: Record<string, unknown> };
-export type MountPage = { runtimeUrl: string; componentUrl: string; providersUrl: string | null };
+export type MountPage = { runtimeUrl: string; domRuntimeUrl: string; componentUrl: string; providersUrl: string | null };
 
 function propsOf(text: string | null): Record<string, unknown> {
   try {
@@ -45,7 +45,7 @@ export function mountHtml(query: string): string {
 `;
 }
 
-export function mountModule({ file, name, props }: MountRequest, { runtimeUrl, componentUrl, providersUrl }: MountPage): string {
+export function reactModule({ file, name, props }: MountRequest, { runtimeUrl, componentUrl, providersUrl }: MountPage): string {
   const controlsUrl = `${PROPS_ROUTE}?${new URLSearchParams({ file, name })}`;
   const providers = providersUrl ? `await import(${JSON.stringify(providersUrl)}).then((m) => m.Providers).catch(() => null)` : 'null';
   const start = JSON.stringify({ name, file, props, controlsUrl });
@@ -58,3 +58,17 @@ const providers = ${providers};
 startMount({ react, createRoot, mod, providers, ...${start} });
 `;
 }
+
+function domModule({ file, name, props }: MountRequest, { domRuntimeUrl, componentUrl }: MountPage, library: string, mounter: string): string {
+  const controlsUrl = `${PROPS_ROUTE}?${new URLSearchParams({ file, name })}`;
+  const start = JSON.stringify({ name, file, props, controlsUrl });
+
+  return `import * as library from ${JSON.stringify(library)};
+import mod from ${JSON.stringify(componentUrl)};
+import { startDomMount, ${mounter} } from ${JSON.stringify(domRuntimeUrl)};
+startDomMount({ mountInto: ${mounter}(library, mod), mod: { default: mod }, ...${start} });
+`;
+}
+
+export const vueModule = (request: MountRequest, page: MountPage) => domModule(request, page, 'vue', 'vueMount');
+export const svelteModule = (request: MountRequest, page: MountPage) => domModule(request, page, 'svelte', 'svelteMount');
