@@ -1,3 +1,4 @@
+import { literalOf } from './literal-expr';
 import { Delimiter, type Attribute } from './open-tag';
 
 export type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
@@ -8,6 +9,7 @@ export type Syntax = {
   expression: (prop: string, js: string) => string | null;
   flag: (prop: string) => string;
   expressionIn: (attribute: Attribute) => boolean;
+  interpolates: boolean;
 };
 
 const DATE_MARK = '$date';
@@ -27,7 +29,8 @@ const braced: Omit<Syntax, 'bindings'> = {
   string: (prop, value) => (NEEDS_EXPRESSION.test(value) ? braces(prop, JSON.stringify(value)) : textOf(prop, value)),
   expression: braces,
   flag: (prop) => prop,
-  expressionIn: (attribute) => attribute.delimiter === Delimiter.Brace && !PLAIN_LITERAL.test(attribute.value ?? '')
+  expressionIn: (attribute) => attribute.delimiter === Delimiter.Brace && !PLAIN_LITERAL.test(attribute.value ?? ''),
+  interpolates: false
 };
 
 const quoted = (prop: string, js: string): string | null => {
@@ -42,15 +45,17 @@ const VUE: Syntax = {
   string: (prop, value) => (NEEDS_EXPRESSION.test(value) ? quoted(prop, JSON.stringify(value)) : textOf(prop, value)),
   expression: quoted,
   flag: (prop) => prop,
-  expressionIn: (attribute) => VUE_BIND.test(attribute.name) && !PLAIN_LITERAL.test(attribute.value ?? '')
+  expressionIn: (attribute) => VUE_BIND.test(attribute.name) && !PLAIN_LITERAL.test(attribute.value ?? ''),
+  interpolates: false
 };
 
 const BRACED: Syntax = { ...braced, bindings: (prop) => [prop] };
+const SVELTE: Syntax = { ...BRACED, interpolates: true };
 
 export const SYNTAX: Record<string, Syntax> = {
   '.tsx': BRACED,
   '.jsx': BRACED,
-  '.svelte': BRACED,
+  '.svelte': SVELTE,
   '.astro': BRACED,
   '.vue': VUE
 };
@@ -82,3 +87,25 @@ export function attributeFor(syntax: Syntax, prop: string, value: Json): string 
   }
   return typeof value === 'string' ? syntax.string(prop, value) : syntax.expression(prop, jsOf(value));
 }
+
+export const DYNAMIC = Symbol('dynamic');
+
+const ENTITIES: Record<string, string> = { '&quot;': '"', '&amp;': '&', '&lt;': '<', '&gt;': '>' };
+
+const decoded = (text: string) => text.replace(/&(quot|amp|lt|gt);/g, (entity) => ENTITIES[entity]);
+
+export function valueIn(syntax: Syntax, attribute: Attribute): Json | typeof DYNAMIC {
+  const bound = syntax.expressionIn(attribute) || VUE_BIND.test(attribute.name) || attribute.delimiter === Delimiter.Brace;
+  if (attribute.delimiter === Delimiter.Shorthand) {
+    return DYNAMIC;
+  }
+  if (attribute.value === null) {
+    return true;
+  }
+  if (bound) {
+    return literalOf(attribute.value)?.value ?? DYNAMIC;
+  }
+  return syntax.interpolates && /[{}]/.test(attribute.value) ? DYNAMIC : decoded(attribute.value);
+}
+
+export const nameOf = (attribute: Attribute): string => attribute.name.replace(VUE_BIND, '').replace(/^\.\.\./, '');
