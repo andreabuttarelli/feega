@@ -1,4 +1,4 @@
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -41,5 +41,34 @@ describe('account invite', () => {
     store.created();
 
     expect(inviteWanted(store.get(), 'a@b.c')).toBe(false);
+  });
+});
+
+describe('onboarding', () => {
+  it('is pending on a fresh install', () => {
+    expect(settingsStore(fresh()).get().onboarded).toBe(false);
+  });
+
+  it('is remembered once finished', () => {
+    const dir = fresh();
+    settingsStore(dir).finishOnboarding();
+
+    expect(settingsStore(dir).get().onboarded).toBe(true);
+  });
+
+  it('comes back when replayed', () => {
+    const dir = fresh();
+    const store = settingsStore(dir);
+    store.finishOnboarding();
+    store.replayOnboarding();
+
+    expect(settingsStore(dir).get().onboarded).toBe(false);
+  });
+
+  it('does not greet an install that already opened projects', () => {
+    const dir = fresh();
+    writeFileSync(join(dir, 'settings.json'), JSON.stringify({ recents: [{ dir: '/a', at: 1 }] }));
+
+    expect(settingsStore(dir).get().onboarded).toBe(true);
   });
 });
