@@ -5,6 +5,7 @@ import { mkdtemp, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { homedir, tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
+import { ToView } from '../messages';
 import { settingsWith, type SettingValue } from '../settings';
 import { pluginsRoot } from '@feega/plugin-store/registry';
 import { fileAccountStore, type AccountStore } from './account';
@@ -131,6 +132,7 @@ export function nodePlatform({ root, launcher, version, transport, print, launch
     sourceControl: () => print(`feega: review the changes with \`git -C ${root} diff\``),
     notify: (text) => print(`feega: ${text}`),
     warn: async (text) => (print(`feega: ${text}`), false),
+    alerts: { show: async (alert) => (await transport.send({ kind: ToView.Alert, alert }), false), clear: (chat) => void transport.send({ kind: ToView.AlertClear, chat }) },
     library: catalogFile(join(dirname(launcher), 'library.json')),
     account,
     cloud,

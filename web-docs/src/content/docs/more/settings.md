@@ -13,6 +13,9 @@ In VS Code, settings are under `feegaInspect.*`. With `npx feega`, they live in 
 | `feegaInspect.devCommand` | empty | command | Command that starts the dev server. Empty: detected from `package.json`. |
 | `feegaInspect.defaultSize` | `full` | `full`, `desktop`, `tablet`, `phone` | Device size the preview opens at. |
 | `feegaInspect.keepServerAlive` | `10` | `0`, `10`, `30`, `60` | Minutes the dev server Feega started stays warm after the panel closes. `0` stops it on close. Closing the window always stops it. |
+| `feegaInspect.notifications` | `true` | boolean | Notify you when an AI agent needs you while Feega is out of view. See [Notifications](/more/chat-with-your-agent/#notifications). |
+| `feegaInspect.notifyFinished` | `true` | boolean | Notify when an agent finishes. Needs `feegaInspect.notifications`. |
+| `feegaInspect.notifyPermission` | `true` | boolean | Notify when an agent needs permission. Needs `feegaInspect.notifications`. |
 | `feegaInspect.telemetry` | `true` | boolean | Anonymous usage counts. See [Privacy](/more/privacy/). |
 
 ## Commands

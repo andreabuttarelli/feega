@@ -67,5 +67,8 @@ export enum Channel {
   PickParent = 'pick-parent',
   CreateProject = 'create-project',
   DismissInvite = 'dismiss-invite',
-  ClearProject = 'clear-project'
+  ClearProject = 'clear-project',
+  Alert = 'alert',
+  AlertClear = 'alert-clear',
+  OpenChat = 'open-chat'
 }

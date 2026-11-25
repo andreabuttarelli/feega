@@ -81,6 +81,7 @@
   import { agentContexts, commentContext, type AgentView } from './agent-context';
   import CommentsList from './CommentsList.svelte';
   import AiPanel from './AiPanel.svelte';
+  import { browserAlerts, desktopBridge } from './alerts';
   import { answerAsk } from './agent-ask';
   import { aiHeard } from './ai-state.svelte';
   import { withImpact } from './ai-context';
@@ -682,6 +683,13 @@
     flagTick++;
   }
 
+  const showChat = (chat: string) => {
+    tab = Tab.Ai;
+    barClosed = false;
+    toHost({ kind: ToHost.AiOpen, chat });
+  };
+  const pageAlerts = browserAlerts(showChat, desktopBridge());
+
   const handlers: { [K in ToView]: (m: Extract<ViewMessage, { kind: K }>) => void } = {
     [ToView.App]: (m) => (restore(m.prefs), (route = m.route ?? route), (start = new URL(route, m.url).toString()), (url = m.url), (styling = m.styling), (breakpoints = m.breakpoints), (scales = m.scales), (themes = m.themes), (themeName = stillThere(m.themes.map((t) => t.name), themeName)), showTheme()),
     [ToView.History]: (m) => ((changes = m.changes), (canUndo = m.canUndo), (canRedo = m.canRedo)),
@@ -763,6 +771,9 @@
     [ToView.AiPolicy]: aiHeard,
     [ToView.Adapters]: (m) => (adapters = m.rows),
     [ToView.AiChats]: aiHeard,
+    [ToView.Alert]: (m) => void pageAlerts.show(m.alert),
+    [ToView.AlertClear]: (m) => pageAlerts.clear(m.chat),
+    [ToView.ShowChat]: (m) => ((tab = Tab.Ai), (barClosed = false)),
     [ToView.AiChat]: aiHeard,
     [ToView.AgentAsk]: (m) => void answerAsk(m, { capture: shoot, context: () => (aiContext === null ? null : withImpact(aiContext, impact)) }).then(toHost),
     [ToView.SkillHint]: (m) => (skillHint = m.command),

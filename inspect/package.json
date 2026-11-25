@@ -124,6 +124,21 @@
           ],
           "description": "Default for the AI tab: Ask every time, Allow edits and ask for commands, or Allow all. Each project remembers its own choice."
         },
+        "feegaInspect.notifications": {
+          "type": "boolean",
+          "default": true,
+          "description": "Notify when an AI agent needs you while Feega is not in view. Messages name the agent and the project, never code or prompts."
+        },
+        "feegaInspect.notifyFinished": {
+          "type": "boolean",
+          "default": true,
+          "description": "Notify when an AI agent finishes. Needs Notifications on."
+        },
+        "feegaInspect.notifyPermission": {
+          "type": "boolean",
+          "default": true,
+          "description": "Notify when an AI agent needs permission. Needs Notifications on."
+        },
         "feegaInspect.cloud.enabled": {
           "type": "boolean",
           "default": false,

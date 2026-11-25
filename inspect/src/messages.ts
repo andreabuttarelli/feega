@@ -1,6 +1,7 @@
 import type { SupportItem } from './support';
 import type { AcpAgent, AcpId } from './host/ai/acp-agents';
 import type { AgentEvent, ConfigView, ModeView } from './host/ai/agent-session';
+import type { Alert } from './host/ai/agent-alert';
 import type { Item } from './host/ai/transcript';
 import type { Policy } from './host/ai/permission-policy';
 import type { LiveEditAsk } from '@feega/live-edit/live-ask';
@@ -323,6 +324,9 @@ export enum ToView {
   AiPolicy = 'ai-policy',
   AiChats = 'ai-chats',
   AiChat = 'ai-chat',
+  Alert = 'alert',
+  AlertClear = 'alert-clear',
+  ShowChat = 'show-chat',
   AgentAsk = 'agent-ask',
   Adapters = 'adapters',
   PageCreated = 'page-created'
@@ -490,6 +494,9 @@ export type ViewMessage =
   | { kind: ToView.AiEvent; event: AgentEvent; chat?: string }
   | { kind: ToView.AiPolicy; policy: Policy }
   | { kind: ToView.AiChats; chats: ChatRow[]; active: string | null }
+  | { kind: ToView.Alert; alert: Alert }
+  | { kind: ToView.AlertClear; chat: string }
+  | { kind: ToView.ShowChat; chat: string }
   | { kind: ToView.AgentAsk; id: number; ask: AgentAsk; selection: boolean }
   | { kind: ToView.Adapters; rows: AdapterRow[] }
   | { kind: ToView.AiChat; chat: string | null; agent?: AcpId; state: AiState; items: Item[]; modes: ModeView[]; mode: string | null; configs: ConfigView[]; images?: boolean };

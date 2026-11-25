@@ -1,5 +1,5 @@
-import { WebContentsView, type BrowserWindow } from 'electron';
-import { basename } from 'node:path';
+import { WebContentsView, type BrowserWindow, type WebContents } from 'electron';
+import { basename, join } from 'node:path';
 import { chosenApp } from '../../../inspect/src/host/app-root';
 import { diskTree } from './app-tree';
 import { startCli, type CliOptions } from './cli-process';
@@ -9,12 +9,13 @@ import { TabStatus, type AppOption, type TabInfo } from './types';
 
 export const CHROME_HEIGHT = 44;
 const MAX_LOG_LINES = 200;
+const VIEW_PRELOAD = join(__dirname, 'view-preload.cjs');
 const OPAQUE_BACKGROUND = '#121212';
 const NO_APP = 'no web app (package.json) found in this folder';
 
 type Tab = { info: TabInfo; view: WebContentsView; stop: () => Promise<void>; pick: ((app: string | null) => void) | null };
 
-export type HostConfig = { options: () => CliOptions; opened: (dirs: string[]) => void };
+export type HostConfig = { options: () => CliOptions; opened: (dirs: string[]) => void; closed: (id: string) => void };
 
 export function tabHost(window: BrowserWindow, changed: () => void, pids: PidFile, config: HostConfig) {
   const tabs = new Map<string, Tab>();
@@ -55,6 +56,7 @@ export function tabHost(window: BrowserWindow, changed: () => void, pids: PidFil
       return;
     }
     tabs.delete(id);
+    config.closed(id);
     remember();
     tab.pick?.(null);
     window.contentView.removeChildView(tab.view);
@@ -80,7 +82,7 @@ export function tabHost(window: BrowserWindow, changed: () => void, pids: PidFil
 
   const open = async (dir: string) => {
     const id = `tab-${++next}`;
-    const view = new WebContentsView();
+    const view = new WebContentsView({ webPreferences: { preload: VIEW_PRELOAD, contextIsolation: true, sandbox: true } });
     view.setBackgroundColor(OPAQUE_BACKGROUND);
     const info: TabInfo = { id, dir, name: basename(dir), status: TabStatus.Starting, message: 'looking for the app', log: [], url: '', apps: [] };
     tabs.set(id, { info, view, stop: async () => undefined, pick: null });
@@ -132,6 +134,8 @@ export function tabHost(window: BrowserWindow, changed: () => void, pids: PidFil
       layout();
       changed();
     },
+    tabOf: (contents: WebContents) => [...tabs].find(([, tab]) => tab.view.webContents.id === contents.id)?.[0] ?? null,
+    send: (id: string, channel: string, ...args: unknown[]) => tabs.get(id)?.view.webContents.send(channel, ...args),
     open,
     close,
     choose: (id: string, app: string) => tabs.get(id)?.pick?.(app),

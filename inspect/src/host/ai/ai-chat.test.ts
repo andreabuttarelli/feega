@@ -11,6 +11,8 @@ import { AgentEventKind, type Launch, type OpenAgent } from './agent-session';
 import { openAcpAgent } from './acp-session';
 import { ItemKind } from './transcript';
 import { Policy } from './permission-policy';
+import { basename } from 'node:path';
+import type { Alert } from './agent-alert';
 
 const FAKE = fileURLToPath(new URL('./fake-acp-agent.mjs', import.meta.url));
 const WAIT_MS = 5000;
@@ -39,6 +41,8 @@ function setup({ flags = [], confirmed = true, saved = [], ready = [], failing }
   let stored: ChatRecord[] = saved;
   let clock = 1000;
   let ids = 0;
+  const raised: Alert[] = [];
+  const cleared: string[] = [];
   const installs: AcpId[] = [];
   const launched: Launch[] = [];
   const present = new Set<AcpId>(ready);
@@ -74,12 +78,13 @@ function setup({ flags = [], confirmed = true, saved = [], ready = [], failing }
     newId: () => `chat-${++ids}`,
     created: (chats, live) => void created.push([chats, live]),
     configured: (category, value) => void configured.push([category, value]),
+    alerts: { raise: async (alert) => void raised.push(alert), clear: (id) => void cleared.push(id) },
     mcp: () => [{ name: 'feega', command: '/usr/bin/node', args: ['/ext/mcp.cjs'], env: { FEEGA_PROJECT: root } }]
   });
   const rows = (): ChatRow[] => sent.flatMap((m) => (m.kind === ToView.AiChats ? [m.chats] : [])).at(-1) ?? [];
   const snapshot = () => sent.flatMap((m) => (m.kind === ToView.AiChat ? [m] : [])).at(-1);
   const events = () => sent.flatMap((m) => (m.kind === ToView.AiEvent ? [m.event] : []));
-  return { chat, sent, rows, snapshot, events, opened, created, configured, installs, launched, finish: () => release(), recover: () => ((reason = undefined), release()), saved: () => stored, root };
+  return { chat, raised, cleared, sent, rows, snapshot, events, opened, created, configured, installs, launched, finish: () => release(), recover: () => ((reason = undefined), release()), saved: () => stored, root };
 }
 
 const done = (t: ReturnType<typeof setup>, count: number) => eventually(() => t.events().filter((e) => e.kind === AgentEventKind.Done).length >= count);
@@ -441,6 +446,35 @@ describe('the AI chats', () => {
     await t.chat.start(AcpId.Grok);
 
     expect(currents(t)).toEqual(['sonnet', 'medium']);
+    t.chat.close();
+  });
+});
+
+describe('alerts for the user who is away', () => {
+  it('raises one when a turn finishes, naming the agent and the project', async () => {
+    const t = setup();
+
+    await t.chat.start(AcpId.OpenCode);
+    await t.chat.send('hello', null);
+    await done(t, 1);
+
+    expect(t.raised).toEqual([{ kind: 'finished', chat: 'chat-1', text: `OpenCode finished in ${basename(t.root)}` }]);
+    t.chat.close();
+  });
+
+  it('raises one when an agent asks for permission and clears it once answered', async () => {
+    const t = setup();
+
+    await t.chat.start(AcpId.OpenCode);
+    void t.chat.send(`write ${t.root}/a.txt`, null);
+    await eventually(() => t.raised.length === 1);
+    const ask = t.events().find((e) => e.kind === AgentEventKind.Permission)!;
+    expect(t.raised[0]).toEqual({ kind: 'permission', chat: 'chat-1', text: 'OpenCode needs permission to edit a file' });
+
+    t.chat.answer(ask.kind === AgentEventKind.Permission ? ask.id : '', null);
+
+    expect(t.cleared).toEqual(['chat-1']);
+    await done(t, 1);
     t.chat.close();
   });
 });

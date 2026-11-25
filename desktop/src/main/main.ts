@@ -1,4 +1,6 @@
-import { BrowserWindow, app, dialog, ipcMain, nativeImage, nativeTheme, shell } from 'electron';
+import { BrowserWindow, Notification, app, dialog, ipcMain, nativeImage, nativeTheme, shell } from 'electron';
+import type { Alert } from '../../../inspect/src/host/ai/agent-alert';
+import { desktopAlerts } from './alerts';
 import { basename, join, resolve } from 'node:path';
 import { accountStore } from './account';
 import { SCHEME, acceptDeepLink, linkOfArgv } from './deep-link';
@@ -108,7 +110,40 @@ app.whenReady().then(() => {
   });
   const tabs = tabHost(window, publish, pids, {
     options: () => ({ editorPort: settings.get().preferences.editorPort, telemetry: settings.get().preferences.telemetry, cloud: settings.get().preferences.cloud }),
-    opened: (dirs) => settings.remember(dirs)
+    opened: (dirs) => settings.remember(dirs),
+    closed: (id) => alerts.closed(id)
+  });
+  const focusWindow = () => {
+    if (window.isMinimized()) {
+      window.restore();
+    }
+    window.show();
+    window.focus();
+  };
+  const alerts = desktopAlerts({
+    focused: () => window.isFocused(),
+    active: () => tabs.active(),
+    reveal: (tab) => (focusWindow(), tabs.activate(tab)),
+    openChat: (tab, chat) => tabs.send(tab, Channel.OpenChat, chat),
+    notify: (text, click) => {
+      const note = new Notification({ title: APP_NAME, body: text });
+      note.on('click', click);
+      note.show();
+      return note;
+    },
+    badge: (count) => app.setBadgeCount(count)
+  });
+  ipcMain.handle(Channel.Alert, (event, alert: Alert) => {
+    const tab = tabs.tabOf(event.sender);
+    if (tab) {
+      alerts.show(tab, alert);
+    }
+  });
+  ipcMain.handle(Channel.AlertClear, (event, chat: string) => {
+    const tab = tabs.tabOf(event.sender);
+    if (tab) {
+      alerts.clear(tab, chat);
+    }
   });
 
   const openDir = (dir: string) => {
@@ -199,14 +234,6 @@ app.whenReady().then(() => {
   updates.start();
 
   void window.loadFile(join(__dirname, 'renderer', 'index.html'));
-
-  const focusWindow = () => {
-    if (window.isMinimized()) {
-      window.restore();
-    }
-    window.show();
-    window.focus();
-  };
 
   deliverLink = (url) => {
     if (acceptDeepLink(url)) {
