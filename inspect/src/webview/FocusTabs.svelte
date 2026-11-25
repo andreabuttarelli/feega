@@ -2,7 +2,7 @@
   import X from '@lucide/svelte/icons/x';
   import { View } from './focus';
 
-  let { name, active, onselect, onclose, notice = null, reason = null, height = $bindable(0) }: { name: string; active: View; onselect: (view: View) => void; onclose: () => void; notice?: string | null; reason?: string | null; height?: number } = $props();
+  let { name, active, onselect, onclose, notice = null, height = $bindable(0) }: { name: string; active: View; onselect: (view: View) => void; onclose: () => void; notice?: string | null; height?: number } = $props();
 </script>
 
 <div class="tabs" role="tablist" data-testid="focus-tabs" bind:clientHeight={height}>
@@ -11,7 +11,7 @@
     <button type="button" role="tab" aria-selected={active === View.Focus} data-testid="tab-focus" onclick={() => onselect(View.Focus)}>{name}</button>
     <button type="button" class="close" data-testid="focus-exit" title="Close (Esc)" aria-label="Close {name}" onclick={onclose}><X size={11} /></button>
   </span>
-  {#if notice}<span class="notice" data-testid="focus-notice" title={reason}>{notice}</span>{/if}
+  {#if notice}<span class="notice" data-testid="focus-notice">{notice}</span>{/if}
 </div>
 
 <style>

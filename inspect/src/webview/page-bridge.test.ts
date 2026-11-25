@@ -89,9 +89,9 @@ describe('the real component in the focus tab', () => {
     pageBridge(() => null, { focused: (...args: unknown[]) => seen.push(args) } as never);
 
     post({ type: FOCUSED, count: 1, mode: 'mount' });
-    post({ type: FOCUSED, count: 1, mode: 'snapshot', reason: 'no provider' });
+    post({ type: FOCUSED, count: 1, mode: 'snapshot', reason: 'mount_error', detail: 'provider' });
 
-    expect(seen).toEqual([[1, 'mount', undefined], [1, 'snapshot', 'no provider']]);
+    expect(seen).toEqual([[1, 'mount', undefined, undefined], [1, 'snapshot', 'mount_error', 'provider']]);
   });
 
   it('hands over what the mounted component reports', () => {

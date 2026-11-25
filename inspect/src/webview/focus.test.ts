@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Pick, Source } from '../messages';
-import { FocusKey, focusKeyOf, focusOf, rowFocus } from './focus';
+import { FocusKey, focusKeyOf, focusOf, rowFocus, snapshotNoticeOf } from './focus';
 
 const CARD: Source = { file: 'src/components/ProductCard.tsx', line: 4, col: 5 };
 
@@ -60,5 +60,29 @@ describe('focusKeyOf', () => {
 
   it('ignores F when nothing can be focused', () => {
     expect(focusKeyOf('f', { focused: false, available: false })).toBeNull();
+  });
+});
+
+describe('snapshotNoticeOf', () => {
+  it.each([
+    ['turbopack', undefined, 'Snapshot: Turbopack cannot mount components'],
+    ['mount_error', 'provider', 'Snapshot: needs a provider or context'],
+    ['mount_error', 'not_exported', 'Snapshot: the component is not exported'],
+    ['mount_error', 'load', 'Snapshot: its module failed to load'],
+    ['mount_error', 'other', 'Snapshot: it failed to render alone'],
+    ['mount_error', undefined, 'Snapshot: it failed to render alone'],
+    ['no_adapter', undefined, 'Snapshot: the dev server has no Feega mount page'],
+    ['timeout', undefined, 'Snapshot: it rendered nothing in time'],
+    ['unsupported_framework', undefined, 'Snapshot: this framework cannot mount alone']
+  ])('labels %s %s', (reason, detail, label) => {
+    expect(snapshotNoticeOf(reason, detail)).toBe(label);
+  });
+
+  it('says nothing for a reason it does not know', () => {
+    expect(snapshotNoticeOf('/Users/me/secret.tsx failed')).toBeNull();
+  });
+
+  it('says nothing when there is no reason', () => {
+    expect(snapshotNoticeOf(null)).toBeNull();
   });
 });

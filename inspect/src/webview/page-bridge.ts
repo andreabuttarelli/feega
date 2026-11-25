@@ -31,7 +31,7 @@ export type PageEvents = {
   settled: (source: string, unapplied: string[]) => void;
   text: (source: string, text: string, was: string) => void;
   tracked: (slot: string, rect: Pick['rect'] | null) => void;
-  focused: (count: number, mode: FocusMode, reason?: string) => void;
+  focused: (count: number, mode: FocusMode, reason?: string, detail?: string) => void;
   mounted: (status: MountStatus) => void;
   focusReady: () => void;
 };
@@ -56,7 +56,7 @@ export function pageBridge(frame: () => HTMLIFrameElement | null, on: PageEvents
       return;
     }
     if (data?.type === FOCUSED) {
-      on.focused(data.count, data.mode ?? FocusMode.Snapshot, data.reason);
+      on.focused(data.count, data.mode ?? FocusMode.Snapshot, data.reason, data.detail);
       return;
     }
     if (data?.type === MOUNT_STATUS) {

@@ -43,7 +43,7 @@
   import { applyAskOf } from './apply-plan';
   import { controlsOf, variantsOf, type PropControl, type PropValue } from './prop-controls';
   import { FocusMode } from './page-bridge';
-  import { FocusKey, SNAPSHOT_NOTICE, View, focusKeyOf, focusOf, rowFocus, type Focus } from './focus';
+  import { FocusKey, View, focusKeyOf, focusOf, rowFocus, snapshotNoticeOf, type Focus } from './focus';
   import { hasSourceInfo } from './source-info';
   import ChangesList from './ChangesList.svelte';
   import DeviceBar from './DeviceBar.svelte';
@@ -328,8 +328,8 @@
       mount = { controls: controlsOf(status.controls, status.props), values: status.props, touched: mount?.touched ?? [] };
       sendProps();
     },
-    focused: (count, mode, reason) => {
-      snapshotReason = mode === FocusMode.Snapshot ? (reason ?? null) : null;
+    focused: (count, mode, reason, detail) => {
+      snapshotNotice = mode === FocusMode.Snapshot ? snapshotNoticeOf(reason, detail) : null;
       if (mode === FocusMode.Snapshot) {
         mount = null;
       }
@@ -1068,7 +1068,7 @@
 
   let mount = $state<{ controls: PropControl[]; values: Record<string, unknown>; touched: string[] } | null>(null);
   let showGrid = $state(false);
-  let snapshotReason = $state<string | null>(null);
+  let snapshotNotice = $state<string | null>(null);
   const variants = $derived(variantsOf(mount?.controls ?? []));
 
   function sendProps() {
@@ -1163,7 +1163,7 @@
     reopening = false;
     mount = null;
     showGrid = false;
-    snapshotReason = null;
+    snapshotNotice = null;
     bridge.useFocus(true);
     bridge.focus(next.source, true, next.index);
   }
@@ -1177,7 +1177,7 @@
     focus = null;
     mount = null;
     showGrid = false;
-    snapshotReason = null;
+    snapshotNotice = null;
     viewing = View.Page;
     bridge.useFocus(false);
     bridge.focus(null);
@@ -1440,7 +1440,7 @@
       {#if share?.available}<SharePanel view={share} onstart={(name, canEdit) => toHost({ kind: ToHost.ShareStart, name, canEdit })} onstop={() => toHost({ kind: ToHost.ShareStop })} onkick={(userId) => toHost({ kind: ToHost.ShareKick, userId })} onrole={(userId, role) => toHost({ kind: ToHost.ShareRole, userId, role })} />{/if}
       <button type="button" class="icon" class:on={!barClosed} title="Properties (⌘\)" onclick={toggleBar} data-testid="bar-toggle"><PanelRight size={15} /></button>
     </header>
-    {#if focus}<FocusTabs name={focus.name} active={viewing} notice={snapshotReason === null ? null : SNAPSHOT_NOTICE} reason={snapshotReason} onselect={showTab} onclose={exitFocus} bind:height={tabsH} />{/if}
+    {#if focus}<FocusTabs name={focus.name} active={viewing} notice={snapshotNotice} onselect={showTab} onclose={exitFocus} bind:height={tabsH} />{/if}
 
     <div class="backdrop" role="presentation" bind:clientWidth={stage.w} bind:clientHeight={stage.h} onpointermove={resizeFrame} onpointerup={endDrag}>
       <div class="frame" class:framed={size !== Size.Full} style={`width:${fit.width * fit.scale}px;height:${fit.height * fit.scale}px`}>

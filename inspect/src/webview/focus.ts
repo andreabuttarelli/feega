@@ -16,7 +16,31 @@ export enum FocusKey {
   Exit = 'exit'
 }
 
-export const SNAPSHOT_NOTICE = "Couldn't render in isolation: showing a snapshot";
+export enum SnapshotReason {
+  Turbopack = 'turbopack',
+  MountError = 'mount_error',
+  NoAdapter = 'no_adapter',
+  Timeout = 'timeout',
+  UnsupportedFramework = 'unsupported_framework'
+}
+
+const MOUNT_ERROR_DEFAULT = 'Snapshot: it failed to render alone';
+
+const MOUNT_ERROR_NOTICE: Record<string, string> = {
+  provider: 'Snapshot: needs a provider or context',
+  not_exported: 'Snapshot: the component is not exported',
+  load: 'Snapshot: its module failed to load'
+};
+
+const NOTICE: Record<SnapshotReason, (detail?: string) => string> = {
+  [SnapshotReason.Turbopack]: () => 'Snapshot: Turbopack cannot mount components',
+  [SnapshotReason.MountError]: (detail) => MOUNT_ERROR_NOTICE[detail ?? ''] ?? MOUNT_ERROR_DEFAULT,
+  [SnapshotReason.NoAdapter]: () => 'Snapshot: the dev server has no Feega mount page',
+  [SnapshotReason.Timeout]: () => 'Snapshot: it rendered nothing in time',
+  [SnapshotReason.UnsupportedFramework]: () => 'Snapshot: this framework cannot mount alone'
+};
+
+export const snapshotNoticeOf = (reason: string | null | undefined, detail?: string): string | null => NOTICE[reason as SnapshotReason]?.(detail) ?? null;
 
 const FOCUS_LETTER = 'f';
 const ESCAPE = 'escape';
