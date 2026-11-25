@@ -1395,3 +1395,7 @@ non solo con la build.
 ## The focus tab is blank on Next.js and React Router
 
 **Signal:** the focus tab opens empty and Layers lists nothing. Next has no `/__feega/mount` route (404 page loads, no status ever arrives); React Router's Vite plugin throws "can't detect preamble" before the mount runtime starts. **Move:** a mount that never reports must still fall back: the mount page posts `failed` from a capturing `error` listener installed before the module, and the tab falls back when the loaded page lacks the `feega.nested-host` marker. Check each framework in `inspect/test/focus-shots.mts`.
+
+## Nuxt focus tab always falls back to the snapshot
+
+**Signal:** `/__feega/mount` answers 404 on Nuxt while Vue and Svelte on plain Vite mount fine. **Move:** Nuxt's own server answers before the Vite middlewares that `feegaSource` registers, so the mount routes are unreachable; the tab falls back by design. Serving them there needs a Nitro dev handler in the Nuxt layer.

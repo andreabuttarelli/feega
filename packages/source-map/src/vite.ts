@@ -10,7 +10,7 @@ import { providersOf } from './providers-module.ts';
 
 const BRIDGE_PATH = fileURLToPath(new URL('./bridge.js', import.meta.url));
 const VITE_CLIENT = /\/vite\/dist\/client\/client\.mjs$/;
-const MOUNT_RUNTIME_PATH = fileURLToPath(new URL('./mount-runtime.js', import.meta.url));
+const MOUNT_RUNTIME_DIR = fileURLToPath(new URL('.', import.meta.url));
 const PROVIDERS_SUFFIX = `?${PROVIDERS_QUERY}`;
 const PASS_THROUGH = 'export function Providers({ children }) {\n  return children;\n}\n';
 const BRIDGE_IMPORT = `import ${JSON.stringify(fsUrl(BRIDGE_PATH))};`;
@@ -42,7 +42,7 @@ export function feegaSource({ bridge = Bridge.ViteClient, root: projectRoot }: S
     },
 
     configureServer(server) {
-      mount = mountRoutes(server, { root: () => root, runtimePath: MOUNT_RUNTIME_PATH });
+      mount = mountRoutes(server, { root: () => root, runtimeDir: MOUNT_RUNTIME_DIR });
     },
 
     resolveId(source) {

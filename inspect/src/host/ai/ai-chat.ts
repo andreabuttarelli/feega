@@ -6,6 +6,7 @@ import type { AgentEnv } from '../agents';
 import { AcpId, acpAgents, launchOf } from './acp-agents';
 import { isPolicy, type Policy } from './permission-policy';
 import { AgentEventKind, type AgentEvent, type AgentFiles, type AgentSession, type ConfigView, type ModeView, type OpenAgent } from './agent-session';
+import { turnWatch, type TurnWatch } from './turn-changes';
 import { answered, heard as transcribed, said, ItemKind, type Item } from './transcript';
 
 const OUTSIDE = 'is outside the workspace';
@@ -22,7 +23,7 @@ export type ChatRecord = { id: string; agent: AcpId; title: string; createdAt: n
 
 export type ChatStore = { load: () => ChatRecord[]; save: (records: ChatRecord[]) => void };
 
-type Chat = { record: ChatRecord; live: AgentSession | null; busy: boolean; opening: boolean };
+type Chat = { record: ChatRecord; live: AgentSession | null; busy: boolean; opening: boolean; watch: TurnWatch | null; settling: Promise<void> };
 
 export type AiChatDeps = {
   root: () => string;
@@ -31,6 +32,7 @@ export type AiChatDeps = {
   confirm: (question: string, yes: string) => Promise<boolean>;
   post: (message: ViewMessage) => unknown;
   write: (path: string, content: string, agent: string) => Promise<void>;
+  record: (path: string, before: string, after: string, agent: string) => Promise<void>;
   policy: { get: () => Policy; set: (policy: Policy) => void };
   store: ChatStore;
   now: () => number;
@@ -57,6 +59,8 @@ export function aiChat(deps: AiChatDeps) {
   const chats = new Map<string, Chat>();
   let active: string | null = null;
   let loaded = false;
+
+  const labelOf = (id: AcpId): string => acpAgents(deps.env()).find((a) => a.id === id)?.label ?? id;
 
   const current = (): Chat | undefined => (active ? chats.get(active) : undefined);
 
@@ -95,12 +99,36 @@ export function aiChat(deps: AiChatDeps) {
     return rel;
   };
 
-  const files = (label: () => string): AgentFiles => ({
+  const files = (label: () => string, watch: () => TurnWatch | null): AgentFiles => ({
     read: async (path, from, count) => slice(await readFile(`${deps.root()}/${inRoot(path)}`, 'utf8'), from, count),
-    write: (path, content) => deps.write(inRoot(path), content, label())
+    write: async (path, content) => {
+      const rel = inRoot(path);
+      await deps.write(rel, content, label());
+      watch()?.wrote(rel, content);
+    }
   });
 
+  const recorded = async (chat: Chat) => {
+    const watch = chat.watch;
+    chat.watch = null;
+    try {
+      for (const { path, before, after } of (await watch?.settle()) ?? []) {
+        await deps.record(path, before, after, labelOf(chat.record.agent));
+      }
+    } catch (error) {
+      failed(error instanceof Error ? error.message : String(error), chat.record.id);
+    }
+  };
+
   const heard = (chat: Chat, event: AgentEvent) => {
+    if (event.kind !== AgentEventKind.Done && event.kind !== AgentEventKind.Failed) {
+      deliver(chat, event);
+      return;
+    }
+    chat.settling = recorded(chat).then(() => deliver(chat, event));
+  };
+
+  const deliver = (chat: Chat, event: AgentEvent) => {
     const { record } = chat;
     record.items = transcribed(record.items, event);
     if (event.kind === AgentEventKind.Modes) {
@@ -153,7 +181,7 @@ export function aiChat(deps: AiChatDeps) {
     chat.opening = true;
     state(chat);
     try {
-      const session = await deps.open(launchOf(agent.id), { cwd: deps.root(), resume: record.sessionId, preferred: record.chosen, files: files(() => agent.label), policy: deps.policy.get, emit: (event) => heard(chat, event) });
+      const session = await deps.open(launchOf(agent.id), { cwd: deps.root(), resume: record.sessionId, preferred: record.chosen, files: files(() => agent.label, () => chat.watch), policy: deps.policy.get, emit: (event) => heard(chat, event) });
       chat.live = session;
       if (record.items.length && !session.resumed) {
         record.items = [...record.items, { kind: ItemKind.Note, text: FORGOT }];
@@ -173,7 +201,7 @@ export function aiChat(deps: AiChatDeps) {
       return;
     }
     loaded = true;
-    deps.store.load().forEach((record) => chats.set(record.id, { record: { ...record, configs: record.configs ?? [], chosen: record.chosen ?? {} }, live: null, busy: false, opening: false }));
+    deps.store.load().forEach((record) => chats.set(record.id, { record: { ...record, configs: record.configs ?? [], chosen: record.chosen ?? {} }, live: null, busy: false, opening: false, watch: null, settling: Promise.resolve() }));
     active = rows()[0]?.id ?? null;
   }
 
@@ -186,7 +214,7 @@ export function aiChat(deps: AiChatDeps) {
   async function start(agent: AcpId) {
     load();
     const now = deps.now();
-    const chat: Chat = { record: { id: deps.newId(), agent, title: '', createdAt: now, updatedAt: now, sessionId: null, mode: null, modes: [], configs: [], chosen: { ...lastChosen(agent) }, items: [] }, live: null, busy: false, opening: true };
+    const chat: Chat = { record: { id: deps.newId(), agent, title: '', createdAt: now, updatedAt: now, sessionId: null, mode: null, modes: [], configs: [], chosen: { ...lastChosen(agent) }, items: [] }, live: null, busy: false, opening: true, watch: null, settling: Promise.resolve() };
     chats.set(chat.record.id, chat);
     active = chat.record.id;
     snapshot(chat);
@@ -223,7 +251,11 @@ export function aiChat(deps: AiChatDeps) {
     }
     state(chat);
     persist();
-    await chat.live!.send(context ? `${context}\n\n${text}` : text);
+    const session = chat.live!;
+    chat.watch = turnWatch(deps.root());
+    await chat.watch.begin();
+    await session.send(context ? `${context}\n\n${text}` : text);
+    await chat.settling;
   }
 
   function open(id: string) {

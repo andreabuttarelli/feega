@@ -44,6 +44,7 @@ function setup({ flags = [], confirmed = true, saved = [] }: Options = {}) {
     confirm: async () => confirmed,
     post: (message) => void sent.push(message),
     write: async () => undefined,
+    record: async () => undefined,
     policy: { get: () => Policy.Ask, set: () => undefined },
     store: { load: () => stored, save: (records) => void (stored = records) },
     now: () => ++clock,

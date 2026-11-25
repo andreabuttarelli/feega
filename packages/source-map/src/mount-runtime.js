@@ -20,8 +20,7 @@ function propsFor(base, extra) {
   return reviveProps({ ...base, ...extra });
 }
 
-export function startMount({ react, createRoot, mod, name, file, props, providers, controlsUrl, win = window }) {
-  const { createElement, Component, Fragment } = react;
+export function runMount({ Target, name, file, props, controlsUrl, win = window, render }) {
   const doc = win.document;
   const container = doc.getElementById('root');
   const style = doc.createElement('style');
@@ -30,45 +29,25 @@ export function startMount({ react, createRoot, mod, name, file, props, provider
   doc.head.append(style);
 
   const post = (message) => win.parent.postMessage({ type: MOUNT_STATUS, ...message }, '*');
-  const Target = mod[name] ?? mod.default;
   if (!Target) {
     post({ status: Status.Failed, reason: Reason.NoExport });
     return;
   }
 
   let ready = false;
-  let version = 0;
   let current = { props, variants: null };
-
-  class Boundary extends Component {
-    state = { error: null };
-    static getDerivedStateFromError(error) {
-      return { error };
-    }
-    componentDidCatch(error) {
-      post({ status: ready ? Status.Error : Status.Failed, reason: String(error?.message ?? error) });
-    }
-    render() {
-      return this.state.error ? null : this.props.children;
-    }
-  }
-
-  const cell = (variant) => createElement('div', { key: variant.label, 'data-feega-variant': variant.label, style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8 } }, createElement('span', { style: { font: `${CAPTION_PX}px system-ui`, color: '#666' } }, variant.label), createElement(Target, propsFor(current.props, variant.props)));
-
-  const view = () => (current.variants ? createElement('div', { style: { display: 'flex', flexWrap: 'wrap', gap: GAP_PX, alignItems: 'flex-start' } }, current.variants.map(cell)) : createElement(Target, propsFor(current.props)));
-
-  const root = createRoot(container);
-  const draw = () => root.render(createElement(Boundary, { key: ++version }, createElement(providers ?? Fragment, null, view())));
+  const fail = (reason) => post({ status: ready ? Status.Error : Status.Failed, reason });
+  const draw = render({ container, fail });
 
   win.addEventListener('error', (event) => !ready && post({ status: Status.Failed, reason: String(event.message) }));
   win.addEventListener('message', (event) => {
     if (event.data?.type === MOUNT_PROPS) {
       current = { props: event.data.props ?? current.props, variants: event.data.variants ?? null };
-      draw();
+      draw(current);
     }
   });
 
-  draw();
+  draw(current);
   win.setTimeout(async () => {
     if (rendersNothing(container)) {
       post({ status: Status.Failed, reason: Reason.Empty });
@@ -78,4 +57,34 @@ export function startMount({ react, createRoot, mod, name, file, props, provider
     ready = true;
     post({ status: Status.Ready, name, file, controls, props: current.props });
   }, SETTLE_MS);
+}
+
+export function startMount({ react, createRoot, mod, name, file, props, providers, controlsUrl, win = window }) {
+  const { createElement, Component, Fragment } = react;
+  const Target = mod[name] ?? mod.default;
+
+  const render = ({ container, fail }) => {
+    let version = 0;
+
+    class Boundary extends Component {
+      state = { error: null };
+      static getDerivedStateFromError(error) {
+        return { error };
+      }
+      componentDidCatch(error) {
+        fail(String(error?.message ?? error));
+      }
+      render() {
+        return this.state.error ? null : this.props.children;
+      }
+    }
+
+    const cell = (current, variant) => createElement('div', { key: variant.label, 'data-feega-variant': variant.label, style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8 } }, createElement('span', { style: { font: `${CAPTION_PX}px system-ui`, color: '#666' } }, variant.label), createElement(Target, propsFor(current.props, variant.props)));
+    const view = (current) => (current.variants ? createElement('div', { style: { display: 'flex', flexWrap: 'wrap', gap: GAP_PX, alignItems: 'flex-start' } }, current.variants.map((variant) => cell(current, variant))) : createElement(Target, propsFor(current.props)));
+    const root = createRoot(container);
+
+    return (current) => root.render(createElement(Boundary, { key: ++version }, createElement(providers ?? Fragment, null, view(current))));
+  };
+
+  runMount({ Target, name, file, props, controlsUrl, win, render });
 }

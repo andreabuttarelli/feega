@@ -108,7 +108,8 @@ async function ruled(read: ReadFile, out: Extract<Structured, { ok: true }>, css
 
 export enum Commit {
   Write = 'write',
-  Preview = 'preview'
+  Preview = 'preview',
+  Record = 'record'
 }
 
 const PROBE_CSS: Css = { 'outline-offset': '7.25px' };
@@ -157,9 +158,11 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
       }
       step.push({ full, before: change.before, after: change.after, encoding: change.encoding });
     }
-    await Promise.all(step.map((s) => mkdir(dirname(s.full), { recursive: true })));
-    await Promise.all(step.map((s) => staged(s.full, s.before, s.after, s.encoding)));
-    await Promise.all(step.map((s) => writeFile(s.full, s.after, s.encoding)));
+    if (mode === Commit.Write) {
+      await Promise.all(step.map((s) => mkdir(dirname(s.full), { recursive: true })));
+      await Promise.all(step.map((s) => staged(s.full, s.before, s.after, s.encoding)));
+      await Promise.all(step.map((s) => writeFile(s.full, s.after, s.encoding)));
+    }
     steps.push(step);
     undone.length = 0;
     const change = { ...meta, id: ++nextId, files: moving.map((c) => c.path), time: Date.now() };
@@ -442,6 +445,11 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     return writtenAll([{ path, before, after: content }], '');
   }
 
+  async function agentRecorded(path: string, before: string, after: string, agent: string): Promise<Written> {
+    meta = { at: path, prop: 'agent', value: agent, scope: '' };
+    return writtenAll([{ path, before, after }], '', undefined, Commit.Record);
+  }
+
   const skippedNote = (total: number, skipped: Skipped[]): string | undefined => {
     const reasons = [...new Set(skipped.map((s) => s.reason))].join('; ');
     return skipped.length ? `${total - skipped.length} of ${total} changed · skipped: ${reasons}` : undefined;
@@ -490,6 +498,7 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
   return {
     proposal: (proposal: Proposal, appDir: string) => inTurn(() => proposed(proposal, appDir)),
     agentWrite: (path: string, content: string, agent: string) => inTurn(() => agentWritten(path, content, agent)),
+    agentRecord: (path: string, before: string, after: string, agent: string) => inTurn(() => agentRecorded(path, before, after, agent)),
     saveVariable: (ask: EditAsk, name: string) => inTurn(() => variableSaved(ask, name)),
     structure: (ask: StructureAsk) => inTurn(() => restructured(ask)),
     detach: (ask: DetachAsk) => inTurn(() => detached(ask.at, ask.usage, ask.which)),
