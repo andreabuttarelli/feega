@@ -1,3 +1,5 @@
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { Readable, Writable } from 'node:stream';
 import { agent, methods, ndJsonStream, PROTOCOL_VERSION, RequestError } from '@agentclientprotocol/sdk';
 
@@ -12,6 +14,23 @@ const WRITTEN = 'written by the agent\n';
 const chunk = (text) => ({ sessionId: SESSION, update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text } } });
 
 let cancelled = null;
+
+const announce = (cx, toolCallId, path) =>
+  cx.client.notify(methods.client.session.update, { sessionId: SESSION, update: { sessionUpdate: 'tool_call', toolCallId, title: `Edit ${path}`, kind: 'edit', status: 'in_progress', locations: [{ path: join(process.cwd(), path) }] } });
+
+const finish = (cx, toolCallId) => cx.client.notify(methods.client.session.update, { sessionId: SESSION, update: { sessionUpdate: 'tool_call_update', toolCallId, status: 'completed' } });
+
+const onDisk = (act) => async (cx, path) => {
+  await announce(cx, 'disk-1', path);
+  act(join(process.cwd(), path));
+  await finish(cx, 'disk-1');
+  return 'end_turn';
+};
+
+const put = (full) => {
+  mkdirSync(dirname(full), { recursive: true });
+  writeFileSync(full, WRITTEN);
+};
 
 const handlers = {
   hello: async (cx) => {
@@ -38,6 +57,12 @@ const handlers = {
     await cx.client.notify(methods.client.session.update, { sessionId: SESSION, update: { sessionUpdate: 'tool_call_update', toolCallId, status: 'completed' } });
     await cx.client.notify(methods.client.session.update, chunk('done'));
     return 'end_turn';
+  },
+  disk: onDisk(put),
+  diskRemove: onDisk((full) => rmSync(full)),
+  mixed: async (cx, path) => {
+    await cx.client.request(methods.client.fs.writeTextFile, { sessionId: SESSION, path, content: WRITTEN });
+    return onDisk(put)(cx, 'src/Direct.txt');
   },
   read: async (cx, path) => {
     const file = await cx.client.request(methods.client.fs.readTextFile, { sessionId: SESSION, path });

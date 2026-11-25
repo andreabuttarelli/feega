@@ -152,6 +152,14 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
       }
       agentEdited(out);
       await postHistory();
+    },
+    record: async (path, before, after, agent) => {
+      const out = await edits.agentRecord(path, before, after, agent);
+      if (!out.ok) {
+        throw new Error(out.reason);
+      }
+      agentEdited(out);
+      await postHistory();
     }
   });
   const authors = new Map<number, string>();
