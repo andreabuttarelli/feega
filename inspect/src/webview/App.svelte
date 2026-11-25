@@ -72,6 +72,7 @@
   import { agentContexts, commentContext, type AgentView } from './agent-context';
   import CommentsList from './CommentsList.svelte';
   import AiPanel from './AiPanel.svelte';
+  import { answerAsk } from './agent-ask';
   import { aiHeard } from './ai-state.svelte';
   import { withImpact } from './ai-context';
   import type { CloudComment, CloudRevisions, CommentDraft } from '../host/cloud-api';
@@ -686,6 +687,7 @@
     [ToView.AiConsent]: aiHeard,
     [ToView.AiChats]: aiHeard,
     [ToView.AiChat]: aiHeard,
+    [ToView.AgentAsk]: (m) => void answerAsk(m, { capture: shoot, context: () => (aiContext === null ? null : withImpact(aiContext, impact)) }).then(toHost),
     [ToView.SkillHint]: (m) => (skillHint = m.command),
     [ToView.IconResults]: (m) => iconsFound({ id: m.id, library: m.library, hits: m.hits, error: m.error ?? '' }),
     [ToView.IconPreview]: (m) => iconDrawn(m.name, m.svg),
@@ -1239,6 +1241,8 @@
 
   let aiContext = $state<string | null>(null);
 
+  const shoot = (selection: boolean) => bridge.capture(selection && picked ? picked.source : null, picked?.instanceIndex);
+
   async function agentText(): Promise<string | null> {
     if (!picked) {
       return null;
@@ -1597,7 +1601,7 @@
         </Tabs.Content>
       {/each}
       <Tabs.Content value={Tab.Ai}>
-        <AiPanel context={aiContext === null ? null : withImpact(aiContext, impact)} tohost={toHost} />
+        <AiPanel context={aiContext === null ? null : withImpact(aiContext, impact)} tohost={toHost} capture={() => shoot(false)} />
       </Tabs.Content>
       <Tabs.Content value={Tab.Comments}>
         <CommentsList {cloud} {picked} {composing} onsubmit={(draft) => (draft.parentId ? toHost({ kind: ToHost.CommentAdd, draft }) : sendComment(draft))} oncancel={() => (composing = false)} onresolve={(id) => toHost({ kind: ToHost.CommentResolve, id })} onselect={select} oncopy={copyComment} onpublish={(summary) => toHost({ kind: ToHost.RevisionPublish, summary })} />

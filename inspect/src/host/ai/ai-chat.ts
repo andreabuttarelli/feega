@@ -5,7 +5,7 @@ import { AiState, ToView, type ChatRow, type ViewMessage } from '../../messages'
 import type { AgentEnv } from '../agents';
 import { AcpId, acpAgents, launchOf } from './acp-agents';
 import { isPolicy, type Policy } from './permission-policy';
-import { AgentEventKind, type AgentEvent, type AgentFiles, type AgentSession, type ConfigView, type ModeView, type OpenAgent } from './agent-session';
+import { AgentEventKind, type AgentEvent, type AgentFiles, type AgentSession, type ConfigView, type McpServerSpec, type ModeView, type OpenAgent } from './agent-session';
 import { turnWatch, type TurnWatch } from './turn-changes';
 import { answered, heard as transcribed, said, ItemKind, type Item } from './transcript';
 
@@ -41,6 +41,7 @@ export type AiChatDeps = {
   newId: () => string;
   created: (chats: number, live: number) => void;
   configured: (category: string, value: string) => void;
+  mcp: () => McpServerSpec[];
 };
 
 const adapterPackage = (id: AcpId): string => launchOf(id).args.find((arg) => VERSIONED_PACKAGE.test(arg)) ?? launchOf(id).command;
@@ -80,14 +81,14 @@ export function aiChat(deps: AiChatDeps) {
   const persist = () => deps.store.save([...chats.values()].map((c) => c.record).sort((a, b) => b.updatedAt - a.updatedAt).slice(0, KEPT_CHATS));
 
   const state = (chat: Chat, next: AiState = stateOf(chat)) => {
-    post({ kind: ToView.AiState, state: next, agent: chat.record.agent, chat: chat.record.id });
+    post({ kind: ToView.AiState, state: next, agent: chat.record.agent, chat: chat.record.id, images: chat.live?.images ?? false });
     postChats();
   };
 
   const snapshot = (chat: Chat | undefined) =>
     post(
       chat
-        ? { kind: ToView.AiChat, chat: chat.record.id, agent: chat.record.agent, state: stateOf(chat), items: chat.record.items, modes: chat.record.modes, mode: chat.record.mode, configs: chat.record.configs }
+        ? { kind: ToView.AiChat, chat: chat.record.id, agent: chat.record.agent, state: stateOf(chat), items: chat.record.items, modes: chat.record.modes, mode: chat.record.mode, configs: chat.record.configs, images: chat.live?.images ?? false }
         : { kind: ToView.AiChat, chat: null, state: AiState.Idle, items: [], modes: [], mode: null, configs: [] }
     );
 
@@ -203,7 +204,7 @@ export function aiChat(deps: AiChatDeps) {
     chat.opening = true;
     state(chat);
     try {
-      const session = await deps.open(launchOf(agent.id), { cwd: deps.root(), resume: record.sessionId, preferred: record.chosen, files: files(() => agent.label, () => chat.watch), policy: deps.policy.get, emit: (event) => heard(chat, event) });
+      const session = await deps.open(launchOf(agent.id), { cwd: deps.root(), resume: record.sessionId, preferred: record.chosen, mcp: deps.mcp(), files: files(() => agent.label, () => chat.watch), policy: deps.policy.get, emit: (event) => heard(chat, event) });
       chat.live = session;
       if (record.items.length && !session.resumed) {
         record.items = [...record.items, { kind: ItemKind.Note, text: FORGOT }];
@@ -252,7 +253,7 @@ export function aiChat(deps: AiChatDeps) {
     state(chat);
   }
 
-  async function send(text: string, context: string | null) {
+  async function send(text: string, context: string | null, images: string[] = []) {
     const chat = current();
     if (!chat) {
       failed(NOT_STARTED);
@@ -276,7 +277,7 @@ export function aiChat(deps: AiChatDeps) {
     const session = chat.live!;
     chat.watch = turnWatch(deps.root());
     await chat.watch.begin();
-    await session.send(context ? `${context}\n${deps.where()}\n\n${text}` : text);
+    await session.send(context ? `${context}\n${deps.where()}\n\n${text}` : text, images);
     await chat.settling;
   }
 

@@ -2,7 +2,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { ToHost, type HostMessage, type Source } from '../messages';
+import { AgentAsk, ToHost, ToView, type HostMessage, type Source, type ViewMessage } from '../messages';
 import { SettingKey } from '../settings';
 import type { BridgeState } from './local-bridge/server';
 import type { Platform } from './platform';
@@ -14,8 +14,9 @@ async function setup() {
   let handle: (m: HostMessage) => unknown = () => undefined;
   const published: { projectRoot: string; state: BridgeState }[] = [];
   const log: string[] = [];
+  const sent: ViewMessage[] = [];
   const platform = {
-    send: () => undefined,
+    send: (message: ViewMessage) => void sent.push(message),
     stored: () => undefined,
     receive: (h: typeof handle) => void (handle = h),
     settings: () => ({ [SettingKey.SyncSelection]: false }),
@@ -24,7 +25,7 @@ async function setup() {
   const root = mkdtempSync(join(tmpdir(), 'feega-bridge-'));
   const session = inspectSession(platform, root);
   await new Promise((resolve) => setImmediate(resolve));
-  return { root, log, session, state: () => published[0].state, published, send: handle };
+  return { root, log, sent, session, state: () => published[0].state, published, send: handle };
 }
 
 describe('local bridge of the session', () => {
@@ -54,6 +55,28 @@ describe('local bridge of the session', () => {
     const { state } = await setup();
 
     expect(state().changes()).toEqual([]);
+  });
+
+  it('asks the panel for a screenshot and serves what it answers', async () => {
+    const { state, sent, send } = await setup();
+
+    const shot = state().screenshot(true);
+    const ask = sent.find((m) => m.kind === ToView.AgentAsk);
+    expect(ask).toMatchObject({ ask: AgentAsk.Screenshot, selection: true });
+    send({ kind: ToHost.AgentAnswer, id: (ask as { id: number }).id, png: 'AAA', text: null });
+
+    expect(await shot).toBe('AAA');
+  });
+
+  it('asks the panel for the context block of the composer', async () => {
+    const { state, sent, send } = await setup();
+
+    const text = state().context();
+    const ask = sent.find((m) => m.kind === ToView.AgentAsk);
+    expect(ask).toMatchObject({ ask: AgentAsk.Context });
+    send({ kind: ToHost.AgentAnswer, id: (ask as { id: number }).id, png: null, text: 'Feega page\npage: /' });
+
+    expect(await text).toBe('Feega page\npage: /');
   });
 
   it('unregisters when the session stops', async () => {

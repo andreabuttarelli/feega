@@ -54,7 +54,7 @@ describe('feega mcp tools', () => {
 
     const { tools } = await client.listTools();
 
-    expect(tools.map((t) => t.name).sort()).toEqual(['feega_changes', 'feega_comments', 'feega_editors', 'feega_resolve', 'feega_review', 'feega_selection', 'feega_share', 'feega_snapshot', 'feega_stop']);
+    expect(tools.map((t) => t.name).sort()).toEqual(['feega_changes', 'feega_comments', 'feega_context', 'feega_editors', 'feega_resolve', 'feega_review', 'feega_screenshot', 'feega_selection', 'feega_share', 'feega_snapshot', 'feega_stop']);
     expect(tools.find((t) => t.name === 'feega_share')!.inputSchema.properties).toHaveProperty('visitorsCanEdit');
     expect(tools.find((t) => t.name === 'feega_snapshot')!.inputSchema.required).toEqual(['sessionId', 'name']);
   });

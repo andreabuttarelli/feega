@@ -3,11 +3,12 @@ import { Readable, Writable } from 'node:stream';
 import { client, methods, ndJsonStream, PROTOCOL_VERSION, type RequestPermissionRequest, type SessionNotification, type ToolCall, type ToolCallContent, type ToolCallUpdate } from '@agentclientprotocol/sdk';
 import type { SessionConfigOption } from '@agentclientprotocol/sdk';
 import { autoAnswer } from './permission-policy';
-import { AgentEventKind, ConfigCategory, ToolStatus, type AgentDeps, type AgentSession, type ConfigView, type DiffView, type Launch, type ModeView, type OptionView, type ToolView } from './agent-session';
+import { AgentEventKind, ConfigCategory, ToolStatus, type AgentDeps, type AgentSession, type ConfigView, type McpServerSpec, type DiffView, type Launch, type ModeView, type OptionView, type ToolView } from './agent-session';
 
 const CLIENT_NAME = 'feega';
 const CANCELLED = { outcome: { outcome: 'cancelled' as const } };
 const AUTH_REQUIRED = -32000;
+const SCREENSHOT_MIME = 'image/png';
 const ALLOWS = new Set(['allow_once', 'allow_always']);
 
 const STATUSES: Record<string, ToolStatus> = {
@@ -44,6 +45,8 @@ const modelsOf = (models: SessionModels | null | undefined): ConfigView | null =
   models?.availableModels.length
     ? { id: SESSION_MODEL_ID, name: 'Model', category: ConfigCategory.Model, current: models.currentModelId, values: models.availableModels.map((m) => ({ id: m.modelId, name: m.name, description: m.description ?? '' })) }
     : null;
+
+const mcpOf = (servers: McpServerSpec[]) => servers.map(({ env, ...server }) => ({ ...server, env: Object.entries(env).map(([name, value]) => ({ name, value })) }));
 
 const messageOf = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
@@ -137,7 +140,9 @@ export const openAcpAgent = async (launch: Launch, deps: AgentDeps): Promise<Age
 
   const hello = await connection.agent.request(methods.agent.initialize, { protocolVersion: PROTOCOL_VERSION, clientCapabilities: { fs: { readTextFile: true, writeTextFile: true } }, clientInfo: { name: CLIENT_NAME, version: '1' } });
 
-  const newSession = () => connection.agent.request(methods.agent.session.new, { cwd: deps.cwd, mcpServers: [] });
+  const takesImages = hello.agentCapabilities?.promptCapabilities?.image === true;
+
+  const newSession = () => connection.agent.request(methods.agent.session.new, { cwd: deps.cwd, mcpServers: mcpOf(deps.mcp) });
 
   const signedIn = async () => {
     for (const method of hello.authMethods ?? []) {
@@ -160,7 +165,7 @@ export const openAcpAgent = async (launch: Launch, deps: AgentDeps): Promise<Age
   const loaded = async (id: string) => {
     replaying = true;
     try {
-      const response = await connection.agent.request(methods.agent.session.load, { sessionId: id, cwd: deps.cwd, mcpServers: [] });
+      const response = await connection.agent.request(methods.agent.session.load, { sessionId: id, cwd: deps.cwd, mcpServers: mcpOf(deps.mcp) });
       return { sessionId: id, modes: response.modes, configOptions: response.configOptions, models: (response as { models?: SessionModels }).models };
     } catch {
       return null;
@@ -213,9 +218,11 @@ export const openAcpAgent = async (launch: Launch, deps: AgentDeps): Promise<Age
   return {
     id: sessionId,
     resumed: resumed !== null,
-    send: async (prompt) => {
+    images: takesImages,
+    send: async (prompt, images = []) => {
       try {
-        const done = await connection.agent.request(methods.agent.session.prompt, { sessionId, prompt: [{ type: 'text', text: prompt }] });
+        const shots = takesImages ? images.map((data) => ({ type: 'image' as const, data, mimeType: SCREENSHOT_MIME })) : [];
+        const done = await connection.agent.request(methods.agent.session.prompt, { sessionId, prompt: [...shots, { type: 'text', text: prompt }] });
         deps.emit({ kind: AgentEventKind.Done, reason: done.stopReason });
       } catch (error) {
         deps.emit({ kind: AgentEventKind.Failed, reason: messageOf(error) });

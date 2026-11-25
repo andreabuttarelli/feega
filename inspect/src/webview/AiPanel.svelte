@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Popover } from 'bits-ui';
   import ArrowUp from '@lucide/svelte/icons/arrow-up';
+  import Camera from '@lucide/svelte/icons/camera';
   import Check from '@lucide/svelte/icons/check';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
@@ -25,6 +26,7 @@
   import { ai, aiAnswered, aiSaid } from './ai-state.svelte';
   import { ChipIcon, chipView } from './ai-chip';
   import { sendsOnKey } from './ai-keys';
+  import { attach, cameraShown } from './ai-shots';
   import { SUGGESTIONS, agoOf, isDanger, isThinking, markOf, pickerLabel, pickerOf, placeholderOf, statusOf, valueName } from './ai-view';
   import { POLICY_ROWS, type Policy } from '../host/ai/permission-policy';
   import { ItemKind } from '../host/ai/transcript';
@@ -32,15 +34,17 @@
   import { markdown } from './ai-markdown';
   import { ConfigCategory, ToolStatus, type ConfigView } from '../host/ai/agent-session';
 
-  type Props = { context: string | null; tohost: (message: HostMessage) => void };
+  type Props = { context: string | null; tohost: (message: HostMessage) => void; capture: () => Promise<string | null> };
 
   const COMPOSER_MAX_PX = 160;
   const CHIP_ICONS = { [ChipIcon.Heading]: Heading1, [ChipIcon.Text]: Type, [ChipIcon.Button]: MousePointerClick, [ChipIcon.Link]: LinkIcon, [ChipIcon.Image]: ImageIcon, [ChipIcon.List]: List, [ChipIcon.Box]: Square, [ChipIcon.Many]: Layers };
 
-  let { context, tohost }: Props = $props();
+  let { context, tohost, capture }: Props = $props();
 
   let text = $state('');
   let dropped = $state<string | null>(null);
+  let shots = $state<string[]>([]);
+  let shooting = $state(false);
   let menu = $state(false);
   let input = $state<HTMLTextAreaElement>();
   let permissions = $state(false);
@@ -53,6 +57,7 @@
   const chip = $derived(context !== null && dropped !== context ? chipView(context) : null);
   const busy = $derived(ai.state === AiState.Busy);
   const ready = $derived(ai.state === AiState.Ready || busy);
+  const camera = $derived(cameraShown(ai.images, ready));
   const current = $derived(ai.agents.find((a) => a.id === ai.agent));
   const available = $derived(ai.agents.filter((a) => a.installed));
   const missing = $derived(ai.agents.filter((a) => !a.installed));
@@ -116,8 +121,15 @@
       return;
     }
     aiSaid(question, chip ? context : null);
-    tohost({ kind: ToHost.AiSend, text: question, context: chip ? context : null });
+    tohost({ kind: ToHost.AiSend, text: question, context: chip ? context : null, images: shots });
     text = '';
+    shots = [];
+  }
+
+  async function shoot() {
+    shooting = true;
+    shots = attach(shots, await capture());
+    shooting = false;
   }
 
   function suggest(suggestion: string) {
@@ -311,6 +323,13 @@
     {#if chip}
       <span class="chip" data-testid="ai-chip" title={chip.title}>{@render chipBody(chip)}<button type="button" aria-label="Remove the selection from the message" onclick={() => (dropped = context)}><X size={11} /></button></span>
     {/if}
+    {#if shots.length}
+      <div class="shots" data-testid="ai-shots">
+        {#each shots as shot, at (at)}
+          <span class="shot"><img src="data:image/png;base64,{shot}" alt="Screenshot {at + 1}" /><button type="button" aria-label="Remove the screenshot" onclick={() => (shots = shots.filter((_, i) => i !== at))}><X size={10} /></button></span>
+        {/each}
+      </div>
+    {/if}
     <textarea rows="1" placeholder={placeholderOf(current?.label ?? null)} aria-label="Message" data-testid="ai-input" disabled={!ready} bind:this={input} bind:value={text} onkeydown={onkey}></textarea>
     <div class="send">
       <div class="pickers">
@@ -344,11 +363,16 @@
         {@render configPicker(option)}
       {/each}
       </div>
+      <div class="actions">
+      {#if camera}
+        <button type="button" class="round" aria-label="Attach a screenshot of the tab" title="Attach a screenshot of the tab" data-testid="ai-camera" disabled={shooting} onclick={shoot}>{#if shooting}<LoaderCircle size={13} />{:else}<Camera size={13} />{/if}</button>
+      {/if}
       {#if busy}
         <button type="button" class="round" aria-label="Stop" data-testid="ai-cancel" onclick={() => tohost({ kind: ToHost.AiCancel })}><Square size={10} fill="currentColor" /></button>
       {:else}
         <button type="button" class="round primary" aria-label="Send" data-testid="ai-send" disabled={!ready || !text.trim()} onclick={send}><ArrowUp size={14} /></button>
       {/if}
+      </div>
     </div>
   </div>
 </div>
@@ -772,6 +796,42 @@
     font-size: var(--ui-text-xs);
   }
 
+  .shots {
+    display: flex;
+    gap: 6px;
+  }
+
+  .shot {
+    position: relative;
+    display: inline-flex;
+    height: 44px;
+    border-radius: var(--ui-radius-sm);
+    overflow: hidden;
+    background: var(--ui-input);
+  }
+
+  .shot img {
+    height: 100%;
+    width: auto;
+    max-width: 96px;
+    object-fit: cover;
+  }
+
+  .shot button {
+    all: unset;
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    display: grid;
+    place-items: center;
+    width: 14px;
+    height: 14px;
+    border-radius: var(--ui-radius-xs);
+    background: color-mix(in srgb, var(--ui-bg) 80%, transparent);
+    color: var(--ui-text);
+    cursor: pointer;
+  }
+
   .chip.static {
     background: color-mix(in srgb, var(--ui-text) 8%, transparent);
   }
@@ -1033,6 +1093,12 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+  }
+
+  .actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
   }
 
   .pickers {

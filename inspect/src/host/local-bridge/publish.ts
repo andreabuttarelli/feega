@@ -19,4 +19,6 @@ export async function publishBridge({ registry, projectRoot, state, pid = proces
   };
 }
 
-export const publishLocal = (projectRoot: string, state: BridgeState): Promise<PublishedBridge> => publishBridge({ registry: editorRegistry(), projectRoot, state });
+export const publishLocalTo = (registry: EditorRegistry) => (projectRoot: string, state: BridgeState): Promise<PublishedBridge> => publishBridge({ registry, projectRoot, state });
+
+export const publishLocal = (projectRoot: string, state: BridgeState): Promise<PublishedBridge> => publishLocalTo(editorRegistry())(projectRoot, state);

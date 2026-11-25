@@ -7,7 +7,7 @@ import { liveAtOf } from '@feega/live-edit/live-ask';
 import { LiveProp } from '@feega/live-edit/live-fields';
 import { StructureOp } from '@feega/live-edit/structure';
 import type { SupportItem } from '../support';
-import { AccountState, Gate, ImpactKind, Onboarding, OnboardingOutcome, OnboardingStep, ServerAction, ServerState, Styling, ToHost, ToView, WebviewUsage, type Author, type Authored, type EditAsk, type ImpactAsk, type HostMessage, type Pick, type Prefs, type ViewMessage } from '../messages';
+import { AccountState, AgentAsk, Gate, ImpactKind, Onboarding, OnboardingOutcome, OnboardingStep, ServerAction, ServerState, Styling, ToHost, ToView, WebviewUsage, type Author, type Authored, type EditAsk, type ImpactAsk, type HostMessage, type Pick, type Prefs, type ViewMessage } from '../messages';
 import { SettingKey, StylingChoice } from '../settings';
 import { SignInEnd, signIn } from './sign-in';
 import { addPlugin } from './add-plugin';
@@ -53,6 +53,8 @@ import { SUPPORT_ITEMS } from '../support';
 import { aiChat, type ChatRecord } from './ai/ai-chat';
 import { policyOf } from './ai/permission-policy';
 import { openAcpAgent } from './ai/acp-session';
+import { editorMcp } from './ai/editor-mcp';
+import { viewAsker } from './view-ask';
 import { machineEnv } from './agents';
 
 const START_WITH_FEEGA = 'Start with Feega';
@@ -149,6 +151,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     newId: randomUUID,
     created: (chats, liveCount) => usage?.track(UsageKind.AiChatCreated, { chat_count: chats, live_count: liveCount }),
     configured: (category, value) => aiStats?.configured(category, value),
+    mcp: () => [editorMcp(platform.launcher, root)],
     policy: {
       get: () => policyOf(platform.stored(Stored.AiPolicy), platform.settings()[SettingKey.AiPermissions]),
       set: (policy) => void platform.store(Stored.AiPolicy, policy)
@@ -176,6 +179,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   const usagesOf = (dir: string) => usageIndex(dir, { watch: platform.watchFiles ?? fsWatch });
   let usages = usagesOf(root);
   const post = (message: ViewMessage) => platform.send(message);
+  const viewAsks = viewAsker(post);
   let signedIn = false;
   let editKind = EditKind.Other;
   const usage = platform.usage ? usageSession({ ...platform.usage, facts: () => ({ framework: running?.plan.framework ?? null, signedIn }) }) : null;
@@ -463,7 +467,14 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   });
 
   let agentContext: string | null = null;
-  const published = platform.localBridge?.(workspace, { selection: () => agentContext, changes: () => edits.history() })?.catch(() => null);
+  const published = platform
+    .localBridge?.(workspace, {
+      selection: () => agentContext,
+      changes: () => edits.history(),
+      screenshot: async (selection) => (await viewAsks.ask(AgentAsk.Screenshot, selection))?.png ?? null,
+      context: async () => (await viewAsks.ask(AgentAsk.Context, false))?.text ?? null
+    })
+    ?.catch(() => null);
 
   async function impact(ask: ImpactAsk) {
     const found = await impactOf(root, ask, edits.targets, usages);
@@ -804,7 +815,8 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.Cursor]: (m) => sharing.hostPointed(m.at),
     [ToHost.AiList]: ai.list,
     [ToHost.AiStart]: (m) => ((aiAgent = m.agent), aiStats?.started(m.agent), ai.start(m.agent)),
-    [ToHost.AiSend]: (m) => (aiStats?.sent(), void ai.send(m.text, m.context)),
+    [ToHost.AiSend]: (m) => (aiStats?.sent(), void ai.send(m.text, m.context, m.images)),
+    [ToHost.AgentAnswer]: viewAsks.answer,
     [ToHost.AiCancel]: () => (aiStats?.cancelled(), ai.cancel()),
     [ToHost.AiAnswer]: (m) => (aiStats?.answered(m.id, m.optionId), ai.answer(m.id, m.optionId)),
     [ToHost.AiMode]: (m) => void ai.setMode(m.id),
