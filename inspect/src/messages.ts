@@ -234,12 +234,14 @@ export enum ToHost {
 export enum WebviewUsage {
   CopyForAgent = 'copy_for_agent',
   FocusOpened = 'focus_opened',
+  FocusPropsChanged = 'focus_props_changed',
+  FocusVariantsShown = 'focus_variants_shown',
   StateSwitch = 'state_switch',
   BreakpointSwitch = 'breakpoint_switch',
   ErrorWebview = 'error_webview'
 }
 
-export type WebviewUsageDims = Partial<{ variant: string; state: string; breakpoint: string; error_class: string; area: string }>;
+export type WebviewUsageDims = Partial<{ variant: string; mode: string; control: string; prop_count: number; state: string; breakpoint: string; error_class: string; area: string }>;
 
 export type ChangeRow = { id: number; at: string; prop: string; value: string; scope: string; files: string[]; time: number; by?: string };
 
