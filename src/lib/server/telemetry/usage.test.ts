@@ -138,6 +138,26 @@ describe('handleUsage', () => {
     expect(rows[0]).toMatchObject({ target: 'tailwind_class', prop_category: 'spacing', file_ext: 'tsx', breakpoint: 'md', state: 'hover', source: 'ai', agent: 'claude-code', impact: 'shared', lines_added: 2, lines_removed: 1, files_count: 1 });
   });
 
+  it('accepts the chat events the extension sends', async () => {
+    const { rows, sink } = recorder();
+    const res = await handleUsage(
+      post({
+        events: [
+          event({ event: 'editor_opened' }),
+          event({ event: 'ai_chat_created', chat_count: 2, live_count: 1 }),
+          event({ event: 'ai_config_changed', agent: 'claude', category: 'model', choice: 'claude-sonnet-4-5[1m]' }),
+          event({ event: 'ai_config_changed', agent: 'claude', category: 'thought_level', choice: 'high' })
+        ]
+      }),
+      freshClient(),
+      sink
+    );
+
+    expect(res.status).toBe(204);
+    expect(rows[1]).toMatchObject({ chat_count: 2, live_count: 1 });
+    expect(rows[2]).toMatchObject({ category: 'model', choice: 'claude-sonnet-4-5[1m]' });
+  });
+
   it('accepts the agents onboarding step the extension sends', async () => {
     const { rows, sink } = recorder();
     const res = await handleUsage(post({ events: [event({ event: 'onboarding_step', step: 'agents', outcome: 'completed', choice: 'mcp' })] }), freshClient(), sink);
@@ -157,6 +177,8 @@ describe('handleUsage', () => {
   it.each([
     ['a path as a tool name', { event: 'mcp_tool_call', tool: '/Users/me/app/page.tsx' }],
     ['a class name as a property category', { event: 'edit', prop_category: 'px-4' }],
+    ['a free-text config category', { event: 'ai_config_changed', category: 'my secret project' }],
+    ['a path as a config choice', { event: 'ai_config_changed', choice: '/Users/me/app' }],
     ['an unknown file extension', { event: 'edit', file_ext: 'secret' }],
     ['a sentence as an error class', { event: 'error_host', error_class: 'Cannot read file /a/b' }]
   ])('rejects %s', async (_name, over) => {
