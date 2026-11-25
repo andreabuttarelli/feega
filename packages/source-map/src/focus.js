@@ -17,11 +17,19 @@ const REFRESH_MS = 150;
 const PADDING_PX = 48;
 const GAP_PX = 32;
 const CHECKER_PX = 16;
-const CHECKER_LIGHT = '#f4f4f6';
-const CHECKER_DARK = '#e6e6ea';
+const SCHEMES = {
+  light: { base: '#e6e6ea', checker: '#dcdce1' },
+  dark: { base: '#1c1c20', checker: '#232328' }
+};
+const DEFAULT_SCHEME = 'light';
 const STYLESHEETS = 'link[rel~="stylesheet"], style';
 
-export const CANVAS_CSS = `html{min-height:100%;background-color:${CHECKER_LIGHT}!important;background-image:conic-gradient(${CHECKER_DARK} 25%,transparent 0 50%,${CHECKER_DARK} 0 75%,transparent 0)!important;background-size:${CHECKER_PX * 2}px ${CHECKER_PX * 2}px!important}body{display:flex!important;flex-wrap:wrap;align-items:center;align-content:center;justify-content:center;gap:${GAP_PX}px;box-sizing:border-box;min-height:100vh;margin:0!important;padding:${PADDING_PX}px!important;background:transparent!important}`;
+export const canvasCss = (scheme = DEFAULT_SCHEME) => {
+  const { base, checker } = SCHEMES[scheme] ?? SCHEMES[DEFAULT_SCHEME];
+  return `html{min-height:100%;background-color:${base}!important;background-image:conic-gradient(${checker} 25%,transparent 0 50%,${checker} 0 75%,transparent 0)!important;background-size:${CHECKER_PX * 2}px ${CHECKER_PX * 2}px!important}body{display:flex!important;flex-wrap:wrap;align-items:center;align-content:center;justify-content:center;gap:${GAP_PX}px;box-sizing:border-box;min-height:100vh;margin:0!important;padding:${PADDING_PX}px!important;background:transparent!important}`;
+};
+
+export const CANVAS_CSS = canvasCss();
 
 const nameOfFile = (file) => file.split('/').pop().replace(/\.[^.]+$/, '');
 const attrsOf = (element) => Object.fromEntries([...element.attributes].filter(({ name }) => name !== SOURCE_ATTR).map(({ name, value }) => [name, value]));
@@ -137,8 +145,8 @@ const pathFrom = (root, element) => {
   return path;
 };
 
-const documentOf = ({ htmlAttrs, bodyAttrs, head, body }) =>
-  `<!doctype html><html${attrText(htmlAttrs)}><head><meta charset="utf-8">${head}<style id="${CANVAS_ID}">${CANVAS_CSS}</style></head><body${attrText(bodyAttrs)}>${body}</body></html>`;
+const documentOf = ({ htmlAttrs, bodyAttrs, head, body }, scheme) =>
+  `<!doctype html><html${attrText(htmlAttrs)}><head><meta charset="utf-8">${head}<style id="${CANVAS_ID}">${canvasCss(scheme)}</style></head><body${attrText(bodyAttrs)}>${body}</body></html>`;
 
 function setAttrs(element, attrs) {
   for (const { name } of [...element.attributes]) {
@@ -175,6 +183,7 @@ export function focusTab(win, { install, prepare, report }) {
   let loaded = false;
   let timer = null;
   let mode = FocusMode.Snapshot;
+  let scheme = DEFAULT_SCHEME;
   let visible = true;
   let why = null;
   const failed = new Map();
@@ -188,7 +197,7 @@ export function focusTab(win, { install, prepare, report }) {
     if (loaded) {
       patch(frame.contentDocument, last, parts);
     } else {
-      frame.srcdoc = documentOf(parts);
+      frame.srcdoc = documentOf(parts, scheme);
     }
     last = parts;
   }
@@ -196,13 +205,13 @@ export function focusTab(win, { install, prepare, report }) {
   function create(parts, mountUrl) {
     frame = win.document.createElement('iframe');
     frame.id = FRAME_ID;
-    frame.style.cssText = `position:fixed;inset:0;width:100%;height:100%;border:0;z-index:${LAYER};background:${CHECKER_LIGHT}`;
+    frame.style.cssText = `position:fixed;inset:0;width:100%;height:100%;border:0;z-index:${LAYER};background:${(SCHEMES[scheme] ?? SCHEMES[DEFAULT_SCHEME]).base}`;
     const mine = frame;
     mode = mountUrl ? FocusMode.Mount : FocusMode.Snapshot;
     if (mountUrl) {
       mine.setAttribute('src', mountUrl);
     } else {
-      mine.srcdoc = documentOf(parts);
+      mine.srcdoc = documentOf(parts, scheme);
     }
     mine.addEventListener('load', () => {
       if (frame === mine && mode === FocusMode.Mount && !mine.contentWindow[NESTED_HOST]) {
@@ -213,6 +222,7 @@ export function focusTab(win, { install, prepare, report }) {
         loaded = true;
         if (mode === FocusMode.Mount) {
           carryPage(win.document, mine.contentDocument);
+          mine.contentDocument.getElementById(CANVAS_ID)?.replaceChildren(canvasCss(scheme));
         }
         install(mine.contentWindow);
       }
@@ -285,6 +295,19 @@ export function focusTab(win, { install, prepare, report }) {
     close() {
       drop();
       wanted = null;
+    },
+    canvas(next) {
+      scheme = next;
+      const style = frame?.contentDocument?.getElementById(CANVAS_ID);
+      if (style) {
+        style.textContent = canvasCss(scheme);
+      }
+      if (frame) {
+        frame.style.background = (SCHEMES[scheme] ?? SCHEMES[DEFAULT_SCHEME]).base;
+      }
+      if (frame && mode === FocusMode.Snapshot && !loaded) {
+        frame.srcdoc = documentOf(last, scheme);
+      }
     },
     twin(element) {
       const root = frame?.contentDocument?.querySelector(`[${SOURCE_ATTR}=${JSON.stringify(last?.rootAttr)}]`);

@@ -25,6 +25,36 @@ describe('focus tab', () => {
     expect(frame()!.srcdoc).not.toContain('Footer');
   });
 
+  it('paints the canvas dark when the view asks for the dark scheme, and light again after', () => {
+    const { send, frame } = bridged();
+    send({ type: 'feega:focus', source: 'src/Card.tsx:5:7', index: 0 });
+    const canvas = () => frame()!.srcdoc.match(/<style id="feega-focus-canvas">([^<]*)<\/style>/)![1];
+    const light = canvas();
+
+    send({ type: 'feega:focus-canvas', scheme: 'dark' });
+    const dark = frame()!.srcdoc.match(/<style id="feega-focus-canvas">([^<]*)<\/style>/)![1];
+
+    expect(dark).not.toBe(light);
+    expect(dark).toContain('#1c1c20');
+    send({ type: 'feega:focus-canvas', scheme: 'light' });
+    expect(canvas()).toBe(light);
+  });
+
+  it('keeps the scheme when another instance opens', () => {
+    const { send, frame } = bridged();
+    send({ type: 'feega:focus-canvas', scheme: 'dark' });
+    send({ type: 'feega:focus', source: 'src/Card.tsx:5:7', index: 1 });
+
+    expect(frame()!.srcdoc).toContain('#1c1c20');
+  });
+
+  it('draws a subtle checker darker than the old light one', () => {
+    const { send, frame } = bridged();
+    send({ type: 'feega:focus', source: 'src/Card.tsx:5:7', index: 0 });
+
+    expect(frame()!.srcdoc).not.toContain('#f4f4f6');
+  });
+
   it('swaps the instance when another one is asked for', () => {
     const { send, frame } = bridged();
     send({ type: 'feega:focus', source: 'src/Card.tsx:5:7', index: 0 });

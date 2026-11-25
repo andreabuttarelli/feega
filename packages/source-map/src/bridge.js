@@ -24,6 +24,7 @@ export const TREE = 'feega:tree';
 export const TREE_RESULT = 'feega:tree:result';
 export const HIDE = 'feega:hide';
 export const FOCUS = 'feega:focus';
+export const FOCUS_CANVAS = 'feega:focus-canvas';
 export { FOCUSED };
 export const PALETTE = 'feega:palette';
 export const PALETTE_RESULT = 'feega:palette:result';
@@ -120,6 +121,7 @@ export function installBridge(win, { nested = false, emit = null, twin = null } 
     [PALETTE]: () => reply({ type: PALETTE_RESULT, ...paletteOf(doc), missing: missingFontsOf(doc) }),
     [HIDE]: (request) => hidePreview(doc, request.source, request.hidden),
     [FOCUS]: (request) => (request.source === null ? tab.close() : reply({ type: FOCUSED, ...tab.open(request) })),
+    [FOCUS_CANVAS]: (request) => tab.canvas(request.scheme),
     [LEAVE]: () => scroll.leave(),
     [TRACK]: (request) => tracker.follow(request.slot, request.source, request.index),
     [TREE]: () => {
