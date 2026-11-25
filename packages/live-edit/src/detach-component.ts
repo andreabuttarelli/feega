@@ -1,15 +1,14 @@
-import { offsetOf, type LiveAt } from './class-patch';
+import type { LiveAt } from './class-patch';
 import type { ReadFile } from './files';
 import type { Structured } from './move-into';
 import { addImport } from './add-import';
 import { loopsAt } from './loop-array';
-import { hiddenOut, spanOf } from './move-node';
+import { spanOf } from './move-node';
+import { baseOf, escaped, kebab, locateUsage, type Which } from './usage-tag';
 
-export type Which = { index: number; count: number };
+export type { Which };
 
 export type DetachAsk = { element: LiveAt; usage: LiveAt; which?: Which };
-
-type Binding = { local: string; named: boolean; statement: string; quote: string; specifier: string };
 
 type Renamer = (source: string, from: string, to: string) => string | null;
 
@@ -17,13 +16,9 @@ const REFUSED_KIND = 'detach works on React, Svelte, Vue and Astro components';
 const ROUTE_FILES = new Set(['index', 'page', '+page', 'layout', '+layout', '_app', 'root']);
 const ROOT_FOLDERS = new Set(['', 'src', 'app', 'pages', 'routes', 'components']);
 const HOME_NAME = 'Home';
-const IMPORT = /import\s+(?:(\w+)\s*,?\s*)?(?:\{([^}]*)\}\s*)?from\s*(['"])([^'"]+)\3;?/g;
 
-const kebab = (name: string) => name.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
 const pascal = (text: string) => text.split(/[^a-zA-Z0-9]+/).filter(Boolean).map((w) => w[0].toUpperCase() + w.slice(1)).join('');
-const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const extOf = (file: string) => file.slice(file.lastIndexOf('.'));
-const baseOf = (file: string) => file.slice(file.lastIndexOf('/') + 1, file.lastIndexOf('.'));
 const dirOf = (file: string) => file.slice(0, file.lastIndexOf('/') + 1);
 
 const REACT_DECLARATIONS = (from: string) => [
@@ -62,24 +57,6 @@ async function freeName(read: ReadFile, dir: string, from: string, parent: strin
   }
 }
 
-function bindingOf(source: string, name: string): Binding | null {
-  for (const m of source.matchAll(IMPORT)) {
-    const specifier = m[4];
-    const last = specifier.slice(specifier.lastIndexOf('/') + 1).replace(/\.[^.]+$/, '');
-    if (last !== name) {
-      continue;
-    }
-    if (m[1]) {
-      return { local: m[1], named: false, statement: m[0], quote: m[3], specifier };
-    }
-    const entry = m[2]?.split(',').map((s) => s.trim()).find((s) => s === name);
-    if (entry) {
-      return { local: name, named: true, statement: m[0], quote: m[3], specifier };
-    }
-  }
-  return null;
-}
-
 const nameInSpecifier = (specifier: string, from: string, to: string) => specifier.replace(new RegExp(`${escaped(from)}(?=(\\.[^./]+)?$)`), to);
 
 function rewriteUsage(source: string, hidden: string, tagAt: number, local: string, to: string): string {
@@ -100,32 +77,19 @@ export async function detachComponent(read: ReadFile, ask: DetachAsk): Promise<S
     return { ok: false, reason: `${element.file}: ${REFUSED_KIND}` };
   }
 
-  const [component, page] = await Promise.all([read(element.file), read(usage.file)]);
-  if (component === null || page === null) {
-    return { ok: false, reason: `${component === null ? element.file : usage.file}: cannot read the file` };
+  const component = await read(element.file);
+  if (component === null) {
+    return { ok: false, reason: `${element.file}: cannot read the file` };
   }
 
   const from = baseOf(element.file);
+  const located = await locateUsage(read, element.file, usage, which);
+  if (!located.ok) {
+    return located;
+  }
+
+  const { page, hidden, binding, tagAt } = located.found;
   const refuse = (reason: string): Structured => ({ ok: false, reason: `${usage.file}: ${reason}` });
-  const binding = bindingOf(page, from);
-  if (!binding) {
-    return refuse(`${from} is not imported straight from its file (a re-export?)`);
-  }
-
-  const hidden = hiddenOut(page);
-  const parent = spanOf(hidden, offsetOf(hidden, usage));
-  if (!parent) {
-    return refuse('the element is not where the page says');
-  }
-
-  const tags = new RegExp(`<(?:${escaped(binding.local)}|${escaped(kebab(binding.local))})(?=[\\s/>])`, 'g');
-  const inside = [...hidden.slice(parent.start + 1, parent.end).matchAll(tags)];
-  const chosen = inside.length === 1 ? inside[0] : which && which.count === inside.length ? inside[which.index] : undefined;
-  if (!chosen) {
-    return refuse(inside.length ? `${inside.length} <${binding.local}> usages in this element: cannot tell which one this is` : `no <${binding.local}> usage in this element (a dynamic component?)`);
-  }
-
-  const tagAt = parent.start + 1 + chosen.index;
   if (loopsAt(hidden, tagAt).length) {
     return refuse('the usage is rendered in a loop: every iteration shares it');
   }

@@ -1,8 +1,8 @@
 import { reviveProps, runMount } from './mount-runtime.js';
+import { gridOf } from './variant-grid.js';
 
 const GAP_PX = 24;
 const CAPTION_PX = 11;
-const CELL_GAP_PX = 8;
 
 function element(doc, tag, css, text = '') {
   const node = doc.createElement(tag);
@@ -16,15 +16,22 @@ function cellsOf(doc, container, current) {
   if (!current.variants) {
     return [{ host: container, props: reviveProps(current.props) }];
   }
-  const grid = element(doc, 'div', `display:flex;flex-wrap:wrap;gap:${GAP_PX}px;align-items:flex-start`);
+  const { columnName, columns, rows } = gridOf(current.variants);
+  const grid = element(doc, 'div', `display:grid;grid-template-columns:max-content repeat(${columns.length},1fr);gap:${GAP_PX}px;align-items:center;justify-items:start;width:max-content`);
+  const caption = (text) => element(doc, 'span', `font:${CAPTION_PX}px system-ui;color:#888;white-space:nowrap`, text);
   container.append(grid);
-  return current.variants.map((variant) => {
-    const cell = element(doc, 'div', `display:flex;flex-direction:column;align-items:flex-start;gap:${CELL_GAP_PX}px`);
-    const host = element(doc, 'div', '');
-    cell.dataset.feegaVariant = variant.label;
-    cell.append(element(doc, 'span', `font:${CAPTION_PX}px system-ui;color:#666`, variant.label), host);
-    grid.append(cell);
-    return { host, props: reviveProps({ ...current.props, ...variant.props }) };
+  grid.append(element(doc, 'span', ''), ...columns.map((column) => caption(`${columnName}=${column}`)));
+  return rows.flatMap((row) => {
+    grid.append(caption(row.header));
+    return row.cells.map((variant) => {
+      const host = element(doc, 'div', '');
+      grid.append(host);
+      if (!variant) {
+        return null;
+      }
+      host.dataset.feegaVariant = variant.label;
+      return { host, props: reviveProps({ ...current.props, ...variant.props }) };
+    }).filter(Boolean);
   });
 }
 

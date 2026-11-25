@@ -18,6 +18,8 @@ function fiberOf(element) {
 
 const COMPONENT_TAGS = new Set([0, 1, 11, 14, 15]);
 const FUNCTION_MARK = { $fn: true };
+const JSX_MARK = { $jsx: true };
+const isElement = (value) => Boolean(value) && typeof value === 'object' && Boolean(value.$$typeof);
 const dateMark = (date) => ({ $date: date.toISOString() });
 const MAX_PROP_DEPTH = 4;
 
@@ -63,7 +65,7 @@ function plainProp(value) {
 }
 
 const plainProps = (props) => Object.fromEntries(Object.entries(props ?? {}).flatMap(([name, value]) => {
-  const kept = plainProp(value);
+  const kept = isElement(value) ? JSX_MARK : plainProp(value);
   return kept === undefined ? [] : [[name, kept]];
 }));
 

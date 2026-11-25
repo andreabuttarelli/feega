@@ -20,6 +20,12 @@ describe('preview gate', () => {
     expect(applyMessage({ ask, reason: '', files })).toEqual({ kind: ToHost.Edit, ask, gate: Gate.Apply });
   });
 
+  it('Apply su props rimanda la stessa scrittura saltando il controllo', () => {
+    const props = { component: 'src/Card.tsx', usage: 'src/Home.tsx:4:3', set: { title: 'New' }, remove: [] };
+
+    expect(applyMessage(heldOf({ kind: ToView.PropsPreview, ask: props, reason: 'x', files }))).toEqual({ kind: ToHost.ApplyProps, ask: props, gate: Gate.Apply });
+  });
+
   it('Non chiedere piu spegne l anteprima', () => {
     expect(muteMessage()).toEqual({ kind: ToHost.Setting, key: SettingKey.PreviewUnknown, value: false });
   });

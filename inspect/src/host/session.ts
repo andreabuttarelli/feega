@@ -3,11 +3,12 @@ import { readFile, rm } from 'node:fs/promises';
 import { join, relative, resolve } from 'node:path';
 import { appsIn } from '@feega/dev-run/run-plan';
 import { AddKind, type AddPlace } from '@feega/live-edit/add-node';
-import { liveAtOf } from '@feega/live-edit/live-ask';
+import { inside, liveAtOf, reader } from '@feega/live-edit/live-ask';
+import { readProps } from '@feega/live-edit/read-props';
 import { LiveProp } from '@feega/live-edit/live-fields';
 import { StructureOp } from '@feega/live-edit/structure';
 import type { SupportItem } from '../support';
-import { AccountState, Gate, ImpactKind, Onboarding, OnboardingOutcome, OnboardingStep, ServerAction, ServerState, Styling, ToHost, ToView, WebviewUsage, type Author, type Authored, type EditAsk, type ImpactAsk, type HostMessage, type Pick, type Prefs, type ViewMessage } from '../messages';
+import { AccountState, Gate, ImpactKind, Onboarding, OnboardingOutcome, OnboardingStep, ServerAction, ServerState, Styling, ToHost, ToView, WebviewUsage, type Author, type Authored, type EditAsk, type ApplyAsk, type ImpactAsk, type ReadAsk, type HostMessage, type Pick, type Prefs, type ViewMessage } from '../messages';
 import { SettingKey, StylingChoice } from '../settings';
 import { SignInEnd, signIn } from './sign-in';
 import { addPlugin } from './add-plugin';
@@ -492,6 +493,31 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     return true;
   }
 
+  async function propsHeld(ask: ApplyAsk): Promise<boolean> {
+    if (platform.settings()[SettingKey.PreviewUnknown] === false) {
+      return false;
+    }
+    const plan = await edits.propsPlan(ask);
+    if (!plan.ok || !plan.cautions.length) {
+      return false;
+    }
+    await post({ kind: ToView.PropsPreview, ask, reason: plan.cautions.join('; '), files: diffOf([plan.change]), by: author });
+    return true;
+  }
+
+  async function usagePropsShown(ask: ReadAsk) {
+    const usage = liveAtOf(ask.usage);
+    const out = usage && inside(root, usage.file) ? await readProps(reader(root), { component: ask.component, usage, which: ask.which }) : null;
+    await post({ kind: ToView.UsageProps, component: ask.component, values: out?.ok ? out.values : {}, dynamic: out?.ok ? out.dynamic : [], spread: out?.ok ? out.spread : false });
+  }
+
+  async function applyProps(ask: ApplyAsk, gate = Gate.Ask): Promise<Written | null> {
+    if (gate === Gate.Ask && (await propsHeld(ask))) {
+      return null;
+    }
+    return edits.applyProps(ask).then((out) => edited(out, null));
+  }
+
   async function edit(ask: EditAsk, gate = Gate.Ask): Promise<Written | null> {
     if (gate === Gate.Ask && (await held(ask))) {
       return null;
@@ -781,6 +807,8 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.Wiring]: (m) => wiringShown(m.at, m.instance),
     [ToHost.Link]: (m) => edits.link(m.at, m.edit, m.instance).then((out) => edited(out, null)),
     [ToHost.Attribute]: (m) => edits.attribute(m.at, m.name, m.value).then((out) => edited(out, null)),
+    [ToHost.ApplyProps]: (m) => applyProps(m.ask, m.gate),
+    [ToHost.ReadProps]: (m) => usagePropsShown(m.ask),
     [ToHost.Go]: (m) => edits.go(m.at, m.ask).then((out) => edited(out, null)),
     [ToHost.Selected]: (m) => (m.at && usage?.track(UsageKind.ElementSelected), void published?.then((bridge) => bridge?.touch()), sharing.hostSelected(m.at), syncSelection(m.at)),
     [ToHost.Context]: (m) => void (agentContext = m.text),
