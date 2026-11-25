@@ -14,7 +14,7 @@ const BAD_REQUEST = 400;
 const PAYLOAD_TOO_LARGE = 413;
 const TOO_MANY_REQUESTS = 429;
 
-export const PRODUCT_EVENTS = ['project_detected', 'editor_opened', 'element_selected', 'edit_reverted', 'breakpoint_switch', 'state_switch', 'copy_for_agent', 'focus_opened', 'ai_agent_chosen', 'ai_session_started', 'ai_chat_created', 'ai_message_sent', 'ai_first_response', 'ai_tool_call', 'ai_permission', 'ai_cancel', 'ai_config_changed', 'ai_session_error', 'ai_session_ended', 'sign_in_prompted', 'share_action', 'cloud_action', 'mcp_tool_call', 'error_host', 'error_webview'] as const;
+export const PRODUCT_EVENTS = ['project_detected', 'editor_opened', 'element_selected', 'edit_reverted', 'breakpoint_switch', 'state_switch', 'copy_for_agent', 'focus_opened', 'focus_props_changed', 'focus_variants_shown', 'ai_agent_chosen', 'ai_session_started', 'ai_chat_created', 'ai_message_sent', 'ai_first_response', 'ai_tool_call', 'ai_permission', 'ai_cancel', 'ai_config_changed', 'ai_session_error', 'ai_session_ended', 'sign_in_prompted', 'share_action', 'cloud_action', 'mcp_tool_call', 'error_host', 'error_webview'] as const;
 const EVENTS = ['install', 'opened', 'session_start', 'preview_ready', 'first_edit', 'edit', 'session_end', 'sign_in', 'sign_out', 'session_resume', 'onboarding_started', 'onboarding_step', 'onboarding_finished', 'onboarding_skipped', 'setup_applied', 'setup_failed', 'skill_hint_shown', 'skill_installed', 'library_insert', 'plugin_installed', 'support_action', ...PRODUCT_EVENTS] as const;
 const FRAMEWORKS = ['sveltekit', 'nuxt', 'astro', 'react-router', 'next', 'gatsby', 'angular', 'cra', 'vite', 'generic'] as const;
 const EDIT_KINDS = ['text', 'style', 'image', 'attribute', 'structure', 'template', 'other'] as const;
@@ -34,6 +34,9 @@ const OUTCOMES = ['kept', 'reverted', 'allow', 'reject', 'viewed', 'completed', 
 const CONFIG_CATEGORIES = ['model', 'thought_level'] as const;
 const AREAS = ['host', 'webview', 'ai', 'edit', 'preview', 'library', 'cloud', 'mcp', 'other'] as const;
 const VARIANTS = ['focus', 'variant'] as const;
+const FOCUS_MODES = ['mount', 'snapshot'] as const;
+const CONTROL_KINDS = ['select', 'toggle', 'text', 'number', 'children'] as const;
+const LIBRARY_CATEGORIES = ['section', 'component', 'app'] as const;
 const DEVICES = ['desktop', 'web', 'cli'] as const;
 
 const CI_HEADER = 'x-feega-ci';
@@ -61,6 +64,9 @@ const productFields = {
   category: z.enum(CONFIG_CATEGORIES).optional(),
   area: z.enum(AREAS).optional(),
   variant: z.enum(VARIANTS).optional(),
+  mode: z.enum(FOCUS_MODES).optional(),
+  control: z.enum(CONTROL_KINDS).optional(),
+  library_category: z.enum(LIBRARY_CATEGORIES).optional(),
   agent: identifier.optional(),
   library_item: identifier.optional(),
   tool: identifier.optional(),
@@ -73,7 +79,8 @@ const productFields = {
   message_count: count.optional(),
   chat_count: count.optional(),
   live_count: count.optional(),
-  tool_count: count.optional()
+  tool_count: count.optional(),
+  prop_count: count.optional()
 };
 
 export const PRODUCT_COLUMNS = Object.keys(productFields);
