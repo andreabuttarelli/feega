@@ -911,3 +911,84 @@ pre {
 .update-pill:hover {
   border-color: #fff;
 }
+
+.form {
+  gap: 0;
+}
+.form .field {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 22px 26px;
+}
+.form .field + .field {
+  border-top: 1px solid var(--sx-line);
+}
+.form .title {
+  font-size: 18px;
+  letter-spacing: -0.02em;
+}
+.form .desc {
+  font-size: 14px;
+  color: var(--sx-ink-3);
+}
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.choice {
+  height: 38px;
+  padding: 0 16px;
+  border: 1px solid rgb(255 255 255 / 0.3);
+  border-radius: 999px;
+  background: transparent;
+  color: #fff;
+  font-size: 15px;
+  cursor: pointer;
+}
+.choice:hover {
+  border-color: #fff;
+}
+.choice.on {
+  background: #fff;
+  color: #000;
+  border-color: #fff;
+}
+.text-input {
+  width: 320px;
+  height: 38px;
+  padding: 0 14px;
+  border: 1px solid rgb(255 255 255 / 0.3);
+  border-radius: 999px;
+  background: transparent;
+  color: #fff;
+  font-size: 15px;
+  user-select: text;
+}
+.text-input:focus-visible {
+  outline: none;
+  border-color: #fff;
+}
+.line.sub {
+  margin-top: 6px;
+  max-width: 520px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--sx-ink-3);
+}
+.invite {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin-right: 12px;
+  font-size: 13px;
+  color: var(--sx-ink-2);
+}
+.invite .text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -29,7 +29,7 @@ vi.mock('vscode', () => ({
 const { vsCodePlatform } = await import('./vscode-platform');
 
 function vsCode(): [Platform, Wire] {
-  const context = { extension: { packageJSON: { version: '1.2.3' } }, workspaceState: { get: (k: string) => memory.state.get(k), update: async (k: string, v: unknown) => void memory.state.set(k, v) } };
+  const context = { globalStorageUri: { fsPath: '/storage' }, extension: { packageJSON: { version: '1.2.3' } }, workspaceState: { get: (k: string) => memory.state.get(k), update: async (k: string, v: unknown) => void memory.state.set(k, v) } };
   const panel = {
     viewColumn: 1,
     webview: { postMessage: async (m: unknown) => (memory.sent.push(m), true), onDidReceiveMessage: (h: (m: unknown) => void) => (memory.handlers.push(h), { dispose: () => undefined }) }
@@ -109,10 +109,41 @@ describe('the node platform on disk', () => {
     const cache = mkdtempSync(join(tmpdir(), 'feega-cache-'));
     const make = () => nodePlatform({ root, launcher: '', version: '', transport: { send: () => undefined, receive: () => undefined }, print: () => undefined, launch: async () => false, env: { XDG_CACHE_HOME: cache } });
 
-    await make().store(Stored.Prefs, { size: 'phone' });
+    await make().store(Stored.App, 'web');
 
     expect(existsSync(join(root, '.feega/state.json'))).toBe(false);
-    expect(make().stored(Stored.Prefs)).toEqual({ size: 'phone' });
+    expect(make().stored(Stored.App)).toBe('web');
+  });
+
+  it('forgets the edit history when the editor restarts', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'feega-history-'));
+    const cache = mkdtempSync(join(tmpdir(), 'feega-cache-'));
+    const make = () => nodePlatform({ root, launcher: '', version: '', transport: { send: () => undefined, receive: () => undefined }, print: () => undefined, launch: async () => false, env: { XDG_CACHE_HOME: cache } });
+    const running = make();
+
+    await running.store(Stored.History, { steps: [1], undone: [] });
+
+    expect(running.stored(Stored.History)).toEqual({ steps: [1], undone: [] });
+    expect(make().stored(Stored.History)).toBeUndefined();
+  });
+
+  it('starts with the full preview width but keeps the panel widths', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'feega-prefs-'));
+    const cache = mkdtempSync(join(tmpdir(), 'feega-cache-'));
+    const make = () => nodePlatform({ root, launcher: '', version: '', transport: { send: () => undefined, receive: () => undefined }, print: () => undefined, launch: async () => false, env: { XDG_CACHE_HOME: cache } });
+
+    await make().store(Stored.Prefs, { size: 'phone', custom: 700, barClosed: false, barWidth: 320 });
+
+    expect(make().stored(Stored.Prefs)).toEqual({ size: 'full', custom: null, barClosed: false, barWidth: 320 });
+  });
+
+  it('serves the library catalog that ships next to the launcher', async () => {
+    const dist = mkdtempSync(join(tmpdir(), 'feega-dist-'));
+    mkdirSync(join(dist, 'launcher'));
+    writeFileSync(join(dist, 'library.json'), JSON.stringify({ items: [], tokens: '' }));
+    const platform = nodePlatform({ root: '/app', launcher: join(dist, 'launcher'), version: '', env: {}, transport: { send: () => undefined, receive: () => undefined }, print: () => undefined });
+
+    expect(await platform.library?.()).toEqual({ items: [], tokens: '' });
   });
 
   it('opens a source in VS Code at its line, else prints where it is', async () => {

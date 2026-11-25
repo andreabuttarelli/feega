@@ -3,7 +3,7 @@ import { writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { Onboarding, ToHost, ToView, type HostMessage, type ViewMessage } from '../messages';
+import { Onboarding, OnboardingOutcome, ToHost, ToView, type HostMessage, type ViewMessage } from '../messages';
 import { deviceOnboardingStore, fileOnboardingStore, globalStateOnboardingStore, memoryOnboardingStore, type OnboardingStore } from './onboarding';
 import type { Platform } from './platform';
 import { inspectSession } from './session';
@@ -86,7 +86,7 @@ describe('onboarding in the session', () => {
 
   it('done is remembered, so the next ready stays quiet', async () => {
     const t = setup();
-    t.send({ kind: ToHost.OnboardingDone });
+    t.send({ kind: ToHost.OnboardingDone, outcome: OnboardingOutcome.Skipped });
     await t.until(() => false);
     t.send({ kind: ToHost.Ready });
     await t.until(() => states(t.sent).length > 0);

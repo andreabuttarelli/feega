@@ -1,0 +1,10 @@
+{
+  "name": "@feega/pixel-icons",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    "./pixel": "./src/pixel.ts",
+    "./Pixel.svelte": "./src/Pixel.svelte"
+  }
+}

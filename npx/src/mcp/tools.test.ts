@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { CloudError, CloudFailure, type CloudApi, type CloudComment } from '../../../inspect/src/host/cloud-api';
 import type { ShareHost, ShareRequest } from '../../../inspect/src/host/share-port';
 import type { Editors } from './editors';
+import { localTools } from './local-tools';
 import { BILLING_URL, mcpServer } from './server';
 
 const comment = (over: Partial<CloudComment> = {}): CloudComment => ({ id: 'c1', sessionId: 's1', authorId: 'u1', authorName: 'Ada', body: 'Tighter padding', selector: 'div.card', sourceFile: 'src/Card.svelte', sourceLine: 4, sourceCol: 2, parentId: null, createdAt: '2026-11-21T10:00:00Z', resolvedAt: null, resolvedBy: null, ...over });
@@ -33,7 +34,7 @@ function rig(over: { comments?: CloudComment[]; api?: Partial<CloudApi>; shareFa
     ...over.api
   } as unknown as CloudApi;
 
-  return { log, started, connect: connect(mcpServer({ api, share, editors, cwd: '/work/shop' }, '0.0.0')) };
+  return { log, started, connect: connect(mcpServer({ api, share, editors, cwd: '/work/shop' }, '0.0.0', localTools({ registry: { list: () => [], save: () => undefined, drop: () => undefined }, send: fetch, cwd: '/work/shop' }))) };
 }
 
 async function connect(server: ReturnType<typeof mcpServer>) {
@@ -48,12 +49,12 @@ const jsonOf = (result: unknown) => JSON.parse(textOf(result));
 const call = async (client: Client, name: string, args: Record<string, unknown> = {}) => client.callTool({ name, arguments: args });
 
 describe('feega mcp tools', () => {
-  it('lists the five tools with json schemas', async () => {
+  it('lists the local and the cloud tools with json schemas', async () => {
     const client = await rig().connect;
 
     const { tools } = await client.listTools();
 
-    expect(tools.map((t) => t.name).sort()).toEqual(['feega_comments', 'feega_resolve', 'feega_share', 'feega_snapshot', 'feega_stop']);
+    expect(tools.map((t) => t.name).sort()).toEqual(['feega_changes', 'feega_comments', 'feega_context', 'feega_editors', 'feega_resolve', 'feega_review', 'feega_screenshot', 'feega_selection', 'feega_share', 'feega_snapshot', 'feega_stop']);
     expect(tools.find((t) => t.name === 'feega_share')!.inputSchema.properties).toHaveProperty('visitorsCanEdit');
     expect(tools.find((t) => t.name === 'feega_snapshot')!.inputSchema.required).toEqual(['sessionId', 'name']);
   });
@@ -166,6 +167,21 @@ describe('feega mcp tools', () => {
 
     expect(result.isError).toBe(true);
     expect(textOf(result)).toContain('nope');
+  });
+
+  it('tells the agent the latest verdict and what is still unresolved', async () => {
+    const review = { status: 'changes_requested', revision: { number: 2, summary: 'Round two', verdicts: [{ reviewerName: 'Vera', verdict: 'changes_requested', note: 'Tighter' }] }, openComments: [comment({ id: 'c9', revisionId: 'r2' })] };
+    const client = await rig({ api: { review: async () => review } as unknown as Partial<CloudApi> }).connect;
+
+    const result = jsonOf(await call(client, 'feega_review', { sessionId: 's1' }));
+
+    expect(result).toMatchObject({ status: 'changes_requested', round: 2, summary: 'Round two', verdicts: [{ reviewer: 'Vera', verdict: 'changes_requested', note: 'Tighter' }], unresolved: [{ id: 'c9', place: 'src/Card.svelte:4:2' }] });
+  });
+
+  it('says nothing is under review before the first round', async () => {
+    const client = await rig({ api: { review: async () => ({ status: 'open', revision: null, openComments: [] }) } as unknown as Partial<CloudApi> }).connect;
+
+    expect(jsonOf(await call(client, 'feega_review', { sessionId: 's1' }))).toMatchObject({ status: 'open', round: null, unresolved: [] });
   });
 
   it('saves a named snapshot', async () => {

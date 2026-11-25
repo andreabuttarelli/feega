@@ -1,3 +1,4 @@
+import { publishLocal } from './local-bridge/publish';
 import { spawn } from 'node:child_process';
 import { mkdirSync, readFileSync } from 'node:fs';
 import { mkdtemp, writeFile } from 'node:fs/promises';
@@ -7,23 +8,30 @@ import { basename, dirname, join } from 'node:path';
 import { settingsWith, type SettingValue } from '../settings';
 import { pluginsRoot } from '@feega/plugin-store/registry';
 import { fileAccountStore, type AccountStore } from './account';
+import { machineAgents } from './agents';
 import { fileOnboardingStore, type OnboardingStore } from './onboarding';
+import { fileSupportStore, type SupportStore } from './support';
+import { catalogFile } from './library';
 import { openTarget } from './open-source';
-import type { Platform, Stored, Transport } from './platform';
+import { Stored, type Platform, type Transport } from './platform';
 import type { PluginsHost } from './plugins-session';
-import { Device, Editor, fileInstallStore, installIdOf, nodeUsageEnabled, type InstallStore } from './usage';
+import { HintSurface, nodeSkillHint } from './skill-hint';
+import { Device, Editor, fileFirstEdit, fileInstallStore, installOf, nodeUsageEnabled, type FirstEditFlag, type InstallStore } from './usage';
 
 const FEEGA_DIR = '.feega';
+const ADAPTERS_DIR = 'adapters';
 const SETTINGS_FILE = 'settings.json';
 const STATE_FILE = 'state.json';
 const CACHE_DIR = 'feega';
 const STATE_KEY_LENGTH = 16;
 const OPENERS: Partial<Record<NodeJS.Platform, string[]>> = { darwin: ['open'], win32: ['cmd', '/c', 'start', ''] };
 const LINUX_OPENER = ['xdg-open'];
+const SESSION_ONLY = new Set<string>([Stored.History]);
+const FULL_WIDTH = 'full';
 
 export type Launch = (command: string, args: string[]) => Promise<boolean>;
 
-export type NodeHost = { root: string; launcher: string; version: string; transport: Transport; print: (line: string) => void; launch?: Launch; env?: NodeJS.ProcessEnv; account?: AccountStore; onboarding?: OnboardingStore; install?: InstallStore; cloud?: Platform['cloud']; share?: Platform['share']; plugins?: PluginsHost };
+export type NodeHost = { root: string; launcher: string; version: string; transport: Transport; print: (line: string) => void; launch?: Launch; env?: NodeJS.ProcessEnv; account?: AccountStore; onboarding?: OnboardingStore; support?: SupportStore; install?: InstallStore; firstEdit?: FirstEditFlag; cloud?: Platform['cloud']; share?: Platform['share']; plugins?: PluginsHost };
 
 export const launchDetached: Launch = (command, args) =>
   new Promise((resolve) => {
@@ -40,18 +48,26 @@ const readJson = (path: string): Record<string, unknown> => {
   }
 };
 
-const stateDirFor = (root: string, env: NodeJS.ProcessEnv) => {
-  const key = createHash('sha256').update(root).digest('hex').slice(0, STATE_KEY_LENGTH);
-  return join(env.XDG_CACHE_HOME || join(homedir(), '.cache'), CACHE_DIR, key);
+const freshLaunch = (state: Record<string, unknown>): Record<string, unknown> => {
+  const prefs = state[Stored.Prefs];
+  return prefs && typeof prefs === 'object' ? { ...state, [Stored.Prefs]: { ...prefs, size: FULL_WIDTH, custom: null } } : state;
 };
 
-export function nodePlatform({ root, launcher, version, transport, print, launch = launchDetached, env = process.env, account = fileAccountStore(), onboarding = fileOnboardingStore(), install = fileInstallStore(), cloud, share, plugins = { root: pluginsRoot(), dev: () => [] } }: NodeHost): Platform {
+const cacheRoot = (env: NodeJS.ProcessEnv) => join(env.XDG_CACHE_HOME || join(homedir(), '.cache'), CACHE_DIR);
+
+const stateDirFor = (root: string, env: NodeJS.ProcessEnv) => {
+  const key = createHash('sha256').update(root).digest('hex').slice(0, STATE_KEY_LENGTH);
+  return join(cacheRoot(env), key);
+};
+
+export function nodePlatform({ root, launcher, version, transport, print, launch = launchDetached, env = process.env, account = fileAccountStore(), onboarding = fileOnboardingStore(), support = fileSupportStore(), install = fileInstallStore(), firstEdit = fileFirstEdit(), cloud, share, plugins = { root: pluginsRoot(), dev: () => [] } }: NodeHost): Platform {
   const dir = join(root, FEEGA_DIR);
   const settingsPath = join(dir, SETTINGS_FILE);
   const stateDir = stateDirFor(root, env);
   const statePath = join(stateDir, STATE_FILE);
   const settings = readJson(settingsPath) as Record<string, SettingValue>;
-  const state = readJson(statePath);
+  const state = freshLaunch(readJson(statePath));
+  const session = new Map<string, unknown>();
 
   const save = async (path: string, value: object) => {
     mkdirSync(dirname(path), { recursive: true });
@@ -89,8 +105,15 @@ export function nodePlatform({ root, launcher, version, transport, print, launch
     ...transport,
     settings: () => settingsWith((row) => settings[row.key]),
     setSetting: (key, value) => ((settings[key] = value), save(settingsPath, settings)),
-    stored: <T>(key: Stored) => state[key] as T | undefined,
-    store: (key, value) => ((state[key] = value), save(statePath, state)),
+    stored: <T>(key: Stored) => (SESSION_ONLY.has(key) ? session.get(key) : state[key]) as T | undefined,
+    store: async (key, value) => {
+      if (SESSION_ONLY.has(key)) {
+        session.set(key, value);
+        return;
+      }
+      state[key] = value;
+      await save(statePath, state);
+    },
     log: (line) => print(line.trimEnd()),
     showLogs: () => print('feega: the dev server logs are in this terminal'),
     openSource: (from, at) => {
@@ -108,14 +131,21 @@ export function nodePlatform({ root, launcher, version, transport, print, launch
     sourceControl: () => print(`feega: review the changes with \`git -C ${root} diff\``),
     notify: (text) => print(`feega: ${text}`),
     warn: async (text) => (print(`feega: ${text}`), false),
+    library: catalogFile(join(dirname(launcher), 'library.json')),
     account,
     cloud,
     share,
     plugins,
     onboarding,
+    support,
+    skillHint: nodeSkillHint(HintSurface.Terminal),
+    localBridge: publishLocal,
+    adapterDir: join(cacheRoot(env), ADAPTERS_DIR),
+    agents: () => machineAgents(),
     usage: {
-      identity: () => ({ installId: installIdOf(install), version, editor: Editor.Npx, os: process.platform, arch: process.arch, device: Device.Cli }),
-      enabled: () => nodeUsageEnabled(env, settingsWith((row) => settings[row.key]))
+      identity: () => ({ ...installOf(install), version, editor: Editor.Npx, os: process.platform, arch: process.arch, device: Device.Cli }),
+      enabled: () => nodeUsageEnabled(env, settingsWith((row) => settings[row.key])),
+      firstEdit
     }
   };
 }

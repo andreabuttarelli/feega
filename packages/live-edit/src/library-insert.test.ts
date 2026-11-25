@@ -99,9 +99,18 @@ describe('libraryInsert on SvelteKit', () => {
     expect(Object.keys(c)).toHaveLength(4);
   });
 
-  it('reports the usage as the selection, after the import shifted the lines', async () => {
+  it('selects the root element of the inserted component', async () => {
     const out = await libraryInsert(kit(), H1_SVELTE, AddPlace.After, ITEM, TOKENS);
-    expect(out.ok && out.selected).toEqual({ file: 'src/routes/+page.svelte', line: 7, col: 3 });
+    expect(out.ok && out.selected).toEqual({ file: 'src/lib/components/feega/Pricing.svelte', line: 1, col: 1 });
+  });
+
+  it.each([
+    ['React', 'src/components/feega/Pricing.tsx', 4, 10, 'src/App.tsx', TSX_PAGE, ['react', 'vite'], { file: 'src/App.tsx', line: 4, col: 7 }],
+    ['Vue', 'src/components/feega/Pricing.vue', 2, 3, 'src/App.vue', VUE_PAGE, ['vue', 'vite'], { file: 'src/App.vue', line: 3, col: 5 }],
+    ['Astro', 'src/components/feega/Pricing.astro', 4, 1, 'src/pages/index.astro', ASTRO_PAGE, ['astro'], { file: 'src/pages/index.astro', line: 6, col: 3 }]
+  ])('selects the root element on %s', async (_name, file, line, col, page, text, deps, at) => {
+    const out = await libraryInsert(files({ 'package.json': pkg(deps), [page]: text, 'src/app.css': '' }), at, AddPlace.After, ITEM, TOKENS);
+    expect(out.ok && out.selected).toEqual({ file, line, col });
   });
 
   it('adds the import to the existing instance script', async () => {

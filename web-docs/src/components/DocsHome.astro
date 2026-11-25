@@ -1,6 +1,7 @@
 ---
 import { getCollection } from 'astro:content';
 import Pixel from './Pixel.astro';
+import { PixelIcon } from './pixel';
 import { COVER_HEIGHT, COVER_WIDTH, coverUrl } from '../docs-pages.mjs';
 
 const START = [
@@ -9,18 +10,9 @@ const START = [
   { slug: 'editing/selecting-and-navigating', n: 3, tint: 'grey', blurb: 'Pick any element, move around the page and know what you are editing.' }
 ];
 
-const DIGITS: Record<number, string[]> = {
-  1: ['..#..', '.##..', '..#..', '..#..', '..#..', '..#..', '.###.'],
-  2: ['.###.', '#...#', '....#', '...#.', '..#..', '.#...', '#####'],
-  3: ['.###.', '#...#', '....#', '..##.', '....#', '#...#', '.###.']
-};
+const DIGITS: Record<number, PixelIcon> = { 1: PixelIcon.Digit1, 2: PixelIcon.Digit2, 3: PixelIcon.Digit3 };
 
-const ICONS: Record<string, string[]> = {
-  start: ['...#....', '..###...', '.#####..', '#######.', '..o.o...', '.o.o.o..', '........'],
-  editing: ['......##', '.....###', '....###.', '...###..', '..###...', '.##o....', '##......'],
-  stack: ['..bbbb..', '.b....b.', 'b..oo..b', 'b.oooo.b', 'b..oo..b', '.b....b.', '..bbbb..'],
-  help: ['..####..', '.##..##.', '.....##.', '....##..', '...##...', '........', '...##...']
-};
+const ICONS: Record<string, PixelIcon> = { start: PixelIcon.Start, editing: PixelIcon.Editing, stack: PixelIcon.Stack, help: PixelIcon.Help };
 
 const GROUPS = [
   { title: 'start here', icon: 'start', dirs: ['getting-started'] },
@@ -62,7 +54,7 @@ const groups = GROUPS.map((g) => ({
         start.map((s) => (
           <a class={`new-card is-${s.tint}`} href={`/${s.slug}/`}>
             <img class="thumb" src={coverUrl(s.slug, 'webp')} alt="" width={COVER_WIDTH} height={COVER_HEIGHT} loading="lazy" decoding="async" />
-            <Pixel rows={DIGITS[s.n]} size={8} />
+            <Pixel icon={DIGITS[s.n]} size={8} />
             <h2>{s.page!.data.title}</h2>
             <p>{s.blurb}</p>
           </a>
@@ -76,7 +68,7 @@ const groups = GROUPS.map((g) => ({
     {
       groups.map((g) => (
         <div class="group">
-          <h2 class="group-title"><Pixel rows={ICONS[g.icon]} size={4} />{g.title}</h2>
+          <h2 class="group-title"><Pixel icon={ICONS[g.icon]} size={4} />{g.title}</h2>
           <ul class="group-grid">
             {g.pages.map((p) => (
               <li>

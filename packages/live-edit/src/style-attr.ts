@@ -5,11 +5,15 @@ import type { TextWritten } from './literal-text';
 export type Css = Record<string, string>;
 
 const STYLE_LITERAL = /(\sstyle=)"([^"{}]*)"/;
+const JSX_STYLE_LITERAL = /(\sstyle=)\{\{([^{}]*)\}\}/;
+const JSX_ENTRY = /^\s*([A-Za-z]+|'--[\w-]+'):\s*'([^']*)'\s*$/;
+const CUSTOM = /^--/;
+const QUOTED = /^'(.*)'$/;
 const STYLE_ANY = /\sstyle=/;
 const JSX_FILE = /\.(t|j)sx$/;
 const REMOVED = '';
 
-const camel = (name: string) => name.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
+const camel = (name: string) => (CUSTOM.test(name) ? `'${name}'` : name.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase()));
 
 function declarations(text: string): Map<string, string> {
   const pairs = text
@@ -23,12 +27,28 @@ const cssText = (all: Map<string, string>) => [...all].map(([name, value]) => `$
 
 const jsxStyle = (css: Css) => `{{ ${Object.entries(css).map(([name, value]) => `${camel(name)}: '${value}'`).join(', ')} }}`;
 
+const kebab = (name: string) => (QUOTED.test(name) ? name.slice(1, -1) : name.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`));
+
+function jsxDeclarations(text: string): Map<string, string> | null {
+  const entries = text.split(',').filter((e) => e.trim()).map((e) => e.match(JSX_ENTRY));
+  if (entries.some((e) => !e)) {
+    return null;
+  }
+  return new Map(entries.map((e) => [kebab(e![1]), e![2]]));
+}
+
 function restyled(open: string, file: string, css: Css): string | null {
   const literal = open.match(STYLE_LITERAL);
   if (literal) {
     const all = declarations(literal[2]);
     Object.entries(css).forEach(([name, value]) => (value === REMOVED ? all.delete(name) : all.set(name, value)));
     return all.size ? open.replace(STYLE_LITERAL, `$1"${cssText(all)}"`) : open.replace(STYLE_LITERAL, '');
+  }
+  const jsx = open.match(JSX_STYLE_LITERAL);
+  const jsxAll = jsx ? jsxDeclarations(jsx[2]) : null;
+  if (jsx && jsxAll) {
+    Object.entries(css).forEach(([name, value]) => (value === REMOVED ? jsxAll.delete(name) : jsxAll.set(name, value)));
+    return jsxAll.size ? open.replace(JSX_STYLE_LITERAL, `$1${jsxStyle(Object.fromEntries(jsxAll))}`) : open.replace(JSX_STYLE_LITERAL, '');
   }
   if (STYLE_ANY.test(open)) {
     return null;

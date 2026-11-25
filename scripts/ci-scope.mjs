@@ -29,10 +29,13 @@ const NOTHING = { fixtures: [], fullOs: false, unit: false, relay: false };
 const EVERYTHING = { fixtures: FIXTURES, fullOs: true, unit: true, relay: true };
 const OS_SENSITIVE = { fixtures: FIXTURES, fullOs: true, unit: true, relay: false };
 const CORE = { fixtures: FIXTURES, fullOs: false, unit: true, relay: false };
+const COLLAB = { fixtures: [], fullOs: false, unit: true, relay: true };
+const COLLAB_CORE = { ...CORE, relay: true };
 const only = (fixtures, unit = true) => ({ fixtures, fullOs: false, unit, relay: false });
 
 const RULES = [
 	[/\.(md|mdx)$/, NOTHING],
+	[/^(relay\/|packages\/share-protocol\/|inspect\/src\/host\/share(\/|-port\.ts$))/, COLLAB],
 	[/\.test\.(ts|js|mjs)$/, only([], true)],
 	[/^(\.github\/workflows\/|scripts\/ci-scope)/, EVERYTHING],
 	[/^(package(-lock)?\.json|inspect\/package(-lock)?\.json|npx\/package(-lock)?\.json)$/, OS_SENSITIVE],
@@ -47,9 +50,9 @@ const RULES = [
 	[/^inspect\/test\/fixtures\/[^/]+$/, NOTHING],
 	[/^npx\/test\/(editor|editing)\.e2e\.mjs$/, only(EDITOR_FIXTURES)],
 	[/^npx\/test\/frameworks\.e2e\.mjs$/, only(FRAMEWORK_FIXTURES)],
-	[/^npx\/test\/attach\.e2e\.mjs$/, only(REPRESENTATIVE)],
+	[/^npx\/test\/(attach|impact)\.e2e\.mjs$/, only(REPRESENTATIVE)],
 	[/^(inspect\/src\/webview\/|packages\/(properties-panel|library|plugin-[^/]+)\/)/, only(REPRESENTATIVE)],
-	[/^(relay\/|packages\/share-protocol\/)/, { fixtures: [], fullOs: false, unit: true, relay: true }],
+	[/^inspect\/src\/(messages|host\/(session|file-edits|edit-queue|presence))\.ts$/, COLLAB_CORE],
 	[/^(inspect|npx|packages\/(source-map|live-edit))\//, CORE],
 ];
 

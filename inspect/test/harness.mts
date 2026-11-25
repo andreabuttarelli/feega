@@ -10,7 +10,12 @@ import { ServerState, ToHost, ToView, type EditAsk, type Pick, type PluginAsk } 
 import { pluginCalls } from '../src/host/plugin-calls.ts';
 import { RestartWatch } from '../src/host/restart-watch.ts';
 import { shownFor, watchServer } from '../src/host/server-watch.ts';
-import { liveAtOf } from '@feega/live-edit/live-ask';
+import { inside, liveAtOf, reader } from '@feega/live-edit/live-ask';
+import { readProps } from '@feega/live-edit/read-props';
+import { diffOf } from '../src/host/diff-preview.ts';
+import { Gate, type ApplyAsk, type ReadAsk } from '../src/messages.ts';
+import { classIndex, classesAt, classOf } from '../src/host/classes.ts';
+import { classImpactOf } from '../src/host/impact.ts';
 import { SETTINGS } from '../src/settings.ts';
 import { searchIcons } from '../src/host/icon-search.ts';
 import { previewQueue } from '../src/host/icon-previews.ts';
@@ -21,8 +26,14 @@ import type { CommentDraft } from '../src/host/cloud-api.ts';
 import { entriesOf, insertAskOf } from '../src/host/library.ts';
 import { buildCatalog } from '../../packages/library/src/catalog.ts';
 import type { AddPlace } from '@feega/live-edit/add-node';
+import type { AcpId } from '../src/host/ai/acp-agents.ts';
+import { randomUUID } from 'node:crypto';
+import { aiChat, type ChatRecord } from '../src/host/ai/ai-chat.ts';
+import { Policy } from '../src/host/ai/permission-policy.ts';
+import type { AgentEnv } from '../src/host/agents.ts';
+import type { OpenAgent } from '../src/host/ai/agent-session.ts';
 
-const catalog = buildCatalog();
+const catalog = buildCatalog(fileURLToPath(new URL('../../packages/library/items', import.meta.url)), fileURLToPath(new URL('../../packages/library/tokens.css', import.meta.url)));
 const PANEL_PORT = Number(process.env.PANEL_PORT ?? 5999);
 const dist = fileURLToPath(new URL('../dist/webview/', import.meta.url));
 const launcher = fileURLToPath(new URL('../dist/launcher/', import.meta.url));
@@ -35,12 +46,15 @@ const pageHtml = (theme: string) => `<!doctype html><html><head><meta charset="u
 export const DARK = ':root{--vscode-editor-background:#1f1f1f;--vscode-foreground:#cccccc;--vscode-sideBar-background:#181818;--vscode-focusBorder:#0078d4;--vscode-font-family:-apple-system,system-ui,sans-serif}';
 export const LIGHT = ':root{--vscode-editor-background:#ffffff;--vscode-foreground:#1f1f1f;--vscode-sideBar-background:#f8f8f8;--vscode-focusBorder:#0078d4;--vscode-font-family:-apple-system,system-ui,sans-serif}';
 
-export async function openPanel(appRoot: string, theme = DARK, cloud?: CommentsCloud) {
+export type AiOverride = { env: () => AgentEnv; open: OpenAgent };
+
+export async function openPanel(appRoot: string, theme = DARK, cloud?: CommentsCloud, aiOverride?: AiOverride) {
   const running = await startDev(appRoot, launcher, { log: () => undefined, installing: () => undefined, spawned: () => undefined, signal: new AbortController().signal }, '', Attach.Never);
   if ('refused' in running) {
     throw new Error(running.refused);
   }
   const edits = fileEdits(appRoot);
+  const classes = classIndex(appRoot, {});
   const styling = await stylingOf(appRoot);
 
   const server = createServer(async (req, res) => {
@@ -77,6 +91,29 @@ export async function openPanel(appRoot: string, theme = DARK, cloud?: CommentsC
       return out;
     }
   });
+  let aiPolicy = Policy.Ask;
+  let aiStored: ChatRecord[] = [];
+  const installedAdapters = new Set<string>();
+  const ai = aiOverride
+    ? aiChat({
+        ...aiOverride,
+        root: () => appRoot,
+        confirm: async () => true,
+        where: () => `project: ${appRoot}`,
+        adapters: { ready: (id) => installedAdapters.has(id), install: async (id) => void installedAdapters.add(id), launch: () => ({ command: process.execPath, args: [] }) },
+        post: reply,
+        policy: { get: () => aiPolicy, set: (next) => (aiPolicy = next) },
+        store: { load: () => aiStored, save: (records) => void (aiStored = records) },
+        now: Date.now,
+        newId: randomUUID,
+        created: () => undefined,
+        configured: () => undefined,
+        write: async (path, content, agent) => {
+          await edits.agentWrite(path, content, agent);
+          await history();
+        }
+      })
+    : null;
   const previewIcons = previewQueue(fetch, (name, svg) => reply({ kind: ToView.IconPreview, name, svg }));
 
   await page.exposeFunction('toHost', async (m: { kind: ToHost; from?: string; to?: string; google?: boolean; family?: string; ask?: EditAsk; id?: number | string; pick?: Pick | null; query?: string; names?: string[]; text?: string; draft?: CommentDraft; at?: string; place?: string }) => {
@@ -86,13 +123,78 @@ export async function openPanel(appRoot: string, theme = DARK, cloud?: CommentsC
       await comments.show();
       await reply({ kind: ToView.Settings, values: Object.fromEntries(SETTINGS.map((r) => [r.key, r.fallback])), facts: { version: '0.1.0', framework: 'sveltekit', styling } });
     }
+    if (m.kind === ToHost.AiList) {
+      ai?.list();
+    }
+    if (m.kind === ToHost.AiStart) {
+      await ai?.start((m as unknown as { agent: AcpId }).agent);
+    }
+    if (m.kind === ToHost.AiSend) {
+      void ai?.send(m.text!, (m as unknown as { context: string | null }).context);
+    }
+    if (m.kind === ToHost.AiAnswer) {
+      ai?.answer(m.id as string, (m as unknown as { optionId: string | null }).optionId);
+    }
+    if (m.kind === ToHost.AiMode) {
+      await ai?.setMode(m.id as string);
+    }
+    if (m.kind === ToHost.AiConfig) {
+      await ai?.setConfig(m.id as string, (m as unknown as { value: string }).value);
+    }
+    if (m.kind === ToHost.AiPolicy) {
+      ai?.setPolicy((m as unknown as { policy: Policy }).policy);
+    }
+    if (m.kind === ToHost.AiOpen) {
+      ai?.open((m as unknown as { chat: string }).chat);
+    }
+    if (m.kind === ToHost.AiRename) {
+      ai?.rename((m as unknown as { chat: string }).chat, (m as unknown as { title: string }).title);
+    }
+    if (m.kind === ToHost.AiDelete) {
+      await ai?.remove((m as unknown as { chat: string }).chat);
+    }
+    if (m.kind === ToHost.AiRetry) {
+      await ai?.retry();
+    }
+    if (m.kind === ToHost.AiCancel) {
+      await ai?.cancel();
+    }
     if (m.kind === ToHost.Picked) {
       picks.get(m.id as number)?.(m.pick ?? null);
     }
+    if (m.kind === ToHost.Classes) {
+      await reply({ kind: ToView.Classes, view: await classesAt(appRoot, await classes.snapshot(), m.at!) });
+    }
+    if (m.kind === ToHost.Impact) {
+      const ask = (m as unknown as { ask: EditAsk }).ask;
+      if (ask.cls) {
+        await reply({ kind: ToView.Impact, id: m.id as number, impact: classImpactOf(classOf(await classes.snapshot(), ask.cls)) });
+      }
+    }
     if (m.kind === ToHost.Edit) {
+      classes.invalidate();
       const out = await edits.edit(m.ask!);
       saves.push(out);
+      await history();
       await reply(out.ok ? { kind: ToView.Edited, ok: true, written: out.written, saved: liveAtOf(m.ask!.at), note: out.note } : { kind: ToView.Edited, ok: false, reason: out.reason, at: out.at });
+    }
+    if (m.kind === ToHost.ReadProps) {
+      const ask = (m as unknown as { ask: ReadAsk }).ask;
+      const usage = liveAtOf(ask.usage);
+      const out = usage && inside(appRoot, usage.file) ? await readProps(reader(appRoot), { component: ask.component, usage, which: ask.which }) : null;
+      await reply({ kind: ToView.UsageProps, component: ask.component, values: out?.ok ? out.values : {}, dynamic: out?.ok ? out.dynamic : [], spread: out?.ok ? out.spread : false });
+    }
+    if (m.kind === ToHost.ApplyProps) {
+      const { ask, gate } = m as unknown as { ask: ApplyAsk; gate?: Gate };
+      const plan = await edits.propsPlan(ask);
+      if (gate !== Gate.Apply && plan.ok && plan.cautions.length) {
+        await reply({ kind: ToView.PropsPreview, ask, reason: plan.cautions.join('; '), files: diffOf([plan.change]) });
+      } else {
+        const out = await edits.applyProps(ask);
+        saves.push(out);
+        await history();
+        await reply(out.ok ? { kind: ToView.Edited, ok: true, written: '', note: out.note } : { kind: ToView.Edited, ok: false, reason: out.reason });
+      }
     }
     if (m.kind === ToHost.FontReplace || m.kind === ToHost.FontLoad) {
       const out = m.kind === ToHost.FontReplace ? await edits.replaceFont(m.from!, m.to!, m.google!) : await edits.loadFont(m.family!);

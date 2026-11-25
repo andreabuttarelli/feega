@@ -1,6 +1,6 @@
 import { JSDOM } from 'jsdom';
 import { describe, expect, it } from 'vitest';
-import { clearPreview, hidePreview, inspectElement, keepPreviews, previewEdit, settlePreview } from './runtime.js';
+import { clearPreview, clearPreviews, hidePreview, inspectElement, keepPreviews, previewEdit, settlePreview } from './runtime.js';
 
 const SOURCE = 'components/Card.tsx:3:5';
 
@@ -160,6 +160,17 @@ describe('a preview made in an element state', () => {
     h1.className = 'red';
 
     expect(settlePreview(win.document, SOURCE, 'hover')).toEqual([]);
+    expect(win.document.getElementById('feega-preview')!.textContent).toBe('');
+  });
+});
+
+describe('clearing every preview', () => {
+  it('drops the overrides of all elements, as after an undo', () => {
+    const win = domOf();
+    previewEdit(win.document, { source: SOURCE, style: { fontSize: '40px' } });
+    previewEdit(win.document, { source: SOURCE, state: 'hover', style: { color: 'rgb(9, 9, 9)' } });
+    clearPreviews(win.document);
+
     expect(win.document.getElementById('feega-preview')!.textContent).toBe('');
   });
 });

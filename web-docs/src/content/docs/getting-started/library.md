@@ -5,7 +5,7 @@ sidebar:
   order: 5
 ---
 
-The Library holds free sections, components and app screens. Everything is bundled with the extension: no network, no sign-in.
+The Library holds sections, components and app screens. Free items are bundled with the extension: no network, no sign-in. Pro items need a Feega Cloud plan.
 
 ## Insert an item
 
@@ -14,7 +14,7 @@ The Library holds free sections, components and app screens. Everything is bundl
 3. Search, or pick Sections, Components or App. Switch the thumbnails between Light and Dark.
 4. Click **Insert** to place the item after the selection, or drag it onto the preview and drop where the line shows.
 
-One insert is one undo step.
+The inserted item becomes the selection. One insert is one undo step.
 
 ## What gets written
 
@@ -36,4 +36,10 @@ If a different file already has the item's name, the new one is suffixed (`Prici
 
 ## Pro items
 
-Items marked **Included in Feega Cloud** are shown locked. Everything else is free.
+Items marked **Included in Feega Cloud** are Pro templates. Their code is not bundled: **Insert** fetches it for your framework with your Feega account, then writes it exactly like a free item.
+
+- Not signed in: Feega asks you to sign in, then you click **Insert** again.
+- Signed in without a Feega Cloud plan: Feega says the item is included in Feega Cloud and offers **See pricing**.
+- With a Feega Cloud plan: the item is inserted.
+
+Everything else is free.

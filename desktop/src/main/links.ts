@@ -4,5 +4,6 @@ import { Link } from './types';
 export const LINKS: Record<Link, string> = {
   [Link.Account]: 'https://oh.feega.app/app/settings/profile',
   [Link.Docs]: 'https://docs.feega.app',
-  [Link.Community]: DISCORD_URL
+  [Link.Community]: DISCORD_URL,
+  [Link.Node]: 'https://nodejs.org/en/download'
 };

@@ -24,6 +24,9 @@
   import { Role, roleOf, sectionsOf } from './roles';
   import { paintOf } from './colour';
   import Field from './Field.svelte';
+  import type { Scales } from '@feega/live-edit/theme-scales';
+  import { scaleFor } from './snap';
+  import { colourCheck, tokenPick } from './colour-theme';
   import { OFFSET_SIDES, OffsetSide, flipOffset, initialOffsets, offsetsFromHost, type Offsets } from './position-box';
   import { sourceText } from './page-bridge';
   import { wiringState } from './wiring-state.svelte';
@@ -39,9 +42,9 @@
   import { DEFAULT_BREAKPOINTS, type Breakpoints } from '@feega/live-edit/breakpoints';
   import { overrideTitle, rowOverrides } from './responsive';
 
-  type Props = { pick: Pick; onpreview: (row: Row, value: string) => void; onchange: (row: Row, value: string, token?: string) => void; onsavevar: (row: Row, name: string, css: string) => void; onhint: (hint: Hint | null) => void; onfont: (font: FontChoice) => void; onfontreplace: (from: string, to: FontChoice) => void; onfontload: (family: string) => void; onnotice: (text: string) => void; palette: Palette; elementState?: ElementState; baseline?: Record<string, string> | null; onstate?: (state: ElementState) => void; breakpoints?: Breakpoints };
+  type Props = { pick: Pick; onpreview: (row: Row, value: string) => void; onchange: (row: Row, value: string, token?: string) => void; onsavevar: (row: Row, name: string, css: string) => void; onhint: (hint: Hint | null) => void; onfont: (font: FontChoice) => void; onfontreplace: (from: string, to: FontChoice) => void; onfontload: (family: string) => void; onnotice: (text: string) => void; palette: Palette; elementState?: ElementState; baseline?: Record<string, string> | null; onstate?: (state: ElementState) => void; breakpoints?: Breakpoints; scales?: Scales | null };
 
-  let { pick, onpreview, onchange, onhint, onfont, onfontreplace, onfontload, onnotice, palette, onsavevar, elementState = ElementState.Default, baseline = null, onstate, breakpoints = DEFAULT_BREAKPOINTS }: Props = $props();
+  let { pick, onpreview, onchange, onhint, onfont, onfontreplace, onfontload, onnotice, palette, onsavevar, elementState = ElementState.Default, baseline = null, onstate, breakpoints = DEFAULT_BREAKPOINTS, scales = null }: Props = $props();
 
   const missingHere = $derived(missingIn(pick.styles['font-family'] ?? '', palette.missing));
   const presentFonts = $derived(palette.fonts.filter((name) => !palette.missing.some((m) => m.family === name)));
@@ -182,7 +185,7 @@
 
 {#snippet field(r: NumberRow, prefix = r.label, iconSvg = '', compact = false, twin: NumberRow | null = null)}
   {#snippet glyph()}<Icon svg={iconSvg} />{/snippet}
-  <Field name={r.name} override={overrideOf(r.name)} css={SIZE_LIMITS.includes(r.name) ? (pick.styles[READS[r.name]] ?? '') : ''} {prefix} icon={iconSvg ? glyph : undefined} {compact} px={shared(r)} units={r.units} unit={r.units ? '' : r.unit} {context} min={r.range.min} max={r.range.max} onpreview={(v) => (onpreview(r, v), twin && onpreview(twin, v))} onchange={(v) => (onchange(r, v), twin && onchange(twin, v))} />
+  <Field name={r.name} steps={scaleFor(r.name, scales)} override={overrideOf(r.name)} css={SIZE_LIMITS.includes(r.name) ? (pick.styles[READS[r.name]] ?? '') : ''} {prefix} icon={iconSvg ? glyph : undefined} {compact} px={shared(r)} units={r.units} unit={r.units ? '' : r.unit} {context} min={r.range.min} max={r.range.max} onpreview={(v) => (onpreview(r, v), twin && onpreview(twin, v))} onchange={(v) => (onchange(r, v), twin && onchange(twin, v))} />
 {/snippet}
 
 {#snippet segmented(r: Row, options: { value: string; label: string; icon: IconComponent }[])}
@@ -222,7 +225,7 @@
       {@const r = num(side)}
       {@const on = offsetOn(side)}
       <div class={`slot ${side}`} class:off={!on} data-on={on}>
-        <Field name={r.name} prefix="" px={shared(r)} units={r.units} {context} min={r.range.min} max={r.range.max} title={SIDE_TITLE[side]} onpreview={(v) => onpreview(r, v)} onchange={(v) => (setOffset(side, true), onchange(r, v))} />
+        <Field name={r.name} steps={scaleFor(r.name, scales)} prefix="" px={shared(r)} units={r.units} {context} min={r.range.min} max={r.range.max} title={SIDE_TITLE[side]} onpreview={(v) => onpreview(r, v)} onchange={(v) => (setOffset(side, true), onchange(r, v))} />
       </div>
     {/each}
     <div class="box" role="presentation">
@@ -256,6 +259,11 @@
           </Popover.Content>
         </Popover.Portal>
       </Popover.Root>
+      {@const verdict = colourCheck(readOf(name), palette.tokens)}
+      {#if verdict.off && verdict.nearest}
+        {@const near = verdict.nearest}
+        <button type="button" class="off-theme" data-off-theme title={`Off theme. Nearest: ${near.name} (${near.value}). Click to apply.`} aria-label={`Off theme, apply ${near.name}`} onclick={() => ((p) => (onpreview(r, p.css), onchange(r, p.css, p.token)))(tokenPick(near.name))}></button>
+      {/if}
       <input type="text" class="hex" value={paint} aria-label={`${r.label} hex`} onchange={(e) => onchange(r, e.currentTarget.value)} />
     {:else}
       <span class="none">None</span>
@@ -292,7 +300,7 @@
         {@render row('Align', al, 'align')}
         {#snippet ju()}{@render choice(byName('justify'))}{/snippet}
         {@render row('Justify', ju, 'justify')}
-        {#snippet gp()}<div class="pair">{@render field(num('gap'), 'G')}</div>{/snippet}
+        {#snippet gp()}<div class="solo">{@render field(num('gap'), 'G')}</div>{/snippet}
         {@render row('Gap', gp, 'gap')}
       {/if}
     </section>
@@ -318,14 +326,17 @@
 
   {#if has(Section.Size)}
     <section data-section={Section.Size}>
-      {#snippet wh()}
+      {#snippet wd()}
         {@const icon = !has(Section.Object) && has(Section.Icon) && sizeLinked}
-        <div class="pair">
-          {@render field(num('width'), 'W', '', false, icon ? num('height') : null)}{@render field(num('height'), 'H', '', false, icon ? num('width') : null)}
-          {#if has(Section.Icon)}<button type="button" class="icon" class:on={sizeLinked} title="Link width and height" aria-label="Link width and height" aria-pressed={sizeLinked} data-field="icon-size-link" onclick={() => (sizeLinked = !sizeLinked)}><Link size={12} /></button>{/if}
-        </div>
+        <div class="solo">{@render field(num('width'), 'W', '', false, icon ? num('height') : null)}</div>
+        {#if has(Section.Icon)}<button type="button" class="icon" class:on={sizeLinked} title="Link width and height" aria-label="Link width and height" aria-pressed={sizeLinked} data-field="icon-size-link" onclick={() => (sizeLinked = !sizeLinked)}><Link size={12} /></button>{/if}
       {/snippet}
-      {@render header(Section.Size, wh, true)}
+      {#snippet ht()}
+        {@const icon = !has(Section.Object) && has(Section.Icon) && sizeLinked}
+        <div class="solo">{@render field(num('height'), 'H', '', false, icon ? num('width') : null)}</div>
+      {/snippet}
+      {@render header(Section.Size, wd, true)}
+      {@render row('Height', ht, 'height')}
       {#if limitsOpen}
         {#each SIZE_LIMITS as name (name)}
           {@const r = num(name)}
@@ -363,16 +374,17 @@
     <section data-section={Section.Typography}>
       {@render header(Section.Typography)}
       {#if !closed[Section.Typography]}
-        {#snippet font()}
-          <div class="pair wide-first">
-            <FontPicker family={readOf('font-family')} project={palette.fonts} onpick={(font) => onfont(font)} />
-            {@render choice(byName('font-weight'))}
-          </div>
-        {/snippet}
-        {@render row('Font', font, 'font')}
+        {#snippet font()}<FontPicker family={readOf('font-family')} project={palette.fonts} onpick={(font) => onfont(font)} />{/snippet}
+        {@render row('Font', font, 'font-family')}
         {#if missingHere}<div class="font-warning"><MissingFont missing={missingHere} project={presentFonts} onreplace={onfontreplace} onload={onfontload} /></div>{/if}
-        {#snippet metrics()}<div class="triple">{@render field(num('font-size'), 'Aa', '', true)}{@render field(num('line-height'), '↕', '', true)}{@render field(num('letter-spacing'), '↔', '', true)}</div>{/snippet}
-        {@render row('Size', metrics, 'type-size')}
+        {#snippet weight()}{@render choice(byName('font-weight'))}{/snippet}
+        {@render row('Weight', weight, 'font-weight')}
+        {#snippet size()}{@render field(num('font-size'), '', '', true)}{/snippet}
+        {@render row('Size', size, 'font-size')}
+        {#snippet lh()}{@render field(num('line-height'), '', '', true)}{/snippet}
+        {@render row('Line height', lh, 'line-height')}
+        {#snippet ls()}{@render field(num('letter-spacing'), '', '', true)}{/snippet}
+        {@render row('Letter spacing', ls, 'letter-spacing')}
         {#snippet ta()}{@render segmented(byName('text-align'), TEXT_ALIGN)}{/snippet}
         {@render row('Align', ta, 'text-align')}
         <FillList scope="text-fill" inline parse={() => textFillsOf(pick.styles)} css={textFillCss} guard={(next) => textFillRefusal(pick.styles, next)} onrefuse={onnotice} {palette} {header} {row} onchange={writeText} onpreview={previewText} />
@@ -395,14 +407,14 @@
 
   {#if has(Section.Border)}
     <section data-section={Section.Border}>
-      {#snippet bw()}<div class="pair">{@render field(num('border'), 'W')}</div>{/snippet}
+      {#snippet bw()}<div class="solo">{@render field(num('border'), 'W')}</div>{/snippet}
       {@render header(Section.Border, bw, true)}
     </section>
   {/if}
 
   {#if has(Section.Effects)}
     <section data-section={Section.Effects}>
-      {#snippet op()}<div class="pair">{@render field(num('opacity'), '◐')}</div>{/snippet}
+      {#snippet op()}<div class="solo">{@render field(num('opacity'), '◐')}</div>{/snippet}
       <ShadowList {palette} css={readOf('shadow')} text={pick.ownText ? readOf('text-shadow') : null} {header} {row} onchange={(css) => onchange(byName('shadow'), css)} ontext={(css) => onchange(byName('text-shadow'), css)} onpreview={(css) => onpreview(byName('shadow'), css)} onpreviewtext={(css) => onpreview(byName('text-shadow'), css)} />
       {@render row('Opacity', op, 'opacity')}
     </section>
@@ -451,7 +463,7 @@
   }
 
   .properties {
-    --label-w: 72px;
+    --label-w: 96px;
     font-size: var(--ui-text-sm);
   }
 
@@ -707,7 +719,6 @@
   }
 
   .pair,
-  .triple,
   .sides {
     display: grid;
     flex: 1;
@@ -719,12 +730,10 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .pair.wide-first {
-    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
-  }
-
-  .triple {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .solo {
+    display: block;
+    flex: 1;
+    min-width: 0;
   }
 
   .font-warning {
@@ -790,6 +799,17 @@
     padding: 0 6px;
     border-radius: var(--ui-radius-sm);
     background: var(--ui-input);
+  }
+
+  .off-theme {
+    flex: none;
+    width: 6px;
+    height: 6px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--ui-radius-full);
+    background: var(--ui-warning, #d9822b);
+    cursor: pointer;
   }
 
   .swatch {

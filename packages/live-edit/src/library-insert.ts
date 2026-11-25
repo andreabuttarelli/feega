@@ -51,6 +51,14 @@ const CLIENT_DIRECTIVE = /^\s*['"]use client['"]/;
 const SUPPORTED = 'Svelte, React, Vue or Astro';
 const SCRIPT_INDENT = '  ';
 
+const ROOT_ELEMENTS: Record<string, RegExp> = {
+  '.svelte': /^(<)(?!script\b|style\b)[a-z]/md,
+  '.vue': /<template>\s*(<)[a-z]/d,
+  '.astro': /^---[\s\S]*?^---\s*\n[\s\S]*?^(<)(?!script\b|style\b)[a-z]/md,
+  '.tsx': /\breturn\s*\(?\s*(<)[a-z]/d,
+  '.jsx': /\breturn\s*\(?\s*(<)[a-z]/d
+};
+
 const relative = (file: string, path: string): string => {
   const from = file.split('/').slice(0, -1);
   const to = path.split('/');
@@ -146,6 +154,13 @@ const finished = (file: ItemFile, target: Target, ownTokens: boolean): ItemFile 
   const own = ownTokens ? withOwnTokens(file) : file;
   return target.client ? { name: own.name, text: clientText(own.text) } : own;
 };
+
+function rootOf(dir: string, files: ItemFile[], target: Target): LiveAt | null {
+  const file = files.find((f) => isComponent(f, target))!;
+  const pattern = ROOT_ELEMENTS[target.hosts.find((host) => file.name.endsWith(host))!];
+  const start = pattern.exec(file.text)?.indices?.[1][0];
+  return start === undefined ? null : { file: `${dir}/${file.name}`, ...lineCol(file.text, start) };
+}
 
 type Planned = { name: string; files: ItemFile[]; fresh: ItemFile[] };
 
@@ -265,5 +280,5 @@ export async function libraryInsert(read: ReadFile, at: LiveAt, place: AddPlace,
   const shift = imported.at >= 0 && imported.at <= start ? imported.text.length - usage.after.length : 0;
   pending.put({ path: at.file, before: usage.before, after: imported.text });
 
-  return { ok: true, changes: pending.list(), selected: { file: at.file, ...lineCol(imported.text, start + shift) } };
+  return { ok: true, changes: pending.list(), selected: rootOf(target.dir, plan.files, target) ?? { file: at.file, ...lineCol(imported.text, start + shift) } };
 }

@@ -32,6 +32,9 @@ Open it and drag Feega to Applications. A browser download is quarantined, so ma
 
 ## Using it
 
+- **Start screen.** With no tab open you see **New project**, **Open folder** and your recent projects. No account is required. See [Start a new project](/getting-started/new-project/).
+- **Node.js.** The app needs Node.js 20 or newer and npm. At launch it reads your shell's `PATH`, so tools from Homebrew, nvm or similar are found. If Node.js is missing it shows an **Install Node.js** link and **Check again**.
+- **AI agents.** The AI chat starts the agents installed on your machine, and downloads their adapters into the app's data folder.
 - **Tabs per folder.** Add a folder with the plus button. Each folder gets its own tab with its own dev server and editor.
 - **Monorepos.** If a folder holds several apps, the tab asks which one to open.
 - **Sign in.** Sign in from the account chip to use your Feega account, or continue without one.
@@ -41,4 +44,5 @@ Open it and drag Feega to Applications. A browser download is quarantined, so ma
 |---|---|
 | Editor port | Auto, or a custom port for the first editor. More tabs take the next free one. |
 | Open last projects on launch | Reopen the folders that were open when you quit. |
+| Feega Cloud (beta) | Off by default. Also in the Feega menu. Applies to editors opened after you change it. |
 | Anonymous usage data | Counts only, never your code. Off starts the editor with `FEEGA_TELEMETRY=0`. See [Privacy](/more/privacy/). |

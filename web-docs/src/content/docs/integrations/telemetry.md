@@ -38,10 +38,14 @@ The server adds country, region and city from the request. It does not store the
 | `first_edit` | The first change on this machine. | |
 | `edit_reverted` | A change was undone or reverted. | `source`, `agent` |
 | `breakpoint_switch`, `state_switch` | You switched breakpoint or state. | `breakpoint`, `state` |
-| `library_insert` | A library item was inserted. | `library_item`, `tier` |
+| `library_insert` | A library item was inserted. | `library_item` (the catalog id), `library_category`, `tier` |
 | `copy_for_agent` | You copied a change for an agent. | |
-| `focus_opened` | Focus mode opened. | `variant` (`focus`) |
+| `focus_opened` | Focus mode opened. | `variant` (`focus`), `mode`, `framework` |
+| `focus_props_changed` | Props were changed in focus mode, once per control kind when focus closes. | `control`, `prop_count` (a number, never the prop names or values) |
+| `focus_variants_shown` | The variants grid was shown in focus mode. | |
+| `ai_chat_created` | A chat was created. | `chat_count`, `live_count` (numbers only, never text) |
 | `ai_agent_chosen`, `ai_session_started`, `ai_session_ended` | An agent was chosen; an AI session started or ended. | `agent`; on end: `message_count`, `tool_count`, `duration_ms` |
+| `ai_config_changed` | A model or effort was picked in an AI chat. | `agent`, `category` (`model` or `thought_level`), `choice` (the value id the agent lists, such as a model id) |
 | `ai_message_sent`, `ai_first_response` | A message was sent; the first reply arrived. | `agent`; first response: `duration_ms` |
 | `ai_tool_call`, `ai_permission`, `ai_cancel`, `ai_session_error` | Agent activity. | `agent`; permission: `outcome` (`allow` or `reject`); error: `error_class` |
 | `onboarding_started`, `onboarding_step`, `onboarding_finished`, `onboarding_skipped` | Onboarding progress. | `step` (`welcome`, `agent`, `agents`, `sign_in`, `support`), `outcome` (`viewed`, `completed`, `skipped`), `choice` (`mcp`, when the MCP setup command is copied) |
@@ -70,9 +74,12 @@ All values are fixed lists or short identifiers, never free text.
 | `area` | `host`, `webview`, `ai`, `edit`, `preview`, `library`, `cloud`, `mcp`, `other` |
 | `item` | `star`, `follow_x`, `discord`, `coffee`, `share` |
 | `tier` | `free`, `pro` |
+| `mode` | `mount` (the component runs live), `snapshot` (a frozen copy of the element) |
+| `control` | `select`, `toggle`, `text`, `number`, `children` |
+| `library_category` | `section`, `component`, `app` |
 | `framework` | `sveltekit`, `nuxt`, `astro`, `react-router`, `next`, `gatsby`, `angular`, `cra`, `vite`, `generic` |
 | `agent`, `library_item`, `tool`, `error_class`, `action` | A short identifier of letters, digits and `_ . : -`. A path or a sentence is rejected by the server. |
-| `lines_added`, `lines_removed`, `files_count`, `diff_count`, `message_count`, `tool_count` | Numbers only. |
+| `lines_added`, `lines_removed`, `files_count`, `diff_count`, `message_count`, `tool_count`, `prop_count` | Numbers only. |
 
 Events are batched, sent every few minutes and when the session ends. A failed send is dropped
 silently and never slows the editor.

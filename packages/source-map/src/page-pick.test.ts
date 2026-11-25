@@ -61,3 +61,18 @@ describe('the page itself', () => {
     expect(info.ancestors.map((a: { name: string }) => a.name)).toEqual(['html']);
   });
 });
+
+describe('colour variables', () => {
+  it('lists the colour custom properties the element declares, with their values', () => {
+    const win = new JSDOM(
+      '<head><style>.f{--c1:#ff0000;--speed:2;--c2:initial}.f[data-x="y"]{--c3:tomato}.g{--c9:blue}</style></head><body><div class="f" data-x="y" data-feega-src="src/A.svelte:1:1" style="--c4: gold"></div></body>'
+    ).window;
+    const info = inspectElement(win.document.querySelector('.f'))!;
+
+    expect(info.variables).toEqual([
+      { name: '--c1', value: '#ff0000' },
+      { name: '--c3', value: 'tomato' },
+      { name: '--c4', value: 'gold' }
+    ]);
+  });
+});

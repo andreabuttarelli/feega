@@ -21,11 +21,11 @@ describe('what a state changes against the default', () => {
     expect(isChanged(keys, 'margin')).toBe(false);
   });
 
-  it('maps the combined rows of the panel to the properties behind them', () => {
+  it('flags the row of the property that changed', () => {
     const keys = changedKeys(ROWS, { ...DEFAULT, 'font-size': '20px' }, { ...DEFAULT, 'font-size': '16px' });
 
-    expect(isChanged(keys, 'type-size')).toBe(true);
-    expect(isChanged(keys, 'font')).toBe(false);
+    expect(isChanged(keys, 'font-size')).toBe(true);
+    expect(isChanged(keys, 'line-height')).toBe(false);
   });
 
   it('marks nothing without a baseline', () => {

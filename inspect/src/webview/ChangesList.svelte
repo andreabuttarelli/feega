@@ -57,7 +57,7 @@
       <button type="button" class="what" onclick={() => source && onselect(source)}>
         <strong>{change.prop}</strong>
         <span class="value">{change.value}</span>
-        <span class="meta">{shortAt(change.at)}{change.scope ? ` · ${change.scope}` : ''} · {timeOf(change.time)}</span>
+        <span class="meta">{shortAt(change.at)}{change.scope ? ` · ${change.scope}` : ''} · {timeOf(change.time)}{change.by ? ` · by ${change.by}` : ''}</span>
       </button>
       <div class="actions">
         {#if source}<button type="button" class="link" onclick={() => onopen(source)}>Open</button>{/if}

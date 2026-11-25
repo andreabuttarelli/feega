@@ -35,12 +35,62 @@ Feega Inspect is a small editor extension, separate from the Feega canvas. No ac
    An element with no click handler can be given **Go to page**, **Open URL** or **Scroll to
    section**: Feega writes a small inline handler (Svelte `goto` with its import, `$router.push`
    in Vue, `window.location` otherwise; Next files become client components). One undo removes it.
+   An element with `data-*` attributes, `src`, `srcset`, `sizes`, `alt`, `title`, `aria-label`, `placeholder` or
+   `poster` gets an **Attributes** section: edit a value and it is written to the source. Only
+   literal strings are written; a value built from props or expressions is refused. Changing an image `src` also removes its literal `srcset` and `sizes`, so the new image shows.
+   An attribute whose element also has `data-<name>-options="a,b,c"` shows as a dropdown of those
+   values. Colour CSS variables the element's rules declare (such as `--ascii-c1`) show as colour
+   swatches; a picked colour is written to the element's inline `style`.
 7. The **State** menu at the top of Properties shows the element as it looks on **Hover**,
    **Focus**, **Focus visible**, **Active** or, on form controls, **Disabled**, without the mouse.
    A dot marks a state that already has styles, and rows that differ from Default turn blue. While
    a state is chosen every edit is written to it: a `hover:` class with Tailwind, a `.name:hover`
    rule next to the base rule in CSS, CSS modules and Svelte/Vue scoped styles; `×` removes only
    that state's value. States set by JavaScript, `:has()` and CSS nesting are not forced.
+
+   **Impact label.** One line under the breadcrumb says, before you edit, where the edit will
+   land. It updates when you select an element and when the scope, state, breakpoint or theme
+   changes.
+   - **This element only**: the markup is in a file no other file imports, in a page or entry
+     file (Next `app/**/page.tsx` and `layout.tsx`, `pages/`, SvelteKit `+page.svelte` and
+     `+layout.svelte`, Nuxt `pages/`, Astro `src/pages/`, React Router `app/routes/` and
+     `root.tsx`), or in a file imported only by the app entry (`App.tsx` from `main.tsx`) or the
+     router. With **This element** scope, a component tag written in its own file also reads this
+     way. In a list it reads "This file only · ×N on this page".
+   - **Button component · used in N files**: the edit lands in a component's source that N other
+     project files import, directly, through an index file that re-exports it (`export { Button }`,
+     `export *` or `import X` then `export { X }`), or with an alias such as `@/`, `$lib`, an exact
+     `tsconfig` path or the package's own name. Only files that import that component count, not
+     every importer of the index file. Tests and stories do not count. The count refreshes when a
+     project file is created, changed or deleted. "×N here" is the number of instances
+     on this page. Click the label to list the files; click a file to open it at the usage.
+     **Only this one** detaches this instance.
+   - **Impact unknown**: Feega cannot tell where the edit lands: the rule would go to a global
+     stylesheet, the value is a CSS variable (`var(--x)`), or the class comes from props, `cn()`,
+     `cva`, a template string, a conditional or a spread. In Tailwind projects Feega writes into
+     the first standalone static string of `cn()`, `clsx()`, `cva()`, a template literal, Vue
+     `:class` or Svelte `class={...}` (and the text before the first `{}` of a Svelte class
+     string), and refuses with a message when there is none. Hover the label for the reason. Before
+     writing, Feega shows a compact diff with **Apply** and **Cancel**; **Don't ask again** turns
+     it off (`feegaInspect.previewUnknown`). Local and component edits write immediately.
+
+   **Detach.** **Detach instance** (**Only this one** in the impact label, and the right-click
+   menu of the preview and the Layers tree) copies the component file next to the original, named
+   after the page or route that uses it (`Button.tsx` becomes `ButtonPricing.tsx`), renames the
+   component inside the copy and points only that usage, its import and its tag, at the copy. It
+   is one undo step and shows in the diff. It works on React (`.tsx`, `.jsx`), Svelte, Vue and
+   Astro, and refuses, saying why, when the component is imported through a re-export, rendered
+   in a loop or a dynamic component, when its usage is not in the file of the nearest parent, or
+   when that element holds several usages of it.
+
+   **Theme snapping.** In a Tailwind project, dragging or typing a padding, margin, gap, width,
+   height, radius or font size snaps to the nearest step of your theme (the Tailwind scale plus
+   `--spacing`, `--radius-*` and `--text-*` from your CSS) when it is within 2px or 8%. Tick marks
+   under the field show the steps while you drag. Hold **Alt** while dragging, or press
+   **Alt+Enter** after typing, to write the exact value. A value that is not on the theme shows a
+   small orange dot; its tooltip names the nearest step and a click applies it. Colour pickers
+   list your project colours first, and a colour that matches none of them gets the same dot,
+   whose click applies the nearest project colour. Projects styled with plain CSS are not snapped.
 8. **Design** (D) selects and edits; **Navigate** (N) uses the app normally. The top bar has
    back/forward/reload, the route, a dev server status dot, and device widths (keys 1–4).
 9. When text uses a font that is not installed on your machine, not loaded by the page and not
@@ -79,7 +129,23 @@ proceed. Styles stay single-element: the Properties controls apply to one elemen
 | Cmd/Ctrl+C | Copy for agent |
 | Enter / Shift+Enter | Select the child / the parent |
 | Tab / Shift+Tab | Select the next / the previous sibling |
-| Esc | Select the parent, which also ends a multi-selection |
+| F | Open the component of the selection in its own tab |
+| Esc | Close the component tab, otherwise select the parent, which also ends a multi-selection |
+
+## Focus a component
+
+Select an element inside a component and press **F**, choose **Focus component** in the
+right-click menu, or double-click a component row in Layers. A tab named after the component opens
+next to **Page**. It shows only that one instance of the component, the one you selected or the
+row you double-clicked, on a neutral checkerboard, with nothing else of the page. Layers lists
+only that component. Select, edit and undo there exactly as on the page: edits go to
+the component source, so every instance changes, and the tab updates when the source changes. **Page** takes you back to
+the page and the component tab stays open; **×** or **Esc** closes it. One component tab is open
+at a time: focusing another component replaces it.
+
+The tab is a copy of the rendered component with the page stylesheets, so it works on React,
+Vue, Svelte and Astro without any setup. It is not a running component: scripts and event
+handlers do not run in it, and state changes such as an opened menu do not show.
 
 ## In the browser: `npx feega`
 
@@ -126,5 +192,9 @@ code --install-extension feega-inspect-0.1.0.vsix
   (Claude Code, Cursor, Copilot, Cline, Codex, Gemini CLI) see what you selected. Turn it off with
   the `feegaInspect.syncSelection` setting.
 - **Copy for agent.** Right-click the selected element and choose **Copy for agent**, or use the
-  link next to the file name in the bar. The clipboard gets `file:line`, selector, component, page,
+  link next to the file name in the bar, or right-click a row in Layers. The clipboard gets `file:line`, selector, component, page,
   preview width, and the breakpoint, theme and state when set. Paste it into your agent.
+- **Skill tip.** In a project with agent files (`CLAUDE.md`, `AGENTS.md`, `.claude/`, `.cursor/`,
+  `.codex/` or `.agents/`) and no Feega skill, Feega shows a one-time tip with
+  `npx skills add andreabuttarelli/feega`. In the editor it has **Copy command** and **Don't show
+  again**; `npx feega` prints one dim line, once per project. Nothing is sent anywhere.

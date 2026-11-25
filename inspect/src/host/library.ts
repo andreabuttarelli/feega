@@ -6,8 +6,9 @@ import type { LibraryEntry } from '../messages';
 export const INCLUDED_IN_CLOUD = 'Included in Feega Cloud';
 
 const PRO_TIER = 'pro';
+const NO_FILES: InsertItem['files'] = { svelte: [], react: [], vue: [], astro: [] };
 
-export type InsertAsk = { ok: true; item: InsertItem; tokens: string } | { ok: false; reason: string };
+export type InsertAsk = { ok: true; item: InsertItem; tokens: string; pro: boolean; category: string } | { ok: false; reason: string };
 
 export const entriesOf = (catalog: Catalog): LibraryEntry[] => catalog.items.map(({ id, name, description, category, tags, tier, page }) => ({ id, name, description, category, tags, tier, page }));
 
@@ -19,10 +20,9 @@ export function insertAskOf(catalog: Catalog | null, id: string): InsertAsk {
   if (!found) {
     return { ok: false, reason: `no library item ${id}` };
   }
-  if (found.tier === PRO_TIER) {
-    return { ok: false, reason: INCLUDED_IN_CLOUD };
-  }
-  return { ok: true, item: { id: found.id, component: found.component, fonts: found.fonts, files: found.files }, tokens: catalog.tokens };
+  const pro = found.tier === PRO_TIER;
+  const files = pro ? NO_FILES : found.files;
+  return { ok: true, item: { id: found.id, component: found.component, fonts: found.fonts, files }, tokens: catalog.tokens, pro, category: found.category };
 }
 
 export function catalogFile(path: string): () => Promise<Catalog | null> {

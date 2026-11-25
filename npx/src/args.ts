@@ -52,16 +52,17 @@ const MCP_USAGE = `
 
 Usage: npx feega mcp
 
-Serves the Feega Cloud tools (share, comments) to a coding agent over
-MCP on stdio. Sign in once with npx feega, or set FEEGA_API_KEY.`;
+Serves Feega to a coding agent over MCP on stdio: the element selected
+and the changes made in the running editor, and Feega Cloud sharing and
+comments. Cloud needs npx feega sign-in once, or FEEGA_API_KEY.`;
 
-export const usageOf = (cloud: boolean): string => (cloud ? EDITOR_USAGE + PLUGIN_USAGE + MCP_USAGE : EDITOR_USAGE + PLUGIN_USAGE);
+export const usageOf = (): string => EDITOR_USAGE + PLUGIN_USAGE + MCP_USAGE;
 
 const MCP_COMMAND = 'mcp';
 
 const FLAGS: Record<string, Run.Help | Run.Version> = { '--help': Run.Help, '-h': Run.Help, '--version': Run.Version, '-v': Run.Version };
 
-function pluginRun(argv: string[], cwd: string, cloud: boolean): Args {
+function pluginRun(argv: string[], cwd: string): Args {
   const parsed = pluginArgsOf(argv);
   if ('error' in parsed) {
     return { run: Run.Error, reason: parsed.error };
@@ -69,23 +70,23 @@ function pluginRun(argv: string[], cwd: string, cloud: boolean): Args {
   if (parsed.action !== PluginAction.Dev) {
     return { run: Run.Plugin, action: parsed.action, value: parsed.value };
   }
-  const editor = argsOf(parsed.rest, cwd, cloud);
+  const editor = argsOf(parsed.rest, cwd);
   return editor.run === Run.Editor ? { ...editor, devPlugins: [resolve(cwd, parsed.value)] } : editor;
 }
 
-export function argsOf(argv: string[], cwd: string, cloud = false): Args {
+export function argsOf(argv: string[], cwd: string): Args {
   let dir = cwd;
   let port = 0;
   let browser = Browser.Open;
   let url: string | undefined;
   const rest = [...argv];
 
-  if (cloud && rest[0] === MCP_COMMAND) {
+  if (rest[0] === MCP_COMMAND) {
     return { run: Run.Mcp };
   }
 
   if (rest[0] === PLUGIN_COMMAND) {
-    return pluginRun(rest.slice(1), cwd, cloud);
+    return pluginRun(rest.slice(1), cwd);
   }
 
   while (rest.length) {
