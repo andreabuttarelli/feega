@@ -1,13 +1,13 @@
 ---
 title: Desktop app (beta)
-description: Install the Feega desktop app on macOS with one terminal command or the dmg, and what it does.
+description: Install the Feega desktop app on macOS, Windows or Linux, and what it does.
 sidebar:
   order: 4
 ---
 
 The desktop app runs Feega without an editor. Open a project folder and Feega starts its dev server and the editor in a tab.
 
-It is a beta. The app is not signed with an Apple developer certificate yet, so macOS treats it as software from an unidentified developer. The two install methods below deal with that.
+It is a beta. The macOS build is signed and notarized. The Windows build is not signed yet. Download any build from the [download page](https://www.feega.app/download).
 
 ## Install from the terminal
 
@@ -17,18 +17,28 @@ curl -fsSL https://www.feega.app/install | sh
 
 The script downloads the right build for your Mac (Apple silicon or Intel), replaces `/Applications/Feega.app` (or `~/Applications/Feega.app` if `/Applications` is not writable), and opens it. A running Feega is quit first.
 
-Files downloaded with `curl` carry no quarantine flag, so macOS does not block the app.
-
 On Linux the script saves the AppImage as `~/.local/bin/feega`.
 
-## Install from the dmg
+## Install on macOS
 
 Download the dmg for your Mac from the [download page](https://www.feega.app/download):
 
 - Apple silicon: `Feega-mac-arm64.dmg`
 - Intel: `Feega-mac-x64.dmg`
 
-Open it and drag Feega to Applications. A browser download is quarantined, so macOS refuses the first launch. Open **System Settings → Privacy & Security**, scroll to the message about Feega and press **Open Anyway**. You only do this once.
+Open it and drag Feega to Applications.
+
+## Install on Windows
+
+Download `Feega-win-x64.exe` from the [download page](https://www.feega.app/download) and run it. Windows may show "Windows protected your PC": click **More info**, then **Run anyway**.
+
+## Install on Linux
+
+Download `Feega-linux-x64.AppImage` from the [download page](https://www.feega.app/download), then:
+
+```bash
+chmod +x Feega-linux-x64.AppImage && ./Feega-linux-x64.AppImage
+```
 
 ## Using it
 
