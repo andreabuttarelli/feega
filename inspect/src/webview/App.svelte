@@ -76,6 +76,7 @@
   import { applyMessage, heldOf, muteMessage, type Held } from './preview-gate';
   import { detachState } from './detach';
   import LibraryPanel from './LibraryPanel.svelte';
+  import NewPage from './NewPage.svelte';
   import { LIBRARY_DRAG_TYPE } from './library';
   import { agentContexts, commentContext, type AgentView } from './agent-context';
   import CommentsList from './CommentsList.svelte';
@@ -680,6 +681,7 @@
     },
     [ToView.Server]: (m) => ((server = m.state), (restarting = restarting ? m.state !== ServerState.Stopped : m.state === ServerState.Restarting), (serverReason = m.reason ?? ''), (serverInfo = m.info ?? serverInfo)),
     [ToView.Reload]: () => reloadAfterRestart(),
+    [ToView.PageCreated]: (m) => go(m.route),
     [ToView.Impact]: (m) => (m.id === impactId ? (impact = m.impact) : impact),
     [ToView.Preview]: (m) => (held = heldOf(m)),
     [ToView.PropsPreview]: (m) => (held = heldOf(m)),
@@ -1529,6 +1531,7 @@
       <button type="button" class="icon" title="Back (⌘[)" disabled={!canBack} onclick={() => go(history.back())}><ArrowLeft size={15} /></button>
       <button type="button" class="icon" title="Forward (⌘])" disabled={!canForward} onclick={() => go(history.forward())}><ArrowRight size={15} /></button>
       <button type="button" class="icon" title="Reload (⌘R)" onclick={() => go(route)}><RotateCw size={14} /></button>
+      <NewPage items={libraryItems} onopen={() => toHost({ kind: ToHost.LibraryList })} oncreate={(route, item) => toHost({ kind: ToHost.NewPage, route, item })} />
       <form class="address" onsubmit={(e) => (e.preventDefault(), go(address))}>
         <ServerPopover state={server} reason={serverReason} info={serverInfo} onopen={(link) => toHost({ kind: ToHost.External, url: link })} onaction={(action) => (action === ServerAction.ReloadPage ? go(route) : toHost({ kind: ToHost.Server, action }))} />
         <input bind:value={address} aria-label="Route" data-testid="address" spellcheck="false" />

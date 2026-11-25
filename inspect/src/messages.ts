@@ -226,6 +226,7 @@ export enum ToHost {
   ShareRole = 'share-role',
   LibraryList = 'library-list',
   LibraryInsert = 'library-insert',
+  NewPage = 'new-page',
   Plugin = 'plugin',
   PluginEnable = 'plugin-enable',
   PluginRemove = 'plugin-remove',
@@ -323,7 +324,8 @@ export enum ToView {
   AiChats = 'ai-chats',
   AiChat = 'ai-chat',
   AgentAsk = 'agent-ask',
-  Adapters = 'adapters'
+  Adapters = 'adapters',
+  PageCreated = 'page-created'
 }
 
 export enum ShareState {
@@ -428,6 +430,7 @@ export type HostMessage =
   | { kind: ToHost.ShareRole; userId: string; role: VisitorRole }
   | { kind: ToHost.LibraryList }
   | { kind: ToHost.LibraryInsert; id: string; at: string; place: AddPlace }
+  | { kind: ToHost.NewPage; route: string; item: string | null }
   | { kind: ToHost.Plugin; id: number; ask: PluginAsk }
   | { kind: ToHost.PluginEnable; id: string; enabled: boolean }
   | { kind: ToHost.PluginRemove; id: string }
@@ -476,6 +479,7 @@ export type ViewMessage =
   | { kind: ToView.Plugin; id: number; result: PluginResult }
   | { kind: ToView.Plugins; catalog: Catalog; canInstall: boolean }
   | { kind: ToView.Reload }
+  | { kind: ToView.PageCreated; route: string }
   | { kind: ToView.Impact; id: number; impact: Impact }
   | { kind: ToView.Preview; ask: EditAsk; reason: string; files: DiffFile[]; by?: Author }
   | { kind: ToView.UsageProps; component: string; values: Record<string, Json>; dynamic: string[]; spread: boolean }

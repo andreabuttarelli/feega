@@ -46,6 +46,7 @@ import { editKindOf } from './edit-kind';
 import { selectionSync } from './selection-sync';
 import { wiringOf } from './wiring';
 import { INCLUDED_IN_CLOUD, entriesOf, insertAskOf } from './library';
+import { newPage } from './new-page';
 import { PRICING_URL, ProRefusal, SEE_PRICING, SIGN_IN, SIGN_IN_FOR_PRO, proItemFor } from './pro-insert';
 import { pluginCalls } from './plugin-calls';
 import { pluginsSession } from './plugins-session';
@@ -335,6 +336,19 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     }
     if (!ready.ok && ready.refusal) {
       void proPrompted(ready.refusal);
+    }
+  }
+
+  async function pageCreated(m: Extract<HostMessage, { kind: ToHost.NewPage }>) {
+    const made = await newPage(reader(root), { route: m.route, item: m.item, catalog: (await platform.library?.()) ?? null });
+    if (!made.ok) {
+      await edited(made, null);
+      return;
+    }
+    const out = await edits.page(made.route, made.changes);
+    await edited(out, null);
+    if (out.ok) {
+      await post({ kind: ToView.PageCreated, route: made.route });
     }
   }
 
@@ -848,6 +862,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.ShareRole]: (m) => sharing.setRole(m.userId, m.role),
     [ToHost.LibraryList]: libraryShown,
     [ToHost.LibraryInsert]: libraryInserted,
+    [ToHost.NewPage]: pageCreated,
     [ToHost.Plugin]: async (m) => post({ kind: ToView.Plugin, id: m.id, result: await pluginRun(m.ask) }),
     [ToHost.PluginEnable]: (m) => pluginList?.enable(m.id, m.enabled),
     [ToHost.PluginRemove]: (m) => pluginList?.remove(m.id),

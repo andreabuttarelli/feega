@@ -6,12 +6,16 @@ import { LINKS } from './links';
 import { installMenu } from './menu';
 import { pidFile } from './pid-file';
 import { frameworkOf } from './project-info';
-import { settingsStore } from './store';
+import { inviteWanted, settingsStore } from './store';
 import { tabHost } from './tabs';
 import { updateController } from './updates/controller';
 import pkg from '../../package.json';
 import { platformRow } from './platform';
-import { Channel, type Link, type Preferences, type ShellState } from './types';
+import { Channel, NodeStatus, type Link, type NodeState, type Preferences, type ProjectState, type ShellState } from './types';
+import { readLoginPath, runShell } from './login-path';
+import { checkNode, runTool } from './node-check';
+import { bundledDir } from './cli-process';
+import { catalogAt, nodePorts, projectCreator, type NewProjectAsk } from './project-creator';
 
 const DEFAULT_SIZE = { width: 1440, height: 900 };
 const MIN_SIZE = { minWidth: 900, minHeight: 600 };
@@ -70,6 +74,9 @@ app.whenReady().then(() => {
     webPreferences: { preload: join(__dirname, 'preload.cjs'), contextIsolation: true, sandbox: true }
   });
 
+  let node: NodeState = { status: NodeStatus.Checking, message: '' };
+  let project: ProjectState | null = null;
+
   const state = (): ShellState => ({
     tabs: tabs.list(),
     active: tabs.active(),
@@ -78,7 +85,11 @@ app.whenReady().then(() => {
     skipped: settings.get().skipped,
     recents: settings.get().recents.map(({ dir, at }) => ({ dir, at, name: basename(dir), framework: frameworkOf(dir) })),
     preferences: settings.get().preferences,
-    update: updates.info()
+    update: updates.info(),
+    node,
+    project,
+    invite: inviteWanted(settings.get(), account.email()),
+    documents: app.getPath('documents')
   });
 
   const publish = () => window.webContents.send(Channel.State, state());
@@ -96,7 +107,7 @@ app.whenReady().then(() => {
     quit: () => app.quit()
   });
   const tabs = tabHost(window, publish, pids, {
-    options: () => ({ editorPort: settings.get().preferences.editorPort, telemetry: settings.get().preferences.telemetry }),
+    options: () => ({ editorPort: settings.get().preferences.editorPort, telemetry: settings.get().preferences.telemetry, cloud: settings.get().preferences.cloud }),
     opened: (dirs) => settings.remember(dirs)
   });
 
@@ -131,17 +142,60 @@ app.whenReady().then(() => {
   ipcMain.handle(Channel.RetryTab, (_event, id: string) => void tabs.retry(id));
   ipcMain.handle(Channel.ChooseApp, (_event, id: string, app: string) => tabs.choose(id, app));
   ipcMain.handle(Channel.Activate, (_event, id: string | null) => tabs.activate(id));
+  const menu = () => installMenu({ showSettings: () => window.webContents.send(Channel.ShowSettings), checkUpdates: () => void updates.check(true), cloud: settings.get().preferences.cloud, setCloud });
+  const setCloud = (on: boolean) => {
+    settings.prefer({ cloud: on });
+    menu();
+    publish();
+  };
   ipcMain.handle(Channel.SetPreferences, (_event, change: Partial<Preferences>) => {
     settings.prefer(change);
+    menu();
     publish();
   });
+  const create = projectCreator(() => catalogAt(bundledDir()), nodePorts(), (progress) => {
+    project = progress ? { name: progress.name, step: progress.step, line: progress.line, error: '' } : null;
+    publish();
+  });
+  ipcMain.handle(Channel.PickParent, async () => {
+    const picked = await dialog.showOpenDialog(window, { properties: ['openDirectory', 'createDirectory'], defaultPath: app.getPath('documents') });
+    return picked.canceled ? null : (picked.filePaths[0] ?? null);
+  });
+  ipcMain.handle(Channel.CreateProject, async (_event, ask: NewProjectAsk) => {
+    const out = await create(ask);
+    if (!out.ok) {
+      project = { name: ask.name, step: 'failed', line: '', error: out.reason };
+      publish();
+      return;
+    }
+    project = null;
+    settings.created();
+    openDir(out.dir);
+  });
+  ipcMain.handle(Channel.ClearProject, () => {
+    project = null;
+    publish();
+  });
+  ipcMain.handle(Channel.DismissInvite, () => {
+    settings.dismissInvite();
+    publish();
+  });
+  const checkRuntime = async () => {
+    node = { status: NodeStatus.Checking, message: '' };
+    publish();
+    const found = await checkNode(runTool);
+    node = found.ok ? { status: NodeStatus.Ready, message: found.node } : { status: NodeStatus.Problem, message: found.message };
+    publish();
+    return found.ok;
+  };
+  ipcMain.handle(Channel.CheckNode, checkRuntime);
   ipcMain.handle(Channel.OpenLink, (_event, link: Link) => shell.openExternal(LINKS[link]));
   ipcMain.handle(Channel.Overlay, (_event, open: boolean) => tabs.overlay(open));
   ipcMain.handle(Channel.CheckUpdates, () => updates.check(true));
   ipcMain.handle(Channel.InstallUpdate, () => updates.install());
   ipcMain.handle(Channel.Quit, () => app.quit());
 
-  installMenu(() => window.webContents.send(Channel.ShowSettings), () => void updates.check(true));
+  menu();
   updates.start();
 
   void window.loadFile(join(__dirname, 'renderer', 'index.html'));
@@ -170,7 +224,11 @@ app.whenReady().then(() => {
       void tabs.open(dir);
     }
   };
-  window.webContents.once('did-finish-load', reopenLast);
+  window.webContents.once('did-finish-load', () => {
+    void readLoginPath({ platform: process.platform, env: process.env, run: runShell })
+      .then(checkRuntime)
+      .then((ready) => ready && reopenLast());
+  });
 
   let closing = false;
   app.on('before-quit', (event) => {

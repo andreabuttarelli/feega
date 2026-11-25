@@ -16,10 +16,10 @@ import { cloudShare } from '../../inspect/src/host/share/share-port-factory';
 import { cloudApiOf, relayUrlOf } from './cloud';
 import { pluginsRoot } from '../../packages/plugin-store/src/registry';
 import { runPlugin, terminalIo } from './plugin-cli';
+import { MIN_NODE_MAJOR, nodeSupported } from './node-version';
 
 declare const FEEGA_VERSION: string;
 
-const MIN_NODE_MAJOR = 20;
 const KEEP_RUNNING = -1;
 const STOP_ON_STDIN_END = 'FEEGA_STOP_ON_STDIN_END';
 
@@ -43,7 +43,7 @@ async function askApp(apps: AppChoice[]): Promise<string | null> {
 }
 
 async function main(): Promise<number> {
-  if (Number(process.versions.node.split('.')[0]) < MIN_NODE_MAJOR) {
+  if (!nodeSupported(process.versions.node)) {
     say(`feega: Node ${MIN_NODE_MAJOR}+ is required (found ${process.versions.node})`);
     return 1;
   }
