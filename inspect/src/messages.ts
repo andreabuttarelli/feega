@@ -246,7 +246,7 @@ export type WebviewUsageDims = Partial<{ variant: string; mode: string; control:
 
 export type ChangeRow = { id: number; at: string; prop: string; value: string; scope: string; files: string[]; time: number; by?: string };
 
-export type Prefs = { size: string; custom: number | null; barClosed: boolean; route?: string; anchor?: string; barWidth?: number; leftWidth?: number; leftClosed?: boolean; layers?: Record<string, { hidden: string[]; locked: string[] }> };
+export type Prefs = { size: string; custom: number | null; barClosed: boolean; route?: string; anchor?: string; dock?: { edge: string; offset: number }; barWidth?: number; leftWidth?: number; leftClosed?: boolean; layers?: Record<string, { hidden: string[]; locked: string[] }> };
 
 export type ChatRow = { id: string; agent: AcpId; title: string; updatedAt: number; running: boolean };
 

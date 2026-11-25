@@ -32,6 +32,9 @@
   import Attributes from './Attributes.svelte';
   import { wiringState } from './wiring-state.svelte';
   import ModeSwitch from './ModeSwitch.svelte';
+  import CloseButton from './CloseButton.svelte';
+  import DockTab from './DockTab.svelte';
+  import { dockedEdge, isDocked, slideAway, tabBox, type Docked } from './dock';
   import FeegaMenu from './FeegaMenu.svelte';
   import OnboardingDialog from './Onboarding.svelte';
   import ServerPopover from './ServerPopover.svelte';
@@ -152,6 +155,7 @@
   let baseline = $state<Styles | null>(null);
   const writtenState = $derived(elementState === ElementState.Default ? undefined : elementState);
   const TOAST_MS = 2500;
+  let noSourceDismissed = $state(false);
   let toast = $state<string | null>(null);
   let toastTimer: ReturnType<typeof setTimeout> | undefined;
   function showToast(text: string) {
@@ -273,6 +277,7 @@
     savePrefs();
   }
   let anchor = $state<Anchor>(DEFAULT_ANCHOR);
+  let docked = $state<Docked | null>(null);
   let bar = $state({ w: 0, h: 0 });
   let toolbarH = $state(0);
   let moving = $state<{ dx: number; dy: number; x: number; y: number } | null>(null);
@@ -593,7 +598,7 @@
   }
 
   function savePrefs() {
-    toHost({ kind: ToHost.Prefs, prefs: { size, custom, barClosed, route, anchor, barWidth, leftWidth, leftClosed, layers: layerFlags.saved() } });
+    toHost({ kind: ToHost.Prefs, prefs: { size, custom, barClosed, route, anchor, dock: docked ?? undefined, barWidth, leftWidth, leftClosed, layers: layerFlags.saved() } });
   }
 
   function restore(prefs: Prefs | null) {
@@ -606,6 +611,7 @@
     barClosed = prefs.barClosed;
     route = prefs.route ?? route;
     anchor = isAnchor(prefs.anchor) ? prefs.anchor : anchor;
+    docked = isDocked(prefs.dock) ? prefs.dock : null;
     barWidth = prefs.barWidth ?? barWidth;
     leftWidth = prefs.leftWidth ?? leftWidth;
     leftClosed = prefs.leftClosed ?? leftClosed;
@@ -736,8 +742,14 @@
     if (!moving) {
       return;
     }
-    anchor = nearestAnchor({ x: moving.x, y: moving.y }, area, bar);
+    docked = dockedEdge({ x: moving.x, y: moving.y }, area, bar);
+    anchor = docked ? anchor : nearestAnchor({ x: moving.x, y: moving.y }, area, bar);
     moving = null;
+    savePrefs();
+  }
+
+  function undock() {
+    docked = null;
     savePrefs();
   }
 
@@ -1490,9 +1502,10 @@
           </form>
         </div>
       {/if}
-      {#if bridged && !hasSourceInfo(layers)}
+      {#if bridged && !noSourceDismissed && !hasSourceInfo(layers)}
         <div class="notice nosource" data-testid="no-source">
           <span>This page has no source info</span>
+          <CloseButton onclose={() => (noSourceDismissed = true)} />
           <button type="button" class="link" data-action="add-plugin" onclick={() => toHost({ kind: ToHost.AddPlugin })}>Add the Feega plugin</button>
           <button type="button" class="link" data-action={ServerAction.RestartUnderFeega} onclick={() => toHost({ kind: ToHost.Server, action: ServerAction.RestartUnderFeega })}>Let Feega start the server</button>
         </div>
@@ -1505,16 +1518,18 @@
           <button type="button" class="link" data-action="skill-hint-copy" onclick={() => toHost({ kind: ToHost.Copy, text: skillHint! })}>Copy command</button>
           <button type="button" class="link" data-action="skill-hint-never" onclick={() => (toHost({ kind: ToHost.SkillHintNever }), (skillHint = null))}>Don't show again</button>
           <button type="button" class="link" data-action="skill-hint-dismiss" onclick={() => (toHost({ kind: ToHost.SkillHintDismiss }), (skillHint = null))}>Dismiss</button>
+          <CloseButton onclose={() => (toHost({ kind: ToHost.SkillHintDismiss }), (skillHint = null))} />
         </div>
       {/if}
       {#if fontNotice}
         <div class="notice missingfont" data-testid="font-notice">
           <MissingFont missing={fontNotice} project={palette.fonts.filter((name) => !palette.missing.some((m) => m.family === name))} onreplace={replaceFont} onload={loadFont} />
           <button type="button" class="link" onclick={() => dismissedFonts.add(fontNotice!.family)}>Dismiss</button>
+          <CloseButton onclose={() => dismissedFonts.add(fontNotice!.family)} />
         </div>
       {/if}
-      {#if toast}<div class="toast" role="status">{toast}</div>{/if}
-      <div class="float" class:moving bind:clientWidth={bar.w} bind:clientHeight={bar.h} style={`left:${barAt.x}px;top:${barAt.y}px`} data-anchor={anchor}>
+      {#if toast}<div class="toast" role="status"><span>{toast}</span><CloseButton onclose={() => (toast = null)} /></div>{/if}
+      <div class="float" class:moving class:docked={!!docked} inert={!!docked} style:--away={docked ? slideAway(docked.edge) : 'none'} bind:clientWidth={bar.w} bind:clientHeight={bar.h} style={`left:${barAt.x}px;top:${barAt.y}px`} data-anchor={anchor}>
         <button type="button" class="grip" title="Drag to move (arrow keys)" aria-label="Move the bar" onpointerdown={grabBar} onpointermove={dragBar} onpointerup={dropBar} onkeydown={onHandleKey}>
           <svg width="8" height="12" viewBox="0 0 8 12" aria-hidden="true">{#each [0, 1, 2] as row (row)}{#each [0, 1] as col (col)}<circle cx={2 + col * 4} cy={2 + row * 4} r="1.1" fill="currentColor" />{/each}{/each}</svg>
         </button>
@@ -1522,6 +1537,8 @@
         <button type="button" class="icon" title="Undo (⌘Z)" disabled={!canUndo} onclick={() => toHost({ kind: ToHost.Undo })}><Undo2 size={14} /></button>
         <button type="button" class="icon" title="Redo (⇧⌘Z)" disabled={!canRedo} onclick={() => toHost({ kind: ToHost.Redo })}><Redo2 size={14} /></button>
       </div>
+
+      {#if docked}<DockTab edge={docked.edge} box={tabBox(docked, area)} onrestore={undock} />{/if}
 
       {#if barClosed && picked}
         <button type="button" class="pill" onclick={toggleBar} data-testid="selection-pill">&lt;{picked.tag}&gt; {fileName(picked.source)} · Edit</button>
@@ -1536,6 +1553,7 @@
             <button type="button" class="link" onclick={() => toHost({ kind: ToHost.Open, at: saved! })}>{saved ? `Saved to ${fileName(saved)}` : ''}</button>
             {#if warning}<span class="warn">{warning}</span>{/if}
           {/if}
+          <CloseButton onclose={() => ((problem = null), (saved = null), (warning = ''))} />
         </div>
       {/if}
     </div>
@@ -1907,6 +1925,9 @@
     box-shadow: 0 0 0 1px var(--ui-divider), 0 4px 12px rgb(0 0 0 / 0.15);
     color: var(--ui-text);
     font-size: var(--ui-text-xs);
+    display: flex;
+    align-items: center;
+    gap: 6px;
   }
 
   .width-label {
@@ -1931,7 +1952,10 @@
     z-index: 5;
     transition:
       left 180ms cubic-bezier(0.16, 1, 0.3, 1),
-      top 180ms cubic-bezier(0.16, 1, 0.3, 1);
+      top 180ms cubic-bezier(0.16, 1, 0.3, 1),
+      transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
+      opacity 180ms ease,
+      visibility 180ms;
     display: flex;
     align-items: center;
     gap: 6px;
@@ -1944,6 +1968,13 @@
 
   .float.moving {
     transition: none;
+  }
+
+  .float.docked {
+    visibility: hidden;
+    opacity: 0;
+    transform: var(--away);
+    pointer-events: none;
   }
 
   .grip {
@@ -1997,6 +2028,10 @@
     background: var(--ui-float);
     box-shadow: 0 0 0 1px var(--ui-divider);
     font-size: var(--ui-text-sm);
+  }
+
+  .notice :global(.close) {
+    align-self: flex-end;
   }
 
   .notice.nosource {
