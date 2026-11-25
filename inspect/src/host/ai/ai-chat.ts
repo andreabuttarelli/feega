@@ -11,9 +11,9 @@ import { answered, heard as transcribed, said, ItemKind, type Item } from './tra
 
 const OUTSIDE = 'is outside the workspace';
 const NOT_STARTED = 'start an agent first';
-const ADAPTER_ACTION = 'Run adapter';
 const DELETE_ACTION = 'Delete';
 const FORGOT = "New session — the agent doesn't remember earlier messages";
+const VERSIONED_PACKAGE = /^@?[\w./-]+@\d/;
 const TITLE_MAX = 40;
 const KEPT_CHATS = 50;
 
@@ -30,6 +30,8 @@ export type AiChatDeps = {
   env: () => AgentEnv;
   open: OpenAgent;
   confirm: (question: string, yes: string) => Promise<boolean>;
+  where: () => string;
+  adapters: { granted: (key: string) => boolean; grant: (key: string) => void };
   post: (message: ViewMessage) => unknown;
   write: (path: string, content: string, agent: string) => Promise<void>;
   record: (path: string, before: string, after: string, agent: string) => Promise<void>;
@@ -41,7 +43,7 @@ export type AiChatDeps = {
   configured: (category: string, value: string) => void;
 };
 
-const adapterPackage = (id: AcpId): string => launchOf(id).args.find((arg) => arg.startsWith('@')) ?? launchOf(id).command;
+const adapterPackage = (id: AcpId): string => launchOf(id).args.find((arg) => VERSIONED_PACKAGE.test(arg)) ?? launchOf(id).command;
 
 const slice = (text: string, from?: number, count?: number): string => {
   if (from === undefined && count === undefined) {
@@ -55,7 +57,7 @@ const titleOf = (text: string): string => (text.length > TITLE_MAX ? `${text.sli
 
 export function aiChat(deps: AiChatDeps) {
   const { post } = deps;
-  const adapted = new Set<AcpId>();
+  let asking: ((allow: boolean) => void) | null = null;
   const chats = new Map<string, Chat>();
   let active: string | null = null;
   let loaded = false;
@@ -160,6 +162,27 @@ export function aiChat(deps: AiChatDeps) {
     return idle !== undefined;
   };
 
+  const allowed = async (chat: Chat, id: AcpId, label: string): Promise<boolean> => {
+    const key = adapterPackage(id);
+    if (deps.adapters.granted(key)) {
+      return true;
+    }
+    asking?.(false);
+    const answer = new Promise<boolean>((resolve) => (asking = resolve));
+    post({ kind: ToView.AiConsent, chat: chat.record.id, agent: id, label });
+    const allow = await answer;
+    if (allow) {
+      deps.adapters.grant(key);
+    }
+    return allow;
+  };
+
+  const consent = (allow: boolean) => {
+    const resolve = asking;
+    asking = null;
+    resolve?.(allow);
+  };
+
   async function connect(chat: Chat): Promise<boolean> {
     const { record } = chat;
     const agent = acpAgents(deps.env()).find((a) => a.id === record.agent);
@@ -170,14 +193,13 @@ export function aiChat(deps: AiChatDeps) {
       failed(`${agent.label} is not installed. Install it with: ${agent.install}`, record.id);
       return false;
     }
-    if (agent.adapter && !adapted.has(agent.id) && !(await deps.confirm(`Feega will run ${adapterPackage(agent.id)} with npx to talk to ${agent.label}. Continue?`, ADAPTER_ACTION))) {
+    if (agent.adapter && !(await allowed(chat, agent.id, agent.label))) {
       return false;
     }
     if (!room()) {
       failed(`${MAX_LIVE} chats are already working. Stop one or wait for it to finish.`, record.id);
       return false;
     }
-    adapted.add(agent.id);
     chat.opening = true;
     state(chat);
     try {
@@ -254,7 +276,7 @@ export function aiChat(deps: AiChatDeps) {
     const session = chat.live!;
     chat.watch = turnWatch(deps.root());
     await chat.watch.begin();
-    await session.send(context ? `${context}\n\n${text}` : text);
+    await session.send(context ? `${context}\n${deps.where()}\n\n${text}` : text);
     await chat.settling;
   }
 
@@ -338,6 +360,7 @@ export function aiChat(deps: AiChatDeps) {
       }
     },
     setConfig,
+    consent,
     setMode: async (id: string) => void (await current()?.live?.setMode(id)),
     start,
     send,

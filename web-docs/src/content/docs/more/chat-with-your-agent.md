@@ -1,6 +1,6 @@
 ---
 title: Chat with your coding agent
-description: Talk to Claude Code, Codex, OpenCode, Gemini CLI, Grok and other ACP agents from the AI tab, with the selected element attached.
+description: Talk to Claude Code, Codex, OpenCode, Gemini CLI, Grok Build and other ACP agents from the AI tab, with the selected element attached.
 sidebar:
   order: 7
 ---
@@ -17,15 +17,24 @@ Feega talks to agents over the [Agent Client Protocol](https://agentclientprotoc
 | --- | --- |
 | Claude Code | `npx @agentclientprotocol/claude-agent-acp` (adapter) |
 | Codex | `npx @agentclientprotocol/codex-acp` (adapter) |
+| Pi | `npx pi-acp` (adapter) |
 | OpenCode | `opencode acp` |
 | Gemini CLI | `gemini --acp` |
-| Grok | `grok agent stdio` |
+| Grok Build | `grok agent stdio` |
 | Cursor Agent | `cursor-agent acp` |
 | GitHub Copilot | `copilot --acp` |
 | Goose | `goose acp` |
 | Qwen Code | `qwen --acp` |
+| Kiro | `kiro-cli acp` |
+| Devin | `devin acp` |
+| Augment | `auggie --acp` |
+| Cline | `cline --acp` |
+| Kimi CLI | `kimi acp` |
+| Qoder | `qodercli --acp` |
+| Factory Droid | `droid exec --output-format acp` |
+| Mistral Vibe | `vibe-acp` |
 
-Claude Code and Codex need a small adapter. Feega asks before it runs it with npx, and never earlier.
+Claude Code, Codex and Pi need a small open-source adapter, downloaded once from npm. Feega asks inside the chat panel with **Connect** and **Cancel**, remembers the answer for that adapter version, and never runs it earlier.
 
 ## Talk to the website
 

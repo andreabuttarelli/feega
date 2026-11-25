@@ -147,6 +147,11 @@
     }
   }
 
+  function decide(allow: boolean) {
+    ai.consent = null;
+    tohost({ kind: ToHost.AiConsent, allow });
+  }
+
   function answer(id: string, optionId: string | null, name: string) {
     aiAnswered(id, name);
     tohost({ kind: ToHost.AiAnswer, id, optionId });
@@ -189,7 +194,7 @@
           {#each available as agent (agent.id)}
             <button type="button" class="agent-option" data-testid="ai-agent-option" data-agent={agent.id} onclick={() => pick(agent.id)}>
               {@render glyph(agent.id, agent.label, 14)}
-              <span class="agent-name">{agent.label}{agent.adapter ? ' (adapter)' : ''}</span>
+              <span class="agent-name">{agent.label}</span>
               {#if agent.id === ai.agent}<span class="dot {status.dot}"></span>{/if}
             </button>
           {/each}
@@ -238,7 +243,16 @@
   </header>
 
   <div class="thread" data-testid="ai-thread">
-    {#if !ai.items.length}
+    {#if ai.consent}
+      <div class="consent" data-testid="ai-consent">
+        <span class="empty-mark">{@render glyph(ai.consent.agent, ai.consent.label, 20)}</span>
+        <p>{ai.consent.label} connects through a small open-source adapter, downloaded once from npm.</p>
+        <div class="consent-actions">
+          <button type="button" class="connect" data-testid="ai-consent-allow" onclick={() => decide(true)}>Connect</button>
+          <button type="button" class="suggestion" data-testid="ai-consent-cancel" onclick={() => decide(false)}>Cancel</button>
+        </div>
+      </div>
+    {:else if !ai.items.length}
       <div class="empty" data-testid="ai-empty">
         {#if current}<span class="empty-mark">{@render glyph(current.id, current.label, 20)}</span>{/if}
         <p>{current ? `Ask ${current.label} to change what you selected.` : 'Pick an agent to start.'}</p>
@@ -573,6 +587,38 @@
     padding: 32px 8px 16px;
     color: var(--ui-text-2);
     text-align: center;
+  }
+
+  .consent {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    margin: 24px 8px 8px;
+    padding: 20px 16px;
+    border: 1px solid var(--ui-field-border);
+    border-radius: var(--ui-radius-lg);
+    color: var(--ui-text-2);
+    text-align: center;
+  }
+
+  .consent p {
+    margin: 0;
+  }
+
+  .consent-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .connect {
+    padding: 6px 12px;
+    border: 1px solid transparent;
+    border-radius: var(--ui-radius-md);
+    background: var(--ui-accent);
+    color: var(--ui-accent-ink);
+    font: inherit;
+    cursor: pointer;
   }
 
   .empty p {

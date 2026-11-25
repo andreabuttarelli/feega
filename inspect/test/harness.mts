@@ -87,11 +87,14 @@ export async function openPanel(appRoot: string, theme = DARK, cloud?: CommentsC
   });
   let aiPolicy = Policy.Ask;
   let aiStored: ChatRecord[] = [];
+  const grantedAdapters = new Set<string>();
   const ai = aiOverride
     ? aiChat({
         ...aiOverride,
         root: () => appRoot,
         confirm: async () => true,
+        where: () => `project: ${appRoot}`,
+        adapters: { granted: (key) => grantedAdapters.has(key), grant: (key) => void grantedAdapters.add(key) },
         post: reply,
         policy: { get: () => aiPolicy, set: (next) => (aiPolicy = next) },
         store: { load: () => aiStored, save: (records) => void (aiStored = records) },
@@ -143,6 +146,9 @@ export async function openPanel(appRoot: string, theme = DARK, cloud?: CommentsC
     }
     if (m.kind === ToHost.AiDelete) {
       await ai?.remove((m as unknown as { chat: string }).chat);
+    }
+    if (m.kind === ToHost.AiConsent) {
+      ai?.consent((m as unknown as { allow: boolean }).allow);
     }
     if (m.kind === ToHost.AiCancel) {
       await ai?.cancel();

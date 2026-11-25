@@ -21,7 +21,7 @@ await panel.pickAt('h1');
 await page.waitForTimeout(400);
 await page.locator('[data-testid=ai-tab]').click();
 await page.locator('[data-testid=ai-agent]').click();
-assert.equal(await page.locator('[data-testid=ai-agent-missing]').count(), 7, 'agents that are not installed sit dimmed inside the menu');
+assert.equal(await page.locator('[data-testid=ai-agent-missing]').count(), 16, 'agents that are not installed sit dimmed inside the menu');
 await page.screenshot({ path: join(SHOTS, '2-dropdown.png') });
 await page.locator('[data-testid=ai-agent-option][data-agent=opencode]').click();
 await page.locator('[data-testid=ai-state][aria-label=Ready]').waitFor({ timeout: 15_000 });
