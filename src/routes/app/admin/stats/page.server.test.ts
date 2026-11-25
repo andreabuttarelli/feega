@@ -5,7 +5,16 @@ const source = vi.hoisted(() => ({
   weekly: vi.fn(),
   retention: vi.fn(),
   funnel: vi.fn(),
-  signups: vi.fn()
+  signups: vi.fn(),
+  active: vi.fn(),
+  onboarding: vi.fn(),
+  features: vi.fn(),
+  agents: vi.fn(),
+  errors: vi.fn(),
+  frameworks: vi.fn(),
+  surfaces: vi.fn(),
+  diffs: vi.fn(),
+  editDims: vi.fn()
 }));
 const adminEmails = vi.hoisted(() => ({ value: 'boss@feega.app, second@feega.app' as string | undefined }));
 
@@ -18,7 +27,7 @@ vi.mock('$env/dynamic/private', () => ({
   }
 }));
 
-const FUNNEL = { installed: 12, opened: 11, onboarded: 6, started: 10, preview_ready: 8, first_edit: 5, signed_in: 3, multi_day: 2 };
+const FUNNEL = [{ step: 'first_seen', installs: 20 }, { step: 'project_detected', installs: 10 }, { step: 'first_edit', installs: 5 }, { step: 'returned_7d', installs: 1 }];
 const SIGNUPS = [{ week: '2026-11-16', total: 7, confirmed: 5 }];
 
 const { load } = await import('./+page.server');
@@ -31,6 +40,15 @@ beforeEach(() => {
   source.retention.mockReset().mockResolvedValue([{ cohort: '2026-11-02', installs: 10, w1: 5, w2: 3, w4: 2, w8: 0 }]);
   source.funnel.mockReset().mockResolvedValue(FUNNEL);
   source.signups.mockReset().mockResolvedValue(SIGNUPS);
+  source.active.mockReset().mockResolvedValue({ day: [{ period: '2026-11-24', installs: 18, signed_in: 4, anonymous: 14 }], week: [{ period: '2026-11-23', installs: 22, signed_in: 5, anonymous: 17 }] });
+  source.onboarding.mockReset().mockResolvedValue([]);
+  source.features.mockReset().mockResolvedValue([{ event: 'library_insert', events: 7, installs: 3 }]);
+  source.agents.mockReset().mockResolvedValue([]);
+  source.errors.mockReset().mockResolvedValue([]);
+  source.frameworks.mockReset().mockResolvedValue([{ framework: 'next', styling: 'tailwind', installs: 6 }]);
+  source.surfaces.mockReset().mockResolvedValue([]);
+  source.diffs.mockReset().mockResolvedValue([{ day: '2026-11-24', diffs: 40, manual: 30, ai: 10, reverted: 4, lines_added: 90, lines_removed: 30 }]);
+  source.editDims.mockReset().mockResolvedValue([{ dim: 'prop_category', value: 'spacing', diffs: 12 }, { dim: 'prop_category', value: 'color', diffs: 30 }, { dim: 'target', value: 'text', diffs: 5 }]);
 });
 
 describe('admin stats page', () => {
@@ -39,8 +57,41 @@ describe('admin stats page', () => {
 
     expect(data.weekly).toEqual([{ week: '2026-11-16', editor: 'cursor', installs: 4 }]);
     expect(data.retention[0]).toMatchObject({ cohort: '2026-11-02', installs: 10, w1: 50, w2: 30, w4: 20, w8: 0 });
-    expect(data.funnel).toEqual(FUNNEL);
+    expect(data.funnel).toEqual([{ step: 'first_seen', installs: 20, percent: 100 }, { step: 'project_detected', installs: 10, percent: 50 }, { step: 'first_edit', installs: 5, percent: 25 }, { step: 'returned_7d', installs: 1, percent: 5 }]);
     expect(data.signups).toEqual(SIGNUPS);
+  });
+
+  it('counts active installs on any event, split anonymous and signed in', async () => {
+    const data = await run({ email: 'boss@feega.app' });
+
+    expect(data.active.day[0]).toEqual({ period: '2026-11-24', installs: 18, signed_in: 4, anonymous: 14 });
+    expect(data.active.week[0].installs).toBe(22);
+  });
+
+  it('derives revert rate and manual versus AI share per day', async () => {
+    const data = await run({ email: 'boss@feega.app' });
+
+    expect(data.diffs[0]).toMatchObject({ day: '2026-11-24', diffs: 40, revertRate: 10, aiShare: 25 });
+  });
+
+  it('ranks property categories by diffs', async () => {
+    const data = await run({ email: 'boss@feega.app' });
+
+    expect(data.editDims.prop_category.map((row: { value: string }) => row.value)).toEqual(['color', 'spacing']);
+    expect(data.editDims.target).toEqual([{ value: 'text', diffs: 5 }]);
+  });
+
+  it('still shows the page when the new telemetry views are not migrated yet', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    source.features.mockRejectedValue(new Error('function does not exist'));
+    source.active.mockRejectedValue(new Error('function does not exist'));
+
+    const data = await run({ email: 'boss@feega.app' });
+
+    expect(data.features).toBeNull();
+    expect(data.active).toBeNull();
+    expect(data.signups).toEqual(SIGNUPS);
+    log.mockRestore();
   });
 
   it('lo shows the other blocks when one fails and logs the failure', async () => {
@@ -52,7 +103,7 @@ describe('admin stats page', () => {
     expect(data.signups).toBeNull();
     expect(data.weekly).toHaveLength(1);
     expect(data.retention).toHaveLength(1);
-    expect(data.funnel).toEqual(FUNNEL);
+    expect(data.funnel).toHaveLength(4);
     expect(log).toHaveBeenCalled();
     log.mockRestore();
   });

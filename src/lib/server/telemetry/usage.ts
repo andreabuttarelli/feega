@@ -14,19 +14,69 @@ const BAD_REQUEST = 400;
 const PAYLOAD_TOO_LARGE = 413;
 const TOO_MANY_REQUESTS = 429;
 
-const EVENTS = ['install', 'opened', 'session_start', 'preview_ready', 'first_edit', 'edit', 'session_end', 'sign_in', 'sign_out', 'session_resume', 'onboarding_started', 'onboarding_step', 'onboarding_finished', 'onboarding_skipped', 'setup_applied', 'setup_failed', 'skill_hint_shown', 'skill_installed', 'library_insert', 'plugin_installed', 'support_action'] as const;
+export const PRODUCT_EVENTS = ['project_detected', 'editor_opened', 'element_selected', 'edit_reverted', 'breakpoint_switch', 'state_switch', 'copy_for_agent', 'focus_opened', 'ai_agent_chosen', 'ai_session_started', 'ai_chat_created', 'ai_message_sent', 'ai_first_response', 'ai_tool_call', 'ai_permission', 'ai_cancel', 'ai_config_changed', 'ai_session_error', 'ai_session_ended', 'sign_in_prompted', 'share_action', 'cloud_action', 'mcp_tool_call', 'error_host', 'error_webview'] as const;
+const EVENTS = ['install', 'opened', 'session_start', 'preview_ready', 'first_edit', 'edit', 'session_end', 'sign_in', 'sign_out', 'session_resume', 'onboarding_started', 'onboarding_step', 'onboarding_finished', 'onboarding_skipped', 'setup_applied', 'setup_failed', 'skill_hint_shown', 'skill_installed', 'library_insert', 'plugin_installed', 'support_action', ...PRODUCT_EVENTS] as const;
 const FRAMEWORKS = ['sveltekit', 'nuxt', 'astro', 'react-router', 'next', 'gatsby', 'angular', 'cra', 'vite', 'generic'] as const;
 const EDIT_KINDS = ['text', 'style', 'image', 'attribute', 'structure', 'template', 'other'] as const;
-const EDITORS = ['vscode', 'cursor', 'windsurf', 'vscodium', 'npx'] as const;
-const STEPS = ['welcome', 'agent', 'sign_in', 'support'] as const;
+const EDITORS = ['vscode', 'cursor', 'windsurf', 'vscodium', 'other', 'npx'] as const;
+const STEPS = ['welcome', 'agent', 'agents', 'sign_in', 'support'] as const;
 const SUPPORT_ITEMS = ['star', 'follow_x', 'discord', 'coffee', 'share'] as const;
 const TIERS = ['free', 'pro'] as const;
+const STYLINGS = ['tailwind', 'css_modules', 'scss', 'styled_components', 'plain_css', 'inline', 'other'] as const;
+const IMPACTS = ['local', 'shared', 'global'] as const;
+const TARGETS = ['tailwind_class', 'scoped_css', 'inline_style', 'text', 'markup', 'library_insert', 'detach'] as const;
+const PROP_CATEGORIES = ['spacing', 'typography', 'color', 'layout', 'size', 'border', 'effect', 'text_content'] as const;
+const FILE_EXTS = ['tsx', 'jsx', 'ts', 'js', 'vue', 'svelte', 'astro', 'html', 'css', 'scss', 'sass', 'less', 'md', 'mdx', 'other'] as const;
+const BREAKPOINTS = ['base', 'sm', 'md', 'lg', 'xl', '2xl', 'custom'] as const;
+const STATES = ['default', 'hover', 'focus', 'active', 'disabled', 'dark', 'other'] as const;
+const SOURCES = ['manual', 'ai', 'revert'] as const;
+const OUTCOMES = ['kept', 'reverted', 'allow', 'reject', 'viewed', 'completed', 'skipped'] as const;
+const CONFIG_CATEGORIES = ['model', 'thought_level'] as const;
+const AREAS = ['host', 'webview', 'ai', 'edit', 'preview', 'library', 'cloud', 'mcp', 'other'] as const;
+const VARIANTS = ['focus', 'variant'] as const;
 const DEVICES = ['desktop', 'web', 'cli'] as const;
 
 const CI_HEADER = 'x-feega-ci';
 const SEMVER = /^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$/;
 
 const text = z.string().min(1).max(MAX_TEXT);
+const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$/;
+const identifier = z.string().regex(IDENTIFIER);
+const VALUE_ID = /^[A-Za-z0-9][A-Za-z0-9_.:/[\]-]{0,63}$/;
+const valueId = z.string().regex(VALUE_ID);
+const MAX_COUNT = 1_000_000;
+const count = z.number().int().min(0).max(MAX_COUNT);
+
+const productFields = {
+  styling: z.enum(STYLINGS).optional(),
+  impact: z.enum(IMPACTS).optional(),
+  target: z.enum(TARGETS).optional(),
+  prop_category: z.enum(PROP_CATEGORIES).optional(),
+  file_ext: z.enum(FILE_EXTS).optional(),
+  breakpoint: z.enum(BREAKPOINTS).optional(),
+  state: z.enum(STATES).optional(),
+  source: z.enum(SOURCES).optional(),
+  outcome: z.enum(OUTCOMES).optional(),
+  choice: valueId.optional(),
+  category: z.enum(CONFIG_CATEGORIES).optional(),
+  area: z.enum(AREAS).optional(),
+  variant: z.enum(VARIANTS).optional(),
+  agent: identifier.optional(),
+  library_item: identifier.optional(),
+  tool: identifier.optional(),
+  error_class: identifier.optional(),
+  action: identifier.optional(),
+  lines_added: count.optional(),
+  lines_removed: count.optional(),
+  files_count: count.optional(),
+  diff_count: count.optional(),
+  message_count: count.optional(),
+  chat_count: count.optional(),
+  live_count: count.optional(),
+  tool_count: count.optional()
+};
+
+export const PRODUCT_COLUMNS = Object.keys(productFields);
 
 const eventSchema = z.object({
   event: z.enum(EVENTS),
@@ -44,7 +94,8 @@ const eventSchema = z.object({
   signed_in: z.boolean().optional(),
   step: z.enum(STEPS).optional(),
   tier: z.enum(TIERS).optional(),
-  item: z.enum(SUPPORT_ITEMS).optional()
+  item: z.enum(SUPPORT_ITEMS).optional(),
+  ...productFields
 });
 
 const batchSchema = z.object({ events: z.array(eventSchema).min(1).max(MAX_EVENTS) });

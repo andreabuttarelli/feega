@@ -66,6 +66,17 @@ describe('usage sink', () => {
     expect(insert.mock.calls[2][0].map((r: UsageRow) => r.event)).toEqual(['edit']);
   });
 
+  it('strips the product columns and events when the table predates them', async () => {
+    const insert = vi.fn().mockResolvedValueOnce({ error: { code: '23503' } }).mockResolvedValueOnce({ error: null });
+
+    await makeSink(insert)([row({ event: 'edit', target: 'text' }), row({ event: 'element_selected' }), row({ event: 'install' })]);
+
+    const retried = insert.mock.calls[1][0];
+    expect(retried.map((r: UsageRow) => r.event)).toEqual(['edit', 'install']);
+    expect(retried[0]).not.toHaveProperty('target');
+    expect(retried[0]).toHaveProperty('framework');
+  });
+
   it('throws other errors', async () => {
     const insert = vi.fn().mockResolvedValue({ error: { code: '500' } });
 
