@@ -56,3 +56,13 @@ describe('impactView', () => {
     expect(impactView(null, 1)).toMatchObject({ label: 'Checking where this lands', tone: Tone.Pending });
   });
 });
+
+describe('class impact', () => {
+  it('says the class, its elements and files', () => {
+    const view = impactView({ kind: ImpactKind.Class, name: 'card', elements: 14, files: [{ file: 'a.html', line: 1 }, { file: 'b.html', line: 2 }] }, 1);
+
+    expect(view.label).toBe('.card in 14 elements, 2 files');
+    expect(view.tone).toBe(Tone.Shared);
+    expect(view.files).toHaveLength(2);
+  });
+});
