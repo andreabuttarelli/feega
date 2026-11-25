@@ -57,7 +57,7 @@ await esbuild({
   platform: 'node',
   format: 'cjs',
   target: 'node20',
-  external: ['svelte', 'svelte/*', '@vue/compiler-sfc', '@astrojs/compiler/sync'],
+  external: ['svelte', 'svelte/*', '@vue/compiler-sfc', '@astrojs/compiler/sync', '@babel/preset-*'],
   define: { 'import.meta.url': 'importMetaUrl' },
   banner: { js: "const importMetaUrl = require('node:url').pathToFileURL(__filename).href;" },
   footer: { js: 'module.exports = module.exports.default;' }
