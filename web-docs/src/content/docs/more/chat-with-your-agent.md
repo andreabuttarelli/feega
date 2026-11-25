@@ -15,9 +15,9 @@ Feega talks to agents over the [Agent Client Protocol](https://agentclientprotoc
 
 | Agent | Started as |
 | --- | --- |
-| Claude Code | `npx @agentclientprotocol/claude-agent-acp` (adapter) |
-| Codex | `npx @agentclientprotocol/codex-acp` (adapter) |
-| Pi | `npx pi-acp` (adapter) |
+| Claude Code | `@agentclientprotocol/claude-agent-acp` (adapter) |
+| Codex | `@agentclientprotocol/codex-acp` (adapter) |
+| Pi | `pi-acp` (adapter) |
 | OpenCode | `opencode acp` |
 | Gemini CLI | `gemini --acp` |
 | Grok Build | `grok agent stdio` |
@@ -34,7 +34,9 @@ Feega talks to agents over the [Agent Client Protocol](https://agentclientprotoc
 | Factory Droid | `droid exec --output-format acp` |
 | Mistral Vibe | `vibe-acp` |
 
-Claude Code, Codex and Pi need a small open-source adapter, downloaded once from npm. Feega asks inside the chat panel with **Connect** and **Cancel**, remembers the answer for that adapter version, and never runs it earlier.
+Claude Code, Codex and Pi need a small open-source adapter. Feega downloads it once from npm, at an exact pinned version, with your own `npm install` into its own storage folder (the extension's storage in VS Code, the `feega` cache folder for `npx feega`). Nothing is installed globally and no `npx` runs later: the adapter starts directly with Node.
+
+The download happens in the **Connect Feega to your agents** onboarding step, which shows "Feega downloads the Claude Code connector from npm" with its progress, or the first time you open a chat with that agent, which shows **Connecting…**. It needs Node.js with `npm` and a network connection once. If either is missing, the chat shows the reason with a **Retry** button. When Feega updates an adapter version, the old one is deleted.
 
 ## Talk to the website
 

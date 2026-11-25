@@ -14,7 +14,7 @@
   import { MOVES, Shortcut, isMac, needsBareFocus, shortcutOf, typingIn } from './selection-keys';
   import { Click, NONE, Surface, clickOf, contains, extend, keyOf, only, primary, refOf, siblingsOf, toggle, visibleRows, type Selection } from './selection';
   import type { SupportItem } from '../support';
-  import { AccountState, type AgentId, Mode, Onboarding, OnboardingOutcome, Move, ServerAction, Slot, type ChangeRow, type FontChoice, type LayerNode, type LibraryEntry, type Palette, ServerState, type ServerInfo, Styling, ToHost, ToView, WebviewUsage, type Impact, type ImpactAsk, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
+  import { AccountState, type AgentId, Mode, Onboarding, OnboardingOutcome, Move, ServerAction, Slot, type ChangeRow, type FontChoice, type LayerNode, type LibraryEntry, type Palette, ServerState, type ServerInfo, Styling, ToHost, ToView, WebviewUsage, type AdapterRow, type Impact, type ImpactAsk, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
   import { fromHost, inVscode, toHost } from './host';
   import { imageSaved } from './image-file.svelte';
   import { iconDrawn, iconsFound } from './icon-search.svelte';
@@ -282,6 +282,7 @@
   let onboarding = $state(Onboarding.Seen);
   let support = $state<SupportItem[]>([]);
   let agents = $state<AgentId[]>([]);
+  let adapters = $state<AdapterRow[]>([]);
 
   function finishOnboarding(outcome: OnboardingOutcome) {
     onboarding = Onboarding.Seen;
@@ -683,7 +684,7 @@
     [ToView.AiState]: aiHeard,
     [ToView.AiEvent]: aiHeard,
     [ToView.AiPolicy]: aiHeard,
-    [ToView.AiConsent]: aiHeard,
+    [ToView.Adapters]: (m) => (adapters = m.rows),
     [ToView.AiChats]: aiHeard,
     [ToView.AiChat]: aiHeard,
     [ToView.SkillHint]: (m) => (skillHint = m.command),
@@ -1607,7 +1608,7 @@
 </main>
 
 {#if onboarding === Onboarding.Pending}
-  <OnboardingDialog {account} {support} {agents} oncopy={(text) => toHost({ kind: ToHost.Copy, text })} onlink={(url) => toHost({ kind: ToHost.External, url })} onaccount={(kind) => toHost({ kind })} onsupport={(item) => toHost({ kind: ToHost.Support, item })} onstep={(step) => toHost({ kind: ToHost.OnboardingStep, step })} ondone={finishOnboarding} />
+  <OnboardingDialog {account} {support} {agents} {adapters} oncopy={(text) => toHost({ kind: ToHost.Copy, text })} onlink={(url) => toHost({ kind: ToHost.External, url })} onaccount={(kind) => toHost({ kind })} onsupport={(item) => toHost({ kind: ToHost.Support, item })} onstep={(step) => toHost({ kind: ToHost.OnboardingStep, step })} ondone={finishOnboarding} />
 {/if}
 
 <style>

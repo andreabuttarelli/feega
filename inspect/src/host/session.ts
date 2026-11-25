@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join, relative, resolve } from 'node:path';
 import { appsIn } from '@feega/dev-run/run-plan';
 import { AddKind, type AddPlace } from '@feega/live-edit/add-node';
@@ -50,11 +51,13 @@ import { dependenciesOf, offerInstall } from './install-offer';
 import { HintSurface, SKILL_COMMAND, hintDue, installedAfterHint } from './skill-hint';
 import { install } from './dev-server';
 import { SUPPORT_ITEMS } from '../support';
+import { adapters, runNpm } from './ai/adapters';
 import { aiChat, type ChatRecord } from './ai/ai-chat';
 import { policyOf } from './ai/permission-policy';
 import { openAcpAgent } from './ai/acp-session';
 import { machineEnv } from './agents';
 
+const ADAPTER_DIR = 'feega-adapters';
 const START_WITH_FEEGA = 'Start with Feega';
 const PICK_TIMEOUT_MS = 3000;
 const SYNC_SELECTION_DELAY_MS = 200;
@@ -139,10 +142,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     open: platform.ai?.open ?? openAcpAgent,
     confirm: (question, yes) => platform.confirm(question, yes),
     where: () => [`project: ${root}`, running ? `dev server: ${running.url}` : null].filter(Boolean).join('\n'),
-    adapters: {
-      granted: (key) => (platform.stored<string[]>(Stored.AiAdapters) ?? []).includes(key),
-      grant: (key) => void platform.store(Stored.AiAdapters, [...(platform.stored<string[]>(Stored.AiAdapters) ?? []), key])
-    },
+    adapters: platform.ai?.adapters ?? adapters({ dir: platform.adapterDir ?? join(tmpdir(), ADAPTER_DIR), node: { command: process.execPath, env: { ELECTRON_RUN_AS_NODE: '1' } }, npm: runNpm }),
     post: (message) => (message.kind === ToView.AiEvent && aiStats?.heard(message.event), platform.send(message)),
     store: { load: () => platform.stored<ChatRecord[]>(Stored.AiChats) ?? [], save: (records) => void platform.store(Stored.AiChats, records) },
     now: Date.now,
@@ -771,7 +771,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.SignIn]: startSignIn,
     [ToHost.CancelSignIn]: () => signing?.abort(),
     [ToHost.SignOut]: signOut,
-    [ToHost.OnboardingStep]: (m) => ((onboardingStep = m.step), usage?.track(UsageKind.OnboardingStep, { step: m.step, outcome: 'viewed' })),
+    [ToHost.OnboardingStep]: (m) => ((onboardingStep = m.step), usage?.track(UsageKind.OnboardingStep, { step: m.step, outcome: 'viewed' }), m.step === OnboardingStep.Agents && void ai.prepare()),
     [ToHost.OnboardingDone]: (m) => (onboardingStep && usage?.track(UsageKind.OnboardingStep, { step: onboardingStep, outcome: ONBOARDING_OUTCOME[m.outcome] }), usage?.track(ONBOARDING_END[m.outcome]), platform.onboarding.markSeen()),
     [ToHost.Support]: (m) => supportAct(m.item),
     [ToHost.SkillHintDismiss]: dismissSkillHint,
@@ -812,7 +812,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.AiOpen]: (m) => ai.open(m.chat),
     [ToHost.AiRename]: (m) => ai.rename(m.chat, m.title),
     [ToHost.AiDelete]: (m) => void ai.remove(m.chat),
-    [ToHost.AiConsent]: (m) => ai.consent(m.allow),
+    [ToHost.AiRetry]: () => void ai.retry(),
     [ToHost.AiPolicy]: (m) => ai.setPolicy(m.policy)
   };
 

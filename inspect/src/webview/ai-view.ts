@@ -16,7 +16,7 @@ export const SUGGESTIONS = ['Make this more spacious', 'Match the button styles'
 
 const STATUS: Record<AiState, Status> = {
   [AiState.Idle]: { label: 'Not connected', dot: Dot.Grey },
-  [AiState.Starting]: { label: 'Starting…', dot: Dot.Amber },
+  [AiState.Starting]: { label: 'Connecting…', dot: Dot.Amber },
   [AiState.Ready]: { label: 'Ready', dot: Dot.Green },
   [AiState.Busy]: { label: 'Working…', dot: Dot.Amber }
 };

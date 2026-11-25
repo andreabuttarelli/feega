@@ -228,7 +228,7 @@ export enum ToHost {
   AiOpen = 'ai-open',
   AiRename = 'ai-rename',
   AiDelete = 'ai-delete',
-  AiConsent = 'ai-consent',
+  AiRetry = 'ai-retry',
   Usage = 'usage'
 }
 
@@ -249,6 +249,14 @@ export type ChangeRow = { id: number; at: string; prop: string; value: string; s
 export type Prefs = { size: string; custom: number | null; barClosed: boolean; route?: string; anchor?: string; barWidth?: number; leftWidth?: number; leftClosed?: boolean; layers?: Record<string, { hidden: string[]; locked: string[] }> };
 
 export type ChatRow = { id: string; agent: AcpId; title: string; updatedAt: number; running: boolean };
+
+export enum AdapterState {
+  Installing = 'installing',
+  Ready = 'ready',
+  Failed = 'failed'
+}
+
+export type AdapterRow = { agent: AcpId; label: string; state: AdapterState; reason?: string };
 
 export enum AiState {
   Idle = 'idle',
@@ -290,7 +298,7 @@ export enum ToView {
   AiPolicy = 'ai-policy',
   AiChats = 'ai-chats',
   AiChat = 'ai-chat',
-  AiConsent = 'ai-consent'
+  Adapters = 'adapters'
 }
 
 export enum ShareState {
@@ -410,7 +418,7 @@ export type HostMessage =
   | { kind: ToHost.AiOpen; chat: string }
   | { kind: ToHost.AiRename; chat: string; title: string }
   | { kind: ToHost.AiDelete; chat: string }
-  | { kind: ToHost.AiConsent; allow: boolean };
+  | { kind: ToHost.AiRetry };
 
 export type Authored = HostMessage & { by?: Author };
 
@@ -446,7 +454,7 @@ export type ViewMessage =
   | { kind: ToView.AiEvent; event: AgentEvent; chat?: string }
   | { kind: ToView.AiPolicy; policy: Policy }
   | { kind: ToView.AiChats; chats: ChatRow[]; active: string | null }
-  | { kind: ToView.AiConsent; chat: string; agent: AcpId; label: string }
+  | { kind: ToView.Adapters; rows: AdapterRow[] }
   | { kind: ToView.AiChat; chat: string | null; agent?: AcpId; state: AiState; items: Item[]; modes: ModeView[]; mode: string | null; configs: ConfigView[] };
 
 export const INSPECT = 'feega:inspect';
