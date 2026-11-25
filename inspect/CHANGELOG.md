@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.0
+
+The Feega desktop app: signed for macOS, with a first-run tour, new projects from templates, automatic updates with an in-app notice, and builds for Windows and Linux. Notifications when a chat agent finishes or asks for permission. Edits to nested CSS rules in plain stylesheets are written to the source. A ShaderGradient community plugin. Typography controls get full-width rows. Fixed `npx feega` attaching to its own editor port.
+
 ## 0.2.19
 
 Focus mode edits every kind of prop, applies them to the page, reads real Svelte and Astro values, says why it shows a snapshot, and opens at 100% on a grey canvas with zoom and a light/dark switch. A Classes panel edits plain CSS classes globally. The AI tab installs agent connectors once, adds more agents with their logos, sends the page you are on, and lets the agent take screenshots. The toolbar docks to an edge; notices have a close button. Fixed a duplicate body row in Layers and page styles in projects without a global stylesheet.
