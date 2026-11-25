@@ -14,10 +14,10 @@ export const DOWNLOAD_PAGE = {
   desktop: {
     heading: 'desktop app (beta)',
     lead: 'a standalone app for macOS, Windows and Linux. one tab per folder, no editor needed. it updates itself.',
-    terminalLabel: 'install from the terminal',
+    terminalLabel: 'or install from the terminal',
     command: DESKTOP_INSTALL_COMMAND,
     terminalNote: 'macOS and Linux. downloads the app; on macOS it also opens it.',
-    downloadsLabel: 'or download for your system',
+    downloadsLabel: 'download for your system',
     macNote: 'signed and notarized by Apple.',
     windowsNote: 'Windows may show "Windows protected your PC": click More info, then Run anyway.',
     linuxNote: 'make it executable, then run it:',

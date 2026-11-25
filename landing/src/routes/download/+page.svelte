@@ -41,6 +41,27 @@
     <p class="lead">{DOWNLOAD_PAGE.lead}</p>
     <p class="version">{DOWNLOAD_PAGE.version} · <a href="/changelog">what's new</a></p>
 
+    {#if DESKTOP_PUBLISHED}
+      <h2 class="titled"><img src="/img/feega-desktop.png" alt="" width="36" height="36" />{desktop.heading}</h2>
+      <p class="lead small">{desktop.lead}</p>
+      <h3>{desktop.downloadsLabel}</h3>
+      <ul class="systems">
+        {#each systems as system (system.name)}
+          <li class="system">
+            <p class="system-head"><span class="logo">{@html system.icon}</span><span class="name">{system.name}</span>{#if 'badge' in system}<span class="badge">{system.badge}</span>{/if}</p>
+            {#each system.files as file (file.target)}
+              <a class="install" href={file.href} {...eventAttrs('download_click', { target: file.target, place: 'download_page' })}>{file.label}</a>
+            {/each}
+            <p class="note">{system.note}</p>
+            {#if 'command' in system}<CommandField command={system.command} />{/if}
+          </li>
+        {/each}
+      </ul>
+      <h3>{desktop.terminalLabel}</h3>
+      <CommandField command={desktop.command} />
+      <p class="note">{desktop.terminalNote}</p>
+    {/if}
+
     <h2>{DOWNLOAD_PAGE.editorsHeading}</h2>
     <ul class="cards">
       {#each editors as option (option.label)}
@@ -57,26 +78,6 @@
     <CommandField command={terminal.command} />
     <p class="note">{terminal.line} {terminal.requirement}.</p>
 
-    {#if DESKTOP_PUBLISHED}
-      <h2 class="titled"><img src="/img/feega-desktop.png" alt="" width="36" height="36" />{desktop.heading}</h2>
-      <p class="lead small">{desktop.lead}</p>
-      <h3>{desktop.terminalLabel}</h3>
-      <CommandField command={desktop.command} />
-      <p class="note">{desktop.terminalNote}</p>
-      <h3>{desktop.downloadsLabel}</h3>
-      <ul class="systems">
-        {#each systems as system (system.name)}
-          <li class="system">
-            <p class="system-head"><span class="logo">{@html system.icon}</span><span class="name">{system.name}</span>{#if 'badge' in system}<span class="badge">{system.badge}</span>{/if}</p>
-            {#each system.files as file (file.target)}
-              <a class="install" href={file.href} {...eventAttrs('download_click', { target: file.target, place: 'download_page' })}>{file.label}</a>
-            {/each}
-            <p class="note">{system.note}</p>
-            {#if 'command' in system}<CommandField command={system.command} />{/if}
-          </li>
-        {/each}
-      </ul>
-    {/if}
 
     <h2>{DOWNLOAD_PAGE.requirements.heading}</h2>
     <ul class="reqs">
