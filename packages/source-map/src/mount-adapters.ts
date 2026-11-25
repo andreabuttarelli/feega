@@ -46,7 +46,7 @@ export const ADAPTERS: Record<MountFramework, MountAdapter> = {
     },
     seedsProps: true
   },
-  [MountFramework.Astro]: { module: astroModule, controls: (code) => astroControlsOf(code), seedsProps: false }
+  [MountFramework.Astro]: { module: astroModule, controls: (code) => astroControlsOf(code), seedsProps: true }
 };
 
 const BY_EXTENSION: [RegExp, MountFramework][] = [

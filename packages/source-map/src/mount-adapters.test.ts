@@ -14,6 +14,12 @@ describe('adapterOf', () => {
     expect(ADAPTERS[MountFramework.Astro].controls('---\n---\n<p />', 'Card.astro', 'Card', '/')).toBeNull();
   });
 
+  it('seeds the props of Astro and Svelte components, which have none on the page', () => {
+    expect(ADAPTERS[MountFramework.Astro].seedsProps).toBe(true);
+    expect(ADAPTERS[MountFramework.Svelte].seedsProps).toBe(true);
+    expect(ADAPTERS[MountFramework.React].seedsProps).toBe(false);
+  });
+
   it('reads the Props of an Astro component', () => {
     const code = '---\ninterface Props { title: string }\nconst { title } = Astro.props;\n---\n<h1>{title}</h1>';
 
