@@ -1205,3 +1205,77 @@ pre {
 .pill.strong {
   color: var(--sx-ink);
 }
+
+.pill.small svg {
+  margin-right: 6px;
+}
+
+.onb-faq {
+  width: 100%;
+  margin-top: 8px;
+  text-align: left;
+}
+
+.onb-question {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 0;
+  color: var(--sx-ink-2);
+  font-size: 13px;
+  text-align: left;
+}
+
+.onb-question:hover {
+  color: var(--sx-ink);
+}
+
+.onb-question span:last-child {
+  display: flex;
+  transition: transform 200ms var(--ease);
+}
+
+.onb-faq.open .onb-question span:last-child {
+  transform: rotate(180deg);
+}
+
+.onb-answer {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 200ms var(--ease);
+}
+
+.onb-faq.open .onb-answer {
+  grid-template-rows: 1fr;
+}
+
+.onb-answer p {
+  margin: 0;
+  overflow: hidden;
+  color: var(--sx-ink-3);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.onb-snackbar {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10px 16px;
+  border-radius: var(--sx-radius-md);
+  background: var(--sx-ink);
+  color: #000;
+  font-size: 14px;
+  white-space: nowrap;
+  animation: snack-in 200ms var(--ease) both;
+}
+
+@keyframes snack-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+}

@@ -503,6 +503,13 @@
     composing = false;
   }
 
+  function copyText(text: string) {
+    toHost({ kind: ToHost.Copy, text });
+    if (!inVscode) {
+      void navigator.clipboard?.writeText(text);
+    }
+  }
+
   function copyComment(comment: CloudComment, replies: CloudComment[]) {
     const text = commentContext(comment, replies);
     if (inVscode) {
@@ -1742,7 +1749,7 @@
 </main>
 
 {#if onboarding === Onboarding.Pending}
-  <OnboardingDialog {account} {support} {agents} {adapters} oncopy={(text) => toHost({ kind: ToHost.Copy, text })} onlink={(url) => toHost({ kind: ToHost.External, url })} onaccount={(kind) => toHost({ kind })} onsupport={(item) => toHost({ kind: ToHost.Support, item })} onstep={(step) => toHost({ kind: ToHost.OnboardingStep, step })} ondone={finishOnboarding} />
+  <OnboardingDialog {account} {support} {agents} {adapters} oncopy={copyText} onlink={(url) => toHost({ kind: ToHost.External, url })} onaccount={(kind) => toHost({ kind })} onsupport={(item) => toHost({ kind: ToHost.Support, item })} onstep={(step) => toHost({ kind: ToHost.OnboardingStep, step })} ondone={finishOnboarding} />
 {/if}
 
 <style>

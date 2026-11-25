@@ -4,6 +4,11 @@ import { PixelIcon } from '@feega/pixel-icons/pixel';
 export type Slide = { step: OnboardingStep; icon: PixelIcon; title: string; body: string; more?: string };
 
 export const MCP_COMMAND = 'claude mcp add feega -- npx -y feega mcp';
+export const SKILL_COMMAND = 'npx skills add andreabuttarelli/feega';
+export const SKILL_TITLE = 'Install the Feega skill';
+export const SKILL_DETAIL = 'Lets your agent drive Feega';
+export const FAQ_QUESTION = "How do I pass a UI element's references to my agent?";
+export const FAQ_ANSWER = 'Right-click any element in the preview and choose Copy for agent. Paste it into your agent: it gets the file, the selector and the view.';
 export const MCP_DOCS_URL = 'https://docs.feega.app/more/connect-your-agent-via-mcp/';
 
 export const SLIDES: Slide[] = [

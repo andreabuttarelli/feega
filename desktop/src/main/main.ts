@@ -1,4 +1,4 @@
-import { BrowserWindow, app, dialog, ipcMain, nativeImage, nativeTheme, shell } from 'electron';
+import { BrowserWindow, app, clipboard, dialog, ipcMain, nativeImage, nativeTheme, shell } from 'electron';
 import { basename, join, resolve } from 'node:path';
 import { accountStore } from './account';
 import { SCHEME, acceptDeepLink, linkOfArgv } from './deep-link';
@@ -186,6 +186,7 @@ app.whenReady().then(() => {
     settings.replayOnboarding();
     publish();
   });
+  ipcMain.handle(Channel.Copy, (_event, text: string) => clipboard.writeText(text));
   ipcMain.handle(Channel.OpenUrl, (_event, url: string) => (onboardingUrlAllowed(url) ? shell.openExternal(url) : undefined));
   ipcMain.handle(Channel.DismissInvite, () => {
     settings.dismissInvite();

@@ -34,6 +34,7 @@ type Bridge = {
   finishOnboarding: () => Promise<void>;
   replayOnboarding: () => Promise<void>;
   openUrl: (url: string) => Promise<void>;
+  copy: (text: string) => Promise<void>;
   onSettings: (listener: () => void) => void;
   onState: (listener: (state: ShellState) => void) => void;
 };
@@ -468,6 +469,7 @@ const onboardingDeps: OnboardingDeps = {
   signIn: () => bridge.signIn(),
   cancelSignIn: () => bridge.cancelSignIn(),
   openUrl: (url) => bridge.openUrl(url),
+  copy: (text) => bridge.copy(text),
   finish: async () => {
     route = Route.Home;
     await bridge.finishOnboarding();

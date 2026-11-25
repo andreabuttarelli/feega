@@ -1,11 +1,13 @@
 <script lang="ts">
   import Check from '@lucide/svelte/icons/check';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import X from '@lucide/svelte/icons/x';
   import { onMount } from 'svelte';
   import { AccountState, AdapterState, AgentId, OnboardingOutcome, OnboardingStep, ToHost, type AdapterRow } from '../messages';
   import type { SupportItem } from '../support';
   import { AGENT_LOGOS } from './agent-logos';
-  import { MCP_COMMAND, MCP_DOCS_URL, SLIDES } from './onboarding-slides';
+  import { FAQ_ANSWER, FAQ_QUESTION, MCP_COMMAND, MCP_DOCS_URL, SKILL_COMMAND, SKILL_DETAIL, SKILL_TITLE, SLIDES } from './onboarding-slides';
+  import { SNACKBAR_TEXT, copyFeedback, type Feedback } from './onboarding-copy';
   import Pixel from '@feega/pixel-icons/Pixel.svelte';
   import SupportList from './SupportList.svelte';
 
@@ -13,7 +15,19 @@
 
   const STATUS: Record<AdapterState, string> = { [AdapterState.Installing]: 'Downloading…', [AdapterState.Ready]: 'Ready', [AdapterState.Failed]: 'Could not download' };
 
+  const MCP_KEY = 'mcp';
+  const SKILL_KEY = 'skill';
+
   let index = $state(0);
+  let feedback = $state<Feedback>({ copied: null, snackbar: false });
+  let faqOpen = $state(false);
+  const feel = copyFeedback((next) => (feedback = next));
+
+  function copy(key: string, text: string) {
+    oncopy(text);
+    feel(key);
+  }
+
   let dialog = $state<HTMLDivElement | null>(null);
 
   const slide = $derived(SLIDES[index]);
@@ -85,15 +99,30 @@
               <span class="text"><span class="label">Feega downloads the {row.label} connector from npm</span><span class="detail">{STATUS[row.state]}{row.reason ? `: ${row.reason}` : ''}</span></span>
             </li>
           {/each}
-          <li><span class="text"><span class="label">Copy for agent</span><span class="detail">Right-click any element</span></span></li>
+          <li>
+            <span class="text"><span class="label">{SKILL_TITLE}</span><span class="detail">{SKILL_DETAIL}</span></span>
+            <span class="actions">
+              <button type="button" class="action" class:copied={feedback.copied === SKILL_KEY} data-testid="onboarding-skill-copy" onclick={() => copy(SKILL_KEY, SKILL_COMMAND)}>
+                {#if feedback.copied === SKILL_KEY}<Check size={12} strokeWidth={3} />Copied{:else}Copy command{/if}
+              </button>
+            </span>
+          </li>
           <li>
             <span class="text"><span class="label">MCP</span><span class="detail">Your agent reads your selection</span></span>
             <span class="actions">
               <button type="button" class="ghost" data-testid="onboarding-mcp-docs" onclick={() => onlink(MCP_DOCS_URL)}>docs</button>
-              <button type="button" class="action" data-testid="onboarding-mcp-copy" onclick={() => oncopy(MCP_COMMAND)}>Copy setup</button>
+              <button type="button" class="action" data-testid="onboarding-mcp-copy" class:copied={feedback.copied === MCP_KEY} onclick={() => copy(MCP_KEY, MCP_COMMAND)}>
+                {#if feedback.copied === MCP_KEY}<Check size={12} strokeWidth={3} />Copied{:else}Copy setup{/if}
+              </button>
             </span>
           </li>
         </ul>
+        <div class="faq" class:open={faqOpen}>
+          <button type="button" class="question" data-testid="onboarding-faq" aria-expanded={faqOpen} onclick={() => (faqOpen = !faqOpen)}>
+            <span>{FAQ_QUESTION}</span><ChevronDown size={14} />
+          </button>
+          <div class="answer"><p>{FAQ_ANSWER}</p></div>
+        </div>
       {/if}
 
       {#if signing}
@@ -132,6 +161,7 @@
       </div>
     </footer>
   </div>
+  {#if feedback.snackbar}<div class="snackbar" role="status" data-testid="onboarding-snackbar">{SNACKBAR_TEXT}</div>{/if}
 </div>
 
 <style>
@@ -301,8 +331,92 @@
     cursor: pointer;
   }
 
+  .action {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: background 150ms ease, color 150ms ease;
+  }
+
   .action:hover {
     filter: brightness(1.15);
+  }
+
+  .action.copied {
+    background: var(--ui-text);
+    color: var(--ui-panel);
+  }
+
+  .faq {
+    margin-top: 8px;
+    text-align: left;
+  }
+
+  .question {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+    padding: 6px 0;
+    border: 0;
+    background: none;
+    color: var(--ui-text-2);
+    font: inherit;
+    font-size: var(--ui-text-xs);
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .question:hover {
+    color: var(--ui-text);
+  }
+
+  .question :global(svg) {
+    flex: none;
+    transition: transform 200ms ease;
+  }
+
+  .faq.open .question :global(svg) {
+    transform: rotate(180deg);
+  }
+
+  .answer {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 200ms ease;
+  }
+
+  .faq.open .answer {
+    grid-template-rows: 1fr;
+  }
+
+  .answer p {
+    overflow: hidden;
+    color: var(--ui-text-3);
+    font-size: var(--ui-text-xs);
+    text-wrap: pretty;
+  }
+
+  .snackbar {
+    position: absolute;
+    bottom: var(--ui-space-2);
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 8px 12px;
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-text);
+    color: var(--ui-panel);
+    font-size: var(--ui-text-xs);
+    white-space: nowrap;
+    animation: snack-in 200ms ease both;
+  }
+
+  @keyframes snack-in {
+    from {
+      opacity: 0;
+      transform: translate(-50%, 8px);
+    }
   }
 
   .account {

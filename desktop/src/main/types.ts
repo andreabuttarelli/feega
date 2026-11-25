@@ -70,5 +70,6 @@ export enum Channel {
   ClearProject = 'clear-project',
   FinishOnboarding = 'finish-onboarding',
   ReplayOnboarding = 'replay-onboarding',
-  OpenUrl = 'open-url'
+  OpenUrl = 'open-url',
+  Copy = 'copy'
 }
