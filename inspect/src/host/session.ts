@@ -139,6 +139,11 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     env: platform.ai?.env ?? (() => machineEnv()),
     open: platform.ai?.open ?? openAcpAgent,
     confirm: (question, yes) => platform.confirm(question, yes),
+    where: () => [`project: ${root}`, running ? `dev server: ${running.url}` : null].filter(Boolean).join('\n'),
+    adapters: {
+      granted: (key) => (platform.stored<string[]>(Stored.AiAdapters) ?? []).includes(key),
+      grant: (key) => void platform.store(Stored.AiAdapters, [...(platform.stored<string[]>(Stored.AiAdapters) ?? []), key])
+    },
     post: (message) => (message.kind === ToView.AiEvent && aiStats?.heard(message.event), platform.send(message)),
     store: { load: () => platform.stored<ChatRecord[]>(Stored.AiChats) ?? [], save: (records) => void platform.store(Stored.AiChats, records) },
     now: Date.now,
@@ -835,6 +840,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.AiOpen]: (m) => ai.open(m.chat),
     [ToHost.AiRename]: (m) => ai.rename(m.chat, m.title),
     [ToHost.AiDelete]: (m) => void ai.remove(m.chat),
+    [ToHost.AiConsent]: (m) => ai.consent(m.allow),
     [ToHost.AiPolicy]: (m) => ai.setPolicy(m.policy)
   };
 

@@ -1,7 +1,9 @@
 import type { CloudComment } from '../host/cloud-api';
 import type { Pick, Source } from '../messages';
 
-export type AgentView = { route: string; width: number; breakpoint?: string; theme?: string; state?: string };
+export type FocusedComponent = { name: string; source: Source };
+
+export type AgentView = { route: string; width: number; breakpoint?: string; theme?: string; state?: string; focus?: FocusedComponent };
 
 const place = (s: Source) => `${s.file}:${s.line}:${s.col}`;
 
@@ -13,13 +15,16 @@ const elementLines = (pick: Pick): string[] =>
   present([`source: ${place(pick.source)}`, `selector: ${selectorOf(pick)}`, pick.component ? `component: ${place(pick.component)}` : null, pick.instances > 1 ? `instance: ${pick.instanceIndex + 1} of ${pick.instances}` : null]);
 
 const viewLines = (view: AgentView): string[] =>
-  present([`page: ${view.route}`, `preview: ${view.width}px`, view.breakpoint ? `breakpoint: ${view.breakpoint}` : null, view.theme ? `theme: ${view.theme}` : null, view.state ? `state: ${view.state}` : null]);
+  present([`page: ${view.route}`, `preview: ${view.width}px`, view.breakpoint ? `breakpoint: ${view.breakpoint}` : null, view.theme ? `theme: ${view.theme}` : null, view.state ? `state: ${view.state}` : null, view.focus ? `focused component: ${view.focus.name} (${place(view.focus.source)})` : null]);
 
 export const agentContext = (pick: Pick, view: AgentView): string => ['Feega selection', ...elementLines(pick), ...viewLines(view)].join('\n');
 
 const numbered = (pick: Pick, i: number): string => elementLines(pick).map((line, at) => (at === 0 ? `${i + 1}. ${line}` : `   ${line}`)).join('\n');
 
 export function agentContexts(picks: Pick[], view: AgentView): string {
+  if (picks.length === 0) {
+    return ['Feega page', ...viewLines(view)].join('\n');
+  }
   if (picks.length === 1) {
     return agentContext(picks[0], view);
   }

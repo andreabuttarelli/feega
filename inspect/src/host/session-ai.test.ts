@@ -107,6 +107,19 @@ describe('the AI panel in the session', () => {
     await session.stop();
   });
 
+  it('tells the agent the project and the page it is looking at', async () => {
+    const { send, sent, dir, session } = setup();
+
+    await send({ kind: ToHost.AiStart, agent: AcpId.OpenCode });
+    await send({ kind: ToHost.AiSend, text: 'echo', context: 'Feega page\npage: /pricing' });
+    await eventually(() => sent.some((m) => m.kind === ToView.AiEvent && m.event.kind === AgentEventKind.Done));
+
+    const reply = sent.flatMap((m) => (m.kind === ToView.AiEvent && m.event.kind === AgentEventKind.Text ? [m.event.text] : [])).join('');
+    expect(reply).toContain('page: /pricing');
+    expect(reply).toContain(`project: ${dir}`);
+    await session.stop();
+  });
+
   it('refuses an agent that is not installed', async () => {
     const { send, events } = setup([]);
 
@@ -116,12 +129,15 @@ describe('the AI panel in the session', () => {
     expect(failed && failed.kind === AgentEventKind.Failed && failed.reason).toContain('npm i -g opencode-ai');
   });
 
-  it('runs an npx adapter only after the user agrees', async () => {
-    const { send, events, asked, states } = setup(['/home/none/.claude'], false);
+  it('runs an npx adapter only after the user allows it in the chat', async () => {
+    const { send, events, asked, states, sent } = setup(['/home/none/.claude']);
 
-    await send({ kind: ToHost.AiStart, agent: AcpId.Claude });
+    const starting = send({ kind: ToHost.AiStart, agent: AcpId.Claude });
+    await eventually(() => sent.some((m) => m.kind === ToView.AiConsent));
+    await send({ kind: ToHost.AiConsent, allow: false });
+    await starting;
 
-    expect(asked[0]).toContain('@agentclientprotocol/claude-agent-acp');
+    expect(asked).toEqual([]);
     expect(states()).not.toContain(AiState.Ready);
     expect(events()).toEqual([]);
   });

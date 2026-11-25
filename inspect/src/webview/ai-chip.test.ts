@@ -35,3 +35,15 @@ describe('the readable chip', () => {
     expect(chipView('Feega selection: 3 elements\npage: /')).toEqual({ icon: ChipIcon.Many, name: '3 elements', place: '', title: '3 elements' });
   });
 });
+
+describe('the chip without a selection', () => {
+  it('names the focused component and its file', () => {
+    const text = ['Feega page', 'page: /', 'focused component: InstallCta (src/InstallCta.svelte:12:1)'].join('\n');
+
+    expect(chipView(text)).toMatchObject({ name: 'InstallCta', place: 'InstallCta.svelte:12', title: 'src/InstallCta.svelte:12' });
+  });
+
+  it('falls back to the page route', () => {
+    expect(chipView('Feega page\npage: /pricing\npreview: 1280px')).toMatchObject({ name: 'Page', place: '/pricing' });
+  });
+});

@@ -1,5 +1,5 @@
 import { AgentId, AiState } from '../messages';
-import { AGENT_LOGOS, type AgentLogo } from './agent-logos';
+import { ACP_LOGOS, AGENT_LOGOS, type AgentLogo } from './agent-logos';
 import { POLICY_ROWS, type Policy } from '../host/ai/permission-policy';
 import type { ConfigCategory, ConfigView, ModeView } from '../host/ai/agent-session';
 import { ItemKind, type Item } from '../host/ai/transcript';
@@ -31,7 +31,7 @@ export type AgentMark = { logo: AgentLogo | null; initial: string };
 
 export function markOf(id: string, label: string): AgentMark {
   const logoId = LOGO_IDS[id];
-  return { logo: logoId ? AGENT_LOGOS[logoId] : null, initial: label.charAt(0).toUpperCase() };
+  return { logo: logoId ? AGENT_LOGOS[logoId] : (ACP_LOGOS[id] ?? null), initial: label.charAt(0).toUpperCase() };
 }
 
 export const isThinking = (busy: boolean, items: Item[]): boolean => {

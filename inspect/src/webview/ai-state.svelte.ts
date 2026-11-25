@@ -4,7 +4,7 @@ import { AgentEventKind, type ConfigView, type ModeView } from '../host/ai/agent
 import { Policy } from '../host/ai/permission-policy';
 import { answered, heard, said, type Item } from '../host/ai/transcript';
 
-export const ai = $state<{ agents: AcpAgent[]; state: AiState; agent: string | null; items: Item[]; modes: ModeView[]; mode: string | null; configs: ConfigView[]; policy: Policy; chats: ChatRow[]; chat: string | null }>({ agents: [], state: AiState.Idle, agent: null, items: [], modes: [], mode: null, configs: [], policy: Policy.Ask, chats: [], chat: null });
+export const ai = $state<{ agents: AcpAgent[]; state: AiState; agent: string | null; items: Item[]; modes: ModeView[]; mode: string | null; configs: ConfigView[]; policy: Policy; chats: ChatRow[]; chat: string | null; consent: { agent: string; label: string } | null }>({ agents: [], state: AiState.Idle, agent: null, items: [], modes: [], mode: null, configs: [], policy: Policy.Ask, chats: [], chat: null, consent: null });
 
 const mine = (chat: string | undefined): boolean => chat === undefined || chat === ai.chat;
 
@@ -13,7 +13,10 @@ export function aiHeard(message: ViewMessage) {
     ai.agents = message.agents;
   } else if (message.kind === ToView.AiChats) {
     ai.chats = message.chats;
+  } else if (message.kind === ToView.AiConsent) {
+    ai.consent = { agent: message.agent, label: message.label };
   } else if (message.kind === ToView.AiChat) {
+    ai.consent = null;
     ai.chat = message.chat;
     ai.agent = message.agent ?? null;
     ai.state = message.state;

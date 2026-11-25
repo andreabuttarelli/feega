@@ -71,7 +71,7 @@
   import { detachState } from './detach';
   import LibraryPanel from './LibraryPanel.svelte';
   import { LIBRARY_DRAG_TYPE } from './library';
-  import { agentContexts, commentContext } from './agent-context';
+  import { agentContexts, commentContext, type AgentView } from './agent-context';
   import CommentsList from './CommentsList.svelte';
   import AiPanel from './AiPanel.svelte';
   import { aiHeard } from './ai-state.svelte';
@@ -728,6 +728,7 @@
     [ToView.AiState]: aiHeard,
     [ToView.AiEvent]: aiHeard,
     [ToView.AiPolicy]: aiHeard,
+    [ToView.AiConsent]: aiHeard,
     [ToView.AiChats]: aiHeard,
     [ToView.AiChat]: aiHeard,
     [ToView.SkillHint]: (m) => (skillHint = m.command),
@@ -1315,8 +1316,17 @@
       return null;
     }
     const picks = several ? (await Promise.all(selection.refs.map((r) => bridge.again(r.source, r.instance)))).filter((p): p is Pick => p !== null) : [picked];
-    return agentContexts(picks, { route, width: Math.round(fit.width), breakpoint: size === Size.Full ? undefined : reachBadge, theme: themeName === DEFAULT_THEME ? undefined : themeName, state: elementState === ElementState.Default ? undefined : elementState });
+    return agentContexts(picks, agentView());
   }
+
+  const agentView = (): AgentView => ({
+    route,
+    width: Math.round(fit.width),
+    breakpoint: size === Size.Full ? undefined : reachBadge,
+    theme: themeName === DEFAULT_THEME ? undefined : themeName,
+    state: elementState === ElementState.Default ? undefined : elementState,
+    focus: focus && viewing === View.Focus ? { name: focus.name, source: focus.source } : undefined
+  });
 
   async function copyForAgent() {
     toHost({ kind: ToHost.Usage, event: WebviewUsage.CopyForAgent });
@@ -1338,7 +1348,9 @@
     size;
     themeName;
     elementState;
-    void agentText().then((text) => (toHost({ kind: ToHost.Context, text }), (aiContext = text)));
+    focus;
+    viewing;
+    void agentText().then((text) => (toHost({ kind: ToHost.Context, text }), (aiContext = text ?? agentContexts([], agentView()))));
   });
 
   function restructure(op: StructureOp) {

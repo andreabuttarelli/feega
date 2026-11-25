@@ -235,6 +235,7 @@ export enum ToHost {
   AiOpen = 'ai-open',
   AiRename = 'ai-rename',
   AiDelete = 'ai-delete',
+  AiConsent = 'ai-consent',
   Usage = 'usage'
 }
 
@@ -297,7 +298,8 @@ export enum ToView {
   AiEvent = 'ai-event',
   AiPolicy = 'ai-policy',
   AiChats = 'ai-chats',
-  AiChat = 'ai-chat'
+  AiChat = 'ai-chat',
+  AiConsent = 'ai-consent'
 }
 
 export enum ShareState {
@@ -418,7 +420,8 @@ export type HostMessage =
   | { kind: ToHost.AiPolicy; policy: Policy }
   | { kind: ToHost.AiOpen; chat: string }
   | { kind: ToHost.AiRename; chat: string; title: string }
-  | { kind: ToHost.AiDelete; chat: string };
+  | { kind: ToHost.AiDelete; chat: string }
+  | { kind: ToHost.AiConsent; allow: boolean };
 
 export type Authored = HostMessage & { by?: Author };
 
@@ -456,6 +459,7 @@ export type ViewMessage =
   | { kind: ToView.AiEvent; event: AgentEvent; chat?: string }
   | { kind: ToView.AiPolicy; policy: Policy }
   | { kind: ToView.AiChats; chats: ChatRow[]; active: string | null }
+  | { kind: ToView.AiConsent; chat: string; agent: AcpId; label: string }
   | { kind: ToView.AiChat; chat: string | null; agent?: AcpId; state: AiState; items: Item[]; modes: ModeView[]; mode: string | null; configs: ConfigView[] };
 
 export const INSPECT = 'feega:inspect';

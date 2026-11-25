@@ -51,6 +51,10 @@ const put = (full) => {
 };
 
 const handlers = {
+  echo: async (cx) => {
+    await cx.client.notify(methods.client.session.update, chunk(textOf(cx.params.prompt)));
+    return 'end_turn';
+  },
   hello: async (cx) => {
     await cx.client.notify(methods.client.session.update, chunk('Hel'));
     await cx.client.notify(methods.client.session.update, chunk('lo'));
