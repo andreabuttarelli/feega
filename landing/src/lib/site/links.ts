@@ -17,15 +17,15 @@ export const DESKTOP_RELEASE_URL = `${GITHUB_URL}/releases/download/desktop-late
 export const DESKTOP_INSTALL_COMMAND = `curl -fsSL ${SITE_URL}/install | sh`;
 
 export const DESKTOP_DMGS = [
-  { arch: 'Apple silicon', href: `${DESKTOP_RELEASE_URL}/Feega-mac-arm64.dmg` },
-  { arch: 'Intel', href: `${DESKTOP_RELEASE_URL}/Feega-mac-x64.dmg` }
+  { arch: 'Apple silicon', href: `${DESKTOP_RELEASE_URL}/Feega-mac-arm64.dmg`, target: 'dmg_apple_silicon' },
+  { arch: 'Intel', href: `${DESKTOP_RELEASE_URL}/Feega-mac-x64.dmg`, target: 'dmg_intel' }
 ] as const;
 
-export const DESKTOP_WINDOWS = { href: `${DESKTOP_RELEASE_URL}/Feega-win-x64.exe` } as const;
+export const DESKTOP_WINDOWS = { href: `${DESKTOP_RELEASE_URL}/Feega-win-x64.exe`, target: 'windows_exe' } as const;
 
 export const DESKTOP_LINUX_FILE = 'Feega-linux-x64.AppImage';
 
-export const DESKTOP_LINUX = { href: `${DESKTOP_RELEASE_URL}/${DESKTOP_LINUX_FILE}` } as const;
+export const DESKTOP_LINUX = { href: `${DESKTOP_RELEASE_URL}/${DESKTOP_LINUX_FILE}`, target: 'linux_appimage' } as const;
 
 export const DOWNLOAD_PATH = '/download';
 
