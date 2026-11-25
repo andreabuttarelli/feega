@@ -30,13 +30,13 @@ export const SLIDES: Slide[] = [
   {
     step: OnboardingStep.LocalAgents,
     icon: PixelIcon.Cursor,
-    title: 'agents on this machine',
+    title: 'works side by side with your agents',
     body: "Feega's local chat runs on the coding agents installed here."
   },
   {
     step: OnboardingStep.Agents,
     icon: PixelIcon.Stack,
-    title: 'Connect Feega to your agents',
+    title: 'connect Feega to your agents',
     body: 'Feega works with the coding agent you already use.'
   },
   {
