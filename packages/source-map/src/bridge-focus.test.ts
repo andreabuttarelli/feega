@@ -19,7 +19,7 @@ describe('focus tab', () => {
     const { up, send, frame } = bridged();
     send({ type: 'feega:focus', source: 'src/Card.tsx:5:7', index: 1 });
 
-    expect(up).toContainEqual({ type: 'feega:focused', count: 1, mode: 'snapshot' });
+    expect(up).toContainEqual({ type: 'feega:focused', count: 1, mode: 'snapshot', reason: 'unsupported_framework' });
     expect(frame()!.srcdoc).toContain('Two');
     expect(frame()!.srcdoc).not.toContain('One');
     expect(frame()!.srcdoc).not.toContain('Footer');
@@ -63,7 +63,7 @@ describe('focus tab', () => {
     win.document.body.insertAdjacentHTML('beforeend', '<aside data-feega-src="src/Late.tsx:1:1"><b data-feega-src="src/Late.tsx:2:3">late</b></aside>');
     await new Promise((resolve) => setTimeout(resolve, 400));
 
-    expect(up).toContainEqual({ type: 'feega:focused', count: 1, mode: 'snapshot' });
+    expect(up).toContainEqual({ type: 'feega:focused', count: 1, mode: 'snapshot', reason: 'unsupported_framework' });
     expect(frame()!.srcdoc).toContain('late');
   });
 
@@ -186,7 +186,7 @@ describe('focus tab', () => {
 
       expect(frame()!.srcdoc).toContain('One');
       expect(frame()!.getAttribute('src')).toBeNull();
-      expect(up).toContainEqual({ type: 'feega:focused', count: 1, mode: 'snapshot', reason: 'useTheme must be used within a ThemeProvider' });
+      expect(up).toContainEqual({ type: 'feega:focused', count: 1, mode: 'snapshot', reason: 'mount_error', detail: 'provider' });
     });
 
     it('falls back to the snapshot when the server has no mount page, as in Next.js', () => {

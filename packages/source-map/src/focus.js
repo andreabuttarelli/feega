@@ -3,10 +3,12 @@ import { mountOf } from './framework-meta.js';
 import { fileOf, rootOf, taggedParent } from './component-root.js';
 import { mountUrlFor } from './mount-hosts.js';
 import { FocusMode, MOUNT_STATUS, Status } from './mount-protocol.js';
+import { Why, reasonOf } from './snapshot-reason.js';
 
 export const FOCUSED = 'feega:focused';
 const NESTED_HOST = Symbol.for('feega.nested-host');
 const NO_MOUNT_PAGE = 'The dev server has no mount page';
+const UNSUPPORTED = { reason: Why.UnsupportedFramework };
 
 const FRAME_ID = 'feega-focus';
 export const CANVAS_ID = 'feega-focus-canvas';
@@ -174,7 +176,8 @@ export function focusTab(win, { install, prepare, report }) {
   let timer = null;
   let mode = FocusMode.Snapshot;
   let visible = true;
-  const failed = new Set();
+  let why = null;
+  const failed = new Map();
 
   const show = (on) => {
     visible = on;
@@ -238,6 +241,7 @@ export function focusTab(win, { install, prepare, report }) {
     if (!frame || source !== request.source || index !== request.index) {
       drop();
       const mountUrl = failed.has(request.source) || request.mount === false ? null : mountUrlOf(win, rootOf(win.document, request.source, request.index), request);
+      why = mountUrl || request.mount === false ? (failed.get(request.source) ?? null) : (failed.get(request.source) ?? UNSUPPORTED);
       create(parts, mountUrl);
       source = request.source;
       index = request.index;
@@ -246,15 +250,15 @@ export function focusTab(win, { install, prepare, report }) {
       update(parts);
     }
     show(request.shown !== false);
-    return { count: parts.count, mode };
+    return { count: parts.count, mode, ...(mode === FocusMode.Snapshot && why) };
   }
 
   function fallBack(reason) {
     const request = { source, index, shown: visible };
-    failed.add(source);
+    failed.set(source, reasonOf(reason));
     drop();
     const { count } = open(request);
-    report({ type: FOCUSED, count, mode, reason });
+    report({ type: FOCUSED, count, mode, ...why });
   }
 
   function refresh() {
@@ -262,7 +266,7 @@ export function focusTab(win, { install, prepare, report }) {
     if (!frame) {
       const { count } = wanted ? open(wanted) : { count: 0 };
       if (count) {
-        report({ type: FOCUSED, count, mode });
+        report({ type: FOCUSED, count, mode, ...(mode === FocusMode.Snapshot && why) });
       }
       return;
     }
