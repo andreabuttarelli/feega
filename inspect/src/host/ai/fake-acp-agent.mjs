@@ -1,5 +1,5 @@
 import { Readable, Writable } from 'node:stream';
-import { agent, methods, ndJsonStream, PROTOCOL_VERSION } from '@agentclientprotocol/sdk';
+import { agent, methods, ndJsonStream, PROTOCOL_VERSION, RequestError } from '@agentclientprotocol/sdk';
 
 const SESSION = 'fake-session';
 const MODES = [
@@ -53,9 +53,22 @@ const handlers = {
 
 const textOf = (prompt) => prompt.map((block) => (block.type === 'text' ? block.text : '')).join('\n');
 
+const NEEDS_LOGIN = process.argv.includes('login');
+const AUTH_REQUIRED = -32000;
+let signedIn = !NEEDS_LOGIN;
+
 const app = agent({ name: 'fake' })
-  .onRequest(methods.agent.initialize, () => ({ protocolVersion: PROTOCOL_VERSION, agentCapabilities: {} }))
-  .onRequest(methods.agent.session.new, () => ({ sessionId: SESSION, modes: { currentModeId: 'default', availableModes: MODES } }))
+  .onRequest(methods.agent.initialize, () => ({ protocolVersion: PROTOCOL_VERSION, agentCapabilities: {}, authMethods: NEEDS_LOGIN ? [{ id: 'fake_login', name: 'Fake login' }] : [] }))
+  .onRequest(methods.agent.authenticate, (cx) => {
+    signedIn = cx.params.methodId === 'fake_login';
+    return {};
+  })
+  .onRequest(methods.agent.session.new, () => {
+    if (!signedIn) {
+      throw new RequestError(AUTH_REQUIRED, 'Authentication required');
+    }
+    return { sessionId: SESSION, modes: { currentModeId: 'default', availableModes: MODES } };
+  })
   .onRequest(methods.agent.session.setMode, async (cx) => {
     await cx.client.notify(methods.client.session.update, { sessionId: SESSION, update: { sessionUpdate: 'current_mode_update', currentModeId: cx.params.modeId } });
     return {};

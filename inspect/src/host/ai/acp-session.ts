@@ -6,6 +6,7 @@ import { AgentEventKind, ToolStatus, type AgentDeps, type AgentSession, type Dif
 
 const CLIENT_NAME = 'feega';
 const CANCELLED = { outcome: { outcome: 'cancelled' as const } };
+const AUTH_REQUIRED = -32000;
 const ALLOWS = new Set(['allow_once', 'allow_always']);
 
 const STATUSES: Record<string, ToolStatus> = {
@@ -86,8 +87,26 @@ export const openAcpAgent = async (launch: Launch, deps: AgentDeps): Promise<Age
   child.on('error', (error) => deps.emit({ kind: AgentEventKind.Failed, reason: messageOf(error) }));
   child.on('exit', (code) => deps.emit({ kind: AgentEventKind.Failed, reason: `the agent exited (${code})` }));
 
-  await connection.agent.request(methods.agent.initialize, { protocolVersion: PROTOCOL_VERSION, clientCapabilities: { fs: { readTextFile: true, writeTextFile: true } }, clientInfo: { name: CLIENT_NAME, version: '1' } });
-  const created = await connection.agent.request(methods.agent.session.new, { cwd: deps.cwd, mcpServers: [] });
+  const hello = await connection.agent.request(methods.agent.initialize, { protocolVersion: PROTOCOL_VERSION, clientCapabilities: { fs: { readTextFile: true, writeTextFile: true } }, clientInfo: { name: CLIENT_NAME, version: '1' } });
+
+  const newSession = () => connection.agent.request(methods.agent.session.new, { cwd: deps.cwd, mcpServers: [] });
+
+  const signedIn = async () => {
+    for (const method of hello.authMethods ?? []) {
+      const ok = await connection.agent.request(methods.agent.authenticate, { methodId: method.id }).then(() => true, () => false);
+      if (ok) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const created = await newSession().catch(async (error) => {
+    if ((error as { code?: number }).code !== AUTH_REQUIRED || !(await signedIn())) {
+      throw error;
+    }
+    return newSession();
+  });
   sessionId = created.sessionId;
   if (created.modes?.availableModes.length) {
     available = created.modes.availableModes.map((m) => ({ id: m.id, name: m.name, description: m.description ?? '' }));
