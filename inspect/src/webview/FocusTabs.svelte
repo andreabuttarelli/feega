@@ -13,7 +13,7 @@
   <button type="button" role="tab" aria-selected={active === View.Page} class:on={active === View.Page} data-testid="tab-page" onclick={() => onselect(View.Page)}><House size={14} />Page</button>
   <span class="tab" class:on={active === View.Focus}>
     <button type="button" role="tab" aria-selected={active === View.Focus} data-testid="tab-focus" onclick={() => onselect(View.Focus)}><ComponentIcon size={14} />{name}</button>
-    <button type="button" class="close" data-testid="focus-exit" title="Close (Esc)" aria-label="Close {name}" onclick={onclose}><X size={11} /></button>
+    <button type="button" class="close" data-testid="focus-exit" title="Close (Esc)" aria-label="Close {name}" onclick={onclose}><X size={14} /></button>
   </span>
   {#if notice}<span class="notice" data-testid="focus-notice">{notice}</span>{/if}
   {#if scheme}
@@ -76,8 +76,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 18px;
-    height: 18px;
+    width: 22px;
+    height: 22px;
     border-radius: var(--ui-radius-sm, 4px);
     color: inherit;
   }
