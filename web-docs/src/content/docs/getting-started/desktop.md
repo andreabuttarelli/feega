@@ -32,7 +32,7 @@ Open it and drag Feega to Applications. A browser download is quarantined, so ma
 
 ## Using it
 
-- **Start screen.** The app opens on the sign-in screen. After you sign in, and once Node.js is checked, you see **New project**, **Open folder** and your recent projects. See [Start a new project](/getting-started/new-project/).
+- **Start screen.** With no tab open you see **New project**, **Open folder** and your recent projects. No account is required. See [Start a new project](/getting-started/new-project/).
 - **Node.js.** The app needs Node.js 20 or newer and npm. At launch it reads your shell's `PATH`, so tools from Homebrew, nvm or similar are found. If Node.js is missing it shows an **Install Node.js** link and **Check again**.
 - **AI agents.** The AI chat starts the agents installed on your machine, and downloads their adapters into the app's data folder.
 - **Tabs per folder.** Add a folder with the plus button. Each folder gets its own tab with its own dev server and editor.

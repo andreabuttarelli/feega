@@ -4,7 +4,9 @@ The desktop app starts a project without a terminal and carries the editor's fea
 
 ## Welcome screen
 
-Signed-out users see the sign-in screen first, as before. After sign-in the Node check runs, then the welcome screen: **New project**, **Open folder**, **Recent projects** (existing store).
+No tab open: **New project**, **Open folder**, **Recent projects** (existing store). No login is required anywhere.
+
+After the first successful New project, a non-blocking invite appears once: "Create a free account to keep your recent projects and get new templates", with **Sign in** (existing desktop flow) and **Later**. Later is remembered in the desktop store. No email or event is sent for it.
 
 ## Node check
 

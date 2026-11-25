@@ -27,6 +27,7 @@ type Bridge = {
   checkNode: () => Promise<boolean>;
   pickParent: () => Promise<string | null>;
   createProject: (ask: { parent: string; name: string; stack: Stack; template: Template }) => Promise<void>;
+  dismissInvite: () => Promise<void>;
   clearProject: () => Promise<void>;
   onSettings: (listener: () => void) => void;
   onState: (listener: (state: ShellState) => void) => void;
@@ -49,9 +50,6 @@ const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
 const STAGGER_MS = 50;
-const HERO_TITLE = 'start designing in your codebase';
-const HERO_LEAD = 'edit your running app like in figma. every change lands in your source.';
-const FACTS = ['free, forever', 'every edit a diff', 'no AI, no tokens'];
 
 const FRIENDLY: [RegExp, string][] = [
   [/several apps here/i, 'this folder holds several apps. open one of them directly.'],
@@ -187,6 +185,13 @@ const updateHint = (state: ShellState) => UPDATE_HINTS[state.update.state];
 const updatePill = (state: ShellState) =>
   state.update.state === UpdateState.Ready ? [el('button', { class: 'update-pill', title: state.update.message, on: run(() => bridge.installUpdate()) }, el('span', { class: 'dot ready' }), el('span', { text: 'update ready · restart' }))] : [];
 
+const INVITE_TEXT = 'Create a free account to keep your recent projects and get new templates';
+
+const invitePill = (state: ShellState) =>
+  state.invite
+    ? [el('div', { class: 'invite' }, el('span', { class: 'text', text: INVITE_TEXT, title: INVITE_TEXT }), pill('sign in', 'primary small', run(() => bridge.signIn())), pill('later', 'outline small', run(() => bridge.dismissInvite())))]
+    : [];
+
 const accountMenu = (state: ShellState) => {
   const label = state.email ?? 'guest · not signed in';
   const who = el('div', { class: 'who' }, el('span', { class: `avatar${state.email ? '' : ' guest'}`, text: (state.email ?? 'guest')[0] }), el('span', { class: 'label', text: label }));
@@ -254,15 +259,11 @@ const settingsView = (state: ShellState): View => ({
 });
 
 const renderBar = (state: ShellState) => {
-  if (!state.email && !state.skipped && state.tabs.length === 0) {
-    bar.replaceChildren(el('span', { class: 'brand', html: `${mark(22)}<span>feega</span>` }), el('span', { class: 'grow' }));
-    return;
-  }
   const known = rendered;
   rendered = new Set(state.tabs.map((t) => t.id));
   const home = el('button', { class: `home${state.active === null ? ' on' : ''}`, html: mark(), title: 'projects', on: run(() => bridge.activate(null)) });
   const add = el('button', { class: 'add', html: PLUS, title: 'new project or open folder', on: run(() => bridge.activate(null)) });
-  bar.replaceChildren(home, ...state.tabs.map((tab) => tabChip(tab, tab.id === state.active, !known.has(tab.id))), add, el('span', { class: 'grow' }), ...updatePill(state), accountChip(state));
+  bar.replaceChildren(home, ...state.tabs.map((tab) => tabChip(tab, tab.id === state.active, !known.has(tab.id))), add, el('span', { class: 'grow' }), ...invitePill(state), ...updatePill(state), accountChip(state));
   document.querySelector('.menu')?.remove();
   if (menuOpen) {
     document.body.append(accountMenu(state));
@@ -288,16 +289,6 @@ const badge = (framework: string) => {
   const icon = logo ? `<svg viewBox="0 0 24 24" fill="currentColor"><path d="${LOGO_PATHS[logo]}"/></svg>` : '';
   return el('span', { class: 'badge', html: `${icon}<span>${framework}</span>` });
 };
-
-const startView = (state: ShellState): View => ({
-  key: `start:${state.signingIn}`,
-  build: () => {
-    const actions = state.signingIn
-      ? [el('button', { class: 'pill waiting', text: 'waiting for your browser…' }), pill('cancel', 'outline', run(() => bridge.cancelSignIn()))]
-      : [pill('sign in', 'primary', run(() => bridge.signIn())), pill('continue without account', 'outline', run(() => bridge.skip()))];
-    return el('div', { class: 'screen banded' }, el('h1', { class: 'display serif hero-title', text: HERO_TITLE }), el('p', { class: 'lead', text: HERO_LEAD }), el('div', { class: 'actions' }, ...actions), el('ul', { class: 'facts' }, ...FACTS.map((fact) => el('li', { text: fact }))), el('div', { class: 'band' }));
-  }
-});
 
 const recentCard = (recent: RecentInfo, index: number) => {
   const card = el(
@@ -475,9 +466,6 @@ const TAB_VIEWS: Record<TabStatus, (tab: TabInfo) => View> = {
 };
 
 const viewOf = (state: ShellState): View => {
-  if (!state.email && !state.skipped) {
-    return startView(state);
-  }
   if (state.node.status === NodeStatus.Problem) {
     return nodeView(state);
   }

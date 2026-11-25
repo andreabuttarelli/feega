@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld('feega', {
   checkNode: () => call(Channel.CheckNode),
   pickParent: (): Promise<string | null> => call(Channel.PickParent),
   createProject: (ask: Omit<NewProjectAsk, 'parent'> & { parent: string }) => call(Channel.CreateProject, ask),
+  dismissInvite: () => call(Channel.DismissInvite),
   clearProject: () => call(Channel.ClearProject),
   onSettings: (listener: () => void) => ipcRenderer.on(Channel.ShowSettings, () => listener()),
   onState: (listener: (state: ShellState) => void) => ipcRenderer.on(Channel.State, (_event, state) => listener(state))

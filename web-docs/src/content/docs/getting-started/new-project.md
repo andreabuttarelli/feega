@@ -26,3 +26,7 @@ Templates are built from free [library](/getting-started/library/) sections. The
 4. The project opens as a tab with its dev server and the editor.
 
 Installing needs the network and Node.js. If Node.js is missing or too old, the app says so and links to nodejs.org.
+
+## Account
+
+No account is needed. After your first project the app offers once to create a free account, with **Sign in** and **Later**. Later is remembered.
