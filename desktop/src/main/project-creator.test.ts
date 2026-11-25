@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { buildCatalog } from '../../../packages/library/src/catalog';
 import { Step } from '../../../cli/lib/scaffold/step';
@@ -19,7 +20,7 @@ describe('projectCreator', () => {
 
     const out = await projectCreator(async () => buildCatalog(), ports(), (p) => p && seen.push(p))(ask);
 
-    expect(out).toEqual({ ok: true, dir: '/w/demo' });
+    expect(out).toEqual({ ok: true, dir: join('/w', 'demo') });
     expect(seen.map((p) => p.step)).toContain(Step.Install);
     expect(seen.some((p) => p.line === 'added 3 packages')).toBe(true);
   });

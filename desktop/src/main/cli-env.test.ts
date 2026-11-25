@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { cliEnv } from './cli-env';
 
@@ -12,7 +13,7 @@ describe('cliEnv', () => {
   });
 
   it('gives AI adapters a writable cache under the app data', () => {
-    expect(cliEnv(base, options, '/data').XDG_CACHE_HOME).toBe('/data/cache');
+    expect(cliEnv(base, options, '/data').XDG_CACHE_HOME).toBe(join('/data', 'cache'));
   });
 
   it('turns Cloud on only when the setting is on', () => {
