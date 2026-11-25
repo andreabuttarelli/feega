@@ -14,6 +14,7 @@ import { machineAgents } from './agents';
 import { deviceOnboardingStore, globalStateOnboardingStore } from './onboarding';
 import { globalStateSupportStore } from './support';
 import { WATCHED, relativeOf, type Watch } from './file-watch';
+import { AlertKind, type AlertPort } from './ai/agent-alert';
 import type { Platform } from './platform';
 import { HintSurface, nodeHintFs } from './skill-hint';
 import { automated, Device, editorOf, globalStateFirstEdit, globalStateInstallStore, installOf, optedOut, type UsageHost } from './usage';
@@ -24,6 +25,7 @@ const COLUMNS: Record<Column, vscode.ViewColumn> = { [Column.First]: vscode.View
 
 const WEB_URL_VAR = 'FEEGA_WEB_URL';
 const SECRET_KEY = 'feegaInspect.account';
+const OPEN_ACTION = 'Open';
 const SKILL_HINT_NEVER = 'feegaInspect.skillHintNever';
 
 export const DEV_PLUGINS_SETTING = 'feegaInspect.plugins.dev';
@@ -34,7 +36,7 @@ const config = () => vscode.workspace.getConfiguration();
 
 export type VsCodeHost = { context: vscode.ExtensionContext; output: vscode.OutputChannel; launcher: string };
 
-export type PanelLike = Pick<vscode.WebviewPanel, 'viewColumn'> & { webview: Pick<vscode.Webview, 'postMessage' | 'onDidReceiveMessage'> };
+export type PanelLike = Pick<vscode.WebviewPanel, 'viewColumn' | 'visible' | 'reveal'> & { webview: Pick<vscode.Webview, 'postMessage' | 'onDidReceiveMessage'> };
 
 export const secretAccountStore = (secrets: Pick<vscode.SecretStorage, 'get' | 'store' | 'delete'>): AccountStore => ({
   read: async () => {
@@ -118,6 +120,23 @@ export function vsCodePlatform(host: VsCodeHost, panel: PanelLike, befores: Map<
 
   const account = secretAccountStore(context.secrets);
 
+  const alertWindows: Record<AlertKind, (text: string, action: string) => Thenable<string | undefined>> = {
+    [AlertKind.Finished]: (text, action) => vscode.window.showInformationMessage(text, action),
+    [AlertKind.Permission]: (text, action) => vscode.window.showWarningMessage(text, action)
+  };
+
+  const alerts: AlertPort = {
+    looking: () => panel.visible && vscode.window.state.focused,
+    show: async (alert) => {
+      const clicked = (await alertWindows[alert.kind](`Feega: ${alert.text}`, OPEN_ACTION)) === OPEN_ACTION;
+      if (clicked) {
+        panel.reveal(undefined, false);
+      }
+      return clicked;
+    },
+    clear: () => undefined
+  };
+
   return {
     version: String(context.extension.packageJSON.version),
     launcher: host.launcher,
@@ -143,6 +162,7 @@ export function vsCodePlatform(host: VsCodeHost, panel: PanelLike, befores: Map<
     sourceControl: () => vscode.commands.executeCommand('workbench.view.scm'),
     notify: (text) => vscode.window.showInformationMessage(`Feega: ${text}`),
     warn: async (text, action) => (await vscode.window.showWarningMessage(`Feega: ${text}`, ...(action ? [action] : []))) === action,
+    alerts,
     pickImage,
     library: catalogFile(join(dirname(host.launcher), 'library.json')),
     watchFiles: vsCodeWatch,

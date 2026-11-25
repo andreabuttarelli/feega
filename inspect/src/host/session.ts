@@ -56,6 +56,7 @@ import { install } from './dev-server';
 import { SUPPORT_ITEMS } from '../support';
 import { adapters, runNpm } from './ai/adapters';
 import { aiChat, type ChatRecord } from './ai/ai-chat';
+import { alerts } from './ai/agent-alert';
 import { policyOf } from './ai/permission-policy';
 import { openAcpAgent } from './ai/acp-session';
 import { editorMcp } from './ai/editor-mcp';
@@ -142,7 +143,13 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   const editsAt = (dir: string) => fileEdits(dir, stylingChoice, platform.stored<Snapshot>(Stored.History), pageCompiled);
   let edits = editsAt(root);
   const queue = editQueue();
+  const agentAlerts = alerts({
+    port: platform.alerts,
+    settings: () => platform.settings(),
+    opened: (chat) => (ai.open(chat), post({ kind: ToView.ShowChat, chat }))
+  });
   const ai = aiChat({
+    alerts: agentAlerts,
     root: () => root,
     env: platform.ai?.env ?? (() => machineEnv()),
     open: platform.ai?.open ?? openAcpAgent,

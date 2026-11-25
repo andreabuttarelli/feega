@@ -14,6 +14,7 @@ import type { SkillHintHost } from './skill-hint';
 import type { AgentEnv } from './agents';
 import type { OpenAgent } from './ai/agent-session';
 import type { Adapters } from './ai/adapters';
+import type { AlertPort } from './ai/agent-alert';
 import type { SettingKey, SettingValue, Settings } from '../settings';
 
 export enum Stored {
@@ -73,5 +74,6 @@ export type Platform = Transport & {
   skillHint?: SkillHintHost;
   agents?: () => AgentId[];
   adapterDir?: string;
+  alerts?: AlertPort;
   ai?: { env: () => AgentEnv; open: OpenAgent; adapters?: Adapters };
 };

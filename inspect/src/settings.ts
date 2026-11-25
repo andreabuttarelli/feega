@@ -8,7 +8,10 @@ export enum SettingKey {
   KeepServerAlive = 'feegaInspect.keepServerAlive',
   SyncSelection = 'feegaInspect.syncSelection',
   PreviewUnknown = 'feegaInspect.previewUnknown',
-  AiPermissions = 'feegaInspect.aiPermissions'
+  AiPermissions = 'feegaInspect.aiPermissions',
+  Notifications = 'feegaInspect.notifications',
+  NotifyFinished = 'feegaInspect.notifyFinished',
+  NotifyPermission = 'feegaInspect.notifyPermission'
 }
 
 export enum StylingChoice {
@@ -83,7 +86,10 @@ export const SETTINGS: SettingRow[] = [
     hint: 'Default for new projects: when the AI tab asks before an agent edits a file or runs a command. Each project remembers its own choice.',
     fallback: Policy.Ask,
     choices: POLICY_ROWS.map((row) => ({ value: row.id, label: row.name }))
-  }
+  },
+  { key: SettingKey.Notifications, label: 'Notifications', hint: 'Tell me when an AI agent needs me while I am in another window or tab. Messages name the agent and the project, never code or prompts.', fallback: true },
+  { key: SettingKey.NotifyFinished, label: 'Notify when an agent finishes', hint: 'Needs Notifications on.', fallback: true },
+  { key: SettingKey.NotifyPermission, label: 'Notify when an agent needs permission', hint: 'Needs Notifications on.', fallback: true }
 ];
 
 export type Settings = Record<SettingKey, SettingValue>;
