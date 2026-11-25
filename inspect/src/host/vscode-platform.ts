@@ -151,6 +151,7 @@ export function vsCodePlatform(host: VsCodeHost, panel: PanelLike, befores: Map<
     onboarding: deviceOnboardingStore(globalStateOnboardingStore(context.globalState)),
     support: globalStateSupportStore(context.globalState),
     localBridge: publishLocal,
+    adapterDir: join(context.globalStorageUri.fsPath, 'adapters'),
     agents: () => machineAgents(vscode.env.appName, vscode.extensions.all.map((extension) => extension.id.toLowerCase())),
     usage: vsCodeUsage(context),
     skillHint: { fs: nodeHintFs, home: homedir(), surface: HintSurface.Panel, never: () => context.globalState.get(SKILL_HINT_NEVER) === true, setNever: async () => context.globalState.update(SKILL_HINT_NEVER, true) },

@@ -9,6 +9,7 @@ import type { AddKind, AddPlace } from '@feega/live-edit/add-node';
 import type { WrapTag } from '@feega/live-edit/wrap-node';
 import type { LoopMove } from '@feega/live-edit/move-loop-item';
 import type { Usage } from '@feega/live-edit/move-usage';
+import type { Json } from '@feega/live-edit/prop-syntax';
 import type { StructureOp } from '@feega/live-edit/structure';
 import type { ClassEntry, UseSite } from '@feega/live-edit/class-index';
 import type { ClassTarget } from '@feega/live-edit/class-rule';
@@ -56,6 +57,10 @@ export type ClassInfo = Omit<ClassEntry, 'uses'> & { uses: UseSite[]; elements: 
 export type ClassesView = { at: string; element: ClassInfo[]; inFile: ClassInfo[]; dynamic: boolean };
 
 export type Impact = { kind: ImpactKind.Local } | { kind: ImpactKind.Component; name: string; files: UsageSite[] } | { kind: ImpactKind.Class; name: string; elements: number; files: UsageSite[] } | { kind: ImpactKind.Unknown; reason: string };
+
+export type ReadAsk = { component: string; usage: string; which?: { index: number; count: number } };
+
+export type ApplyAsk = { component: string; usage: string; which?: { index: number; count: number }; set: Record<string, Json>; remove: string[] };
 
 export type ImpactAsk = { at: string } & Partial<EditAsk>;
 
@@ -205,6 +210,8 @@ export enum ToHost {
   Classes = 'classes',
   Link = 'link',
   Attribute = 'attribute',
+  ApplyProps = 'apply-props',
+  ReadProps = 'read-props',
   Go = 'go',
   Selected = 'selected',
   Context = 'context',
@@ -236,7 +243,7 @@ export enum ToHost {
   AiOpen = 'ai-open',
   AiRename = 'ai-rename',
   AiDelete = 'ai-delete',
-  AiConsent = 'ai-consent',
+  AiRetry = 'ai-retry',
   Usage = 'usage'
 }
 
@@ -257,6 +264,14 @@ export type ChangeRow = { id: number; at: string; prop: string; value: string; s
 export type Prefs = { size: string; custom: number | null; barClosed: boolean; route?: string; anchor?: string; barWidth?: number; leftWidth?: number; leftClosed?: boolean; layers?: Record<string, { hidden: string[]; locked: string[] }> };
 
 export type ChatRow = { id: string; agent: AcpId; title: string; updatedAt: number; running: boolean };
+
+export enum AdapterState {
+  Installing = 'installing',
+  Ready = 'ready',
+  Failed = 'failed'
+}
+
+export type AdapterRow = { agent: AcpId; label: string; state: AdapterState; reason?: string };
 
 export enum AiState {
   Idle = 'idle',
@@ -292,6 +307,8 @@ export enum ToView {
   Reload = 'reload',
   Impact = 'impact',
   Preview = 'preview',
+  PropsPreview = 'props-preview',
+  UsageProps = 'usage-props',
   Peers = 'peers',
   AiAgents = 'ai-agents',
   AiState = 'ai-state',
@@ -299,7 +316,7 @@ export enum ToView {
   AiPolicy = 'ai-policy',
   AiChats = 'ai-chats',
   AiChat = 'ai-chat',
-  AiConsent = 'ai-consent'
+  Adapters = 'adapters'
 }
 
 export enum ShareState {
@@ -388,6 +405,8 @@ export type HostMessage =
   | { kind: ToHost.Classes; at: string }
   | { kind: ToHost.Link; at: string; edit: LinkEdit; instance?: number }
   | { kind: ToHost.Attribute; at: string; name: string; value: string }
+  | { kind: ToHost.ApplyProps; ask: ApplyAsk; gate?: Gate }
+  | { kind: ToHost.ReadProps; ask: ReadAsk }
   | { kind: ToHost.Go; at: string; ask: GoAsk }
   | { kind: ToHost.Selected; at: Source | null }
   | { kind: ToHost.Context; text: string | null }
@@ -420,7 +439,7 @@ export type HostMessage =
   | { kind: ToHost.AiOpen; chat: string }
   | { kind: ToHost.AiRename; chat: string; title: string }
   | { kind: ToHost.AiDelete; chat: string }
-  | { kind: ToHost.AiConsent; allow: boolean };
+  | { kind: ToHost.AiRetry };
 
 export type Authored = HostMessage & { by?: Author };
 
@@ -451,13 +470,15 @@ export type ViewMessage =
   | { kind: ToView.Reload }
   | { kind: ToView.Impact; id: number; impact: Impact }
   | { kind: ToView.Preview; ask: EditAsk; reason: string; files: DiffFile[]; by?: Author }
+  | { kind: ToView.UsageProps; component: string; values: Record<string, Json>; dynamic: string[]; spread: boolean }
+  | { kind: ToView.PropsPreview; ask: ApplyAsk; reason: string; files: DiffFile[]; by?: Author }
   | { kind: ToView.Peers; peers: Present[] }
   | { kind: ToView.AiAgents; agents: AcpAgent[] }
   | { kind: ToView.AiState; state: AiState; agent?: AcpId; chat?: string }
   | { kind: ToView.AiEvent; event: AgentEvent; chat?: string }
   | { kind: ToView.AiPolicy; policy: Policy }
   | { kind: ToView.AiChats; chats: ChatRow[]; active: string | null }
-  | { kind: ToView.AiConsent; chat: string; agent: AcpId; label: string }
+  | { kind: ToView.Adapters; rows: AdapterRow[] }
   | { kind: ToView.AiChat; chat: string | null; agent?: AcpId; state: AiState; items: Item[]; modes: ModeView[]; mode: string | null; configs: ConfigView[] };
 
 export const INSPECT = 'feega:inspect';
@@ -482,6 +503,9 @@ export const SCROLLED = 'feega:scrolled';
 export const REVEAL = 'feega:reveal';
 export const FOCUS = 'feega:focus';
 export const FOCUSED = 'feega:focused';
+export const FOCUS_CANVAS = 'feega:focus-canvas';
+export const FOCUS_ZOOM = 'feega:focus-zoom';
+export const FOCUS_ZOOMED = 'feega:focus-zoomed';
 export const MOUNT_STATUS = 'feega:mount:status';
 export const MOUNT_PROPS = 'feega:mount:props';
 export const TEXT_EDIT = 'feega:text:edit';

@@ -33,8 +33,9 @@ import { svgMarkup } from '@feega/live-edit/svg-markup';
 import { addGo, type GoAsk } from '@feega/live-edit/go-action';
 import { linkWrite, type LinkEdit } from '@feega/live-edit/link-edit';
 import { attributeWrite } from '@feega/live-edit/attribute-edit';
+import { applyProps, type Applied } from '@feega/live-edit/apply-props';
 import type { Proposal } from '@feega/plugin-api/protocol';
-import { Styling, type EditAsk, type ImpactAsk } from '../messages';
+import { Styling, type ApplyAsk, type EditAsk, type ImpactAsk } from '../messages';
 import { StylingChoice } from '../settings';
 import { stylingOf } from './styling';
 import { breakpointsOf } from './breakpoints';
@@ -328,6 +329,24 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     return out.ok ? writtenAll([out.change], '') : out;
   }
 
+  async function propsPlanned(ask: ApplyAsk): Promise<Applied> {
+    const usage = placed(ask.usage);
+    if (!usage) {
+      return { ok: false, reason: `${ask.usage} is not a file:line:col inside the workspace` };
+    }
+    return applyProps(reader(root), { component: ask.component, usage, which: ask.which, set: ask.set, remove: ask.remove });
+  }
+
+  async function propsWritten(ask: ApplyAsk): Promise<Written> {
+    meta = { at: ask.usage, prop: 'props', value: [...Object.keys(ask.set), ...ask.remove].join(', '), scope: '' };
+    const out = await propsPlanned(ask);
+    if (!out.ok) {
+      return out;
+    }
+    const note = out.skipped.length ? `Not written: ${out.skipped.join(', ')}` : undefined;
+    return writtenAll([out.change], '', note);
+  }
+
   async function goWritten(rawAt: string, ask: GoAsk): Promise<Written> {
     meta = { at: rawAt, prop: 'go', value: `${ask.go} ${ask.target}`, scope: '' };
     const at = placed(rawAt);
@@ -520,6 +539,8 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     loadFont: (family: string) => inTurn(() => fontLoaded(family)),
     link: (at: string, edit: LinkEdit, instance?: number) => inTurn(() => linkWritten(at, edit, instance)),
     attribute: (at: string, name: string, value: string) => inTurn(() => attributeWritten(at, name, value)),
+    propsPlan: (ask: ApplyAsk) => inTurn(() => propsPlanned(ask)),
+    applyProps: (ask: ApplyAsk) => inTurn(() => propsWritten(ask)),
     go: (at: string, ask: GoAsk) => inTurn(() => goWritten(at, ask)),
     undo: () => inTurn(undoStep),
     redo: () => inTurn(redoStep),

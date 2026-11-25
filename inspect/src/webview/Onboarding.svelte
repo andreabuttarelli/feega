@@ -2,14 +2,16 @@
   import Check from '@lucide/svelte/icons/check';
   import X from '@lucide/svelte/icons/x';
   import { onMount } from 'svelte';
-  import { AccountState, AgentId, OnboardingOutcome, OnboardingStep, ToHost } from '../messages';
+  import { AccountState, AdapterState, AgentId, OnboardingOutcome, OnboardingStep, ToHost, type AdapterRow } from '../messages';
   import type { SupportItem } from '../support';
   import { AGENT_LOGOS } from './agent-logos';
   import { MCP_COMMAND, MCP_DOCS_URL, SLIDES } from './onboarding-slides';
   import Pixel from '@feega/pixel-icons/Pixel.svelte';
   import SupportList from './SupportList.svelte';
 
-  let { account, support, agents, onaccount, onsupport, oncopy, onlink, onstep, ondone }: { account: { state: AccountState; email?: string }; support: SupportItem[]; agents: AgentId[]; onaccount: (kind: ToHost.SignIn | ToHost.CancelSignIn) => void; onsupport: (item: SupportItem) => void; oncopy: (text: string) => void; onlink: (url: string) => void; onstep: (step: OnboardingStep) => void; ondone: (outcome: OnboardingOutcome) => void } = $props();
+  let { account, support, agents, adapters, onaccount, onsupport, oncopy, onlink, onstep, ondone }: { account: { state: AccountState; email?: string }; support: SupportItem[]; agents: AgentId[]; adapters: AdapterRow[]; onaccount: (kind: ToHost.SignIn | ToHost.CancelSignIn) => void; onsupport: (item: SupportItem) => void; oncopy: (text: string) => void; onlink: (url: string) => void; onstep: (step: OnboardingStep) => void; ondone: (outcome: OnboardingOutcome) => void } = $props();
+
+  const STATUS: Record<AdapterState, string> = { [AdapterState.Installing]: 'Downloading…', [AdapterState.Ready]: 'Ready', [AdapterState.Failed]: 'Could not download' };
 
   let index = $state(0);
   let dialog = $state<HTMLDivElement | null>(null);
@@ -78,6 +80,11 @@
           {/each}
         </ul>
         <ul class="ways">
+          {#each adapters as row (row.agent)}
+            <li data-testid="onboarding-adapter-{row.agent}" data-state={row.state}>
+              <span class="text"><span class="label">Feega downloads the {row.label} connector from npm</span><span class="detail">{STATUS[row.state]}{row.reason ? `: ${row.reason}` : ''}</span></span>
+            </li>
+          {/each}
           <li><span class="text"><span class="label">Copy for agent</span><span class="detail">Right-click any element</span></span></li>
           <li>
             <span class="text"><span class="label">MCP</span><span class="detail">Your agent reads your selection</span></span>

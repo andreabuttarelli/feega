@@ -14,7 +14,7 @@
   import { MOVES, Shortcut, isMac, needsBareFocus, shortcutOf, typingIn } from './selection-keys';
   import { Click, NONE, Surface, clickOf, contains, extend, keyOf, only, primary, refOf, siblingsOf, toggle, visibleRows, type Selection } from './selection';
   import type { SupportItem } from '../support';
-  import { AccountState, type AgentId, Mode, Onboarding, OnboardingOutcome, Move, ServerAction, Slot, type ChangeRow, type FontChoice, type LayerNode, type LibraryEntry, type Palette, ServerState, type ServerInfo, Styling, ToHost, ToView, WebviewUsage, type Impact, type ImpactAsk, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
+  import { AccountState, type AgentId, Mode, Onboarding, OnboardingOutcome, Move, ServerAction, Slot, type ChangeRow, type FontChoice, type LayerNode, type LibraryEntry, type Palette, ServerState, type ServerInfo, Styling, ToHost, ToView, WebviewUsage, type AdapterRow, type Impact, type ImpactAsk, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
   import { fromHost, inVscode, toHost } from './host';
   import { imageSaved } from './image-file.svelte';
   import { iconDrawn, iconsFound } from './icon-search.svelte';
@@ -43,9 +43,11 @@
   import FocusTabs from './FocusTabs.svelte';
   import ComponentProps from './ComponentProps.svelte';
   import { propTally } from './focus-usage';
+  import { applyAskOf } from './apply-plan';
+  import { readAskOf, withUsage, type Mounted } from './usage-values';
   import { controlsOf, variantsOf, type PropControl, type PropValue } from './prop-controls';
   import { FocusMode } from './page-bridge';
-  import { FocusKey, SNAPSHOT_NOTICE, View, focusKeyOf, focusOf, rowFocus, type Focus } from './focus';
+  import { FocusKey, Scheme, View, focusKeyOf, focusOf, REAL_SIZE, rowFocus, schemeApplyOf, schemeOf, snapshotNoticeOf, stepZoom, themeOfScheme, wheelFactor, type Focus } from './focus';
   import { hasSourceInfo } from './source-info';
   import ChangesList from './ChangesList.svelte';
   import DeviceBar from './DeviceBar.svelte';
@@ -287,6 +289,7 @@
   let onboarding = $state(Onboarding.Seen);
   let support = $state<SupportItem[]>([]);
   let agents = $state<AgentId[]>([]);
+  let adapters = $state<AdapterRow[]>([]);
 
   function finishOnboarding(outcome: OnboardingOutcome) {
     onboarding = Onboarding.Seen;
@@ -329,11 +332,14 @@
     moved: (path) => (visited(path), bridge.tree()),
     tree: (tree) => ((layers = tree), askPalette()),
     mounted: (status) => {
-      mount = { controls: controlsOf(status.controls, status.props), values: status.props };
+      mount = { controls: controlsOf(status.controls, status.props), values: status.props, touched: mount?.touched ?? [], dynamic: mount?.dynamic ?? [] };
       sendProps();
+      askUsageProps();
     },
-    focused: (count, mode, reason) => {
-      snapshotReason = mode === FocusMode.Snapshot ? (reason ?? null) : null;
+    zoomed: (zoom) => (zoomNow = zoom),
+    focused: (count, mode, reason, detail, dark) => {
+      pageDark = dark ?? false;
+      snapshotNotice = mode === FocusMode.Snapshot ? snapshotNoticeOf(reason, detail) : null;
       if (mode === FocusMode.Snapshot) {
         mount = null;
       }
@@ -572,7 +578,40 @@
 
   function showTheme() {
     const plain = $state.snapshot(themes);
-    bridge.theme(plain.map((t) => t.apply), activeApply(plain, themeName));
+    const emulating = viewing === View.Focus && userScheme !== null;
+    bridge.theme(plain.map((t) => t.apply), emulating ? schemeApplyOf(plain, themeName, userScheme!) : activeApply(plain, themeName));
+    bridge.canvas(userScheme, transparentCanvas);
+  }
+
+  let userScheme = $state<Scheme | null>(null);
+  let pageDark = $state(false);
+  let transparentCanvas = $state(false);
+  let zoomNow = $state(REAL_SIZE);
+  const darkThemeName = $derived(themeOfScheme(themes, Scheme.Dark));
+  const shownScheme = $derived(userScheme ?? (darkThemeName ? schemeOf(themes, themeName) : pageDark ? Scheme.Dark : Scheme.Light));
+
+  function switchScheme(next: Scheme) {
+    userScheme = next;
+    const name = themeOfScheme(themes, next);
+    if (darkThemeName && name) {
+      chooseTheme(name);
+      return;
+    }
+    showTheme();
+  }
+
+  function toggleTransparent() {
+    transparentCanvas = !transparentCanvas;
+    showTheme();
+  }
+
+  function wheelOnFocus(e: WheelEvent) {
+    if (viewing === View.Focus && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      bridge.zoom({ mode: 'by', value: wheelFactor(e.deltaY) });
+      return;
+    }
+    bridge.scroll(e.deltaX / fit.scale, e.deltaY / fit.scale);
   }
 
   function chooseTheme(name: string) {
@@ -636,6 +675,13 @@
     [ToView.Reload]: () => reloadAfterRestart(),
     [ToView.Impact]: (m) => (m.id === impactId ? (impact = m.impact) : impact),
     [ToView.Preview]: (m) => (held = heldOf(m)),
+    [ToView.PropsPreview]: (m) => (held = heldOf(m)),
+    [ToView.UsageProps]: (m) => {
+      if (mount && focus?.source.file === m.component) {
+        mount = withUsage($state.snapshot(mount), m);
+        sendProps();
+      }
+    },
     [ToView.Status]: (m) => (problem = { text: m.text }),
     [ToView.Edited]: (m) => {
       const unsavedText = textPending;
@@ -688,7 +734,7 @@
     [ToView.AiState]: aiHeard,
     [ToView.AiEvent]: aiHeard,
     [ToView.AiPolicy]: aiHeard,
-    [ToView.AiConsent]: aiHeard,
+    [ToView.Adapters]: (m) => (adapters = m.rows),
     [ToView.AiChats]: aiHeard,
     [ToView.AiChat]: aiHeard,
     [ToView.SkillHint]: (m) => (skillHint = m.command),
@@ -1071,10 +1117,19 @@
     }
   }
 
-  let mount = $state<{ controls: PropControl[]; values: Record<string, unknown> } | null>(null);
+  let mount = $state<Mounted | null>(null);
+  let usageAsked = false;
   let showGrid = $state(false);
-  let snapshotReason = $state<string | null>(null);
+  let snapshotNotice = $state<string | null>(null);
   const variants = $derived(variantsOf(mount?.controls ?? []));
+
+  function askUsageProps() {
+    const ask = focus && !usageAsked ? readAskOf(focus) : null;
+    if (ask) {
+      usageAsked = true;
+      toHost({ kind: ToHost.ReadProps, ask });
+    }
+  }
 
   function sendProps() {
     if (mount) {
@@ -1106,7 +1161,7 @@
       propsChanged.add(control.kind);
     }
     const { [name]: _, ...rest } = mount.values;
-    mount = { ...mount, values: value === undefined ? rest : { ...rest, [name]: value } };
+    mount = { ...mount, values: value === undefined ? rest : { ...rest, [name]: value }, touched: mount.touched.includes(name) ? mount.touched : [...mount.touched, name], dynamic: mount.dynamic.filter((d) => d !== name) };
     sendProps();
   }
 
@@ -1119,6 +1174,15 @@
   }
 
   let focus = $state<Focus | null>(null);
+
+  const applyPlan = $derived(focus && mount ? applyAskOf({ focus, controls: mount.controls, values: mount.values, touched: mount.touched }) : null);
+
+  function applyToPage() {
+    if (applyPlan) {
+      const { skipped: _skipped, ...ask } = $state.snapshot(applyPlan);
+      toHost({ kind: ToHost.ApplyProps, ask });
+    }
+  }
   let viewing = $state(View.Page);
   let reopening = false;
   let tabsH = $state(0);
@@ -1159,9 +1223,14 @@
     reopening = false;
     mount = null;
     showGrid = false;
-    snapshotReason = null;
+    snapshotNotice = null;
+    usageAsked = false;
+    userScheme = null;
+    pageDark = false;
+    transparentCanvas = false;
     bridge.useFocus(true);
     bridge.focus(next.source, true, next.index);
+    bridge.zoom({ mode: 'set', value: REAL_SIZE });
   }
 
   function exitFocus() {
@@ -1173,7 +1242,11 @@
     focus = null;
     mount = null;
     showGrid = false;
-    snapshotReason = null;
+    snapshotNotice = null;
+    usageAsked = false;
+    userScheme = null;
+    pageDark = false;
+    transparentCanvas = false;
     viewing = View.Page;
     bridge.useFocus(false);
     bridge.focus(null);
@@ -1452,14 +1525,14 @@
       {#if share?.available}<SharePanel view={share} onstart={(name, canEdit) => toHost({ kind: ToHost.ShareStart, name, canEdit })} onstop={() => toHost({ kind: ToHost.ShareStop })} onkick={(userId) => toHost({ kind: ToHost.ShareKick, userId })} onrole={(userId, role) => toHost({ kind: ToHost.ShareRole, userId, role })} />{/if}
       <button type="button" class="icon" class:on={!barClosed} title="Properties (⌘\)" onclick={toggleBar} data-testid="bar-toggle"><PanelRight size={15} /></button>
     </header>
-    {#if focus}<FocusTabs name={focus.name} active={viewing} notice={snapshotReason === null ? null : SNAPSHOT_NOTICE} reason={snapshotReason} onselect={showTab} onclose={exitFocus} bind:height={tabsH} />{/if}
+    {#if focus}<FocusTabs name={focus.name} active={viewing} notice={snapshotNotice} scheme={shownScheme} onscheme={switchScheme} transparent={transparentCanvas} ontransparent={toggleTransparent} zoom={zoomNow} onzoom={(request) => bridge.zoom(request)} onstep={(direction) => bridge.zoom({ mode: 'set', value: stepZoom(zoomNow, direction) })} onselect={showTab} onclose={exitFocus} bind:height={tabsH} />{/if}
 
     <div class="backdrop" role="presentation" bind:clientWidth={stage.w} bind:clientHeight={stage.h} onpointermove={resizeFrame} onpointerup={endDrag}>
       <div class="frame" class:framed={size !== Size.Full} style={`width:${fit.width * fit.scale}px;height:${fit.height * fit.scale}px`}>
         {#if url}<iframe bind:this={frame} src={start} title="App" data-testid="app-frame" style={`width:${fit.width}px;height:${fit.height}px;transform:scale(${fit.scale})`}></iframe>{/if}
         {#if restarting}<div class="restarting" data-testid="restarting" role="status"><span class="server-dot-inline amber"></span>Restarting dev server…</div>{/if}
         {#if mode === Mode.Design && bridged && !editing}
-          <div class="overlay" role="presentation" onpointerdown={pressOverlay} onpointermove={(e) => (pointed(e), dragOverlay(e))} onpointerleave={() => ((hover = null), toHost({ kind: ToHost.Cursor, at: null }))} onclick={onPick} oncontextmenu={onMenu} ondragover={overAdd} ondragleave={() => (addSpot = null)} ondrop={dropAdd} ondblclick={onDouble} onwheel={(e) => bridge.scroll(e.deltaX / fit.scale, e.deltaY / fit.scale)}>
+          <div class="overlay" role="presentation" onpointerdown={pressOverlay} onpointermove={(e) => (pointed(e), dragOverlay(e))} onpointerleave={() => ((hover = null), toHost({ kind: ToHost.Cursor, at: null }))} onclick={onPick} oncontextmenu={onMenu} ondragover={overAdd} ondragleave={() => (addSpot = null)} ondrop={dropAdd} ondblclick={onDouble} onwheel={wheelOnFocus}>
             {#if hover && !lostSlots[Slot.Hovered]}<div class="outline hover" style={box(hover)}></div>{/if}
             {#if addSpot}
               <div class="drop-line box" data-testid="add-outline" style={`left:${addSpot.outline.x * fit.scale - 1}px;top:${addSpot.outline.y * fit.scale - 1}px;width:${Math.max(2, addSpot.outline.w * fit.scale)}px;height:${Math.max(2, addSpot.outline.h * fit.scale)}px`}></div>
@@ -1470,7 +1543,7 @@
           {#if picked}<PluginOverlay {plugins} {picked} scale={fit.scale} />{/if}
           {#each others as other (keyOf(refOf(other.source, other.instanceIndex)))}<div class="outline picked" data-testid="selected-outline" style={box(other)}></div>{/each}
           <PeerLayer {peers} rects={peerRects} scale={fit.scale} />
-          {#if picked && !lostSlots[Slot.Selected]}<div class="outline picked" style={box(picked)}><span class="label"><Breadcrumb pick={picked} onselect={select} compact state={elementState} /></span></div>{/if}
+          {#if picked && !lostSlots[Slot.Selected]}<div class="outline picked" style={box(picked)}>{#if !(viewing === View.Focus && showGrid)}<span class="label"><Breadcrumb pick={picked} onselect={select} compact state={elementState} /></span>{/if}</div>{/if}
           {#each pins as pin (pin.id)}
             {@const rect = pinRects[pin.id]}
             {#if rect}
@@ -1564,7 +1637,7 @@
       </Tabs.List>
       <Tabs.Content value={Tab.Properties}>
         {#if mount && viewing === View.Focus && mount.controls.length}
-          <ComponentProps controls={mount.controls} values={mount.values} grid={showGrid} {variants} onchange={setProp} ongrid={setGrid} />
+          <ComponentProps controls={mount.controls} values={mount.values} grid={showGrid} {variants} dynamic={mount.dynamic} apply={{ ready: Boolean(applyPlan), usage: Boolean(focus?.usage), skipped: applyPlan?.skipped ?? [] }} onchange={setProp} ongrid={setGrid} onapply={applyToPage} />
         {/if}
         {#if several}
           <div class="what" data-testid="multi-selection">
@@ -1626,7 +1699,7 @@
 </main>
 
 {#if onboarding === Onboarding.Pending}
-  <OnboardingDialog {account} {support} {agents} oncopy={(text) => toHost({ kind: ToHost.Copy, text })} onlink={(url) => toHost({ kind: ToHost.External, url })} onaccount={(kind) => toHost({ kind })} onsupport={(item) => toHost({ kind: ToHost.Support, item })} onstep={(step) => toHost({ kind: ToHost.OnboardingStep, step })} ondone={finishOnboarding} />
+  <OnboardingDialog {account} {support} {agents} {adapters} oncopy={(text) => toHost({ kind: ToHost.Copy, text })} onlink={(url) => toHost({ kind: ToHost.External, url })} onaccount={(kind) => toHost({ kind })} onsupport={(item) => toHost({ kind: ToHost.Support, item })} onstep={(step) => toHost({ kind: ToHost.OnboardingStep, step })} ondone={finishOnboarding} />
 {/if}
 
 <style>

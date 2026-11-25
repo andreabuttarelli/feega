@@ -63,7 +63,7 @@ export type AgentFiles = {
   write: (path: string, content: string) => Promise<void>;
 };
 
-export type Launch = { command: string; args: string[] };
+export type Launch = { command: string; args: string[]; env?: Record<string, string> };
 
 export type AgentDeps = { cwd: string; resume: string | null; preferred: Record<string, string>; files: AgentFiles; policy: () => Policy; emit: (event: AgentEvent) => void };
 

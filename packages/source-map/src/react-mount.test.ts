@@ -41,12 +41,12 @@ describe('reactMountOf', () => {
     expect(reactMountOf(element(fiber))!.props).toEqual({ onClick: { $fn: true } });
   });
 
-  it('keeps text children and drops React elements', () => {
+  it('keeps text children and marks React elements as JSX', () => {
     const text = host(component({ children: 'Buy' }));
     const nodes = host(component({ children: { $$typeof: Symbol.for('react.transitional.element'), type: 'b' } }));
 
     expect(reactMountOf(element(text))!.props).toEqual({ children: 'Buy' });
-    expect(reactMountOf(element(nodes))!.props).toEqual({});
+    expect(reactMountOf(element(nodes))!.props).toEqual({ children: { $jsx: true } });
   });
 
   it('keeps plain objects and arrays and drops what is not data', () => {
@@ -101,5 +101,13 @@ describe('mountOf', () => {
 
   it('is null for an element no component framework made', () => {
     expect(mountOf(element(null))).toBeNull();
+  });
+
+  it('marks a prop that is JSX instead of dropping it', () => {
+    const root = new JSDOM('<div></div>').window.document.createElement('div');
+    const fiber = component({ icon: { $$typeof: Symbol.for('react.element'), type: 'svg' }, size: 'sm' });
+    (root as unknown as Record<string, unknown>)['__reactFiber$k'] = { tag: 5, type: 'div', memoizedProps: {}, return: fiber };
+
+    expect(reactMountOf(root)?.props).toEqual({ icon: { $jsx: true }, size: 'sm' });
   });
 });

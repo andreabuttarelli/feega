@@ -26,6 +26,10 @@ describe('reviveProps', () => {
     expect((props.onClick as () => unknown)()).toBeUndefined();
   });
 
+  it('leaves out a prop that was JSX on the page, which cannot be sent', () => {
+    expect(reviveProps({ icon: { $jsx: true }, size: 'sm' })).toEqual({ icon: undefined, size: 'sm' });
+  });
+
   it('turns the date marks back into dates', () => {
     const props = reviveProps({ when: { $date: '2026-01-02T00:00:00.000Z' } });
 

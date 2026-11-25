@@ -8,7 +8,8 @@ export enum ControlKind {
   Object = 'object',
   Callback = 'callback',
   Color = 'color',
-  Date = 'date'
+  Date = 'date',
+  Element = 'element'
 }
 
 export type Scalar = string | number | boolean;
@@ -43,6 +44,7 @@ const HEX = /^#[0-9a-f]{6}$/i;
 const SWATCH_FALLBACK = '#000000';
 const DATE_MARK = '$date';
 const FUNCTION_MARK = '$fn';
+const JSX_MARK = '$jsx';
 const DATE_LENGTH = 10;
 const JSON_INDENT = 2;
 const MIDNIGHT = 'T00:00:00.000Z';
@@ -85,10 +87,15 @@ export const EDITORS: Record<ControlKind, Editor> = {
     show: (value) => textOf((value as { $date?: string } | undefined)?.[DATE_MARK]).slice(0, DATE_LENGTH),
     read: (raw) => (raw === '' ? undefined : { [DATE_MARK]: `${raw}${MIDNIGHT}` })
   },
-  [ControlKind.Callback]: { input: Input.Readonly, readonly: true, show: () => 'function', read: () => undefined }
+  [ControlKind.Callback]: { input: Input.Readonly, readonly: true, show: () => 'function', read: () => undefined },
+  [ControlKind.Element]: { input: Input.Readonly, readonly: true, show: () => 'JSX', read: () => undefined }
 };
 
-const plainKind = (value: object): ControlKind => (FUNCTION_MARK in value ? ControlKind.Callback : DATE_MARK in value ? ControlKind.Date : ControlKind.Object);
+const isJsx = (value: unknown) => typeof value === 'object' && value !== null && JSX_MARK in value;
+
+export const editorFor = (control: PropControl, value: unknown): Editor => EDITORS[isJsx(value) ? ControlKind.Element : control.kind];
+
+const plainKind = (value: object): ControlKind => (JSX_MARK in value ? ControlKind.Element : FUNCTION_MARK in value ? ControlKind.Callback : DATE_MARK in value ? ControlKind.Date : ControlKind.Object);
 
 const OBSERVED: Record<string, (value: unknown) => ControlKind> = {
   string: () => ControlKind.Text,
@@ -99,7 +106,7 @@ const OBSERVED: Record<string, (value: unknown) => ControlKind> = {
 
 function observedKind(name: string, value: unknown): ControlKind | null {
   if (name === CHILDREN) {
-    return typeof value === 'string' || typeof value === 'number' ? ControlKind.Children : null;
+    return typeof value === 'string' || typeof value === 'number' ? ControlKind.Children : isJsx(value) ? ControlKind.Element : null;
   }
   return value === null ? null : (OBSERVED[typeof value]?.(value) ?? null);
 }
