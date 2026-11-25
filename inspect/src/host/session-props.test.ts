@@ -2,7 +2,7 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { Gate, ToHost, ToView, type ApplyAsk, type HostMessage, type ViewMessage } from '../messages';
+import { Gate, ToHost, ToView, type ApplyAsk, type ReadAsk, type HostMessage, type ViewMessage } from '../messages';
 import { SettingKey } from '../settings';
 import { memoryAccountStore } from './account';
 import { memoryOnboardingStore } from './onboarding';
@@ -33,8 +33,11 @@ function setup(settings: Record<string, unknown> = {}) {
     watchFiles: () => ({ dispose: () => undefined })
   } as unknown as Platform;
   inspectSession(platform, root);
+  writeFileSync(join(root, 'src/Page.svelte'), "<script>\n  import Card from './Card.svelte';\n</script>\n\n<main>\n  <Card title=\"Hi\" size={post.size} />\n</main>\n");
   return { sent, deliver: (m: HostMessage) => deliver(m), text: () => readFileSync(join(root, 'src/Home.tsx'), 'utf8') };
 }
+
+const read: ReadAsk = { component: 'src/Card.svelte', usage: 'src/Page.svelte:5:1', which: { index: 0, count: 1 } };
 
 const ask: ApplyAsk = { component: 'src/Card.tsx', usage: 'src/Home.tsx:4:3', set: { title: 'New' }, remove: [] };
 
@@ -73,5 +76,23 @@ describe('apply props in the session', () => {
 
     expect(text()).toContain('title="New"');
     expect(sent.some((m) => m.kind === ToView.PropsPreview)).toBe(false);
+  });
+});
+
+describe('props at the usage in the session', () => {
+  it('answers with the literals, the dynamic names and the component', async () => {
+    const { sent, deliver } = setup();
+
+    await deliver({ kind: ToHost.ReadProps, ask: read });
+
+    expect(sent.find((m) => m.kind === ToView.UsageProps)).toEqual({ kind: ToView.UsageProps, component: 'src/Card.svelte', values: { title: 'Hi' }, dynamic: ['size'], spread: false });
+  });
+
+  it('answers with nothing when the usage cannot be found', async () => {
+    const { sent, deliver } = setup();
+
+    await deliver({ kind: ToHost.ReadProps, ask: { ...read, usage: 'src/Missing.svelte:1:1' } });
+
+    expect(sent.find((m) => m.kind === ToView.UsageProps)).toEqual({ kind: ToView.UsageProps, component: 'src/Card.svelte', values: {}, dynamic: [], spread: false });
   });
 });

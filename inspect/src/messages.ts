@@ -51,6 +51,8 @@ export type UsageSite = { file: string; line: number };
 
 export type Impact = { kind: ImpactKind.Local } | { kind: ImpactKind.Component; name: string; files: UsageSite[] } | { kind: ImpactKind.Unknown; reason: string };
 
+export type ReadAsk = { component: string; usage: string; which?: { index: number; count: number } };
+
 export type ApplyAsk = { component: string; usage: string; which?: { index: number; count: number }; set: Record<string, Json>; remove: string[] };
 
 export type ImpactAsk = { at: string } & Partial<EditAsk>;
@@ -201,6 +203,7 @@ export enum ToHost {
   Link = 'link',
   Attribute = 'attribute',
   ApplyProps = 'apply-props',
+  ReadProps = 'read-props',
   Go = 'go',
   Selected = 'selected',
   Context = 'context',
@@ -287,6 +290,7 @@ export enum ToView {
   Impact = 'impact',
   Preview = 'preview',
   PropsPreview = 'props-preview',
+  UsageProps = 'usage-props',
   Peers = 'peers',
   AiAgents = 'ai-agents',
   AiState = 'ai-state',
@@ -382,6 +386,7 @@ export type HostMessage =
   | { kind: ToHost.Link; at: string; edit: LinkEdit; instance?: number }
   | { kind: ToHost.Attribute; at: string; name: string; value: string }
   | { kind: ToHost.ApplyProps; ask: ApplyAsk; gate?: Gate }
+  | { kind: ToHost.ReadProps; ask: ReadAsk }
   | { kind: ToHost.Go; at: string; ask: GoAsk }
   | { kind: ToHost.Selected; at: Source | null }
   | { kind: ToHost.Context; text: string | null }
@@ -443,6 +448,7 @@ export type ViewMessage =
   | { kind: ToView.Reload }
   | { kind: ToView.Impact; id: number; impact: Impact }
   | { kind: ToView.Preview; ask: EditAsk; reason: string; files: DiffFile[]; by?: Author }
+  | { kind: ToView.UsageProps; component: string; values: Record<string, Json>; dynamic: string[]; spread: boolean }
   | { kind: ToView.PropsPreview; ask: ApplyAsk; reason: string; files: DiffFile[]; by?: Author }
   | { kind: ToView.Peers; peers: Present[] }
   | { kind: ToView.AiAgents; agents: AcpAgent[] }

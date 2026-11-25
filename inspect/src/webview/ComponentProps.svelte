@@ -2,9 +2,9 @@
   import { EDITORS, INVALID, Input, type PropControl, type PropValue, type Variants } from './prop-controls';
 
   type Apply = { ready: boolean; usage: boolean; skipped: string[] };
-  type Props = { controls: PropControl[]; values: Record<string, unknown>; grid: boolean; variants: Variants; apply: Apply; onchange: (name: string, value: PropValue | undefined) => void; ongrid: (on: boolean) => void; onapply: () => void };
+  type Props = { controls: PropControl[]; values: Record<string, unknown>; grid: boolean; variants: Variants; dynamic: string[]; apply: Apply; onchange: (name: string, value: PropValue | undefined) => void; ongrid: (on: boolean) => void; onapply: () => void };
 
-  let { controls, values, grid, variants, apply, onchange, ongrid, onapply }: Props = $props();
+  let { controls, values, grid, variants, dynamic, apply, onchange, ongrid, onapply }: Props = $props();
 
   let invalid = $state<Record<string, boolean>>({});
 
@@ -39,7 +39,7 @@
     {@const editor = EDITORS[control.kind]}
     {@const current = editor.show(values[control.name], control)}
     <div class="row" data-row={control.name} data-kind={control.kind}>
-      <span class="label" title={control.name}>{control.name}{#if control.required}<span class="required" title="Required" aria-label="required">*</span>{/if}</span>
+      <span class="label" title={control.name}>{control.name}{#if control.required}<span class="required" title="Required" aria-label="required">*</span>{/if}{#if dynamic.includes(control.name)}<span class="dynamic" title="The usage passes an expression: showing the default" data-testid="dynamic-{control.name}">dynamic</span>{/if}</span>
       <div class="control">
         {#if editor.input === Input.Select}
           <select class="text" value={current} aria-label={control.name} data-field={control.name} onchange={(e) => commit(control, e.currentTarget.value)}>
@@ -140,6 +140,14 @@
   .control {
     display: flex;
     min-width: 0;
+  }
+
+  .dynamic {
+    margin-left: 4px;
+    padding: 0 4px;
+    border: 1px solid var(--ui-field-border);
+    border-radius: var(--ui-radius-sm);
+    font-style: italic;
   }
 
   .required {
