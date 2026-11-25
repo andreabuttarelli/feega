@@ -236,6 +236,7 @@
 
   .field {
     display: flex;
+    flex: 1;
     align-items: center;
     position: relative;
     min-width: 0;

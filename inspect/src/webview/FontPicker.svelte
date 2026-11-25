@@ -69,6 +69,7 @@
 <style>
   .font-field {
     display: flex;
+    flex: 1;
     align-items: center;
     min-width: 0;
     height: 28px;
