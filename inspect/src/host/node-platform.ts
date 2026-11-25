@@ -19,6 +19,7 @@ import { HintSurface, nodeSkillHint } from './skill-hint';
 import { Device, Editor, fileFirstEdit, fileInstallStore, installOf, nodeUsageEnabled, type FirstEditFlag, type InstallStore } from './usage';
 
 const FEEGA_DIR = '.feega';
+const ADAPTERS_DIR = 'adapters';
 const SETTINGS_FILE = 'settings.json';
 const STATE_FILE = 'state.json';
 const CACHE_DIR = 'feega';
@@ -52,9 +53,11 @@ const freshLaunch = (state: Record<string, unknown>): Record<string, unknown> =>
   return prefs && typeof prefs === 'object' ? { ...state, [Stored.Prefs]: { ...prefs, size: FULL_WIDTH, custom: null } } : state;
 };
 
+const cacheRoot = (env: NodeJS.ProcessEnv) => join(env.XDG_CACHE_HOME || join(homedir(), '.cache'), CACHE_DIR);
+
 const stateDirFor = (root: string, env: NodeJS.ProcessEnv) => {
   const key = createHash('sha256').update(root).digest('hex').slice(0, STATE_KEY_LENGTH);
-  return join(env.XDG_CACHE_HOME || join(homedir(), '.cache'), CACHE_DIR, key);
+  return join(cacheRoot(env), key);
 };
 
 export function nodePlatform({ root, launcher, version, transport, print, launch = launchDetached, env = process.env, account = fileAccountStore(), onboarding = fileOnboardingStore(), support = fileSupportStore(), install = fileInstallStore(), firstEdit = fileFirstEdit(), cloud, share, plugins = { root: pluginsRoot(), dev: () => [] } }: NodeHost): Platform {
@@ -137,6 +140,7 @@ export function nodePlatform({ root, launcher, version, transport, print, launch
     support,
     skillHint: nodeSkillHint(HintSurface.Terminal),
     localBridge: publishLocal,
+    adapterDir: join(cacheRoot(env), ADAPTERS_DIR),
     agents: () => machineAgents(),
     usage: {
       identity: () => ({ ...installOf(install), version, editor: Editor.Npx, os: process.platform, arch: process.arch, device: Device.Cli }),

@@ -64,7 +64,7 @@ export type AgentFiles = {
   write: (path: string, content: string) => Promise<void>;
 };
 
-export type Launch = { command: string; args: string[] };
+export type Launch = { command: string; args: string[]; env?: Record<string, string> };
 
 export type McpServerSpec = { name: string; command: string; args: string[]; env: Record<string, string> };
 

@@ -3,10 +3,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { AiState, ToView, type ChatRow, type ViewMessage } from '../../messages';
+import { AdapterState, AiState, ToView, type ChatRow, type ViewMessage } from '../../messages';
 import { AcpId } from './acp-agents';
 import { aiChat, MAX_LIVE, type ChatRecord } from './ai-chat';
-import { AgentEventKind, type OpenAgent } from './agent-session';
+import type { Adapters } from './adapters';
+import { AgentEventKind, type Launch, type OpenAgent } from './agent-session';
 import { openAcpAgent } from './acp-session';
 import { ItemKind } from './transcript';
 import { Policy } from './permission-policy';
@@ -24,9 +25,11 @@ const eventually = async (check: () => boolean) => {
   }
 };
 
-type Options = { flags?: string[]; confirmed?: boolean; saved?: ChatRecord[]; granted?: Set<string> };
+const ADAPTER_LAUNCH = { command: '/node', args: ['/adapter/index.js'], env: { ELECTRON_RUN_AS_NODE: '1' } };
 
-function setup({ flags = [], confirmed = true, saved = [], granted = new Set<string>() }: Options = {}) {
+type Options = { flags?: string[]; confirmed?: boolean; saved?: ChatRecord[]; ready?: AcpId[]; failing?: string };
+
+function setup({ flags = [], confirmed = true, saved = [], ready = [], failing }: Options = {}) {
   const root = mkdtempSync(join(tmpdir(), 'ai-chat-'));
   writeFileSync(join(root, 'a.txt'), 'x');
   const sent: ViewMessage[] = [];
@@ -36,14 +39,32 @@ function setup({ flags = [], confirmed = true, saved = [], granted = new Set<str
   let stored: ChatRecord[] = saved;
   let clock = 1000;
   let ids = 0;
-  const open: OpenAgent = (_launch, deps) => (opened.push(deps.resume), openAcpAgent({ command: process.execPath, args: [FAKE, ...flags] }, deps));
+  const installs: AcpId[] = [];
+  const launched: Launch[] = [];
+  const present = new Set<AcpId>(ready);
+  let reason = failing;
+  let release: () => void = () => undefined;
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  const adapters: Adapters = {
+    ready: (id) => present.has(id),
+    install: async (id) => {
+      installs.push(id);
+      if (reason) {
+        throw new Error(reason);
+      }
+      await gate;
+      present.add(id);
+    },
+    launch: () => ADAPTER_LAUNCH
+  };
+  const open: OpenAgent = (launch, deps) => (opened.push(deps.resume), launched.push(launch), openAcpAgent({ command: process.execPath, args: [FAKE, ...flags] }, deps));
   const chat = aiChat({
     root: () => root,
     env: () => ({ path: ['/bin'], home: '/h', exists: (p) => p === '/bin/opencode' || p === '/bin/grok' || p === '/bin/claude', appName: '', extensions: [] }),
     open,
     confirm: async () => confirmed,
     where: () => 'project: /work/app\ndev server: http://localhost:5173',
-    adapters: { granted: (key) => granted.has(key), grant: (key) => void granted.add(key) },
+    adapters,
     post: (message) => void sent.push(message),
     write: async () => undefined,
     record: async () => undefined,
@@ -58,12 +79,10 @@ function setup({ flags = [], confirmed = true, saved = [], granted = new Set<str
   const rows = (): ChatRow[] => sent.flatMap((m) => (m.kind === ToView.AiChats ? [m.chats] : [])).at(-1) ?? [];
   const snapshot = () => sent.flatMap((m) => (m.kind === ToView.AiChat ? [m] : [])).at(-1);
   const events = () => sent.flatMap((m) => (m.kind === ToView.AiEvent ? [m.event] : []));
-  return { chat, sent, rows, snapshot, events, opened, created, configured, saved: () => stored, root };
+  return { chat, sent, rows, snapshot, events, opened, created, configured, installs, launched, finish: () => release(), recover: () => ((reason = undefined), release()), saved: () => stored, root };
 }
 
 const done = (t: ReturnType<typeof setup>, count: number) => eventually(() => t.events().filter((e) => e.kind === AgentEventKind.Done).length >= count);
-
-const consents = (t: ReturnType<typeof setup>) => t.sent.filter((m) => m.kind === ToView.AiConsent);
 
 describe('the context the agent receives', () => {
   it('carries the page, the focused component, the project and the dev server', async () => {
@@ -146,68 +165,91 @@ describe('what the agent can see', () => {
   });
 });
 
-describe('the adapter consent', () => {
-  it('asks inside the chat and opens nothing until the user allows', async () => {
+describe('the adapter in the chat', () => {
+  it('installs a missing adapter on first open, showing Connecting, and asks nothing', async () => {
     const t = setup();
 
     const starting = t.chat.start(AcpId.Claude);
-    await eventually(() => consents(t).length === 1);
+    await eventually(() => t.installs.length === 1);
 
-    expect(consents(t)[0]).toMatchObject({ chat: 'chat-1', agent: AcpId.Claude, label: 'Claude Code' });
+    expect(t.sent.some((m) => m.kind === ToView.AiState && m.state === AiState.Starting)).toBe(true);
     expect(t.opened).toEqual([]);
-    t.chat.consent(true);
+    t.finish();
     await starting;
     expect(t.opened).toEqual([null]);
+    expect(t.installs).toEqual([AcpId.Claude]);
     t.chat.close();
   });
 
-  it('drops the chat when the user cancels', async () => {
-    const t = setup();
+  it('launches the installed adapter, not npx', async () => {
+    const t = setup({ ready: [AcpId.Claude] });
 
-    const starting = t.chat.start(AcpId.Claude);
-    await eventually(() => consents(t).length === 1);
-    t.chat.consent(false);
-    await starting;
+    await t.chat.start(AcpId.Claude);
+
+    expect(t.installs).toEqual([]);
+    expect(t.launched).toEqual([ADAPTER_LAUNCH]);
+    t.chat.close();
+  });
+
+  it('keeps the chat with the reason when the install fails, and connects on retry', async () => {
+    const t = setup({ failing: 'Could not reach npm. Check your connection, then retry.' });
+
+    await t.chat.start(AcpId.Claude);
 
     expect(t.opened).toEqual([]);
-    expect(t.rows()).toEqual([]);
+    expect(t.rows()).toMatchObject([{ id: 'chat-1', agent: AcpId.Claude }]);
+    expect(t.snapshot()?.items).toEqual([{ kind: ItemKind.Error, text: 'Could not reach npm. Check your connection, then retry.' }]);
+
+    t.recover();
+    await t.chat.retry();
+
+    expect(t.opened).toEqual([null]);
+    expect(t.snapshot()?.state).toBe(AiState.Ready);
+    expect(t.snapshot()?.items).toEqual([]);
+    t.chat.close();
   });
 
-  it('does not ask again once allowed, even after a restart', async () => {
-    const granted = new Set<string>();
-    const first = setup({ granted });
-    const starting = first.chat.start(AcpId.Claude);
-    await eventually(() => consents(first).length === 1);
-    first.chat.consent(true);
-    await starting;
-    first.chat.close();
-
-    const again = setup({ granted });
-    await again.chat.start(AcpId.Claude);
-
-    expect(consents(again)).toEqual([]);
-    expect(again.opened).toEqual([null]);
-    again.chat.close();
-  });
-
-  it('asks again when the adapter version changes', async () => {
-    const t = setup({ granted: new Set(['@agentclientprotocol/claude-agent-acp@0.1.0']) });
-
-    const starting = t.chat.start(AcpId.Claude);
-    await eventually(() => consents(t).length === 1);
-    t.chat.consent(false);
-    await starting;
-
-    expect(t.opened).toEqual([]);
-  });
-
-  it('never asks for an agent that needs no adapter', async () => {
+  it('never installs for an agent that needs no adapter', async () => {
     const t = setup();
 
     await t.chat.start(AcpId.OpenCode);
 
-    expect(consents(t)).toEqual([]);
+    expect(t.installs).toEqual([]);
     t.chat.close();
+  });
+});
+
+describe('preparing the adapters for onboarding', () => {
+  const rowsOf = (t: ReturnType<typeof setup>) => t.sent.flatMap((m) => (m.kind === ToView.Adapters ? [m.rows] : []));
+
+  it('downloads the adapter of each installed agent and reports progress', async () => {
+    const t = setup();
+
+    const preparing = t.chat.prepare();
+    await eventually(() => t.installs.length === 1);
+    t.finish();
+    await preparing;
+
+    const states = rowsOf(t).map((rows) => rows.map((r) => [r.agent, r.state]));
+    expect(states).toEqual([[[AcpId.Claude, AdapterState.Installing]], [[AcpId.Claude, AdapterState.Ready]]]);
+    expect(rowsOf(t)[0][0].label).toBe('Claude Code');
+  });
+
+  it('reports the reason when the download fails', async () => {
+    const t = setup({ failing: 'offline' });
+
+    await t.chat.prepare();
+
+    expect(rowsOf(t).at(-1)).toEqual([{ agent: AcpId.Claude, label: 'Claude Code', state: AdapterState.Failed, reason: 'offline' }]);
+  });
+
+  it('downloads nothing that is already there', async () => {
+    const t = setup({ ready: [AcpId.Claude] });
+
+    await t.chat.prepare();
+
+    expect(t.installs).toEqual([]);
+    expect(rowsOf(t).at(-1)).toMatchObject([{ agent: AcpId.Claude, state: AdapterState.Ready }]);
   });
 });
 

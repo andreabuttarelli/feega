@@ -1407,3 +1407,7 @@ non solo con la build.
 ## An ACP `mcpServers` entry with a bare `node` is refused
 
 **Signal:** the agent answers `-32602` to `session/new`. **Move:** `command` must be an absolute path: use `process.execPath` with `ELECTRON_RUN_AS_NODE=1` (`editorMcp` in `inspect/src/host/ai/editor-mcp.ts`), which also runs inside the VS Code extension host.
+
+## Worktree tests cannot find `@feega/*` or the ACP sdk
+
+**Signal:** `Failed to load url @feega/live-edit/...` in a new worktree whose `node_modules` is a symlink to the main checkout. The symlinks under `@feega` resolve to the main checkout's `packages/`, which may be another branch and lacks the new modules. **Move:** make `node_modules` a real folder of per-entry symlinks and link each `@feega/<name>` to this worktree's `packages/<name>`; install missing dependencies such as `@agentclientprotocol/sdk` outside the repo and link them.

@@ -159,9 +159,8 @@
     }
   }
 
-  function decide(allow: boolean) {
-    ai.consent = null;
-    tohost({ kind: ToHost.AiConsent, allow });
+  function retry() {
+    tohost({ kind: ToHost.AiRetry });
   }
 
   function answer(id: string, optionId: string | null, name: string) {
@@ -255,14 +254,10 @@
   </header>
 
   <div class="thread" data-testid="ai-thread">
-    {#if ai.consent}
-      <div class="consent" data-testid="ai-consent">
-        <span class="empty-mark">{@render glyph(ai.consent.agent, ai.consent.label, 20)}</span>
-        <p>{ai.consent.label} connects through a small open-source adapter, downloaded once from npm.</p>
-        <div class="consent-actions">
-          <button type="button" class="connect" data-testid="ai-consent-allow" onclick={() => decide(true)}>Connect</button>
-          <button type="button" class="suggestion" data-testid="ai-consent-cancel" onclick={() => decide(false)}>Cancel</button>
-        </div>
+    {#if ai.state === AiState.Starting && !ai.items.length}
+      <div class="empty" data-testid="ai-connecting">
+        {#if current}<span class="empty-mark">{@render glyph(current.id, current.label, 20)}</span>{/if}
+        <p>Connecting…</p>
       </div>
     {:else if !ai.items.length}
       <div class="empty" data-testid="ai-empty">
@@ -312,6 +307,7 @@
         </div>
       {:else if item.kind === ItemKind.Error}
         <p class="error">{item.text}</p>
+        {#if item === ai.items.at(-1) && ai.state === AiState.Ready}<button type="button" class="connect" data-testid="ai-retry" onclick={retry}>Retry</button>{/if}
       {:else}
         <p class="note">{item.text}</p>
       {/if}
@@ -611,28 +607,6 @@
     padding: 32px 8px 16px;
     color: var(--ui-text-2);
     text-align: center;
-  }
-
-  .consent {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 12px;
-    margin: 24px 8px 8px;
-    padding: 20px 16px;
-    border: 1px solid var(--ui-field-border);
-    border-radius: var(--ui-radius-lg);
-    color: var(--ui-text-2);
-    text-align: center;
-  }
-
-  .consent p {
-    margin: 0;
-  }
-
-  .consent-actions {
-    display: flex;
-    gap: 8px;
   }
 
   .connect {

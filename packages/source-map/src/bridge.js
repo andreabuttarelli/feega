@@ -1,5 +1,5 @@
 import { stampSources } from './framework-meta.js';
-import { SOURCE_ATTR, rectOf, deepestAt, clearPreview, clearPreviews, hidePreview, paletteOf, relativeOf, treeOf, inspectElement, keepPreviews, previewEdit, settlePreview } from './runtime.js';
+import { SOURCE_ATTR, GHOST_ATTR, rectOf, deepestAt, clearPreview, clearPreviews, hidePreview, paletteOf, relativeOf, treeOf, inspectElement, keepPreviews, previewEdit, settlePreview } from './runtime.js';
 import { FOCUSED, focusTab } from './focus.js';
 import { missingFontsOf } from './missing-fonts.js';
 import { trackRects } from './track.js';
@@ -25,6 +25,8 @@ export const TREE = 'feega:tree';
 export const TREE_RESULT = 'feega:tree:result';
 export const HIDE = 'feega:hide';
 export const FOCUS = 'feega:focus';
+export const FOCUS_CANVAS = 'feega:focus-canvas';
+export const FOCUS_ZOOM = 'feega:focus-zoom';
 export { FOCUSED };
 export const PALETTE = 'feega:palette';
 export const PALETTE_RESULT = 'feega:palette:result';
@@ -121,6 +123,8 @@ export function installBridge(win, { nested = false, emit = null, twin = null, r
     [PALETTE]: () => reply({ type: PALETTE_RESULT, ...paletteOf(doc), missing: missingFontsOf(doc) }),
     [HIDE]: (request) => hidePreview(doc, request.source, request.hidden),
     [FOCUS]: (request) => (request.source === null ? tab.close() : reply({ type: FOCUSED, ...tab.open(request) })),
+    [FOCUS_CANVAS]: (request) => tab.canvas(request),
+    [FOCUS_ZOOM]: (request) => tab.zoom(request),
     [LEAVE]: () => scroll.leave(),
     [CAPTURE]: (request) => {
       const answer = reply;
@@ -145,8 +149,9 @@ export function installBridge(win, { nested = false, emit = null, twin = null, r
       stampSources(doc);
       const target = targetOf(doc, request);
       settleForced(doc);
-      const inspected = target ? inspectElement(target, { maxHtml: request.maxHtml, twin }) : null;
       const tagged = target?.closest(`[${SOURCE_ATTR}]`);
+      const outside = nested && (!tagged || tagged.hasAttribute(GHOST_ATTR));
+      const inspected = target && !outside ? inspectElement(target, { maxHtml: request.maxHtml, twin }) : null;
       reply({ type: INSPECT_RESULT, id: request.id, result: inspected && { ...inspected, states: tagged ? statesOf(tagged) : [] } });
     }
   };

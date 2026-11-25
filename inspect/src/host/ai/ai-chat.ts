@@ -1,9 +1,10 @@
 import { readFile } from 'node:fs/promises';
 import { isAbsolute, relative } from 'node:path';
 import { inside } from '@feega/live-edit/live-ask';
-import { AiState, ToView, type ChatRow, type ViewMessage } from '../../messages';
+import { AdapterState, AiState, ToView, type AdapterRow, type ChatRow, type ViewMessage } from '../../messages';
 import type { AgentEnv } from '../agents';
 import { AcpId, acpAgents, launchOf } from './acp-agents';
+import type { Adapters } from './adapters';
 import { isPolicy, type Policy } from './permission-policy';
 import { AgentEventKind, type AgentEvent, type AgentFiles, type AgentSession, type ConfigView, type McpServerSpec, type ModeView, type OpenAgent } from './agent-session';
 import { turnWatch, type TurnWatch } from './turn-changes';
@@ -13,7 +14,6 @@ const OUTSIDE = 'is outside the workspace';
 const NOT_STARTED = 'start an agent first';
 const DELETE_ACTION = 'Delete';
 const FORGOT = "New session — the agent doesn't remember earlier messages";
-const VERSIONED_PACKAGE = /^@?[\w./-]+@\d/;
 const TITLE_MAX = 40;
 const KEPT_CHATS = 50;
 
@@ -31,7 +31,7 @@ export type AiChatDeps = {
   open: OpenAgent;
   confirm: (question: string, yes: string) => Promise<boolean>;
   where: () => string;
-  adapters: { granted: (key: string) => boolean; grant: (key: string) => void };
+  adapters: Adapters;
   post: (message: ViewMessage) => unknown;
   write: (path: string, content: string, agent: string) => Promise<void>;
   record: (path: string, before: string, after: string, agent: string) => Promise<void>;
@@ -44,7 +44,7 @@ export type AiChatDeps = {
   mcp: () => McpServerSpec[];
 };
 
-const adapterPackage = (id: AcpId): string => launchOf(id).args.find((arg) => VERSIONED_PACKAGE.test(arg)) ?? launchOf(id).command;
+const messageOf = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
 const slice = (text: string, from?: number, count?: number): string => {
   if (from === undefined && count === undefined) {
@@ -58,7 +58,6 @@ const titleOf = (text: string): string => (text.length > TITLE_MAX ? `${text.sli
 
 export function aiChat(deps: AiChatDeps) {
   const { post } = deps;
-  let asking: ((allow: boolean) => void) | null = null;
   const chats = new Map<string, Chat>();
   let active: string | null = null;
   let loaded = false;
@@ -163,25 +162,20 @@ export function aiChat(deps: AiChatDeps) {
     return idle !== undefined;
   };
 
-  const allowed = async (chat: Chat, id: AcpId, label: string): Promise<boolean> => {
-    const key = adapterPackage(id);
-    if (deps.adapters.granted(key)) {
+  const installed = async (chat: Chat, id: AcpId): Promise<boolean> => {
+    if (deps.adapters.ready(id)) {
       return true;
     }
-    asking?.(false);
-    const answer = new Promise<boolean>((resolve) => (asking = resolve));
-    post({ kind: ToView.AiConsent, chat: chat.record.id, agent: id, label });
-    const allow = await answer;
-    if (allow) {
-      deps.adapters.grant(key);
+    chat.opening = true;
+    state(chat);
+    try {
+      await deps.adapters.install(id);
+      return true;
+    } catch (error) {
+      chat.opening = false;
+      deliver(chat, { kind: AgentEventKind.Failed, reason: messageOf(error) });
+      return false;
     }
-    return allow;
-  };
-
-  const consent = (allow: boolean) => {
-    const resolve = asking;
-    asking = null;
-    resolve?.(allow);
   };
 
   async function connect(chat: Chat): Promise<boolean> {
@@ -194,7 +188,7 @@ export function aiChat(deps: AiChatDeps) {
       failed(`${agent.label} is not installed. Install it with: ${agent.install}`, record.id);
       return false;
     }
-    if (agent.adapter && !(await allowed(chat, agent.id, agent.label))) {
+    if (agent.adapter && !(await installed(chat, agent.id))) {
       return false;
     }
     if (!room()) {
@@ -204,7 +198,7 @@ export function aiChat(deps: AiChatDeps) {
     chat.opening = true;
     state(chat);
     try {
-      const session = await deps.open(launchOf(agent.id), { cwd: deps.root(), resume: record.sessionId, preferred: record.chosen, mcp: deps.mcp(), files: files(() => agent.label, () => chat.watch), policy: deps.policy.get, emit: (event) => heard(chat, event) });
+      const session = await deps.open(agent.adapter ? deps.adapters.launch(agent.id) : launchOf(agent.id)!, { cwd: deps.root(), resume: record.sessionId, preferred: record.chosen, mcp: deps.mcp(), files: files(() => agent.label, () => chat.watch), policy: deps.policy.get, emit: (event) => heard(chat, event) });
       chat.live = session;
       if (record.items.length && !session.resumed) {
         record.items = [...record.items, { kind: ItemKind.Note, text: FORGOT }];
@@ -242,8 +236,10 @@ export function aiChat(deps: AiChatDeps) {
     active = chat.record.id;
     snapshot(chat);
     if (!(await connect(chat))) {
-      chats.delete(chat.record.id);
-      active = rows()[0]?.id ?? null;
+      if (!chat.record.items.length) {
+        chats.delete(chat.record.id);
+        active = rows()[0]?.id ?? null;
+      }
       snapshot(current());
       postChats();
       return;
@@ -279,6 +275,39 @@ export function aiChat(deps: AiChatDeps) {
     await chat.watch.begin();
     await session.send(context ? `${context}\n${deps.where()}\n\n${text}` : text, images);
     await chat.settling;
+  }
+
+  async function retry() {
+    const chat = current();
+    if (!chat || chat.live || chat.opening) {
+      return;
+    }
+    if (chat.record.items.at(-1)?.kind === ItemKind.Error) {
+      chat.record.items = chat.record.items.slice(0, -1);
+      snapshot(chat);
+    }
+    if (await connect(chat)) {
+      persist();
+    }
+    state(chat);
+  }
+
+  async function prepare() {
+    const rows: AdapterRow[] = acpAgents(deps.env())
+      .filter((a) => a.installed && a.adapter)
+      .map(({ id, label }) => ({ agent: id, label, state: deps.adapters.ready(id) ? AdapterState.Ready : AdapterState.Installing }));
+    const announce = () => post({ kind: ToView.Adapters, rows: rows.map((r) => ({ ...r })) });
+    announce();
+    for (const row of rows.filter((r) => r.state === AdapterState.Installing)) {
+      try {
+        await deps.adapters.install(row.agent);
+        row.state = AdapterState.Ready;
+      } catch (error) {
+        row.state = AdapterState.Failed;
+        row.reason = messageOf(error);
+      }
+      announce();
+    }
   }
 
   function open(id: string) {
@@ -361,7 +390,8 @@ export function aiChat(deps: AiChatDeps) {
       }
     },
     setConfig,
-    consent,
+    retry,
+    prepare,
     setMode: async (id: string) => void (await current()?.live?.setMode(id)),
     start,
     send,
