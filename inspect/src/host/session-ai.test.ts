@@ -3,18 +3,19 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { AiState, ToHost, ToView, type HostMessage, type ViewMessage } from '../messages';
+import { AdapterState, AiState, OnboardingStep, ToHost, ToView, type HostMessage, type ViewMessage } from '../messages';
 import { memoryAccountStore } from './account';
 import { memoryOnboardingStore } from './onboarding';
 import type { Platform } from './platform';
 import { inspectSession } from './session';
 import { AcpId } from './ai/acp-agents';
-import { AgentEventKind, type OpenAgent } from './ai/agent-session';
+import { AgentEventKind, type Launch, type OpenAgent } from './ai/agent-session';
 import { openAcpAgent } from './ai/acp-session';
 import type { AgentEnv } from './agents';
 
 const FAKE = fileURLToPath(new URL('./ai/fake-acp-agent.mjs', import.meta.url));
 const WAIT_MS = 5000;
+const ADAPTER_LAUNCH = { command: '/node', args: ['/adapter.js'] };
 
 const eventually = async (check: () => boolean) => {
   const start = Date.now();
@@ -35,7 +36,11 @@ function setup(installed: string[] = ['/bin/opencode'], confirmed = true) {
   const asked: string[] = [];
   let handle: (message: HostMessage) => unknown = () => undefined;
   const env: AgentEnv = { path: ['/bin'], home: '/home/none', exists: (p) => installed.includes(p), appName: '', extensions: [] };
-  const open: OpenAgent = (_launch, deps) => openAcpAgent({ command: process.execPath, args: [FAKE] }, deps);
+  const installs: AcpId[] = [];
+  const launched: Launch[] = [];
+  const present = new Set<AcpId>();
+  const adapters = { ready: (id: AcpId) => present.has(id), install: async (id: AcpId) => void (installs.push(id), present.add(id)), launch: () => ADAPTER_LAUNCH };
+  const open: OpenAgent = (launch, deps) => (launched.push(launch), openAcpAgent({ command: process.execPath, args: [FAKE] }, deps));
   const platform = {
     version: '1',
     launcher: '',
@@ -48,12 +53,12 @@ function setup(installed: string[] = ['/bin/opencode'], confirmed = true) {
     confirm: async (question: string) => (asked.push(question), confirmed),
     account: memoryAccountStore(),
     onboarding: memoryOnboardingStore(),
-    ai: { env: () => env, open }
+    ai: { env: () => env, open, adapters }
   } as unknown as Platform;
   const session = inspectSession(platform, dir);
   const events = () => sent.flatMap((m) => (m.kind === ToView.AiEvent ? [m.event] : []));
   const states = () => sent.flatMap((m) => (m.kind === ToView.AiState ? [m.state] : []));
-  return { dir, session, send: (m: HostMessage) => handle(m), sent, events, states, asked, read: (p: string) => readFileSync(join(dir, p), 'utf8'), exists: (p: string) => existsSync(join(dir, p)), changes: () => (sent.flatMap((m) => (m.kind === ToView.History ? [m.changes] : [])).at(-1) ?? []) };
+  return { dir, installs, launched, session, send: (m: HostMessage) => handle(m), sent, events, states, asked, read: (p: string) => readFileSync(join(dir, p), 'utf8'), exists: (p: string) => existsSync(join(dir, p)), changes: () => (sent.flatMap((m) => (m.kind === ToView.History ? [m.changes] : [])).at(-1) ?? []) };
 }
 
 describe('the AI panel in the session', () => {
@@ -129,17 +134,23 @@ describe('the AI panel in the session', () => {
     expect(failed && failed.kind === AgentEventKind.Failed && failed.reason).toContain('npm i -g opencode-ai');
   });
 
-  it('runs an npx adapter only after the user allows it in the chat', async () => {
-    const { send, events, asked, states, sent } = setup(['/home/none/.claude']);
+  it('installs the adapter without asking and opens the agent through it', async () => {
+    const { send, installs, launched, states } = setup(['/home/none/.claude']);
 
-    const starting = send({ kind: ToHost.AiStart, agent: AcpId.Claude });
-    await eventually(() => sent.some((m) => m.kind === ToView.AiConsent));
-    await send({ kind: ToHost.AiConsent, allow: false });
-    await starting;
+    await send({ kind: ToHost.AiStart, agent: AcpId.Claude });
 
-    expect(asked).toEqual([]);
-    expect(states()).not.toContain(AiState.Ready);
-    expect(events()).toEqual([]);
+    expect(installs).toEqual([AcpId.Claude]);
+    expect(launched).toEqual([ADAPTER_LAUNCH]);
+    expect(states()).toContain(AiState.Ready);
+  });
+
+  it('downloads the adapters when onboarding reaches the agents step', async () => {
+    const { send, installs, sent } = setup(['/home/none/.claude']);
+
+    await send({ kind: ToHost.OnboardingStep, step: OnboardingStep.Agents });
+
+    await eventually(() => sent.some((m) => m.kind === ToView.Adapters && m.rows[0]?.state === AdapterState.Ready));
+    expect(installs).toEqual([AcpId.Claude]);
   });
 });
 

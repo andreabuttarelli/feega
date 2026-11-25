@@ -13,6 +13,7 @@ import type { UsageHost } from './usage';
 import type { SkillHintHost } from './skill-hint';
 import type { AgentEnv } from './agents';
 import type { OpenAgent } from './ai/agent-session';
+import type { Adapters } from './ai/adapters';
 import type { SettingKey, SettingValue, Settings } from '../settings';
 
 export enum Stored {
@@ -25,8 +26,7 @@ export enum Stored {
   SkillHintShown = 'feegaInspect.skillHintShown',
   SkillInstalledSent = 'feegaInspect.skillInstalledSent',
   AiPolicy = 'feegaInspect.aiPolicy',
-  AiChats = 'feegaInspect.aiChats',
-  AiAdapters = 'feegaInspect.aiAdapters'
+  AiChats = 'feegaInspect.aiChats'
 }
 
 import type { Watch } from './file-watch';
@@ -72,5 +72,6 @@ export type Platform = Transport & {
   plugins?: PluginsHost;
   skillHint?: SkillHintHost;
   agents?: () => AgentId[];
-  ai?: { env: () => AgentEnv; open: OpenAgent };
+  adapterDir?: string;
+  ai?: { env: () => AgentEnv; open: OpenAgent; adapters?: Adapters };
 };

@@ -1,11 +1,15 @@
 <script lang="ts">
-  import { EDITORS, INVALID, Input, type PropControl, type PropValue, type Variants } from './prop-controls';
+  import { EDITORS, INVALID, editorFor, Input, type PropControl, type PropValue, type Variants } from './prop-controls';
 
-  type Props = { controls: PropControl[]; values: Record<string, unknown>; grid: boolean; variants: Variants; onchange: (name: string, value: PropValue | undefined) => void; ongrid: (on: boolean) => void };
+  type Apply = { ready: boolean; usage: boolean; skipped: string[] };
+  type Props = { controls: PropControl[]; values: Record<string, unknown>; grid: boolean; variants: Variants; dynamic: string[]; apply: Apply; onchange: (name: string, value: PropValue | undefined) => void; ongrid: (on: boolean) => void; onapply: () => void };
 
-  let { controls, values, grid, variants, onchange, ongrid }: Props = $props();
+  let { controls, values, grid, variants, dynamic, apply, onchange, ongrid, onapply }: Props = $props();
 
   let invalid = $state<Record<string, boolean>>({});
+
+  const applyTitle = $derived(!apply.usage ? 'Select the instance on the page to write its props back' : !apply.ready ? 'Edit a prop first' : 'Write the edited props into the source where this instance is used');
+  const skippedNote = $derived(apply.skipped.length ? `Not written: ${apply.skipped.join(', ')} (callbacks and children stay in code).` : null);
 
   const shown = $derived(variants.variants?.length ?? 0);
   const note = $derived(variants.dropped.length ? `Showing ${shown} of ${variants.total} combinations. Left out: ${variants.dropped.join(', ')}.` : `${shown} combinations.`);
@@ -26,12 +30,16 @@
       <button type="button" class="grid" class:on={grid} aria-pressed={grid} data-testid="variants-toggle" onclick={() => ongrid(!grid)}>Variants</button>
     {/if}
   </div>
+  <div class="apply">
+    <button type="button" class="grid" data-testid="apply-props" disabled={!apply.ready} title={applyTitle} onclick={onapply}>Apply to page</button>
+    {#if skippedNote}<span class="note" data-testid="apply-skipped">{skippedNote}</span>{/if}
+  </div>
   {#if grid && variants.variants}<p class="note" data-testid="variants-note">{note}</p>{/if}
   {#each controls as control (control.name)}
-    {@const editor = EDITORS[control.kind]}
+    {@const editor = editorFor(control, values[control.name])}
     {@const current = editor.show(values[control.name], control)}
     <div class="row" data-row={control.name} data-kind={control.kind}>
-      <span class="label" title={control.name}>{control.name}{#if control.required}<span class="required" title="Required" aria-label="required">*</span>{/if}</span>
+      <span class="label" title={control.name}>{control.name}{#if control.required}<span class="required" title="Required" aria-label="required">*</span>{/if}{#if dynamic.includes(control.name)}<span class="dynamic" title="The usage passes an expression: showing the default" data-testid="dynamic-{control.name}">dynamic</span>{/if}</span>
       <div class="control">
         {#if editor.input === Input.Select}
           <select class="text" value={current} aria-label={control.name} data-field={control.name} onchange={(e) => commit(control, e.currentTarget.value)}>
@@ -93,6 +101,18 @@
     color: var(--ui-text);
   }
 
+  .apply {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 0 12px 6px;
+  }
+
+  .grid:disabled {
+    opacity: 0.5;
+  }
+
   .note {
     margin: 0;
     padding: 0 12px 6px;
@@ -120,6 +140,14 @@
   .control {
     display: flex;
     min-width: 0;
+  }
+
+  .dynamic {
+    margin-left: 4px;
+    padding: 0 4px;
+    border: 1px solid var(--ui-field-border);
+    border-radius: var(--ui-radius-sm);
+    font-style: italic;
   }
 
   .required {

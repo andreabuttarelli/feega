@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ControlKind, EDITORS, INVALID, VARIANT_CAP, controlsOf, variantsOf, type PropControl } from './prop-controls';
+import { ControlKind, EDITORS, INVALID, VARIANT_CAP, controlsOf, editorFor, variantsOf, type PropControl } from './prop-controls';
 
 const select = (name: string, options: string[]): PropControl => ({ name, kind: ControlKind.Select, options });
 const toggle = (name: string): PropControl => ({ name, kind: ControlKind.Toggle });
@@ -117,5 +117,22 @@ describe('EDITORS', () => {
 
     expect(EDITORS[ControlKind.Color].swatch?.('#ff0000')).toBe('#ff0000');
     expect(EDITORS[ControlKind.Color].swatch?.('tomato')).toBe('#000000');
+  });
+});
+
+describe('JSX props', () => {
+  it('adds a read-only control for a prop the page passes as JSX', () => {
+    expect(controlsOf(null, { icon: { $jsx: true } })).toEqual([{ name: 'icon', kind: ControlKind.Element }]);
+  });
+
+  it('shows a documented children prop as JSX when the instance passes JSX', () => {
+    const control: PropControl = { name: 'icon', kind: ControlKind.Children };
+
+    expect(editorFor(control, { $jsx: true }).show({ $jsx: true }, control)).toBe('JSX');
+    expect(editorFor(control, { $jsx: true }).readonly).toBe(true);
+  });
+
+  it('keeps the editor of the control when the value is plain', () => {
+    expect(editorFor({ name: 'label', kind: ControlKind.Text }, 'x')).toBe(EDITORS[ControlKind.Text]);
   });
 });

@@ -10,7 +10,10 @@ import { ServerState, ToHost, ToView, type EditAsk, type Pick, type PluginAsk } 
 import { pluginCalls } from '../src/host/plugin-calls.ts';
 import { RestartWatch } from '../src/host/restart-watch.ts';
 import { shownFor, watchServer } from '../src/host/server-watch.ts';
-import { liveAtOf } from '@feega/live-edit/live-ask';
+import { inside, liveAtOf, reader } from '@feega/live-edit/live-ask';
+import { readProps } from '@feega/live-edit/read-props';
+import { diffOf } from '../src/host/diff-preview.ts';
+import { Gate, type ApplyAsk, type ReadAsk } from '../src/messages.ts';
 import { SETTINGS } from '../src/settings.ts';
 import { searchIcons } from '../src/host/icon-search.ts';
 import { previewQueue } from '../src/host/icon-previews.ts';
@@ -87,14 +90,14 @@ export async function openPanel(appRoot: string, theme = DARK, cloud?: CommentsC
   });
   let aiPolicy = Policy.Ask;
   let aiStored: ChatRecord[] = [];
-  const grantedAdapters = new Set<string>();
+  const installedAdapters = new Set<string>();
   const ai = aiOverride
     ? aiChat({
         ...aiOverride,
         root: () => appRoot,
         confirm: async () => true,
         where: () => `project: ${appRoot}`,
-        adapters: { granted: (key) => grantedAdapters.has(key), grant: (key) => void grantedAdapters.add(key) },
+        adapters: { ready: (id) => installedAdapters.has(id), install: async (id) => void installedAdapters.add(id), launch: () => ({ command: process.execPath, args: [] }) },
         post: reply,
         policy: { get: () => aiPolicy, set: (next) => (aiPolicy = next) },
         store: { load: () => aiStored, save: (records) => void (aiStored = records) },
@@ -147,8 +150,8 @@ export async function openPanel(appRoot: string, theme = DARK, cloud?: CommentsC
     if (m.kind === ToHost.AiDelete) {
       await ai?.remove((m as unknown as { chat: string }).chat);
     }
-    if (m.kind === ToHost.AiConsent) {
-      ai?.consent((m as unknown as { allow: boolean }).allow);
+    if (m.kind === ToHost.AiRetry) {
+      await ai?.retry();
     }
     if (m.kind === ToHost.AiCancel) {
       await ai?.cancel();
@@ -160,6 +163,24 @@ export async function openPanel(appRoot: string, theme = DARK, cloud?: CommentsC
       const out = await edits.edit(m.ask!);
       saves.push(out);
       await reply(out.ok ? { kind: ToView.Edited, ok: true, written: out.written, saved: liveAtOf(m.ask!.at), note: out.note } : { kind: ToView.Edited, ok: false, reason: out.reason, at: out.at });
+    }
+    if (m.kind === ToHost.ReadProps) {
+      const ask = (m as unknown as { ask: ReadAsk }).ask;
+      const usage = liveAtOf(ask.usage);
+      const out = usage && inside(appRoot, usage.file) ? await readProps(reader(appRoot), { component: ask.component, usage, which: ask.which }) : null;
+      await reply({ kind: ToView.UsageProps, component: ask.component, values: out?.ok ? out.values : {}, dynamic: out?.ok ? out.dynamic : [], spread: out?.ok ? out.spread : false });
+    }
+    if (m.kind === ToHost.ApplyProps) {
+      const { ask, gate } = m as unknown as { ask: ApplyAsk; gate?: Gate };
+      const plan = await edits.propsPlan(ask);
+      if (gate !== Gate.Apply && plan.ok && plan.cautions.length) {
+        await reply({ kind: ToView.PropsPreview, ask, reason: plan.cautions.join('; '), files: diffOf([plan.change]) });
+      } else {
+        const out = await edits.applyProps(ask);
+        saves.push(out);
+        await history();
+        await reply(out.ok ? { kind: ToView.Edited, ok: true, written: '', note: out.note } : { kind: ToView.Edited, ok: false, reason: out.reason });
+      }
     }
     if (m.kind === ToHost.FontReplace || m.kind === ToHost.FontLoad) {
       const out = m.kind === ToHost.FontReplace ? await edits.replaceFont(m.from!, m.to!, m.google!) : await edits.loadFont(m.family!);

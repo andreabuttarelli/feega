@@ -1,6 +1,7 @@
 import { CANVAS_CSS, CANVAS_ID } from './focus.js';
+import { gridOf } from './variant-grid.js';
 
-import { DATE_MARK, FUNCTION_MARK, MOUNT_PROPS, MOUNT_STATUS, Status } from './mount-protocol.js';
+import { DATE_MARK, FUNCTION_MARK, JSX_MARK, MOUNT_PROPS, MOUNT_STATUS, Status } from './mount-protocol.js';
 
 export const Reason = { NoExport: 'The component is not exported', Empty: 'It rendered nothing' };
 
@@ -11,6 +12,7 @@ const CAPTION_PX = 11;
 
 const MARKS = [
   { mark: FUNCTION_MARK, matches: (value) => value === true, revive: () => () => undefined },
+  { mark: JSX_MARK, matches: (value) => value === true, revive: () => undefined },
   { mark: DATE_MARK, matches: (value) => typeof value === 'string', revive: (value) => new Date(value) }
 ];
 
@@ -97,8 +99,16 @@ export function startMount({ react, createRoot, mod, name, file, props, provider
       }
     }
 
-    const cell = (current, variant) => createElement('div', { key: variant.label, 'data-feega-variant': variant.label, style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8 } }, createElement('span', { style: { font: `${CAPTION_PX}px system-ui`, color: '#666' } }, variant.label), createElement(Target, propsFor(current.props, variant.props)));
-    const view = (current) => (current.variants ? createElement('div', { style: { display: 'flex', flexWrap: 'wrap', gap: GAP_PX, alignItems: 'flex-start' } }, current.variants.map((variant) => cell(current, variant))) : createElement(Target, propsFor(current.props)));
+    const cell = (variant, current) => createElement('div', { key: variant.label, 'data-feega-variant': variant.label }, createElement(Target, propsFor(current.props, variant.props)));
+    const caption = (key, text) => createElement('span', { key, style: { font: `${CAPTION_PX}px system-ui`, color: '#888', whiteSpace: 'nowrap' } }, text);
+    const grid = (current) => {
+      const { columnName, columns, rows } = gridOf(current.variants);
+      const style = { display: 'grid', gridTemplateColumns: `max-content repeat(${columns.length}, 1fr)`, gap: GAP_PX, alignItems: 'center', justifyItems: 'start', width: 'max-content' };
+      const head = [createElement('span', { key: 'corner' }), ...columns.map((column) => caption(`c-${column}`, `${columnName}=${column}`))];
+      const body = rows.flatMap((row, at) => [caption(`h-${at}`, row.header), ...row.cells.map((variant, i) => (variant ? cell(variant, current) : createElement('span', { key: `x-${at}-${i}` })))]);
+      return createElement('div', { style }, ...head, ...body);
+    };
+    const view = (current) => (current.variants ? grid(current) : createElement(Target, propsFor(current.props)));
     const root = createRoot(container);
 
     return (current) => root.render(createElement(Boundary, { key: ++version }, createElement(providers ?? Fragment, null, view(current))));

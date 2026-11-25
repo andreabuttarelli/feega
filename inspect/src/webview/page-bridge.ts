@@ -1,12 +1,14 @@
 import type { PropControl, Variant } from './prop-controls';
 import type { ElementState } from '@feega/live-edit/element-state';
 import type { Apply } from '@feega/live-edit/themes';
-import { BRIDGE_READY, INSPECT, INSPECT_RESULT, LOCAL_ORIGIN, LOCATION, MODE, PREVIEW, PREVIEW_CLEAR, PREVIEW_CLEAR_ALL, PREVIEW_SETTLE, PREVIEW_SETTLED, SCROLL, SCROLLED, REVEAL, FOCUS, FOCUSED, MOUNT_PROPS, MOUNT_STATUS, HIDE, PALETTE, PALETTE_RESULT, type Palette, TREE, TREE_RESULT, type LayerNode, TEXT_DONE, TEXT_EDIT, TEXT_RESTORE, TRACK, TRACKED, LEAVE, FORCE, THEME, type Slot, type Mode, type Move, type Pick, type Source } from '../messages';
+import { BRIDGE_READY, INSPECT, INSPECT_RESULT, LOCAL_ORIGIN, LOCATION, MODE, PREVIEW, PREVIEW_CLEAR, PREVIEW_CLEAR_ALL, PREVIEW_SETTLE, PREVIEW_SETTLED, SCROLL, SCROLLED, REVEAL, FOCUS, FOCUS_CANVAS, FOCUS_ZOOM, FOCUS_ZOOMED, FOCUSED, MOUNT_PROPS, MOUNT_STATUS, HIDE, PALETTE, PALETTE_RESULT, type Palette, TREE, TREE_RESULT, type LayerNode, TEXT_DONE, TEXT_EDIT, TEXT_RESTORE, TRACK, TRACKED, LEAVE, FORCE, THEME, type Slot, type Mode, type Move, type Pick, type Source } from '../messages';
 
 export enum FocusMode {
   Mount = 'mount',
   Snapshot = 'snapshot'
 }
+
+export type ZoomRequest = { mode: 'fit' } | { mode: 'set' | 'by'; value: number };
 
 export type MountStatus = { status: 'ready' | 'error'; reason?: string; controls: PropControl[] | null; props: Record<string, unknown> };
 
@@ -31,7 +33,8 @@ export type PageEvents = {
   settled: (source: string, unapplied: string[]) => void;
   text: (source: string, text: string, was: string) => void;
   tracked: (slot: string, rect: Pick['rect'] | null) => void;
-  focused: (count: number, mode: FocusMode, reason?: string) => void;
+  focused: (count: number, mode: FocusMode, reason?: string, detail?: string, dark?: boolean) => void;
+  zoomed: (zoom: number) => void;
   mounted: (status: MountStatus) => void;
   focusReady: () => void;
 };
@@ -56,7 +59,11 @@ export function pageBridge(frame: () => HTMLIFrameElement | null, on: PageEvents
       return;
     }
     if (data?.type === FOCUSED) {
-      on.focused(data.count, data.mode ?? FocusMode.Snapshot, data.reason);
+      on.focused(data.count, data.mode ?? FocusMode.Snapshot, data.reason, data.detail, data.dark);
+      return;
+    }
+    if (data?.type === FOCUS_ZOOMED) {
+      on.zoomed(data.zoom);
       return;
     }
     if (data?.type === MOUNT_STATUS) {
@@ -133,6 +140,8 @@ export function pageBridge(frame: () => HTMLIFrameElement | null, on: PageEvents
     mode: (mode: Mode) => send({ type: MODE, mode }),
     reveal: (source: Source, index = 0) => send({ type: REVEAL, source: sourceText(source), index }),
     focus: (source: Source | null, shown = true, index?: number) => send({ type: FOCUS, source: source ? sourceText(source) : null, shown, index }, Target.Page),
+    canvas: (scheme: string | null, transparent: boolean) => send({ type: FOCUS_CANVAS, scheme, transparent }, Target.Page),
+    zoom: (request: ZoomRequest) => send({ type: FOCUS_ZOOM, ...request }, Target.Page),
     mountProps: (props: Record<string, unknown>, variants: Variant[] | null) => send({ type: MOUNT_PROPS, props, variants }, Target.Focus),
     useFocus: (on: boolean) => (inFocus = on),
     scroll: (dx: number, dy: number) => send({ type: SCROLL, dx, dy }),

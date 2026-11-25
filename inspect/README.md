@@ -41,6 +41,7 @@ Prefer the browser? Run `npx feega` in your app folder (Node 20 or newer).
 
 - **Selection sync.** Selecting an element reveals its source beside Feega with the line selected, without taking focus. Coding agents that read the editor selection (Claude Code, Cursor, Copilot, Cline, Codex, Gemini CLI) see it. Turn off with `feegaInspect.syncSelection`.
 - **Copy for agent.** Right-click the element, or use **Copy for agent** in the bar: file:line, selector, component, page, preview width, breakpoint, theme and state go to the clipboard, ready to paste into the agent.
+- **Chat with your agent.** The AI tab talks to the coding agent on your machine. Claude Code, Codex and Pi connect through a small open-source adapter that Feega downloads once from npm (`@agentclientprotocol/claude-agent-acp`, `@agentclientprotocol/codex-acp`, `pi-acp`, exact versions) into the extension's storage, using your own `npm`. It happens in onboarding or on the first chat, and Feega shows it while it runs. Needs Node.js and network access once.
 
 ## Supported frameworks
 
