@@ -451,6 +451,11 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     return written.ok ? { ...written, selected: out.selected } : written;
   }
 
+  async function pageWritten(route: string, changes: FileChange[]): Promise<Written> {
+    meta = { at: changes[0]?.path ?? '', prop: 'page', value: route, scope: '' };
+    return writtenAll(changes, '');
+  }
+
   async function proposed(proposal: Proposal, appDir: string): Promise<Written> {
     const first = proposal.ops.find((op) => 'at' in op);
     meta = { at: first && 'at' in first ? first.at : '', prop: 'plugin', value: proposal.label, scope: '' };
@@ -522,6 +527,7 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     structure: (ask: StructureAsk) => inTurn(() => restructured(ask)),
     detach: (ask: DetachAsk) => inTurn(() => detached(ask.at, ask.usage, ask.which)),
     library: (at: string, place: AddPlace, item: InsertItem, tokens: string) => inTurn(() => libraryWritten(at, place, item, tokens)),
+    page: (route: string, changes: FileChange[]) => inTurn(() => pageWritten(route, changes)),
     structureMany: (ask: ManyAsk) => inTurn(() => restructuredMany(ask)),
     move: (from: string, to: string, place: Place) => inTurn(() => moved(from, to, place)),
     edit: (ask: EditAsk) => inTurn(() => edited(ask)),
