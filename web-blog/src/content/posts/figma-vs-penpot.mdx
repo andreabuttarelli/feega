@@ -1,0 +1,184 @@
+---
+title: Figma vs Penpot in 2026, plus a third option in code
+description: Figma and Penpot compared on licence, pricing, code handoff, MCP and tokens, checked on vendor pages on 26 November 2026, with Feega as a third option.
+date: 2026-11-26
+cover: /covers/figma-vs-penpot.png
+coverAlt: "Cover: Figma or Penpot? And a third option that lives in your code"
+tags: [figma, penpot, comparison, design-tools]
+---
+
+import Callout from '../../components/Callout.astro';
+import Cta from '../../components/Cta.astro';
+
+Figma and Penpot are both browser-based design tools with shared files, components and a developer view. They differ most in who owns the software and how code leaves the design file. This post compares them on what the vendors publish today, then covers a third option that is not a design tool at all.
+
+The short version: Penpot is open source (MPL-2.0), can be self-hosted, and its free plan has no feature limits. Figma is a hosted product with the larger set of handoff tools: Dev Mode, Code Connect and a documented MCP server. If you need to run the tool on your own servers, Penpot is the only one of the two that offers it. If your team lives inside Figma files already, switching costs more than the licence difference. Feega is a third answer for teams whose design should live in the code. It does not replace either tool, and it does not import their files today.
+
+<Callout icon="check" title="Dates for this post">
+Every price and feature below was read on the vendors' own pages on 26 November 2026. Prices are in US dollars. Vendors change them, so check before you buy.
+</Callout>
+
+## How we checked
+
+I read the vendors' pages instead of relying on memory. All of these were opened on 26 November 2026.
+
+- Figma: the [pricing page](https://www.figma.com/pricing/), the help articles on [Dev Mode](https://help.figma.com/hc/en-us/articles/15023124644247-Guide-to-Dev-Mode), the [Figma MCP server](https://help.figma.com/hc/en-us/articles/32132100833559-Guide-to-the-Figma-MCP-server) and [plans and features](https://help.figma.com/hc/en-us/articles/360040328273-Figma-plans-and-features), the [Code Connect docs](https://developers.figma.com/docs/code-connect/) and the [downloads page](https://www.figma.com/downloads/).
+- Penpot: the [pricing page](https://penpot.app/pricing), the [GitHub repository](https://github.com/penpot/penpot) and its latest release through the GitHub API, the [self-host page](https://penpot.app/self-host), the [code page](https://penpot.app/code), the [design tokens page](https://penpot.app/design-tokens) and the Help Center pages for [design tokens](https://help.penpot.app/user-guide/design-systems/design-tokens/), [plugins](https://help.penpot.app/plugins/) and the [MCP server](https://help.penpot.app/mcp/).
+- Feega: the `inspect/`, `npx/` and `desktop/` folders and the `web-docs/` pages in the Feega repository, at the commit this post was written on.
+
+Limits: I did not open either tool and design anything for this post. I did not benchmark performance, and neither vendor publishes numbers I could verify, so there is no performance verdict here. I did not test whether Penpot's MCP server or Figma's work well in practice, only what the pages say they do. Several help pages show no "last updated" date, so those facts carry the date I read them.
+
+## Licence and self-hosting
+
+Penpot is open source under the Mozilla Public License 2.0, according to its GitHub repository. The repository says you can deploy it on your own infrastructure. The self-host page lists Docker, a Helm chart for Kubernetes, Rancher, OpenShift, Elestio and TrueNAS as official options. Podman and a desktop app are listed as unofficial, community-run. The latest GitHub release was 2.19.5, published on 24 November 2026.
+
+Figma is a hosted service. I found no self-hosting option on its pricing, help or downloads pages, and I did not find a published source licence. If you need data to stay on servers you control, that settles it for Figma unless an enterprise contract says otherwise, which I could not check.
+
+Penpot also sells a plan for organisations that want dedicated infrastructure, a Private Server at $50,000 a year (see the next section).
+
+## Pricing and free tiers
+
+Figma, from its pricing page:
+
+| Plan | Full seat | Dev seat | Collab seat |
+|---|---|---|---|
+| Starter | Free | not listed | not listed |
+| Professional | $16/month | $12/month | $3/month |
+| Organization | $55/month | $25/month | $5/month |
+| Enterprise | $90/month | $35/month | $5/month |
+
+Organization and Enterprise are billed annually. The page showed only monthly prices for Professional, so I have no annual figure to quote. The Starter plan is described as free, limited access. Figma's plans help article gives its limits: a single team with one folder and 3 files, no variable modes, 30 days of version history, and no Dev Mode or Code Connect. On paid plans, people can view and comment on files without a seat.
+
+Penpot, from its pricing page:
+
+| Plan | Price |
+|---|---|
+| Professional | $0 per user per month |
+| Unlimited | $7 per editor per month, capped at $175 per month |
+| Enterprise | $25 per member per month |
+| Private Server | $50,000 per year |
+
+The free plan is described as "Free and fully featured. No limits, no missing tools." Unlimited adds storage and longer version history. The page states storage and history figures per plan, but its text came through flattened and I could not match each value to a plan, so I left them out. Penpot also lists discounts for non-profits, education and open-source projects.
+
+The seat models differ. Figma prices a designer, a developer and a commenter separately. Penpot prices an editor, and the free plan covers a whole team. For a small team that mostly needs a design file and a code view, Penpot is cheaper. For a company that already buys Figma by seat, the gap matters less than the migration.
+
+## Design to code handoff
+
+This is where the tools differ most.
+
+**Figma** has Dev Mode, a workspace for inspecting designs, viewing code and properties, and downloading assets. Per the help center it is available on Professional, Education, Organization, Government and Enterprise plans, and Starter does not include it. Full and Dev seats get the full version, while Collab seats and viewers get basic inspection.
+
+**Code Connect** links components in your repository to components in Figma, so Dev Mode shows your real component code instead of generated snippets. It needs a Dev or Full seat on Professional, Organization or Enterprise. Professional allows one active library and one active framework. The docs say template files work with any codebase, and list React, HTML (Web Components, Angular, Vue), SwiftUI and Jetpack Compose as legacy integrations.
+
+**The Figma MCP server** connects an AI agent to your Figma files. The recommended remote server is at `mcp.figma.com/mcp` and does not need the desktop app. The help article says it can retrieve design context, variables and components, use Code Connect, and write to the canvas. Writing needs the remote server and a Full seat, is free during the beta and, per the article, will become usage-based.
+
+**Penpot** has an inspect tab, which its code page says gives access to SVG, CSS and HTML. Its model is built on web standards: the layout tools are CSS Grid and Flex. The point it makes is that developers inspect the design and read code that matches what the browser will do, instead of translating from a different model.
+
+**Penpot's MCP server** has three parts: the server, a Penpot plugin and your MCP client. You enable it in your account settings, generate a key (shown once), and connect the plugin from the file. The help page says the agent works on the page you have in focus, only one browser tab can own the connection, and agents can write changes, so it recommends starting with read-only prompts. Among the listed uses are extracting layout structure, generating HTML and CSS, inspecting tokens and updating frontend styles. The page names no plans and does not call it a beta, so I cannot say whether it is limited to certain accounts. Penpot also has a plugin API, with starter templates in several frameworks.
+
+Both tools can feed a coding agent. Figma's route is more documented and ties to your component code through Code Connect. Penpot's route is open and works against a file format built on CSS and SVG.
+
+## Design tokens
+
+Penpot supports design tokens natively. Its help center says they follow the W3C Design Tokens Community Group format, which it calls a draft, with import and export as JSON. Types include color, dimension, opacity, sizing, spacing, stroke width, rotation, number, shadow and typography. Tokens are grouped in sets, where a later set overrides an earlier one, and themes switch values such as light and dark. Its design tokens page says gradients are not yet supported.
+
+Figma uses variables. From Figma's help articles I could confirm that Starter has no variable modes and that Professional allows up to 10 modes per collection. I did not verify variable types or export formats against Figma's pages, so I am not comparing them here.
+
+## Collaboration and platforms
+
+Both are multiplayer, browser-first tools. Penpot's collaboration page talks about multiplayer work, invitations without limits and sharing outside the team.
+
+Figma lists desktop apps for macOS, Windows and Windows on Arm on its downloads page, and none for Linux. Penpot runs in the browser, and its desktop app is a community project. If your team uses Linux workstations, both work in a browser; only Penpot can run on a Linux server.
+
+## The comparison
+
+| | Figma | Penpot |
+|---|---|---|
+| Licence | Hosted product | MPL-2.0, open source |
+| Self-hosting | None found | Docker, Kubernetes and others |
+| Free plan | Starter: 1 folder, 3 files, no Dev Mode | Professional: $0, described as no limits |
+| Cheapest paid editor | $16 per month (Full seat, Professional) | $7 per editor per month, capped at $175 |
+| Dev inspection | Dev Mode, from Professional | Inspect tab with SVG, CSS and HTML |
+| Component link to code | Code Connect | None found |
+| MCP server | Remote server, canvas writes in beta | Plugin-based server, key from account settings |
+| Tokens | Variables, modes from Professional | W3C DTCG-format JSON, sets and themes |
+| Desktop apps | macOS, Windows | Community app only |
+
+<Callout icon="tip" title="How to choose">
+Pick Penpot when open source, self-hosting or a free plan with no feature limits matter. Pick Figma when your team already works in it, or you want Code Connect and the documented MCP server. Pick neither when the thing you keep editing is the running app.
+</Callout>
+
+## Where Feega fits
+
+Feega is not a design tool. It has no canvas where you draw frames. It is a free, open-source (Apache-2.0) tool that runs your actual app, lets you click an element and edit it, and writes the change into your source. It comes as a VS Code extension, as `npx feega` in a terminal, and as a [desktop app](https://docs.feega.app/getting-started/desktop/) for macOS, Windows (beta) and Linux. The [download page](https://www.feega.app/download) has the builds.
+
+It suits a team where the code is already the source of truth for how the product looks. A developer or designer who writes code changes spacing, colour, type or text on the real page, and the edit lands as a Tailwind class or a CSS rule, shown as a diff you can undo. It supports React, Next.js, Svelte, SvelteKit, Vue, Astro and plain HTML, with Tailwind or CSS; the [docs](https://docs.feega.app/getting-started/what-is-feega/) list the rest and the limits.
+
+What it does not do:
+
+- It does not import Figma or Penpot files today. I found no import in the docs or the code.
+- It does not give you a blank canvas for exploring ideas before any code exists.
+- It does not replace a shared design library across several products.
+
+Feega can sit beside either tool. A team might explore in Figma or Penpot, build the page, then fine-tune the result in Feega. For coding agents, Feega has its own [MCP server](https://docs.feega.app/more/connect-your-agent-via-mcp/) (`npx feega mcp`) that gives an agent the element you selected, by file and line. That is a different job from Figma's or Penpot's, which expose design files. For more on the idea, read [why Feega is now one thing](/posts/design-in-your-codebase/).
+
+## Mistakes to avoid
+
+- **Comparing the free plans as if they were equal.** Figma's Starter limits you to one folder and 3 files and leaves out Dev Mode. Penpot's free plan is described as having no limits. Read the limits before you pick a tool for a team.
+- **Counting only the designer seats.** Figma charges separately for developers who need full Dev Mode. Add the Dev seats to your estimate.
+- **Assuming self-hosting is free of work.** Penpot is free to run, but you maintain the install, updates and backups. The Private Server plan exists because many organisations would rather pay someone else to do that.
+- **Treating MCP as read-only.** Both vendors' MCP servers can write to your design files. Start with read-only prompts, as Penpot's page advises.
+- **Using a design tool for a job the code already does.** If you edit the same padding in a file and then again in the app, you have two sources of truth. Pick one.
+
+<Cta title="Edit the app you already have">
+Download Feega, open your project, click an element and change it. The edit lands in your file as a diff you can read and undo.
+</Cta>
+
+## Questions
+
+### Is Penpot really free?
+
+Its pricing page lists a Professional plan at $0 per user per month, described as free and fully featured. Paid plans add storage, history length and governance features. Open-source licence terms are separate: the code is MPL-2.0.
+
+### Can I self-host Figma?
+
+I found no self-hosting option on Figma's pricing, help or downloads pages on 26 November 2026. Ask Figma sales if you have a compliance requirement.
+
+### Does Penpot have an MCP server?
+
+Yes. The help center describes an MCP server that works with a Penpot plugin and an MCP client such as Cursor or Claude Code. You enable it in your account settings and generate a key.
+
+### What does Figma Dev Mode cost?
+
+Dev Mode is included with Full seats and Dev seats on paid plans. On the Professional plan a Dev seat is $12 per month and a Full seat is $16 per month, as listed on 26 November 2026.
+
+### Does Feega work with Figma or Penpot files?
+
+No. Feega does not import Figma or Penpot files today. It edits your running app and writes to your source.
+
+### Is Feega a Figma alternative?
+
+Only for one job: adjusting a running app in code. It has no canvas for drawing screens, so it does not replace Figma or Penpot for design work before code exists.
+
+## Sources
+
+Opened on 26 November 2026.
+
+- [Figma pricing](https://www.figma.com/pricing/): plans and seat prices.
+- [Figma plans and features](https://help.figma.com/hc/en-us/articles/360040328273-Figma-plans-and-features): Starter limits.
+- [Guide to Dev Mode](https://help.figma.com/hc/en-us/articles/15023124644247-Guide-to-Dev-Mode).
+- [Guide to the Figma MCP server](https://help.figma.com/hc/en-us/articles/32132100833559-Guide-to-the-Figma-MCP-server).
+- [Code Connect](https://developers.figma.com/docs/code-connect/).
+- [Figma downloads](https://www.figma.com/downloads/).
+- [Penpot pricing](https://penpot.app/pricing) and [self-host](https://penpot.app/self-host).
+- [Penpot on GitHub](https://github.com/penpot/penpot): MPL-2.0 licence; release 2.19.5, 24 November 2026, from the GitHub API.
+- [Penpot code](https://penpot.app/code), [design tokens](https://penpot.app/design-tokens) and [collaboration](https://penpot.app/collaboration).
+- Penpot Help Center: [design tokens](https://help.penpot.app/user-guide/design-systems/design-tokens/), [plugins](https://help.penpot.app/plugins/), [MCP server](https://help.penpot.app/mcp/).
+- Feega docs: [what is Feega](https://docs.feega.app/getting-started/what-is-feega/), [desktop app](https://docs.feega.app/getting-started/desktop/), [connect your agent via MCP](https://docs.feega.app/more/connect-your-agent-via-mcp/).
+
+## Read next
+
+- [Why Feega is now one thing](/posts/design-in-your-codebase/)
+- [Introducing Feega](/posts/introducing-feega/)
+- [SvelteKit vs Next.js in 2026](/posts/sveltekit-vs-nextjs/)
+- [Using Feega with Claude Code](/use-cases/feega-with-claude-code/)
