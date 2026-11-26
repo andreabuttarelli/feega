@@ -49,7 +49,8 @@ const covers = [
   { file: 'public/covers/feega-with-claude-code.png', scene: 'sunset', lines: ['Claude Code writes.', 'You adjust.'], kicker: 'Use case: Claude Code' },
   { file: 'public/covers/feega-with-grok-build.png', scene: 'terminal', lines: ['Grok Build writes.', 'You adjust.'], kicker: 'Use case: Grok Build' },
   { file: 'public/covers/glm-5-4-what-we-know.png', scene: 'dusk', lines: ['GLM-5.4:', 'what we know'], kicker: 'Z.ai, vision, and no benchmarks yet' },
-  { file: 'public/covers/feega-with-ai-site-builders.png', scene: 'windows', lines: ['Generated site.', 'Hand-tuned code.'], kicker: 'Use case: AI site builders' }
+  { file: 'public/covers/feega-with-ai-site-builders.png', scene: 'windows', lines: ['Generated site.', 'Hand-tuned code.'], kicker: 'Use case: AI site builders' },
+  { file: 'public/covers/figma-vs-penpot.png', scene: 'forge', lines: ['Figma or Penpot?', 'Or your code.'], kicker: 'Design tools in 2026' }
 ];
 
 const CURSOR = [
