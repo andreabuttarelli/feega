@@ -1,0 +1,17 @@
+{
+  "name": "@feega/plugin-brand-logos",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "pack": "node --experimental-transform-types scripts/pack-icons.ts"
+  },
+  "exports": {
+    "./manifest": "./feega-plugin.json",
+    "./worker": "./src/worker.ts",
+    "./*": "./src/*.ts"
+  },
+  "devDependencies": {
+    "simple-icons": "16.38.1"
+  }
+}
