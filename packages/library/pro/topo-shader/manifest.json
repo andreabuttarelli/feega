@@ -1,0 +1,39 @@
+{
+  "id": "topo-shader",
+  "name": "Topo shader",
+  "description": "A card of glowing topographic contour lines. The pointer latches onto the nearest peak, stretches its gold rings and snaps to the next one.",
+  "category": "component",
+  "tags": [
+    "shader",
+    "topographic",
+    "webgl",
+    "interactive",
+    "card"
+  ],
+  "frameworks": [
+    "html",
+    "svelte",
+    "react",
+    "vue",
+    "astro"
+  ],
+  "dependencies": [],
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "weights": [
+        400,
+        500,
+        600
+      ]
+    },
+    {
+      "family": "Fragment Mono",
+      "weights": [
+        400
+      ]
+    }
+  ],
+  "tier": "pro",
+  "preview": "https://www.feega.app/templates-shots/topo-shader-light.webp"
+}
