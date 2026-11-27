@@ -1,12 +1,12 @@
 ---
 title: Plugins
-description: Plugins ship with Feega Inspect, Mesh gradient, 3D object, Lucide icons and Brand logos. Plugins run sandboxed and change your code only through the same edit engine as manual edits.
+description: Plugins ship with Feega Inspect, Mesh gradient, 3D object, Lucide icons, Brand logos and Gradient presets. Plugins run sandboxed and change your code only through the same edit engine as manual edits.
 sidebar:
   order: 4
 ---
 
-Plugins add controls to Feega Inspect. Four are built in and on by default: **Mesh gradient**,
-**3D object**, **Lucide icons** and **Brand logos**. You can also install third-party plugins or load one from a folder while you build
+Plugins add controls to Feega Inspect. Five are built in and on by default: **Mesh gradient**,
+**3D object**, **Lucide icons**, **Brand logos** and **Gradient presets**. You can also install third-party plugins or load one from a folder while you build
 it: see [Write a plugin](/integrations/write-a-plugin/).
 
 ## Browse plugins
@@ -106,6 +106,17 @@ written as a `color` prop on the tag only when it is the brand colour.
 The shapes come from [Simple Icons](https://simpleicons.org) (CC0). The logos themselves are
 trademarks of their owners: follow each brand's guidelines when you use them. A few brands, such as
 LinkedIn, Slack and Microsoft, are not in the set.
+
+## Gradient presets
+
+Select an element. In **Properties**, **Gradient presets** shows a gallery of 36 subtle gradients.
+**Kind** filters the gallery to linear, radial or conic. Click a preset to apply it; **Remove
+gradient** sets the background image back to `none`.
+
+The preset is written as the element's background image through the same edit engine as a manual
+style change: a `background-image` declaration in the element's stylesheet rule (Svelte and Vue
+`<style>`, CSS modules for React) or its inline style when the file has no stylesheet. This is true
+in Tailwind projects too. Each click is one undoable step.
 
 ## Safety
 

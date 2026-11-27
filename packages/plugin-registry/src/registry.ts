@@ -53,6 +53,16 @@ export const SOURCES: readonly PluginSource[] = [
     tier: 'free',
     latestVersion: '1.0.0',
     permissions: ['selection', 'project', 'edit.insert']
+  },
+  {
+    id: 'gradient-presets',
+    manifestId: 'feega.gradient-presets',
+    name: 'Gradient presets',
+    summary: 'Pick a subtle linear, radial or conic gradient from a curated gallery and apply it as a background.',
+    author: 'Feega',
+    tier: 'free',
+    latestVersion: '1.0.0',
+    permissions: ['selection', 'edit.style']
   }
 ];
 
@@ -76,5 +86,10 @@ export const COPY: Readonly<Record<string, PluginCopy>> = {
     icon: 'brand-logos',
     description:
       'Select an element, search over 3,000 brand logos, pick one and set its size and whether it keeps the official brand colour or follows the text colour. Feega inserts it as a small component with the SVG inline and an accessible title. Nothing is added to package.json. One undoable step. Logo shapes come from Simple Icons (CC0). The logos are trademarks of their owners: brand guidelines apply to how you use them.'
+  },
+  'gradient-presets': {
+    icon: 'gradient-presets',
+    description:
+      'Select an element and click a gradient from a gallery of 36 subtle, modern presets: linear, radial and conic. It is applied as the element background image, written as plain CSS in the same place a manual style edit goes. One undoable step. Remove gradient resets the background image.'
   }
 };
