@@ -34,6 +34,14 @@ describe('plugins', () => {
     expect(object?.permissions.some((line) => line.startsWith('Download files'))).toBe(false);
   });
 
+  it('credits the third-party library a plugin wraps', () => {
+    const lucide = PLUGINS.find((p) => p.id === 'lucide-icons');
+    const mesh = PLUGINS.find((p) => p.id === 'mesh-gradient');
+
+    expect(lucide?.credit).toEqual({ name: 'Lucide', url: 'https://lucide.dev', license: 'ISC' });
+    expect(mesh?.credit).toBeUndefined();
+  });
+
   it('builds the detail path from the id', () => {
     expect(pluginPath('3d-object')).toBe('/plugins/3d-object');
   });

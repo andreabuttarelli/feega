@@ -84,7 +84,7 @@ try {
   await page.locator(HOT).waitFor({ timeout: 10_000 });
 
   check('the folder plugin is a community card', (await page.locator(`${HOT} [data-testid=plugin-badge]`).textContent()) === 'Community');
-  check('a built-in is an official card', (await page.locator(`[data-plugin="${BUILT_IN}"] [data-testid=plugin-badge]`).textContent()) === 'Official');
+  check('a built-in is a by-Feega card', (await page.locator(`[data-plugin="${BUILT_IN}"] [data-testid=plugin-badge]`).textContent()) === 'By Feega');
 
   await page.locator(`${HOT} [data-testid=plugin-open]`).click();
   const badges = await page.locator('[data-testid=plugin-detail] .badge').allTextContents();
