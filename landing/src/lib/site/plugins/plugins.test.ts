@@ -19,7 +19,7 @@ describe('permission words', () => {
 
 describe('plugins', () => {
   it('lists the built-ins', () => {
-    expect(PLUGINS.map((p) => p.id)).toEqual(['mesh-gradient', '3d-object', 'lucide-icons']);
+    expect(PLUGINS.map((p) => p.id)).toEqual(['mesh-gradient', '3d-object', 'lucide-icons', 'brand-logos']);
   });
 
   it('writes each permission in plain words', () => {

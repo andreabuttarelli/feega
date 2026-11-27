@@ -1,3 +1,5 @@
+import brandManifest from '@feega/plugin-brand-logos/manifest';
+import BrandWorker from '@feega/plugin-brand-logos/worker?worker&inline';
 import lucideManifest from '@feega/plugin-lucide/manifest';
 import LucideWorker from '@feega/plugin-lucide/worker?worker&inline';
 import meshManifest from '@feega/plugin-mesh-gradient/manifest';
@@ -14,5 +16,6 @@ export const BUILT_IN: BuiltIn[] = [
   { manifest: meshManifest, worker: () => new MeshWorker() as unknown as WorkerLike },
   { manifest: objectManifest, worker: () => new ObjectWorker() as unknown as WorkerLike },
   { manifest: gradientManifest, worker: () => new GradientWorker() as unknown as WorkerLike },
-  { manifest: lucideManifest, worker: () => new LucideWorker() as unknown as WorkerLike }
+  { manifest: lucideManifest, worker: () => new LucideWorker() as unknown as WorkerLike },
+  { manifest: brandManifest, worker: () => new BrandWorker() as unknown as WorkerLike }
 ];

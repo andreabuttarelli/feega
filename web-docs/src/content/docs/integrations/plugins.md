@@ -1,12 +1,12 @@
 ---
 title: Plugins
-description: Plugins ship with Feega Inspect, Mesh gradient, 3D object and Lucide icons. Plugins run sandboxed and change your code only through the same edit engine as manual edits.
+description: Plugins ship with Feega Inspect, Mesh gradient, 3D object, Lucide icons and Brand logos. Plugins run sandboxed and change your code only through the same edit engine as manual edits.
 sidebar:
   order: 4
 ---
 
-Plugins add controls to Feega Inspect. Three are built in and on by default: **Mesh gradient**,
-**3D object** and **Lucide icons**. You can also install third-party plugins or load one from a folder while you build
+Plugins add controls to Feega Inspect. Four are built in and on by default: **Mesh gradient**,
+**3D object**, **Lucide icons** and **Brand logos**. You can also install third-party plugins or load one from a folder while you build
 it: see [Write a plugin](/integrations/write-a-plugin/).
 
 ## Browse plugins
@@ -95,6 +95,29 @@ was built from. **The first use needs internet.** Icons already shown stay avail
 session; the others show "Icons need internet the first time." with a **Retry** button. The
 plugin declares those two hosts as its network permission, and the downloads go through Feega, not
 the panel.
+
+## Brand logos
+
+Select an element. In **Properties**, the **Brand logos** section works like Lucide icons: a search
+box, a grid (common brands when nothing is typed), then **Insert**.
+
+- **Size** sets the width and height.
+- **Colour** is **Brand colour**, the brand's official hex, or **Text colour**, which follows the
+  surrounding text.
+
+Insert writes `src/feega/icons/<Name>Icon` with the downloaded SVG inline and a `<title>` with the brand name,
+imports it and places it like the Lucide icons. Nothing is added to `package.json`. The colour is
+written as a `color` prop on the tag only when it is the brand colour.
+
+Feega bundles only the list of brand names and colours. Each logo file is downloaded when it first
+appears in the grid or is inserted, from jsDelivr (`cdn.jsdelivr.net`, with `unpkg.com` as a
+fallback), at the exact `simple-icons` version the list was built from. **The first use needs
+internet**; logos already shown stay available for the session, the others show "Icons need
+internet the first time." with a **Retry** button. The downloads go through Feega, not the panel.
+
+The shapes come from [Simple Icons](https://simpleicons.org) (CC0). The logos themselves are
+trademarks of their owners: follow each brand's guidelines when you use them. A few brands, such as
+LinkedIn, Slack and Microsoft, are not in the set.
 
 ## Safety
 
