@@ -99,6 +99,7 @@ export const settingsWith = (read: (row: SettingRow) => SettingValue | undefined
 
 export const LINKS = {
   docs: 'https://docs.feega.app/integrations/inspect/',
+  plugins: 'https://docs.feega.app/integrations/plugins/',
   changelog: 'https://feega.app/changelog',
   dashboard: 'https://feega.app/',
   issues: 'https://github.com/andreabuttarelli/feega/issues/new',

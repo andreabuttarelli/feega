@@ -7,8 +7,24 @@ sidebar:
 
 Plugins add controls to Feega Inspect. Two are built in and on by default: **Mesh gradient** and
 **3D object**. You can also install third-party plugins or load one from a folder while you build
-it: see [Write a plugin](/integrations/write-a-plugin/). **Plugins** in the Feega menu lists them
-all and switches any of them on or off.
+it: see [Write a plugin](/integrations/write-a-plugin/).
+
+## Browse plugins
+
+In the Feega menu (the logo, top left), **Plugins**, then **Browse plugins**, opens a full-panel
+view of every plugin as a card: name, one-line description, an **Official** or **Community**
+badge, and an **Enabled** switch. This works the same in the VS Code extension, `npx feega` and
+the desktop app.
+
+- Type in **Search plugins** to filter by name or description.
+- Click a card for its details: a longer description, screenshots, the permissions it asks for
+  in words, and a **Docs** button.
+- **Remove** appears on plugins you installed. Built-in plugins can be switched off, not removed.
+- Type a source such as `github:owner/repo@tag` under the grid and press **Install**. Feega asks
+  you to approve the permissions first. Where the host cannot ask, the view shows the terminal
+  command instead: `npx feega plugin add`.
+
+Plugin commands still appear under **Plugins** in the Feega menu.
 A third built-in, [ShaderGradient (community)](/integrations/shadergradient/), edits ShaderGradient props.
 
 Every plugin change goes through the same edit engine as a manual edit. It shows in **Changes**,
