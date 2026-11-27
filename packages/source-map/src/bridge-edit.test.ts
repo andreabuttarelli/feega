@@ -46,6 +46,27 @@ describe('text edited in place', () => {
     expect(replies.some((r) => r.type === 'feega:text:done')).toBe(false);
   });
 
+  it('escape tells the panel the edit ended', () => {
+    const { win, send, replies, h1 } = bridged();
+    send({ type: 'feega:mode', mode: 'design' });
+    send({ type: 'feega:text:edit', selector: 'h1' });
+    key(win as unknown as Window, h1, 'Escape');
+
+    expect(replies).toContainEqual({ type: 'feega:text:cancel' });
+  });
+
+  it('a double click on something without a source tells the panel no edit began', () => {
+    const win = new JSDOM('<body><p id="plain">No source</p></body>').window;
+    installBridge(win as unknown as Window);
+    const replies: Record<string, unknown>[] = [];
+    const parent = { postMessage: (data: Record<string, unknown>) => replies.push(data) };
+    const send = (data: Record<string, unknown>) => win.dispatchEvent(new win.MessageEvent('message', { data, source: parent as unknown as Window }));
+    send({ type: 'feega:mode', mode: 'design' });
+    send({ type: 'feega:text:edit', selector: '#plain' });
+
+    expect(replies).toContainEqual({ type: 'feega:text:cancel' });
+  });
+
   it('escape keeps the inline elements inside the text', () => {
     const win = new JSDOM(`<body><h1 data-feega-src="${SOURCE}">Build <span>fast</span> today</h1></body>`).window;
     installBridge(win as unknown as Window);

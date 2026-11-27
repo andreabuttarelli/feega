@@ -1,7 +1,7 @@
 import type { PropControl, Variant } from './prop-controls';
 import type { ElementState } from '@feega/live-edit/element-state';
 import type { Apply } from '@feega/live-edit/themes';
-import { BRIDGE_READY, CAPTURE, CAPTURED, INSPECT, INSPECT_RESULT, LOCAL_ORIGIN, LOCATION, MODE, PREVIEW, PREVIEW_CLEAR, PREVIEW_CLEAR_ALL, PREVIEW_SETTLE, PREVIEW_SETTLED, SCROLL, SCROLLED, REVEAL, FOCUS, FOCUS_CANVAS, FOCUS_ZOOM, FOCUS_ZOOMED, FOCUSED, MOUNT_PROPS, MOUNT_STATUS, HIDE, PALETTE, PALETTE_RESULT, type Palette, TREE, TREE_RESULT, type LayerNode, TEXT_DONE, TEXT_EDIT, TEXT_RESTORE, TRACK, TRACKED, LEAVE, FORCE, THEME, type Slot, type Mode, type Move, type Pick, type Source } from '../messages';
+import { BRIDGE_READY, CAPTURE, CAPTURED, INSPECT, INSPECT_RESULT, LOCAL_ORIGIN, LOCATION, MODE, PREVIEW, PREVIEW_CLEAR, PREVIEW_CLEAR_ALL, PREVIEW_SETTLE, PREVIEW_SETTLED, SCROLL, SCROLLED, REVEAL, FOCUS, FOCUS_CANVAS, FOCUS_ZOOM, FOCUS_ZOOMED, FOCUSED, MOUNT_PROPS, MOUNT_STATUS, HIDE, PALETTE, PALETTE_RESULT, type Palette, TREE, TREE_RESULT, type LayerNode, TEXT_CANCEL, TEXT_DONE, TEXT_EDIT, TEXT_RESTORE, TRACK, TRACKED, LEAVE, FORCE, THEME, type Slot, type Mode, type Move, type Pick, type Source } from '../messages';
 
 export enum FocusMode {
   Mount = 'mount',
@@ -34,6 +34,7 @@ export type PageEvents = {
   palette: (palette: Palette) => void;
   settled: (source: string, unapplied: string[]) => void;
   text: (source: string, text: string, was: string) => void;
+  textEnded: () => void;
   tracked: (slot: string, rect: Pick['rect'] | null) => void;
   focused: (count: number, mode: FocusMode, reason?: string, detail?: string, dark?: boolean) => void;
   zoomed: (zoom: number) => void;
@@ -102,6 +103,10 @@ export function pageBridge(frame: () => HTMLIFrameElement | null, on: PageEvents
     }
     if (data?.type === TEXT_DONE) {
       on.text(data.source, data.text, data.was);
+      return;
+    }
+    if (data?.type === TEXT_CANCEL) {
+      on.textEnded();
       return;
     }
     if (data?.type === CAPTURED) {
