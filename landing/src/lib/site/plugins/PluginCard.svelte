@@ -9,23 +9,20 @@
 </script>
 
 <a class="card" href={pluginPath(plugin.id)} {...eventAttrs('plugin_open', { id: plugin.id })}>
-  <div class="top">
-    <span class="icon"><Pixel icon={plugin.icon} size={6} /></span>
+  <div class="head">
+    <span class="icon"><Pixel icon={plugin.icon} size={4} /></span>
+    <h2>{lower(plugin.name)}</h2>
     <TierBadge tier={plugin.tier} />
   </div>
 
-  <img class="cover" src={plugin.cover.src} alt={plugin.cover.alt} width={plugin.cover.width} height={plugin.cover.height} loading="lazy" decoding="async" />
-
-  <h2>{lower(plugin.name)}</h2>
   <p class="summary">{lower(plugin.summary)}</p>
-
 </a>
 
 <style>
   .card {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 16px;
     padding: 24px;
     border-radius: 10px;
     background: #000;
@@ -39,40 +36,45 @@
     background: var(--sx-grey-1);
   }
 
-  .top {
+  .head {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-  }
-
-  .cover {
-    display: block;
-    width: 100%;
-    height: auto;
-    border-radius: 6px;
+    gap: 12px;
+    min-width: 0;
   }
 
   .icon {
     display: grid;
+    flex: none;
     place-items: center;
-    width: 56px;
-    height: 56px;
+    width: 48px;
+    height: 48px;
     border-radius: 10px;
     background: var(--sx-grey-1);
   }
 
   h2 {
-    margin: 8px 0 0;
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
     font-size: 28px;
     line-height: 1;
     letter-spacing: -0.04em;
     font-weight: 400;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .summary {
+    display: -webkit-box;
     margin: 0;
+    overflow: hidden;
     font-size: 16px;
     line-height: 1.4;
     opacity: 0.7;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
   }
 </style>

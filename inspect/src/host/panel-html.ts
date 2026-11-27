@@ -3,7 +3,6 @@ export type PanelAssets = { script: string; style: string; cspSource: string; no
 export type PanelTheme = { bodyClass: string; variables: Record<string, string> };
 
 const LOCAL_FRAMES = 'http://localhost:* http://127.0.0.1:*';
-const SCREENSHOT_HOST = 'https://www.feega.app';
 const LOCAL_SOCKETS = 'ws://localhost:* ws://127.0.0.1:*';
 
 const themeStyle = (theme?: PanelTheme) =>
@@ -18,7 +17,7 @@ export function panelHtml({ script, style, cspSource, nonce, theme }: PanelAsset
     `worker-src blob:`,
     `style-src ${cspSource} 'unsafe-inline' https://fonts.googleapis.com`,
     `font-src ${cspSource} https://fonts.gstatic.com`,
-    `img-src ${cspSource} data: ${SCREENSHOT_HOST}`
+    `img-src ${cspSource} data:`
   ].join('; ');
 
   return `<!doctype html>

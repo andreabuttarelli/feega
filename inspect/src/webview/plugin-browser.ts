@@ -1,4 +1,4 @@
-import { COPY, SOURCES, type PluginShot } from '@feega/plugin-registry/registry';
+import { COPY, SOURCES } from '@feega/plugin-registry/registry';
 import type { Row } from './plugin-manager';
 
 export enum Badge {
@@ -6,21 +6,17 @@ export enum Badge {
   Community = 'Community'
 }
 
-export type Card = Row & { summary: string; description: string; badge: Badge; shots: PluginShot[] };
-
-const SITE = 'https://www.feega.app';
-
-const absolute = (shot: PluginShot): PluginShot => ({ ...shot, src: `${SITE}${shot.src}` });
+export type Card = Row & { summary: string; description: string; badge: Badge };
 
 export function cardsOf(rows: Row[]): Card[] {
   return rows.map((row) => {
     const source = SOURCES.find((one) => one.manifestId === row.id);
     if (!source) {
-      return { ...row, summary: '', description: '', badge: Badge.Community, shots: [] };
+      return { ...row, summary: '', description: '', badge: Badge.Community };
     }
 
     const copy = COPY[source.id];
-    return { ...row, summary: source.summary, description: copy.description, badge: Badge.Official, shots: copy.shots.map(absolute) };
+    return { ...row, summary: source.summary, description: copy.description, badge: Badge.Official };
   });
 }
 

@@ -65,10 +65,6 @@
         <button type="button" class="action" data-testid="plugin-docs" onclick={() => onlink(LINKS.plugins)}>Docs</button>
       </div>
 
-      {#if open.shots.length}
-        <div class="shots">{#each open.shots as shot (shot.src)}<img src={shot.src} alt={shot.alt} width={shot.width} height={shot.height} loading="lazy" />{/each}</div>
-      {/if}
-
       <h3>Permissions</h3>
       {#if open.words.length}
         <ul>{#each open.words as word (word)}<li>{word}</li>{/each}</ul>
@@ -81,12 +77,14 @@
       {#each shown as card (card.id)}
         <div class="card" data-testid="plugin-card" data-plugin={card.id}>
           <button type="button" class="open" aria-label={`Open ${card.name}`} data-testid="plugin-open" onclick={() => (openId = card.id)}>
-            <span class="glyph"><Puzzle size={18} /></span>
-            <span class="name">{card.name}</span>
+            <span class="head">
+              <span class="glyph"><Puzzle size={16} /></span>
+              <span class="name">{card.name}</span>
+              <span class="badge" data-testid="plugin-badge">{card.badge}</span>
+            </span>
             <span class="summary">{card.summary}</span>
           </button>
           <div class="foot">
-            <span class="badge" data-testid="plugin-badge">{card.badge}</span>
             <label class="toggle"><input type="checkbox" checked={card.enabled} aria-label={`Enable ${card.name}`} data-testid="plugin-enable" onchange={(e) => onenable(card.id, e.currentTarget.checked)} />{card.enabled ? 'Enabled' : 'Off'}</label>
             {#if card.removable}<button type="button" class="action" data-testid="plugin-remove" onclick={() => onremove(card.id)}>Remove</button>{/if}
           </div>
@@ -145,7 +143,7 @@
 
   header input[type='search'] {
     flex: 1;
-    max-width: 360px;
+    min-width: 0;
     height: 28px;
     padding: 0 8px;
     border: 0;
@@ -177,25 +175,25 @@
 
   .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+    grid-auto-rows: 1fr;
     gap: var(--ui-space-3, 12px);
   }
 
   .card {
     display: flex;
     flex-direction: column;
-    gap: var(--ui-space-2);
-    padding: 12px;
     border-radius: var(--ui-radius-lg);
     background: var(--ui-input);
   }
 
   .open {
     display: flex;
+    flex: 1;
     flex-direction: column;
-    gap: 6px;
-    align-items: flex-start;
-    padding: 0;
+    gap: var(--ui-space-2);
+    align-items: stretch;
+    padding: 12px 12px 0;
     border: 0;
     background: none;
     color: inherit;
@@ -204,27 +202,55 @@
     cursor: pointer;
   }
 
+  .head {
+    display: flex;
+    align-items: center;
+    gap: var(--ui-space-2);
+    min-width: 0;
+    height: 32px;
+  }
+
   .glyph {
     display: grid;
+    flex: none;
     place-items: center;
-    width: 36px;
-    height: 36px;
+    width: 32px;
+    height: 32px;
     border-radius: var(--ui-radius-md, 8px);
     background: var(--ui-panel);
     color: var(--ui-text-2);
   }
 
   .name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
     font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .summary {
+    display: -webkit-box;
+    overflow: hidden;
     color: var(--ui-text-2);
     font-size: var(--ui-text-xs);
     line-height: 1.4;
+    min-height: 2.8em;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
   }
 
-  .foot,
+  .foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--ui-space-2);
+    height: 40px;
+    padding: 0 12px;
+  }
+
   .actions,
   .meta {
     display: flex;
@@ -234,6 +260,7 @@
   }
 
   .badge {
+    flex: none;
     padding: 0 6px;
     border-radius: var(--ui-radius-full);
     background: var(--ui-panel);
@@ -262,7 +289,7 @@
 
   .action,
   .install button {
-    height: 22px;
+    height: 28px;
     padding: 0 8px;
     border: 0;
     border-radius: var(--ui-radius-sm);
@@ -285,18 +312,6 @@
     line-height: 1.5;
   }
 
-  .shots {
-    display: flex;
-    flex-direction: column;
-    gap: var(--ui-space-2);
-  }
-
-  .shots img {
-    width: 100%;
-    height: auto;
-    border-radius: var(--ui-radius-md, 8px);
-  }
-
   ul {
     margin: 0;
     padding-left: 16px;
@@ -306,14 +321,14 @@
 
   .install {
     display: flex;
-    gap: 4px;
-    max-width: 480px;
+    gap: var(--ui-space-2);
   }
 
   .install input {
     flex: 1;
     min-width: 0;
-    height: 24px;
+    height: 28px;
+    padding: 0 8px;
     border: 0;
     border-radius: var(--ui-radius-sm);
     background: var(--ui-input);

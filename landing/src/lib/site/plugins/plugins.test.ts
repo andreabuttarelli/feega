@@ -1,4 +1,3 @@
-import { existsSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { PLUGINS, pluginPath } from './plugins';
 import { permissionWords } from './permissions';
@@ -39,22 +38,4 @@ describe('plugins', () => {
     expect(pluginPath('3d-object')).toBe('/plugins/3d-object');
   });
 
-  it('shows two or three real screenshots per plugin, each with alt text', () => {
-    for (const plugin of PLUGINS) {
-      expect(plugin.shots.length).toBeGreaterThanOrEqual(2);
-      expect(plugin.shots.length).toBeLessThanOrEqual(3);
-
-      for (const shot of plugin.shots) {
-        expect(existsSync(`static${shot.src}`), shot.src).toBe(true);
-        expect(shot.alt.length).toBeGreaterThan(40);
-        expect(shot.width / shot.height).toBe(1.6);
-      }
-    }
-  });
-
-  it('picks the card cover from the plugin screenshots', () => {
-    for (const plugin of PLUGINS) {
-      expect(plugin.shots).toContain(plugin.cover);
-    }
-  });
 });
