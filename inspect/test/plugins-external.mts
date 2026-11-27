@@ -62,10 +62,16 @@ await page.exposeFunction('toHost', async (m: HostMessage) => {
 });
 
 const openMenu = async () => {
-  if ((await page.locator('[data-testid=plugin-manager]').count()) === 0) {
+  if ((await page.locator('[data-testid=open-plugins]').count()) === 0) {
     await page.locator('[data-testid=feega-menu]').click();
   }
 };
+const openBrowser = async () => {
+  await openMenu();
+  await page.locator('[data-testid=open-plugins]').click();
+  await page.locator('[data-testid=plugin-grid]').waitFor();
+};
+const closeBrowser = () => page.locator('[data-testid=plugin-close]').click();
 const sayHello = async () => {
   await openMenu();
   await page.locator('[data-testid=plugin-command]', { hasText: 'Say hello' }).click();
@@ -74,13 +80,18 @@ const sayHello = async () => {
 try {
   await page.goto(`http://127.0.0.1:${PORT}/`);
   await page.locator('[data-testid=feega-menu]').waitFor({ timeout: 30_000 });
-  await openMenu();
+  await openBrowser();
   await page.locator(HOT).waitFor({ timeout: 10_000 });
 
-  const badges = await page.locator(`${HOT} [data-testid=plugin-badge]`).allTextContents();
-  check('the folder plugin is listed marked Dev and Not reviewed', badges.join() === 'Dev,Not reviewed', badges.join());
-  check('a built-in is listed with no badge', (await page.locator(`[data-plugin="${BUILT_IN}"] [data-testid=plugin-badge]`).count()) === 0);
-  check('the permissions are readable in words', (await page.locator(`${HOT} li`).first().textContent()) === 'See which element you select');
+  check('the folder plugin is a community card', (await page.locator(`${HOT} [data-testid=plugin-badge]`).textContent()) === 'Community');
+  check('a built-in is an official card', (await page.locator(`[data-plugin="${BUILT_IN}"] [data-testid=plugin-badge]`).textContent()) === 'Official');
+
+  await page.locator(`${HOT} [data-testid=plugin-open]`).click();
+  const badges = await page.locator('[data-testid=plugin-detail] .badge').allTextContents();
+  check('the folder plugin detail says Dev and Not reviewed', badges.join() === 'Community,Dev,Not reviewed', badges.join());
+  check('the permissions are readable in words', (await page.locator('[data-testid=plugin-detail] li').first().textContent()) === 'See which element you select');
+  await page.locator('[data-testid=plugin-back]').click();
+  await closeBrowser();
 
   await sayHello();
   await page.locator('.toast', { hasText: 'Hello. Select an element first.' }).waitFor({ timeout: 10_000 });
@@ -92,13 +103,14 @@ try {
   await page.locator('.toast', { hasText: 'Reloaded.' }).waitFor({ timeout: 10_000 });
   check('editing the folder reloads the plugin', true);
 
-  await openMenu();
+  await openBrowser();
   await page.locator(`${HOT} input[type=checkbox]`).uncheck();
   await page.waitForTimeout(600);
+  await closeBrowser();
   check('switching it off removes its command', (await page.locator('[data-testid=plugin-command]', { hasText: 'Say hello' }).count()) === 0);
   check('the switch is kept in plugins.json', readRegistry(root).disabled.includes('example.hello'));
 
-  await openMenu();
+  await openBrowser();
   await page.locator(`[data-plugin="${BUILT_IN}"] input[type=checkbox]`).uncheck();
   await page.waitForTimeout(600);
   check('a built-in can be switched off too', readRegistry(root).disabled.includes(BUILT_IN));

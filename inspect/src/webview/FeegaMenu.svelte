@@ -2,14 +2,12 @@
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import { tick } from 'svelte';
   import type { Contributed } from '@feega/plugin-api/host';
-  import PluginManager from './PluginManager.svelte';
   import SupportList from './SupportList.svelte';
-  import type { Row } from './plugin-manager';
   import { AccountState, ToHost } from '../messages';
   import type { SupportItem } from '../support';
   import { SETTINGS, helpLinks, type ReportFacts, type SettingKey, type SettingValue, type Settings } from '../settings';
 
-  let { commands = [], oncommand = () => undefined, rows = [], problems = [], canInstall = false, onenable = () => undefined, onremove = () => undefined, oninstall = () => undefined, values, facts, account, support = [], onaccount, onsupport = () => undefined, onsetting, onlink }: { commands?: Contributed[]; oncommand?: (plugin: string, command: string) => void; rows?: Row[]; problems?: string[]; canInstall?: boolean; onenable?: (id: string, enabled: boolean) => void; onremove?: (id: string) => void; oninstall?: (source: string) => void; values: Settings | null; facts: ReportFacts | null; account: { state: AccountState; email?: string }; support?: SupportItem[]; onaccount: (kind: ToHost.SignIn | ToHost.CancelSignIn | ToHost.SignOut) => void; onsupport?: (item: SupportItem) => void; onsetting: (key: SettingKey, value: SettingValue) => void; onlink: (url: string) => void } = $props();
+  let { commands = [], oncommand = () => undefined, onplugins = () => undefined, values, facts, account, support = [], onaccount, onsupport = () => undefined, onsetting, onlink }: { commands?: Contributed[]; oncommand?: (plugin: string, command: string) => void; onplugins?: () => void; values: Settings | null; facts: ReportFacts | null; account: { state: AccountState; email?: string }; support?: SupportItem[]; onaccount: (kind: ToHost.SignIn | ToHost.CancelSignIn | ToHost.SignOut) => void; onsupport?: (item: SupportItem) => void; onsetting: (key: SettingKey, value: SettingValue) => void; onlink: (url: string) => void } = $props();
 
   let open = $state(false);
   let trigger = $state<HTMLButtonElement | null>(null);
@@ -90,7 +88,7 @@
         {#each commands as command (command.plugin + command.entry.id)}
           <button type="button" class="row" data-testid="plugin-command" onclick={() => (oncommand(command.plugin, command.entry.id), close())}>{command.entry.title}</button>
         {/each}
-        <PluginManager {rows} {problems} {canInstall} {onenable} {onremove} {oninstall} />
+        <button type="button" class="row" data-testid="open-plugins" onclick={() => (onplugins(), close())}>Browse plugins</button>
       </section>
 
       <section>
