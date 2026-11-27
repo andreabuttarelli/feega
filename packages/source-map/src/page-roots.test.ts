@@ -18,7 +18,7 @@ describe('layers tree with tagged page elements', () => {
     const [html] = treeOf(doc());
 
     expect(html.children.map((n: Node) => n.name)).toEqual(['body']);
-    expect(html.children[0].children.map((n: Node) => n.name)).toEqual(['main']);
+    expect(html.children[0].children.map((n: Node) => n.name)).toEqual(['Main']);
   });
 
   it('the page elements stay selectable under their page sources', () => {
