@@ -65,6 +65,13 @@ export const PRESETS = Object.values(Size).filter((s) => s !== Size.Custom && !S
 
 export const frameOf = (size: Size): DeviceFrame | null => SIZES[size].frame ?? null;
 
+export type PageBox = { left: number; top: number; width: number; height: number };
+
+export function pageBoxOf(frame: DeviceFrame | null, fit: Fit): PageBox {
+  const { top, right, bottom, left } = frame?.insets ?? insets(0, 0, 0, 0);
+  return { left, top, width: fit.width - left - right, height: fit.height - top - bottom };
+}
+
 const SNAP_PX = 8;
 const MAX_SCALE = 1;
 
