@@ -395,6 +395,7 @@
       refresh();
       bridge.tree();
     },
+    textEnded: () => (editing = false),
     text: (source, text, was) => {
       editing = false;
       textPending = source;
