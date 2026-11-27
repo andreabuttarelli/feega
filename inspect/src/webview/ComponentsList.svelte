@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { ComponentRow } from '../host/component-list';
-  import CanvasBanner from './CanvasBanner.svelte';
+  import ActionBanner from './ActionBanner.svelte';
   import { groupComponents, keyOfComponent } from './components';
   import { freshKeys } from './fresh-keys.svelte';
   import SearchField from './SearchField.svelte';
@@ -16,7 +16,7 @@
 </script>
 
 <div class="components" data-testid="components">
-  <CanvasBanner hint="See every component side by side" testid="canvas-open-components" onopen={oncanvas} />
+  <ActionBanner hint="See every component side by side" testid="canvas-open-components" onopen={oncanvas} />
   <div class="search"><SearchField label="Search components" value={query} placeholder="Search components" onsearch={(text) => (query = text)} /></div>
 
   {#each groups as group (group.folder)}

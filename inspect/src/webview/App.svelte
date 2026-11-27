@@ -4,6 +4,7 @@
   import ArrowRight from '@lucide/svelte/icons/arrow-right';
   import RotateCw from '@lucide/svelte/icons/rotate-cw';
   import Plus from '@lucide/svelte/icons/plus';
+  import ActionBanner from './ActionBanner.svelte';
   import ExternalLink from '@lucide/svelte/icons/external-link';
   import PanelRight from '@lucide/svelte/icons/panel-right';
   import PanelLeft from '@lucide/svelte/icons/panel-left';
@@ -1640,9 +1641,9 @@
       <Tabs.Trigger value={LeftTab.Layers} class="tab" data-testid="layers-tab">Layers</Tabs.Trigger>
       <Tabs.Trigger value={LeftTab.Pages} class="tab" data-testid="pages-tab">Pages</Tabs.Trigger>
       <Tabs.Trigger value={LeftTab.Components} class="tab" data-testid="components-tab">Components</Tabs.Trigger>
-      {#if leftTab === LeftTab.Layers}<button type="button" class="icon add" title="Add an element (/)" aria-label="Add" data-testid="add-button" disabled={!picked} onclick={(e) => openAddMenu(e.clientX, e.clientY)}><Plus size={15} /></button>{/if}
     </Tabs.List>
     <Tabs.Content value={LeftTab.Layers}>
+    <ActionBanner title="Add element" hint={picked ? 'Insert after the selection (/)' : 'Select an element first'} testid="add-button" icon={Plus} disabled={!picked} onopen={(e) => openAddMenu(e.clientX, e.clientY)} />
     <div class="layers" role="tree" aria-label="Layers" data-testid="layers">
       <LayersTree nodes={layers} {picked} selected={selectedKeys} badge={badgeOf(elementState)} open={layersOpen} onselect={selectRow} onhover={hoverLayer} onopen={(at) => toHost({ kind: ToHost.Open, at })} onmove={moveLayer} onusage={moveUsage} dragging={layerDrag} hidden={hiddenNow} locked={lockedNow} ontoggle={toggleFlag} oncontext={openLayerMenu} onadd={layerAdd} onfocus={(node) => viewing === View.Page && enterFocus(rowFocus(node))} ondelete={deleteRow} />
     </div>
@@ -2077,9 +2078,6 @@
     outline: 2px solid var(--ui-accent);
   }
 
-  .add {
-    margin-left: auto;
-  }
 
   .drop-line {
     position: absolute;
