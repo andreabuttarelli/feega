@@ -144,6 +144,13 @@ depends on `@phosphor-icons/react` or `@phosphor-icons/vue`, the file re-exports
 (Vue) that library's component and the weight is written as a `weight` prop. `@phosphor-icons/web`
 and Svelte or Astro files use inline SVG. Nothing is added to `package.json`.
 
+Feega bundles only the list of icon names and tags. Each icon file, in the weight you pick, is
+downloaded when it first appears in the grid or is inserted, from jsDelivr (`cdn.jsdelivr.net`,
+with `unpkg.com` as a fallback), at the exact `@phosphor-icons/core` version the list was built
+from. **The first use needs internet**; icons already shown stay available for the session, the
+others show "Icons need internet the first time." with a **Retry** button. The downloads go through
+Feega, not the panel.
+
 Phosphor Icons are released under the MIT licence, Copyright Phosphor Icons.
 
 ## Safety

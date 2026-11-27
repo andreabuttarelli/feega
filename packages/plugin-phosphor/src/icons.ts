@@ -1,5 +1,5 @@
 import { unpack } from '@feega/plugin-icon-kit/unpack';
-import { PACKED } from './packed.generated';
+import { PACKED, VERSION } from './packed.generated';
 
 export enum Weight {
   Thin = 'thin',
@@ -12,7 +12,11 @@ export enum Weight {
 
 export const WEIGHTS: Weight[] = [Weight.Thin, Weight.Light, Weight.Regular, Weight.Bold, Weight.Fill, Weight.Duotone];
 
-export type PhosphorIcon = { name: string; bodies: string[]; words: string[] };
+export { VERSION };
+
+export type PhosphorIcon = { name: string; words: string[] };
+
+export const SOURCE = { name: '@phosphor-icons/core', version: VERSION };
 
 export const VIEW_BOX = '0 0 256 256';
 export const DEFAULT_SIZE = 24;
@@ -25,11 +29,9 @@ export const POPULAR = [
 ];
 
 export async function loadIcons(): Promise<PhosphorIcon[]> {
-  const packed = await unpack<Record<string, [string[], string[]]>>(PACKED);
+  const packed = await unpack<Record<string, string[]>>(PACKED);
 
-  return Object.entries(packed).map(([name, [bodies, words]]) => ({ name, bodies, words }));
+  return Object.entries(packed).map(([name, words]) => ({ name, words }));
 }
 
-export const bodyOf = (icon: PhosphorIcon, weight: Weight): string => icon.bodies[WEIGHTS.indexOf(weight)];
-
-export const glyphOf = (icon: PhosphorIcon, weight: Weight): string => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${VIEW_BOX}" fill="#000">${bodyOf(icon, weight)}</svg>`;
+export const fileOf = (icon: PhosphorIcon, weight: Weight): string => `assets/${weight}/${weight === Weight.Regular ? icon.name : `${icon.name}-${weight}`}.svg`;

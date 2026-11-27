@@ -72,7 +72,7 @@ export const SOURCES: readonly PluginSource[] = [
     author: 'Feega',
     tier: 'free',
     latestVersion: '1.0.0',
-    permissions: ['selection', 'project', 'edit.insert']
+    permissions: ['selection', 'project', 'edit.insert', 'network:cdn.jsdelivr.net', 'network:unpkg.com']
   }
 ];
 
@@ -105,6 +105,6 @@ export const COPY: Readonly<Record<string, PluginCopy>> = {
   'phosphor-icons': {
     icon: 'phosphor',
     description:
-      'Select an element, search the Phosphor set of over 1,500 icons by name or tag, choose a weight (thin, light, regular, bold, fill or duotone), size and colour, and insert it. Feega writes a small component with the SVG inline, or, when the project already uses @phosphor-icons/react or @phosphor-icons/vue, a component of that library with the weight as a prop. Nothing is added to package.json. One undoable step. Phosphor Icons are released under the MIT licence, Copyright Phosphor Icons.'
+      'Select an element, search the Phosphor set of over 1,500 icons by name or tag, choose a weight (thin, light, regular, bold, fill or duotone), size and colour, and insert it. Feega writes a small component with the SVG inline, or, when the project already uses @phosphor-icons/react or @phosphor-icons/vue, a component of that library with the weight as a prop. Nothing is added to package.json. Icons are downloaded from jsDelivr (unpkg as fallback) the first time they are shown, so the first use needs internet. One undoable step. Phosphor Icons are released under the MIT licence, Copyright Phosphor Icons.'
   }
 };
