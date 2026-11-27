@@ -1,10 +1,11 @@
 <script lang="ts">
+  import CanvasBanner from './CanvasBanner.svelte';
   import ExampleField from './ExampleField.svelte';
   import { EXAMPLE_LIMIT, type PageRow } from './pages';
 
-  type Props = { rows: PageRow[]; onopen: (route: string) => void; onadd: (pattern: string, path: string) => void };
+  type Props = { rows: PageRow[]; onopen: (route: string) => void; onadd: (pattern: string, path: string) => void; oncanvas: () => void };
 
-  let { rows, onopen, onadd }: Props = $props();
+  let { rows, onopen, onadd, oncanvas }: Props = $props();
 
   let expanded = $state<string[]>([]);
 
@@ -12,6 +13,8 @@
   const hiddenOf = (row: PageRow) => row.examples.length - shownOf(row).length;
   const expand = (route: string) => (expanded = [...expanded, route]);
 </script>
+
+<CanvasBanner hint="See every page at every size" testid="canvas-open-pages" onopen={oncanvas} />
 
 <ul class="pages" data-testid="pages">
   {#each rows as row (row.route)}

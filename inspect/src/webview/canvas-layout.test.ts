@@ -1,6 +1,38 @@
 import { describe, expect, it } from 'vitest';
 import { Size } from './sizes';
-import { CANVAS_COLUMNS, COLUMN_GAP, ROW_GAP, ROW_HEAD, layoutCanvas } from './canvas-layout';
+import { CANVAS_COLUMNS, COLUMN_GAP, GRID_GAP_X, GRID_GAP_Y, ROW_GAP, ROW_HEAD, layoutCanvas, layoutGrid } from './canvas-layout';
+
+describe('layoutGrid', () => {
+  const items = ['a', 'b', 'c', 'd', 'e'].map((key) => ({ key, name: key.toUpperCase() }));
+
+  it('fills rows left to right, then wraps at the column count', () => {
+    const { frames } = layoutGrid(items, 3);
+
+    expect(frames.map((f) => [f.key, f.x === 0, f.y === 0])).toEqual([['a', true, true], ['b', false, true], ['c', false, true], ['d', true, false], ['e', false, false]]);
+  });
+
+  it('gives every cell the same size and gaps', () => {
+    const { frames } = layoutGrid(items, 3);
+
+    expect(new Set(frames.map((f) => `${f.width}x${f.height}`)).size).toBe(1);
+    expect(frames[1].x).toBe(frames[0].x + frames[0].width + GRID_GAP_X);
+    expect(frames[3].y).toBe(frames[0].y + frames[0].height + GRID_GAP_Y);
+  });
+
+  it('carries the name and opens the frame by its key', () => {
+    expect(layoutGrid(items, 3).frames.map((f) => [f.name, f.target])).toEqual(items.map((i) => [i.name, i.key]));
+  });
+
+  it('bounds wrap the cells', () => {
+    const { frames, bounds } = layoutGrid(items, 3);
+
+    expect(bounds).toEqual({ x: 0, y: 0, width: frames[2].x + frames[2].width, height: frames[3].y + frames[3].height });
+  });
+
+  it('is empty without items', () => {
+    expect(layoutGrid([], 3)).toEqual({ frames: [], bounds: { x: 0, y: 0, width: 0, height: 0 } });
+  });
+});
 
 const pages = [
   { route: '/', dynamic: false },

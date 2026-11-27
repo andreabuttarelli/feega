@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, relative, resolve } from 'node:path';
+import { join, posix, relative, resolve } from 'node:path';
 import { appsIn } from '@feega/dev-run/run-plan';
 import { GIT_MISSING, gitPanel } from './git-panel';
 import { AddKind, type AddPlace } from '@feega/live-edit/add-node';
@@ -65,6 +65,7 @@ import { editorMcp } from './ai/editor-mcp';
 import { viewAsker } from './view-ask';
 import { machineEnv } from './agents';
 import { listRoutes } from './project-routes';
+import { listComponents } from './component-list';
 
 const ADAPTER_DIR = 'feega-adapters';
 const START_WITH_FEEGA = 'Start with Feega';
@@ -314,6 +315,12 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
 
   async function routesShown() {
     await post({ kind: ToView.Routes, routes: await listRoutes(join(root, running?.plan.appDir ?? '')) });
+  }
+
+  async function componentsShown() {
+    const appDir = running?.plan.appDir ?? '';
+    const usesOf = async (file: string) => (await usages.usersOf(posix.join(appDir, file))).length;
+    await post({ kind: ToView.Components, components: await listComponents(join(root, appDir), usesOf) });
   }
 
   async function libraryShown() {
@@ -898,6 +905,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.ShareRole]: (m) => sharing.setRole(m.userId, m.role),
     [ToHost.LibraryList]: libraryShown,
     [ToHost.Routes]: routesShown,
+    [ToHost.Components]: componentsShown,
     [ToHost.LibraryInsert]: libraryInserted,
     [ToHost.NewPage]: pageCreated,
     [ToHost.Plugin]: async (m) => post({ kind: ToView.Plugin, id: m.id, result: await pluginRun(m.ask) }),

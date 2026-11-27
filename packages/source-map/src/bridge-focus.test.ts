@@ -281,6 +281,50 @@ describe('focus tab', () => {
     expect(up).toContainEqual(expect.objectContaining({ type: 'feega:palette:result', focus: true }));
   });
 
+  describe('a component that is not on the page', () => {
+    const ALONE = { type: 'feega:focus', source: 'src/lib/Button.svelte:1:1', index: 0, alone: true };
+
+    it('opens the real component from the dev server by its file', () => {
+      const { up, send, frame } = bridged();
+      send(ALONE);
+
+      const url = new URL(frame()!.getAttribute('src')!, 'http://localhost');
+      expect(url.pathname).toBe('/__feega/mount');
+      expect(url.searchParams.get('file')).toBe('src/lib/Button.svelte');
+      expect(url.searchParams.get('name')).toBe('Button');
+      expect(up).toContainEqual({ type: 'feega:focused', count: 1, mode: 'mount', dark: false });
+    });
+
+    it('does not reopen the frame when asked again for the same component', () => {
+      const { send, frame } = bridged();
+      send(ALONE);
+      const first = frame();
+      send(ALONE);
+
+      expect(frame()).toBe(first);
+    });
+
+    it('falls back to an empty snapshot with the reason when it cannot render alone', () => {
+      const { up, send, frame } = bridged();
+      send(ALONE);
+      const status = { type: 'feega:mount:status', status: 'failed', reason: 'useTheme must be used within a ThemeProvider' };
+      const win = (frame()!.ownerDocument.defaultView as Window)!;
+      win.dispatchEvent(new (win as unknown as typeof globalThis).MessageEvent('message', { data: status, source: frame()!.contentWindow as unknown as Window }));
+
+      expect(frame()!.getAttribute('src')).toBeNull();
+      expect(up).toContainEqual({ type: 'feega:focused', count: 1, mode: 'snapshot', dark: false, reason: 'mount_error', detail: 'provider' });
+    });
+
+    it('does not try the mount route on Next.js, which has none', () => {
+      const { win, up, send, frame } = bridged();
+      (win as unknown as Record<string, unknown>).next = { version: '15.0.0' };
+      send(ALONE);
+
+      expect(frame()!.getAttribute('src')).toBeNull();
+      expect(up).toContainEqual({ type: 'feega:focused', count: 1, mode: 'snapshot', dark: false, reason: 'unsupported_framework' });
+    });
+  });
+
   describe('a React component', () => {
     const MOUNT_STATUS = 'feega:mount:status';
     const reactive = () => {
