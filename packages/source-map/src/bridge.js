@@ -6,6 +6,7 @@ import { trackRects } from './track.js';
 import { keepScroll } from './reload-restore.js';
 import { applyTheme, keepTheme, themeNow, watchScheme } from './theme-switch.js';
 import { watchPageMount } from './page-mount.js';
+import { watchLinks } from './links.js';
 import { CAPTURE, CAPTURED, captureTab, loadRenderer } from './capture.js';
 import { FORCED_REBUILD_MS, forceState, forcedNow, keepForced, settleForced, statesOf } from './forced-state.js';
 
@@ -40,6 +41,7 @@ export const TRACKED = 'feega:tracked';
 export const LEAVE = 'feega:leave';
 export const FORCE = 'feega:force';
 export const THEME = 'feega:theme';
+export const LINKS = 'feega:links';
 
 export const Mode = { Navigate: 'navigate', Design: 'design' };
 
@@ -71,6 +73,7 @@ export function installBridge(win, { nested = false, emit = null, twin = null, r
   let reply = toParent;
   const scroll = nested ? { restored: false, leave: () => undefined } : keepScroll(win);
   const tab = focusTab(win, { install: (inner) => installBridge(inner, { nested: true, twin: (element) => tab.twin(element), emit: (message) => win.parent?.postMessage({ ...message, focus: true }, '*') }), prepare: () => stampSources(doc), report: (message) => win.parent?.postMessage(message, '*') });
+  const refreshLinks = nested ? () => undefined : watchLinks(win, (paths) => toParent({ type: LINKS, paths }));
   const tracker = trackRects(win, (slot, rect) => reply({ type: TRACKED, slot, rect }));
 
   function sendTree() {
@@ -174,11 +177,12 @@ export function installBridge(win, { nested = false, emit = null, twin = null, r
     handle(event.data);
   });
 
-  new win.MutationObserver(() => (keepPreviews(doc), refreshTree(), refreshForced(), refreshTheme(), tab.changed())).observe(doc.documentElement, { childList: true, subtree: true });
+  new win.MutationObserver(() => (keepPreviews(doc), refreshTree(), refreshForced(), refreshTheme(), refreshLinks(), tab.changed())).observe(doc.documentElement, { childList: true, subtree: true });
   new win.MutationObserver(() => (refreshTree(), tab.changed())).observe(doc.documentElement, { subtree: true, attributes: true, attributeFilter: TREE_ATTRIBUTES, characterData: true });
 
   if (!nested) {
     reportRoutes(win);
+    refreshLinks();
   }
   toParent({ type: READY, path: win.location.pathname + win.location.search, restored: scroll.restored });
 }

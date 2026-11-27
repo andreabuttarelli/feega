@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CANVAS_COLUMNS, layoutCanvas } from './canvas-layout';
-import { VISIBLE_MARGIN, visibleKeys } from './canvas-live';
+import { VISIBLE_MARGIN, liveSet, visibleKeys } from './canvas-live';
 
 const pages = Array.from({ length: 10 }, (_, i) => ({ route: `/p${i}`, dynamic: i === 9 }));
 const { frames } = layoutCanvas(pages, CANVAS_COLUMNS);
@@ -28,5 +28,19 @@ describe('visibleKeys', () => {
     const far = { scale: 0.1, x: 0, y: -frames[3].y * 0.1 };
 
     expect(visibleKeys(frames, far, viewport, 0)).toContain('/p1::desktop');
+  });
+});
+
+describe('liveSet and dynamic routes', () => {
+  const blog = (examples: { path: string; label: string }[]) => layoutCanvas([{ route: '/blog/[slug]', dynamic: true, examples }], CANVAS_COLUMNS).frames;
+  const wide = { scale: 0.7, x: 0, y: 0 };
+  const big = { w: 4000, h: 4000 };
+
+  it('keeps a dynamic route that shows an example', () => {
+    expect(liveSet(blog([{ path: '/blog/a', label: 'a' }]), wide, big, [])).toHaveLength(3);
+  });
+
+  it('skips a dynamic route without an example', () => {
+    expect(liveSet(blog([]), wide, big, [])).toEqual([]);
   });
 });

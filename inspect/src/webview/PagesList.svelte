@@ -1,19 +1,46 @@
 <script lang="ts">
-  import type { PageRow } from './pages';
+  import ExampleField from './ExampleField.svelte';
+  import { EXAMPLE_LIMIT, type PageRow } from './pages';
 
-  type Props = { rows: PageRow[]; onopen: (route: string) => void };
+  type Props = { rows: PageRow[]; onopen: (route: string) => void; onadd: (pattern: string, path: string) => void };
 
-  let { rows, onopen }: Props = $props();
+  let { rows, onopen, onadd }: Props = $props();
+
+  let expanded = $state<string[]>([]);
+
+  const shownOf = (row: PageRow) => (expanded.includes(row.route) ? row.examples : row.examples.slice(0, EXAMPLE_LIMIT));
+  const hiddenOf = (row: PageRow) => row.examples.length - shownOf(row).length;
+  const expand = (route: string) => (expanded = [...expanded, route]);
 </script>
 
 <ul class="pages" data-testid="pages">
   {#each rows as row (row.route)}
-    <li>
-      <button type="button" class="page" class:on={row.current} aria-current={row.current ? 'page' : undefined} disabled={row.dynamic} title={row.dynamic ? 'Dynamic route: open it from a link in the preview' : `Open ${row.route}`} data-testid="page-row" data-route={row.route} onclick={() => onopen(row.route)}>
-        <span class="route">{row.route}</span>
-        {#if row.dynamic}<span class="tag" data-testid="page-dynamic">dynamic</span>{/if}
-      </button>
-    </li>
+    {#if row.dynamic}
+      <li class="group" data-testid="page-group" data-route={row.route}>
+        <span class="page head"><span class="route">{row.route}</span></span>
+        <ul class="examples">
+          {#each shownOf(row) as example (example.path)}
+            <li>
+              <button type="button" class="page example" class:on={example.current} aria-current={example.current ? 'page' : undefined} title={`Open ${example.path}`} data-testid="page-example" data-path={example.path} onclick={() => onopen(example.path)}>
+                <span class="route">{example.label}</span>
+              </button>
+            </li>
+          {/each}
+          {#if hiddenOf(row) > 0}
+            <li><button type="button" class="page more" data-testid="page-more" onclick={() => expand(row.route)}>{hiddenOf(row)} more</button></li>
+          {/if}
+          {#if row.examples.length === 0}
+            <li class="manual"><ExampleField pattern={row.route} onadd={(path) => onadd(row.route, path)} /></li>
+          {/if}
+        </ul>
+      </li>
+    {:else}
+      <li>
+        <button type="button" class="page" class:on={row.current} aria-current={row.current ? 'page' : undefined} title={`Open ${row.route}`} data-testid="page-row" data-route={row.route} onclick={() => onopen(row.route)}>
+          <span class="route">{row.route}</span>
+        </button>
+      </li>
+    {/if}
   {:else}
     <li class="empty" data-testid="pages-empty">No pages found yet. Pages you visit in the preview appear here.</li>
   {/each}
@@ -43,7 +70,31 @@
     cursor: pointer;
   }
 
-  .page:hover:not(:disabled) {
+  .head {
+    cursor: default;
+  }
+
+  .examples {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .example,
+  .more {
+    padding-left: 24px;
+  }
+
+  .more {
+    color: var(--ui-text-2);
+    font-size: var(--ui-text-xs);
+  }
+
+  .manual {
+    padding: 2px 12px 4px 24px;
+  }
+
+  button.page:hover {
     background: var(--ui-input);
     color: var(--ui-text);
   }
@@ -53,22 +104,10 @@
     color: var(--ui-text);
   }
 
-  .page:disabled {
-    cursor: default;
-  }
-
   .route {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-
-  .tag {
-    margin-left: auto;
-    padding: 0 6px;
-    border-radius: var(--ui-radius-sm);
-    background: var(--ui-input);
-    font-size: var(--ui-text-xs);
   }
 
   .empty {
