@@ -66,6 +66,7 @@ import { viewAsker } from './view-ask';
 import { machineEnv } from './agents';
 import { listRoutes } from './project-routes';
 import { listComponents } from './component-list';
+import { projectLive } from './project-live';
 
 const ADAPTER_DIR = 'feega-adapters';
 const START_WITH_FEEGA = 'Start with Feega';
@@ -313,14 +314,26 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     await edits.structure({ op: StructureOp.Add, at, add: { kind: AddKind.Image, src: copied.url, place } }).then((out) => edited(out, null));
   }
 
+  const appRootNow = () => join(root, running?.plan.appDir ?? '');
+  const routesNow = () => listRoutes(appRootNow());
+  const componentsNow = () => {
+    const appDir = running?.plan.appDir ?? '';
+    return listComponents(appRootNow(), async (file) => (await usages.usersOf(posix.join(appDir, file))).length);
+  };
+  const live = projectLive({ appRoot: appRootNow, routes: routesNow, components: componentsNow, post });
+
   async function routesShown() {
-    await post({ kind: ToView.Routes, routes: await listRoutes(join(root, running?.plan.appDir ?? '')) });
+    const routes = await routesNow();
+    live.routesSent(routes);
+    live.watch();
+    await post({ kind: ToView.Routes, routes });
   }
 
   async function componentsShown() {
-    const appDir = running?.plan.appDir ?? '';
-    const usesOf = async (file: string) => (await usages.usersOf(posix.join(appDir, file))).length;
-    await post({ kind: ToView.Components, components: await listComponents(join(root, appDir), usesOf) });
+    const components = await componentsNow();
+    live.componentsSent(components);
+    live.watch();
+    await post({ kind: ToView.Components, components });
   }
 
   async function libraryShown() {
@@ -988,6 +1001,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     stop: async () => {
       close();
       ai.close();
+      live.dispose();
       usages.dispose();
       classes.dispose();
       pluginList?.stop();

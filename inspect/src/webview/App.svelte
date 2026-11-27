@@ -65,6 +65,7 @@
   import PagesCanvas from './PagesCanvas.svelte';
   import ComponentsCanvas from './ComponentsCanvas.svelte';
   import ComponentsList from './ComponentsList.svelte';
+  import type { FilesChange } from './files-change';
   import { componentFocus } from './components';
   import type { ComponentRow } from '../host/component-list';
   import LayoutGrid from '@lucide/svelte/icons/layout-grid';
@@ -226,6 +227,7 @@
   let canvasKind = $state<CanvasKind | null>(null);
   let projectRoutes = $state<PageRoute[]>([]);
   let projectComponents = $state<ComponentRow[]>([]);
+  let filesChanged = $state<FilesChange | null>(null);
   let seen = $state<string[]>([]);
   const pages = $derived(pageRows(projectRoutes, seen, route));
   let share = $state<Extract<ViewMessage, { kind: ToView.Share }> | null>(null);
@@ -819,6 +821,7 @@
     [ToView.Library]: (m) => (libraryItems = m.items),
     [ToView.Routes]: (m) => (projectRoutes = m.routes),
     [ToView.Components]: (m) => (projectComponents = m.components),
+    [ToView.FilesChanged]: (m) => (filesChanged = { files: m.files }),
     [ToView.Comments]: (m) => (cloud = { enabled: m.enabled, comments: m.comments, review: m.review ?? cloud.review, error: m.error ?? '' }),
     [ToView.Onboarding]: (m) => (onboarding = m.state),
     [ToView.Support]: (m) => (support = m.done),
@@ -1665,8 +1668,8 @@
       {#if share?.available}<SharePanel view={share} onstart={(name, canEdit) => toHost({ kind: ToHost.ShareStart, name, canEdit })} onstop={() => toHost({ kind: ToHost.ShareStop })} onkick={(userId) => toHost({ kind: ToHost.ShareKick, userId })} onrole={(userId, role) => toHost({ kind: ToHost.ShareRole, userId, role })} />{/if}
       <button type="button" class="icon" class:on={!barClosed} title="Properties (⌘\)" onclick={toggleBar} data-testid="bar-toggle"><PanelRight size={15} /></button>
     </header>
-    {#if canvasKind === CanvasKind.Pages && url}<PagesCanvas rows={pages} base={url} onopen={openFromCanvas} onclose={() => (canvasKind = null)} />{/if}
-    {#if canvasKind === CanvasKind.Components && url}<ComponentsCanvas rows={projectComponents} base={url} onopen={openFromComponentsCanvas} onclose={() => (canvasKind = null)} />{/if}
+    {#if canvasKind === CanvasKind.Pages && url}<PagesCanvas rows={pages} base={url} onopen={openFromCanvas} onclose={() => (canvasKind = null)} changed={filesChanged} />{/if}
+    {#if canvasKind === CanvasKind.Components && url}<ComponentsCanvas rows={projectComponents} base={url} onopen={openFromComponentsCanvas} onclose={() => (canvasKind = null)} changed={filesChanged} />{/if}
     {#if focus}<FocusTabs name={focus.name} {route} active={viewing} notice={snapshotNotice} scheme={shownScheme} onscheme={switchScheme} transparent={transparentCanvas} ontransparent={toggleTransparent} zoom={zoomNow} onzoom={(request) => bridge.zoom(request)} onstep={(direction) => bridge.zoom({ mode: 'set', value: stepZoom(zoomNow, direction) })} onselect={showTab} onclose={exitFocus} bind:height={tabsH} />{/if}
 
     <div class="backdrop" role="presentation" bind:clientWidth={stage.w} bind:clientHeight={stage.h} onpointermove={resizeFrame} onpointerup={endDrag}>

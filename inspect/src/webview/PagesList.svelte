@@ -1,10 +1,13 @@
 <script lang="ts">
   import CanvasBanner from './CanvasBanner.svelte';
+  import { freshKeys } from './fresh-keys.svelte';
   import type { PageRow } from './pages';
 
   type Props = { rows: PageRow[]; onopen: (route: string) => void; oncanvas: () => void };
 
   let { rows, onopen, oncanvas }: Props = $props();
+
+  const fresh = freshKeys(() => rows.map((row) => row.route));
 </script>
 
 <CanvasBanner hint="See every page at every size" testid="canvas-open-pages" onopen={oncanvas} />
@@ -12,7 +15,7 @@
 <ul class="pages" data-testid="pages">
   {#each rows as row (row.route)}
     <li>
-      <button type="button" class="page" class:on={row.current} aria-current={row.current ? 'page' : undefined} disabled={row.dynamic} title={row.dynamic ? 'Dynamic route: open it from a link in the preview' : `Open ${row.route}`} data-testid="page-row" data-route={row.route} onclick={() => onopen(row.route)}>
+      <button type="button" class="page" class:on={row.current} class:fresh={fresh.has(row.route)} aria-current={row.current ? 'page' : undefined} disabled={row.dynamic} title={row.dynamic ? 'Dynamic route: open it from a link in the preview' : `Open ${row.route}`} data-testid="page-row" data-route={row.route} onclick={() => onopen(row.route)}>
         <span class="route">{row.route}</span>
         {#if row.dynamic}<span class="tag" data-testid="page-dynamic">dynamic</span>{/if}
       </button>
@@ -54,6 +57,16 @@
   .page.on {
     background: var(--ui-input);
     color: var(--ui-text);
+  }
+
+  .page.fresh {
+    animation: flash 2.5s ease-out;
+  }
+
+  @keyframes flash {
+    from {
+      background: color-mix(in srgb, var(--ui-accent) 35%, transparent);
+    }
   }
 
   .page:disabled {

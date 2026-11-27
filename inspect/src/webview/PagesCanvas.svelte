@@ -3,26 +3,31 @@
   import Maximize from '@lucide/svelte/icons/maximize';
   import Minus from '@lucide/svelte/icons/minus';
   import Plus from '@lucide/svelte/icons/plus';
+  import { untrack } from 'svelte';
   import { CANVAS_COLUMNS, layoutCanvas, type CanvasFrame } from './canvas-layout';
   import { LIVE_CAP, VISIBLE_MARGIN, leaving, liveKeys } from './canvas-live';
   import { openOf, type CanvasOpen } from './canvas-open';
+  import { pageKeysOf } from './canvas-stale';
   import { shotOf } from './canvas-shot';
   import { CanvasKey, actualView, canvasKeyOf, fitView, panBy, percentOf, stepView, wheelOf, zoomAround, type CanvasView, type Point } from './canvas-view';
+  import type { FilesChange } from './files-change';
   import type { PageRow } from './pages';
   import { SIZES } from './sizes';
 
-  type Props = { rows: PageRow[]; base: string; onopen: (target: CanvasOpen) => void; onclose: () => void };
+  type Props = { rows: PageRow[]; base: string; onopen: (target: CanvasOpen) => void; onclose: () => void; changed: FilesChange | null };
 
-  let { rows, base, onopen, onclose }: Props = $props();
+  let { rows, base, onopen, onclose, changed }: Props = $props();
 
   const MIDDLE_BUTTON = 1;
   const SPACE_CODE = 'Space';
   const FIRST_SHOT_DELAY_MS = 800;
+  const RECAPTURE_DELAY_MS = 1200;
 
   let root = $state<HTMLElement | null>(null);
   let viewport = $state({ w: 0, h: 0 });
   let view = $state<CanvasView>({ scale: 1, x: 0, y: 0 });
   let touched = $state(false);
+  let fitted = false;
   let held = $state(false);
   let panning = $state(false);
   let shots = $state<Record<string, string>>({});
@@ -44,9 +49,26 @@
   }
 
   $effect(() => {
-    if (!touched && viewport.w > 0) {
+    if (!touched && !fitted && viewport.w > 0) {
       view = fitView(layout.bounds, viewport);
+      fitted = true;
     }
+  });
+
+  $effect(() => {
+    if (!changed) {
+      return;
+    }
+    const files = changed.files;
+    untrack(() => {
+      for (const key of pageKeysOf(layout.frames, files)) {
+        if (!mounted.has(key)) {
+          delete shots[key];
+          continue;
+        }
+        setTimeout(() => void shoot(key), RECAPTURE_DELAY_MS);
+      }
+    });
   });
 
   function shoot(key: string): Promise<void> {

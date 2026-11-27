@@ -2,6 +2,7 @@
   import type { ComponentRow } from '../host/component-list';
   import CanvasBanner from './CanvasBanner.svelte';
   import { groupComponents, keyOfComponent } from './components';
+  import { freshKeys } from './fresh-keys.svelte';
   import SearchField from './SearchField.svelte';
 
   type Props = { rows: ComponentRow[]; onopen: (row: ComponentRow) => void; oncanvas: () => void };
@@ -11,6 +12,7 @@
   let query = $state('');
 
   const groups = $derived(groupComponents(rows, query));
+  const fresh = freshKeys(() => rows.map(keyOfComponent));
 </script>
 
 <div class="components" data-testid="components">
@@ -23,7 +25,7 @@
       <ul>
         {#each group.rows as row (keyOfComponent(row))}
           <li>
-            <button type="button" class="component" title={`Open ${row.name} on its own`} data-testid="component-row" data-name={row.name} onclick={() => onopen(row)}>
+            <button type="button" class="component" class:fresh={fresh.has(keyOfComponent(row))} title={`Open ${row.name} on its own`} data-testid="component-row" data-name={row.name} onclick={() => onopen(row)}>
               <span class="name">{row.name}</span>
               {#if row.uses > 0}<span class="uses" data-testid="component-uses" title={`Used in ${row.uses} ${row.uses === 1 ? 'file' : 'files'}`}>{row.uses}</span>{/if}
             </button>
@@ -80,6 +82,16 @@
   .component:hover {
     background: var(--ui-input);
     color: var(--ui-text);
+  }
+
+  .component.fresh {
+    animation: flash 2.5s ease-out;
+  }
+
+  @keyframes flash {
+    from {
+      background: color-mix(in srgb, var(--ui-accent) 35%, transparent);
+    }
   }
 
   .name {
