@@ -24,6 +24,7 @@ import { themesOf } from '../src/host/themes.ts';
 import { commentsHost, type CommentsCloud } from '../src/host/comments.ts';
 import type { CommentDraft } from '../src/host/cloud-api.ts';
 import { entriesOf, insertAskOf } from '../src/host/library.ts';
+import { listRoutes } from '../src/host/project-routes.ts';
 import { buildCatalog } from '../../packages/library/src/catalog.ts';
 import type { AddPlace } from '@feega/live-edit/add-node';
 import type { AcpId } from '../src/host/ai/acp-agents.ts';
@@ -206,6 +207,9 @@ export async function openPanel(appRoot: string, theme = DARK, cloud?: CommentsC
     }
     if (m.kind === ToHost.LibraryList) {
       await reply({ kind: ToView.Library, items: entriesOf(catalog) });
+    }
+    if (m.kind === ToHost.Routes) {
+      await reply({ kind: ToView.Routes, routes: await listRoutes(appRoot) });
     }
     if (m.kind === ToHost.LibraryInsert) {
       const ask = insertAskOf(catalog, m.id as string);

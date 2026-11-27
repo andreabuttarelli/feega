@@ -60,7 +60,10 @@
   import Redo2 from '@lucide/svelte/icons/redo-2';
   import { Scope } from '@feega/live-edit/scoped-rule';
   import { Tabs } from 'bits-ui';
-  import { Tab } from './tabs';
+  import { LeftTab, Tab } from './tabs';
+  import PagesList from './PagesList.svelte';
+  import { pageRows, seenRoutes } from './pages';
+  import type { PageRoute } from '../host/page-route';
   import { fontCss } from './fonts';
   import MissingFont from './MissingFont.svelte';
   import { SvelteSet } from 'svelte/reactivity';
@@ -212,6 +215,10 @@
   let drop = $state<Drop | null>(null);
 
   let tab = $state<string>(Tab.Properties);
+  let leftTab = $state<string>(LeftTab.Layers);
+  let projectRoutes = $state<PageRoute[]>([]);
+  let seen = $state<string[]>([]);
+  const pages = $derived(pageRows(projectRoutes, seen, route));
   let share = $state<Extract<ViewMessage, { kind: ToView.Share }> | null>(null);
   let cloud = $state<{ enabled: boolean; comments: CloudComment[]; review: CloudRevisions; error: string }>({ enabled: false, comments: [], review: { status: 'open', revisions: [] }, error: '' });
   let composing = $state(false);
@@ -545,6 +552,7 @@
     route = path;
     address = path;
     history.visited(path);
+    seen = seenRoutes(seen, path);
     navTick++;
     savePrefs();
   }
@@ -780,6 +788,7 @@
     [ToView.Share]: (m) => (share = m),
     [ToView.Peers]: (m) => (peers = share ? strangersOf(m.peers, HOST_PEER) : m.peers),
     [ToView.Library]: (m) => (libraryItems = m.items),
+    [ToView.Routes]: (m) => (projectRoutes = m.routes),
     [ToView.Comments]: (m) => (cloud = { enabled: m.enabled, comments: m.comments, review: m.review ?? cloud.review, error: m.error ?? '' }),
     [ToView.Onboarding]: (m) => (onboarding = m.state),
     [ToView.Support]: (m) => (support = m.done),
@@ -812,6 +821,7 @@
 
   fromHost((m) => (handlers[m.kind] as (m: ViewMessage) => void)(m));
   toHost({ kind: ToHost.Ready });
+  toHost({ kind: ToHost.Routes });
 
   function setMode(next: Mode) {
     mode = next;
@@ -1577,10 +1587,21 @@
     {#if libraryOpen}
       <LibraryPanel items={libraryItems} canInsert={!!picked} oninsert={(id) => picked && insertLibrary(id, picked.source, AddPlace.After)} onclose={() => (libraryOpen = false)} />
     {:else}
-    <header class="left-head">Layers<button type="button" class="add" title="Add an element (/)" aria-label="Add" data-testid="add-button" disabled={!picked} onclick={(e) => openAddMenu(e.clientX, e.clientY)}>+ Add</button></header>
+    <Tabs.Root bind:value={leftTab} onValueChange={(value) => value === LeftTab.Pages && toHost({ kind: ToHost.Routes })}>
+    <Tabs.List class="tab-list left-head">
+      <Tabs.Trigger value={LeftTab.Layers} class="tab" data-testid="layers-tab">Layers</Tabs.Trigger>
+      <Tabs.Trigger value={LeftTab.Pages} class="tab" data-testid="pages-tab">Pages</Tabs.Trigger>
+      {#if leftTab === LeftTab.Layers}<button type="button" class="add" title="Add an element (/)" aria-label="Add" data-testid="add-button" disabled={!picked} onclick={(e) => openAddMenu(e.clientX, e.clientY)}>+ Add</button>{/if}
+    </Tabs.List>
+    <Tabs.Content value={LeftTab.Layers}>
     <div class="layers" role="tree" aria-label="Layers" data-testid="layers">
       <LayersTree nodes={layers} {picked} selected={selectedKeys} badge={badgeOf(elementState)} open={layersOpen} onselect={selectRow} onhover={hoverLayer} onopen={(at) => toHost({ kind: ToHost.Open, at })} onmove={moveLayer} onusage={moveUsage} dragging={layerDrag} hidden={hiddenNow} locked={lockedNow} ontoggle={toggleFlag} oncontext={openLayerMenu} onadd={layerAdd} onfocus={(node) => viewing === View.Page && enterFocus(rowFocus(node))} ondelete={deleteRow} />
     </div>
+    </Tabs.Content>
+    <Tabs.Content value={LeftTab.Pages}>
+      <PagesList rows={pages} onopen={go} />
+    </Tabs.Content>
+    </Tabs.Root>
     {/if}
     {#if !leftClosed}<span class="edge-right" role="separator" aria-orientation="vertical" aria-label="Resize Layers" title="Drag to resize, double-click to reset" onpointerdown={(e) => ((e.currentTarget as HTMLElement).setPointerCapture(e.pointerId), (leftSizing = { x: e.clientX, width: leftPx }))} onpointermove={(e) => leftSizing && (leftWidth = leftSizing.width + (e.clientX - leftSizing.x))} onpointerup={() => leftSizing && ((leftSizing = null), (leftWidth = leftPx), savePrefs())} ondblclick={() => ((leftWidth = LEFT_DEFAULT_PX), savePrefs())}></span>{/if}
   </aside>
@@ -2238,7 +2259,8 @@
     color: #ff9f0a;
   }
 
-  .right :global(.tab-list) {
+  .right :global(.tab-list),
+  .left :global(.tab-list) {
     display: flex;
     align-items: center;
     gap: 2px;
@@ -2248,7 +2270,8 @@
     border-bottom: 1px solid var(--ui-divider);
   }
 
-  .right :global(.tab) {
+  .right :global(.tab),
+  .left :global(.tab) {
     height: 26px;
     padding: 0 10px;
     border: 0;
@@ -2260,7 +2283,8 @@
     cursor: pointer;
   }
 
-  .right :global(.tab[data-state='active']) {
+  .right :global(.tab[data-state='active']),
+  .left :global(.tab[data-state='active']) {
     background: var(--ui-input);
     color: var(--ui-text);
   }
@@ -2348,18 +2372,6 @@
 
   .left.closed {
     border: 0;
-  }
-
-  .left-head {
-    display: flex;
-    align-items: center;
-    box-sizing: border-box;
-    height: var(--top-row);
-    padding: 0 12px;
-    border-bottom: 1px solid var(--ui-divider);
-    color: var(--ui-text-2);
-    font-size: var(--ui-text-xs);
-    font-weight: 600;
   }
 
   .edge-right {
