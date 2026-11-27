@@ -1,0 +1,9 @@
+{
+  "id": "feega.phosphor-icons",
+  "name": "Phosphor icons",
+  "version": "1.0.0",
+  "permissions": ["selection", "project", "edit.insert"],
+  "contributions": {
+    "rightBar": [{ "id": "phosphor", "title": "Phosphor icons", "when": ["selection"] }]
+  }
+}

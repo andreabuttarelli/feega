@@ -63,6 +63,16 @@ export const SOURCES: readonly PluginSource[] = [
     tier: 'free',
     latestVersion: '1.0.0',
     permissions: ['selection', 'edit.style']
+  },
+  {
+    id: 'phosphor-icons',
+    manifestId: 'feega.phosphor-icons',
+    name: 'Phosphor icons',
+    summary: 'Search the Phosphor icon set in six weights and insert an icon with the size and colour you want.',
+    author: 'Feega',
+    tier: 'free',
+    latestVersion: '1.0.0',
+    permissions: ['selection', 'project', 'edit.insert']
   }
 ];
 
@@ -91,5 +101,10 @@ export const COPY: Readonly<Record<string, PluginCopy>> = {
     icon: 'gradient-presets',
     description:
       'Select an element and click a gradient from a gallery of 36 subtle, modern presets: linear, radial and conic. It is applied as the element background image, written as plain CSS in the same place a manual style edit goes. One undoable step. Remove gradient resets the background image.'
+  },
+  'phosphor-icons': {
+    icon: 'phosphor',
+    description:
+      'Select an element, search the Phosphor set of over 1,500 icons by name or tag, choose a weight (thin, light, regular, bold, fill or duotone), size and colour, and insert it. Feega writes a small component with the SVG inline, or, when the project already uses @phosphor-icons/react or @phosphor-icons/vue, a component of that library with the weight as a prop. Nothing is added to package.json. One undoable step. Phosphor Icons are released under the MIT licence, Copyright Phosphor Icons.'
   }
 };
