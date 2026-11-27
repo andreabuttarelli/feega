@@ -3,6 +3,7 @@
   import type { Palette } from '../messages';
   import ColourSwatch from './ColourSwatch.svelte';
   import Field from './Field.svelte';
+  import SearchField from './SearchField.svelte';
   import type { Plugins } from './plugins.svelte';
 
   type Props = { plugins: Plugins; palette: Palette };
@@ -14,6 +15,8 @@
       .map((one) => ({ plugin: one.plugin, id: one.entry.id, title: one.entry.title ?? one.entry.id, tree: plugins.ui(one.plugin, one.entry.id) }))
       .filter((section) => section.tree.length)
   );
+
+  const maskOf = (image: string) => `url("data:image/svg+xml,${encodeURIComponent(image)}")`;
 
   const send = (plugin: string, id: string, control: string, value: string | number | boolean, live: boolean) => plugins.host.control(plugin, id, control, value, live);
 </script>
@@ -57,6 +60,18 @@
           {#each node.items as item (item.id)}
             <button type="button" role="radio" aria-checked={item.id === node.selected} class:on={item.id === node.selected} data-item={item.id} onclick={() => send(section.plugin, section.id, node.id, item.id, false)}>
               {#if item.swatch}<span class="swatch" style={`background:${item.swatch}`}></span>{/if}{item.label}
+            </button>
+          {/each}
+        </div>
+      {:else if node.type === Control.Search}
+        <div class="row wide" data-control={node.id}>
+          <SearchField label={node.label} value={node.value} placeholder={node.placeholder} onsearch={(text) => send(section.plugin, section.id, node.id, text, true)} />
+        </div>
+      {:else if node.type === Control.Grid}
+        <div class="grid" role="radiogroup" aria-label={node.label} data-control={node.id}>
+          {#each node.items as item (item.id)}
+            <button type="button" role="radio" aria-checked={item.id === node.selected} aria-label={item.label} title={item.label} class:on={item.id === node.selected} data-item={item.id} onclick={() => send(section.plugin, section.id, node.id, item.id, false)}>
+              {#if item.image}<span class="glyph" style={`mask-image:${maskOf(item.image)}`}></span>{:else if item.swatch}<span class="tile" style={`background:${item.swatch}`}></span>{/if}
             </button>
           {/each}
         </div>
@@ -180,6 +195,51 @@
 
   .list button.on {
     background: color-mix(in srgb, var(--ui-accent) 20%, transparent);
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
+    gap: 4px;
+    max-height: 264px;
+    padding: 2px 12px 6px;
+    overflow-y: auto;
+  }
+
+  .grid button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    aspect-ratio: 1;
+    padding: 0;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-input);
+    cursor: pointer;
+  }
+
+  .grid button:hover {
+    background: var(--ui-input-hover);
+  }
+
+  .grid button.on {
+    background: color-mix(in srgb, var(--ui-accent) 28%, transparent);
+    outline: 1px solid var(--ui-accent);
+  }
+
+  .glyph {
+    width: 20px;
+    height: 20px;
+    background-color: var(--ui-text);
+    mask-repeat: no-repeat;
+    mask-position: center;
+    mask-size: contain;
+  }
+
+  .tile {
+    width: 100%;
+    height: 100%;
+    border-radius: inherit;
   }
 
   .swatch {

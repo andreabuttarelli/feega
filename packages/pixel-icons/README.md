@@ -12,5 +12,5 @@ the package directly.
 
 ## Icons
 
-`start` `editing` `stack` `help` `plugin` `templates` `mesh-gradient` `object-3d` `digit-1`
+`start` `editing` `stack` `help` `plugin` `templates` `mesh-gradient` `object-3d` `lucide` `digit-1`
 `digit-2` `digit-3` `sign-in` `support` `star` `x` `discord` `coffee` `share` `cursor` `screens` `components` `grid` `sun` `history`

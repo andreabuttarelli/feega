@@ -1,3 +1,5 @@
+import lucideManifest from '@feega/plugin-lucide/manifest';
+import LucideWorker from '@feega/plugin-lucide/worker?worker&inline';
 import meshManifest from '@feega/plugin-mesh-gradient/manifest';
 import MeshWorker from '@feega/plugin-mesh-gradient/worker?worker&inline';
 import objectManifest from '@feega/plugin-object-3d/manifest';
@@ -11,5 +13,6 @@ export type BuiltIn = { manifest: unknown; worker: () => WorkerLike };
 export const BUILT_IN: BuiltIn[] = [
   { manifest: meshManifest, worker: () => new MeshWorker() as unknown as WorkerLike },
   { manifest: objectManifest, worker: () => new ObjectWorker() as unknown as WorkerLike },
-  { manifest: gradientManifest, worker: () => new GradientWorker() as unknown as WorkerLike }
+  { manifest: gradientManifest, worker: () => new GradientWorker() as unknown as WorkerLike },
+  { manifest: lucideManifest, worker: () => new LucideWorker() as unknown as WorkerLike }
 ];
