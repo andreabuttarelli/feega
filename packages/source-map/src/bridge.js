@@ -7,7 +7,7 @@ import { keepScroll } from './reload-restore.js';
 import { applyTheme, keepTheme, themeNow, watchScheme } from './theme-switch.js';
 import { watchPageMount } from './page-mount.js';
 import { watchLinks } from './links.js';
-import { CAPTURE, CAPTURED, captureTab, loadRenderer } from './capture.js';
+import { CAPTURE, CAPTURED, captureFull, captureTab, loadRenderer } from './capture.js';
 import { FORCED_REBUILD_MS, forceState, forcedNow, keepForced, settleForced, statesOf } from './forced-state.js';
 
 export const INSPECT = 'feega:inspect';
@@ -133,7 +133,7 @@ export function installBridge(win, { nested = false, emit = null, twin = null, r
     [CAPTURE]: (request) => {
       const answer = reply;
       captured(win, request, render).then(
-        (png) => answer({ type: CAPTURED, id: request.id, png }),
+        (shot) => answer({ type: CAPTURED, id: request.id, ...shot }),
         (error) => answer({ type: CAPTURED, id: request.id, error: error?.message ?? String(error) })
       );
     },
@@ -188,7 +188,12 @@ export function installBridge(win, { nested = false, emit = null, twin = null, r
 }
 
 async function captured(win, request, render) {
-  return captureTab(win, request, render ?? (await loadRenderer()));
+  const draw = render ?? (await loadRenderer());
+  if (request.full) {
+    return captureFull(win, request, draw);
+  }
+
+  return { png: await captureTab(win, request, draw) };
 }
 
 function reportRoutes(win) {

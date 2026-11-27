@@ -35,3 +35,13 @@ export async function captureTab(win, request, render) {
   const url = await render(element ?? doc.documentElement, options);
   return url.startsWith(PNG_PREFIX) ? url.slice(PNG_PREFIX.length) : url;
 }
+
+export async function captureFull(win, request, render) {
+  const doc = win.document;
+  await doc.fonts?.ready;
+  const document = doc.documentElement.scrollHeight;
+  const height = Math.min(document, request.maxHeight);
+  const url = await render(doc.documentElement, { width: win.innerWidth, height, scale: request.scale, backgroundColor: backdropOf(win) });
+
+  return { png: url.startsWith(PNG_PREFIX) ? url.slice(PNG_PREFIX.length) : url, height, capped: document > height };
+}

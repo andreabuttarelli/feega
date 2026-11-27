@@ -67,6 +67,8 @@
   import { CanvasKind, LeftTab, Tab } from './tabs';
   import PagesList from './PagesList.svelte';
   import PagesCanvas from './PagesCanvas.svelte';
+  import { sessionSnaps } from './canvas-session';
+  import { forgetPages } from './canvas-stale';
   import ComponentsCanvas from './ComponentsCanvas.svelte';
   import ComponentsList from './ComponentsList.svelte';
   import type { FilesChange } from './files-change';
@@ -845,7 +847,7 @@
     [ToView.Library]: (m) => (libraryItems = m.items),
     [ToView.Routes]: (m) => (projectRoutes = m.routes),
     [ToView.Components]: (m) => (projectComponents = m.components),
-    [ToView.FilesChanged]: (m) => (filesChanged = { files: m.files }),
+    [ToView.FilesChanged]: (m) => (canvasShown !== CanvasKind.Pages && forgetPages(sessionSnaps, m.files), (filesChanged = { files: m.files })),
     [ToView.Comments]: (m) => (cloud = { enabled: m.enabled, comments: m.comments, review: m.review ?? cloud.review, error: m.error ?? '' }),
     [ToView.Onboarding]: (m) => (onboarding = m.state),
     [ToView.Support]: (m) => (support = m.done),

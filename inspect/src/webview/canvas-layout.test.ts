@@ -105,6 +105,31 @@ describe('a dynamic route with examples', () => {
   });
 });
 
+describe('frames take the height of their captured page', () => {
+  const heights = { '/::desktop': 3200, '/::tablet': 5000, '/::phone': 9100, '/about::phone': 700 };
+  const { frames, rows, bounds } = layoutCanvas(pages, CANVAS_COLUMNS, heights);
+
+  it('uses the captured height and falls back to the device height', () => {
+    expect(frames.filter((f) => f.route === '/').map((f) => f.height)).toEqual([3200, 5000, 9100]);
+    expect(frames.find((f) => f.key === '/about::desktop')!.height).toBe(900);
+    expect(frames.find((f) => f.key === '/about::phone')!.height).toBe(700);
+  });
+
+  it('sizes a row to its tallest frame and pushes the next row below it', () => {
+    expect(rows[0].height).toBe(ROW_HEAD + 9100);
+    expect(rows[1].y).toBe(rows[0].y + ROW_HEAD + 9100 + ROW_GAP);
+    expect(rows[1].height).toBe(ROW_HEAD + 1024);
+  });
+
+  it('bounds follow the rows', () => {
+    expect(bounds.height).toBe(rows[2].y + rows[2].height);
+  });
+
+  it('keeps x positions when heights arrive', () => {
+    expect(frames.map((f) => f.x)).toEqual(layoutCanvas(pages, CANVAS_COLUMNS).frames.map((f) => f.x));
+  });
+});
+
 describe('bounds', () => {
   it('wrap every frame and row head', () => {
     const { frames, rows, bounds } = layoutCanvas(pages, CANVAS_COLUMNS);

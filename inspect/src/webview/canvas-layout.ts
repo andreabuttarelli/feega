@@ -4,7 +4,7 @@ export const CANVAS_COLUMNS = [Size.Desktop, Size.Tablet, Size.Phone];
 
 export const COLUMN_GAP = 160;
 export const ROW_GAP = 240;
-export const ROW_HEAD = 240;
+export const ROW_HEAD = 280;
 
 export type CanvasExample = { path: string; label: string };
 
@@ -20,20 +20,25 @@ const keyOf = (route: string, size: Size) => `${route}::${size}`;
 
 const dimsOf = (size: Size) => ({ width: SIZES[size].width ?? 0, height: SIZES[size].height ?? 0 });
 
-export function layoutCanvas(pages: CanvasPage[], columns: Size[]) {
+export type Heights = Record<string, number>;
+
+export function layoutCanvas(pages: CanvasPage[], columns: Size[], heights: Heights = {}) {
   const frames: CanvasFrame[] = [];
   const rows: CanvasRow[] = [];
-  const tallest = Math.max(0, ...columns.map((size) => dimsOf(size).height));
   let y = 0;
 
   for (const page of pages) {
     const example = page.dynamic ? (page.examples?.[0] ?? null) : null;
     const target = page.dynamic ? (example?.path ?? null) : page.route;
     let x = 0;
+    let tallest = 0;
     for (const size of columns) {
-      const { width, height } = dimsOf(size);
-      frames.push({ key: keyOf(page.route, size), route: page.route, size, dynamic: page.dynamic, target, x, y: y + ROW_HEAD, width, height });
+      const key = keyOf(page.route, size);
+      const { width } = dimsOf(size);
+      const height = heights[key] ?? dimsOf(size).height;
+      frames.push({ key, route: page.route, size, dynamic: page.dynamic, target, x, y: y + ROW_HEAD, width, height });
       x += width + COLUMN_GAP;
+      tallest = Math.max(tallest, height);
     }
     rows.push({ route: page.route, dynamic: page.dynamic, example, y, height: ROW_HEAD + tallest });
     y += ROW_HEAD + tallest + ROW_GAP;

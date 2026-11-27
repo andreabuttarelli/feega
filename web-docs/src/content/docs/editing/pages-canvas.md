@@ -24,6 +24,8 @@ The canvas is the only place with zoom and pan. The editor itself stays at its f
 
 Click a frame to switch to the Page tab on that route at that size. The canvas tab stays open. Frames highlight on hover. A dynamic route such as `/blog/[slug]` renders its first example page, and its row is labelled with the pattern and the example. With no example yet, the frames show a field per parameter: type a value and press `Enter` to show that page. See [Layers](/editing/layers/) for where examples come from.
 
-## Performance
+## Snapshots
 
-Only the frames near the viewport run live, at most six at a time. The others show a snapshot taken after the page first loaded or when the frame left the view, so a snapshot can be slightly out of date until the frame is back on screen.
+The canvas shows static snapshots, not live pages. Feega loads each page once at its real size, in the background and out of sight, and captures the whole page, up to 15,000 px tall. Frames are as tall as their page, and a row is as tall as its tallest frame. Two pages are captured at a time, the ones nearest the middle of the view first, at any zoom level.
+
+Snapshots stay for the session. When you save a page file, that page is captured again; the old snapshot stays until the new one is ready. A page that cannot be captured keeps its route card, and the reason is logged in the webview console.
