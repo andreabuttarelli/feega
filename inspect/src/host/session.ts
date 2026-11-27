@@ -20,6 +20,7 @@ import { previewQueue } from './icon-previews';
 import { appOfSource, firstStampedFile, urlOf } from './attach-url';
 import { serverInfo } from './server-info';
 import { Attach, attachDev, factsOf, startDev, type Refused, type Running } from './dev-server';
+import { COMPILING_FIRST_PAGE, phaseFeed } from './dev-phase';
 import { RestartWatch, Signal, Step } from './restart-watch';
 import { shownFor, watchServer } from './server-watch';
 import { commentsHost } from './comments';
@@ -134,6 +135,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   const pids = memoOf(platform);
   let route = startRoute;
   let lastError = '';
+  const phases = phaseFeed((text) => void post({ kind: ToView.Phase, text }));
   let startedAt = 0;
   let nextPick = 0;
   const picks = new Map<number, (pick: Pick | null) => void>();
@@ -649,6 +651,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
 
   function logLine(line: string) {
     platform.log(line);
+    phases.line(line);
     if (ERROR.test(line)) {
       lastError = [...lastError.split('\n'), ...line.trim().split('\n')].slice(-ERROR_LINES).join('\n');
     }
@@ -719,6 +722,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     cancel?.abort();
     const signal = (cancel = new AbortController()).signal;
     lastError = '';
+    phases.begin();
     post({ kind: ToView.Server, state: ServerState.Starting });
     const hooks = {
       log: logLine,
@@ -738,11 +742,13 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
       if (started.apps?.length && (await chooseApp(started.apps)) !== null) {
         return startServer(attach);
       }
+      phases.finish();
       post({ kind: ToView.Server, state: ServerState.Stopped, reason: started.refused });
       return started;
     }
     startedAt = Date.now();
     adopt(started, current);
+    phases.show(COMPILING_FIRST_PAGE);
     await showApp();
     return started;
   }
@@ -925,7 +931,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.PluginEnable]: (m) => pluginList?.enable(m.id, m.enabled),
     [ToHost.PluginRemove]: (m) => pluginList?.remove(m.id),
     [ToHost.PluginInstall]: (m) => pluginList?.install(m.source),
-    [ToHost.PreviewReady]: () => usage?.previewReady(),
+    [ToHost.PreviewReady]: () => (phases.finish(), usage?.previewReady()),
     [ToHost.Cursor]: (m) => sharing.hostPointed(m.at),
     [ToHost.AiList]: ai.list,
     [ToHost.AiStart]: (m) => ((aiAgent = m.agent), aiStats?.started(m.agent), ai.start(m.agent)),
