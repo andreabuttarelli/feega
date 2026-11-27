@@ -12,6 +12,7 @@ import { fileAccountStore, type AccountStore } from './account';
 import { machineAgents } from './agents';
 import { fileOnboardingStore, type OnboardingStore } from './onboarding';
 import { fileSupportStore, type SupportStore } from './support';
+import { nodeGit } from './node-git';
 import { catalogFile } from './library';
 import { openTarget } from './open-source';
 import { Stored, type Platform, type Transport } from './platform';
@@ -130,6 +131,7 @@ export function nodePlatform({ root, launcher, version, transport, print, launch
       return edit(settingsPath);
     },
     sourceControl: () => print(`feega: review the changes with \`git -C ${root} diff\``),
+    git: (at) => nodeGit(at, env),
     notify: (text) => print(`feega: ${text}`),
     warn: async (text) => (print(`feega: ${text}`), false),
     alerts: { show: async (alert) => (await transport.send({ kind: ToView.Alert, alert }), false), clear: (chat) => void transport.send({ kind: ToView.AlertClear, chat }) },

@@ -27,7 +27,7 @@ export const pascalOf = (iconName: string): string =>
     .map((word) => word[0].toUpperCase() + word.slice(1))
     .join('');
 
-export const componentName = (iconName: string): string => `${/^\d/.test(pascalOf(iconName)) ? 'Icon' : ''}${pascalOf(iconName)}Icon`;
+export const componentName = (iconName: string, variant = ''): string => `${/^\d/.test(pascalOf(iconName)) ? 'Icon' : ''}${pascalOf(iconName)}${pascalOf(variant)}Icon`;
 
 const quoted = (value: number | string) => (typeof value === 'number' ? String(value) : `'${value}'`);
 

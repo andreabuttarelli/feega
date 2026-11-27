@@ -57,6 +57,10 @@ export function pageBridge(frame: () => HTMLIFrameElement | null, on: PageEvents
     if (!LOCAL_ORIGIN.test(event.origin) && event.origin !== location.origin) {
       return;
     }
+    const mine = frame()?.contentWindow;
+    if (mine && event.source && event.source !== mine) {
+      return;
+    }
     const data = event.data;
     if (data?.type === BRIDGE_READY) {
       data.focus ? on.focusReady() : on.ready(data.path ?? '/', Boolean(data.restored));

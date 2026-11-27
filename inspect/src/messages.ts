@@ -1,4 +1,5 @@
 import type { SupportItem } from './support';
+import type { PageRoute } from './host/page-route';
 import type { AcpAgent, AcpId } from './host/ai/acp-agents';
 import type { AgentEvent, ConfigView, ModeView } from './host/ai/agent-session';
 import type { Alert } from './host/ai/agent-alert';
@@ -226,6 +227,7 @@ export enum ToHost {
   ShareKick = 'share-kick',
   ShareRole = 'share-role',
   LibraryList = 'library-list',
+  Routes = 'routes',
   LibraryInsert = 'library-insert',
   NewPage = 'new-page',
   Plugin = 'plugin',
@@ -247,7 +249,15 @@ export enum ToHost {
   AiDelete = 'ai-delete',
   AgentAnswer = 'agent-answer',
   AiRetry = 'ai-retry',
-  Usage = 'usage'
+  Usage = 'usage',
+  GitRefresh = 'git-refresh',
+  GitCommit = 'git-commit',
+  GitPush = 'git-push',
+  GitPull = 'git-pull',
+  GitPullPush = 'git-pull-push',
+  GitIdentity = 'git-identity',
+  GitFix = 'git-fix',
+  GitOpen = 'git-open'
 }
 
 export enum WebviewUsage {
@@ -262,9 +272,50 @@ export enum WebviewUsage {
 
 export type WebviewUsageDims = Partial<{ variant: string; mode: string; control: string; prop_count: number; state: string; breakpoint: string; error_class: string; area: string }>;
 
+export enum GitState {
+  NoGit = 'no-git',
+  NotRepo = 'not-repo',
+  Ready = 'ready'
+}
+
+export enum GitScope {
+  Feega = 'feega',
+  All = 'all'
+}
+
+export enum GitAfter {
+  Stay = 'stay',
+  Push = 'push'
+}
+
+export enum GitAction {
+  Commit = 'commit',
+  Push = 'push',
+  Pull = 'pull'
+}
+
+export enum GitHost {
+  GitHub = 'github',
+  Other = 'other'
+}
+
+export enum GitFix {
+  None = 'none',
+  Pull = 'pull',
+  PullAndPush = 'pull-and-push',
+  Sync = 'sync',
+  Agent = 'agent',
+  SignIn = 'sign-in',
+  Identity = 'identity',
+  CopyInit = 'copy-init',
+  CopyRemote = 'copy-remote'
+}
+
+export type GitView = { state: GitState; branch: string | null; upstream: string | null; remote: string | null; ahead: number; behind: number; feega: string[]; others: string[]; message: string; open: boolean; host: GitHost };
+
 export type ChangeRow = { id: number; at: string; prop: string; value: string; scope: string; files: string[]; time: number; by?: string };
 
-export type Prefs = { size: string; custom: number | null; barClosed: boolean; route?: string; anchor?: string; dock?: { edge: string; offset: number }; barWidth?: number; leftWidth?: number; leftClosed?: boolean; layers?: Record<string, { hidden: string[]; locked: string[] }> };
+export type Prefs = { size: string; custom: number | null; barClosed: boolean; route?: string; anchor?: string; dock?: { edge: string; offset: number }; barWidth?: number; leftWidth?: number; leftClosed?: boolean; gitOpen?: boolean; layers?: Record<string, { hidden: string[]; locked: string[] }> };
 
 export type ChatRow = { id: string; agent: AcpId; title: string; updatedAt: number; running: boolean };
 
@@ -329,7 +380,10 @@ export enum ToView {
   ShowChat = 'show-chat',
   AgentAsk = 'agent-ask',
   Adapters = 'adapters',
-  PageCreated = 'page-created'
+  PageCreated = 'page-created',
+  Git = 'git',
+  GitResult = 'git-result',
+  Routes = 'routes'
 }
 
 export enum ShareState {
@@ -434,6 +488,7 @@ export type HostMessage =
   | { kind: ToHost.ShareKick; userId: string }
   | { kind: ToHost.ShareRole; userId: string; role: VisitorRole }
   | { kind: ToHost.LibraryList }
+  | { kind: ToHost.Routes }
   | { kind: ToHost.LibraryInsert; id: string; at: string; place: AddPlace }
   | { kind: ToHost.NewPage; route: string; item: string | null }
   | { kind: ToHost.Plugin; id: number; ask: PluginAsk }
@@ -455,6 +510,14 @@ export type HostMessage =
   | { kind: ToHost.AiRename; chat: string; title: string }
   | { kind: ToHost.AiDelete; chat: string }
   | { kind: ToHost.AiRetry }
+  | { kind: ToHost.GitRefresh }
+  | { kind: ToHost.GitCommit; message: string; scope: GitScope; after: GitAfter }
+  | { kind: ToHost.GitPush }
+  | { kind: ToHost.GitPull }
+  | { kind: ToHost.GitPullPush }
+  | { kind: ToHost.GitIdentity; name: string; email: string }
+  | { kind: ToHost.GitFix; agent: AcpId }
+  | { kind: ToHost.GitOpen; open: boolean }
   | { kind: ToHost.AgentAnswer; id: number; png: string | null; text: string | null };
 
 export type Authored = HostMessage & { by?: Author };
@@ -481,6 +544,7 @@ export type ViewMessage =
   | { kind: ToView.Comments; enabled: boolean; comments: CloudComment[]; review?: CloudRevisions; error?: string }
   | { kind: ToView.Share; state: ShareState; available: boolean; name: string; canEdit: boolean; url?: string; expiresAt?: string; visitors: Present[]; notice: boolean; error?: string }
   | { kind: ToView.Library; items: LibraryEntry[] }
+  | { kind: ToView.Routes; routes: PageRoute[] }
   | { kind: ToView.Plugin; id: number; result: PluginResult }
   | { kind: ToView.Plugins; catalog: Catalog; canInstall: boolean }
   | { kind: ToView.Reload }
@@ -500,6 +564,8 @@ export type ViewMessage =
   | { kind: ToView.ShowChat; chat: string }
   | { kind: ToView.AgentAsk; id: number; ask: AgentAsk; selection: boolean }
   | { kind: ToView.Adapters; rows: AdapterRow[] }
+  | { kind: ToView.Git; view: GitView }
+  | { kind: ToView.GitResult; action: GitAction; ok: boolean; text: string; fix: GitFix }
   | { kind: ToView.AiChat; chat: string | null; agent?: AcpId; state: AiState; items: Item[]; modes: ModeView[]; mode: string | null; configs: ConfigView[]; images?: boolean };
 
 export const INSPECT = 'feega:inspect';

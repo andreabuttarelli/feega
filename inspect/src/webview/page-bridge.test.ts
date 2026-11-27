@@ -13,6 +13,22 @@ function pageWindow() {
 
 afterEach(() => vi.unstubAllGlobals());
 
+describe('messages from other frames', () => {
+  const dispatchFrom = (source: unknown, data: unknown) => (window as unknown as EventTarget).dispatchEvent(Object.assign(new Event('message'), { data, origin: ORIGIN, source }));
+
+  it('are ignored: a canvas frame cannot move the editor', () => {
+    pageWindow();
+    const mine = { postMessage: () => undefined };
+    const moved: string[] = [];
+    pageBridge(() => ({ src: `${ORIGIN}/`, contentWindow: mine }) as unknown as HTMLIFrameElement, { moved: (path: string) => moved.push(path) } as never);
+
+    dispatchFrom({}, { type: 'feega:location', path: '/other' });
+    dispatchFrom(mine, { type: 'feega:location', path: '/mine' });
+
+    expect(moved).toEqual(['/mine']);
+  });
+});
+
 describe('tracked rects reach the view', () => {
   it('a rect that disappears is reported, so the outline cannot stay behind', () => {
     const post = pageWindow();

@@ -1,12 +1,13 @@
 ---
 title: Plugins
-description: Plugins ship with Feega Inspect, Mesh gradient, 3D object and Lucide icons. Plugins run sandboxed and change your code only through the same edit engine as manual edits.
+description: Plugins ship with Feega Inspect, Mesh gradient, 3D object, Lucide icons, Brand logos, Gradient presets, Phosphor icons and Heroicons. Plugins run sandboxed and change your code only through the same edit engine as manual edits.
 sidebar:
   order: 4
 ---
 
-Plugins add controls to Feega Inspect. Three are built in and on by default: **Mesh gradient**,
-**3D object** and **Lucide icons**. You can also install third-party plugins or load one from a folder while you build
+Plugins add controls to Feega Inspect. Seven are built in and on by default: **Mesh gradient**,
+**3D object**, **Lucide icons**, **Brand logos**, **Gradient presets**, **Phosphor icons** and
+**Heroicons**. You can also install third-party plugins or load one from a folder while you build
 it: see [Write a plugin](/integrations/write-a-plugin/).
 
 ## Browse plugins
@@ -95,6 +96,86 @@ was built from. **The first use needs internet.** Icons already shown stay avail
 session; the others show "Icons need internet the first time." with a **Retry** button. The
 plugin declares those two hosts as its network permission, and the downloads go through Feega, not
 the panel.
+
+## Brand logos
+
+Select an element. In **Properties**, the **Brand logos** section works like Lucide icons: a search
+box, a grid (common brands when nothing is typed), then **Insert**.
+
+- **Size** sets the width and height.
+- **Colour** is **Brand colour**, the brand's official hex, or **Text colour**, which follows the
+  surrounding text.
+
+Insert writes `src/feega/icons/<Name>Icon` with the downloaded SVG inline and a `<title>` with the brand name,
+imports it and places it like the Lucide icons. Nothing is added to `package.json`. The colour is
+written as a `color` prop on the tag only when it is the brand colour.
+
+Feega bundles only the list of brand names and colours. Each logo file is downloaded when it first
+appears in the grid or is inserted, from jsDelivr (`cdn.jsdelivr.net`, with `unpkg.com` as a
+fallback), at the exact `simple-icons` version the list was built from. **The first use needs
+internet**; logos already shown stay available for the session, the others show "Icons need
+internet the first time." with a **Retry** button. The downloads go through Feega, not the panel.
+
+The shapes come from [Simple Icons](https://simpleicons.org) (CC0). The logos themselves are
+trademarks of their owners: follow each brand's guidelines when you use them. A few brands, such as
+LinkedIn, Slack and Microsoft, are not in the set.
+
+## Gradient presets
+
+Select an element. In **Properties**, **Gradient presets** shows a gallery of 36 subtle gradients.
+**Kind** filters the gallery to linear, radial or conic. Click a preset to apply it; **Remove
+gradient** sets the background image back to `none`.
+
+The preset is written as the element's background image through the same edit engine as a manual
+style change: a `background-image` declaration in the element's stylesheet rule (Svelte and Vue
+`<style>`, CSS modules for React) or its inline style when the file has no stylesheet. This is true
+in Tailwind projects too. Each click is one undoable step.
+
+## Phosphor icons
+
+Works like Lucide icons: search box, grid, **Insert**. Search matches names and Phosphor's tags
+("photography" finds the camera). Options:
+
+- **Weight**: thin, light, regular, bold, fill or duotone. The grid redraws in the weight you pick.
+- **Size** and **Text colour** or **Colour**.
+
+Insert writes `src/feega/icons/<Name>Icon`. With inline SVG, every weight is its own file
+(`CameraIcon`, `CameraBoldIcon`), so several weights of one icon can live together. If the project
+depends on `@phosphor-icons/react` or `@phosphor-icons/vue`, the file re-exports (React) or wraps
+(Vue) that library's component and the weight is written as a `weight` prop. `@phosphor-icons/web`
+and Svelte or Astro files use inline SVG. Nothing is added to `package.json`.
+
+Feega bundles only the list of icon names and tags. Each icon file, in the weight you pick, is
+downloaded when it first appears in the grid or is inserted, from jsDelivr (`cdn.jsdelivr.net`,
+with `unpkg.com` as a fallback), at the exact `@phosphor-icons/core` version the list was built
+from. **The first use needs internet**; icons already shown stay available for the session, the
+others show "Icons need internet the first time." with a **Retry** button. The downloads go through
+Feega, not the panel.
+
+Phosphor Icons are released under the MIT licence, Copyright Phosphor Icons.
+
+## Heroicons
+
+Works like Lucide icons: search box (by name), grid, **Insert**. Options:
+
+- **Style**: Outline 24, Solid 24, Mini 20 or Micro 16. A few icons do not exist in Micro; they
+  drop out of the grid when that style is chosen.
+- **Size** and **Text colour** or **Colour**.
+
+Insert writes `src/feega/icons/<Name>Icon` (`<Name>SolidIcon`, `<Name>MiniIcon`,
+`<Name>MicroIcon` for the other styles). If the project depends on `@heroicons/react` or
+`@heroicons/vue`, the file re-exports (React) or wraps (Vue) that library's component for the
+chosen style and the size is written as `width` and `height`. Otherwise, and in Svelte and Astro
+files, the SVG is inline. Nothing is added to `package.json`.
+
+Feega bundles only the list of icon names and the styles each exists in. Each icon file, in the
+style you pick, is downloaded when it first appears in the grid or is inserted, from jsDelivr
+(`cdn.jsdelivr.net`, with `unpkg.com` as a fallback), at the exact `heroicons` version the list was
+built from. **The first use needs internet**; icons already shown stay available for the session,
+the others show "Icons need internet the first time." with a **Retry** button. The downloads go
+through Feega, not the panel.
+
+Heroicons are released under the MIT licence, Copyright Tailwind Labs, Inc.
 
 ## Safety
 
