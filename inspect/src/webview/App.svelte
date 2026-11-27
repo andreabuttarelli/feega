@@ -267,6 +267,7 @@
   let scope = $state(Scope.Element);
   const classInfo = $derived(classOfKey(classesState.view, classesState.targetKey));
   const classTarget = $derived(classInfo ? editTarget(classInfo) : null);
+  let componentFolders = $state<string[]>([]);
   let layersOpen = $state<Record<string, boolean>>({ '(html):0:0': true, '(page):0:0': true });
   const layerDrag = $state<{ source: Source | null; name: string; component: boolean; parentFile: string | null; hint: { id: string; place: AddPlace } | null }>({ source: null, name: '', component: false, parentFile: null, hint: null });
 
@@ -740,7 +741,7 @@
   }
 
   function savePrefs() {
-    toHost({ kind: ToHost.Prefs, prefs: { size, custom, barClosed, route, anchor, dock: docked ?? undefined, barWidth, leftWidth, leftClosed, examples: $state.snapshot(manual), layers: layerFlags.saved() } });
+    toHost({ kind: ToHost.Prefs, prefs: { size, custom, barClosed, route, anchor, dock: docked ?? undefined, barWidth, leftWidth, leftClosed, examples: $state.snapshot(manual), layers: layerFlags.saved(), componentFolders } });
   }
 
   function restore(prefs: Prefs | null) {
@@ -758,6 +759,7 @@
     leftWidth = prefs.leftWidth ?? leftWidth;
     leftClosed = prefs.leftClosed ?? leftClosed;
     manual = prefs.examples ?? manual;
+    componentFolders = prefs.componentFolders ?? componentFolders;
     for (const [r, flags] of Object.entries((prefs.layers ?? {}) as SavedLayers)) {
       flags.hidden.forEach((k) => layerFlags.toggle('hidden', r, k));
       flags.locked.forEach((k) => layerFlags.toggle('locked', r, k));
@@ -1699,7 +1701,7 @@
       <PagesList rows={pages} onopen={go} onadd={typedExample} oncanvas={() => openCanvas(CanvasKind.Pages)} />
     </Tabs.Content>
     <Tabs.Content value={LeftTab.Components}>
-      <ComponentsList rows={projectComponents} onopen={openComponent} oncanvas={() => openCanvas(CanvasKind.Components)} />
+      <ComponentsList rows={projectComponents} open={componentFolders} onfolders={(open) => ((componentFolders = open), savePrefs())} onopen={openComponent} oncanvas={() => openCanvas(CanvasKind.Components)} />
     </Tabs.Content>
     </Tabs.Root>
     {/if}
