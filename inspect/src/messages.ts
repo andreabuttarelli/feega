@@ -315,7 +315,7 @@ export type GitView = { state: GitState; branch: string | null; upstream: string
 
 export type ChangeRow = { id: number; at: string; prop: string; value: string; scope: string; files: string[]; time: number; by?: string };
 
-export type Prefs = { size: string; custom: number | null; barClosed: boolean; route?: string; anchor?: string; dock?: { edge: string; offset: number }; barWidth?: number; leftWidth?: number; leftClosed?: boolean; gitOpen?: boolean; layers?: Record<string, { hidden: string[]; locked: string[] }> };
+export type Prefs = { size: string; custom: number | null; barClosed: boolean; route?: string; anchor?: string; dock?: { edge: string; offset: number }; barWidth?: number; leftWidth?: number; leftClosed?: boolean; gitOpen?: boolean; examples?: Record<string, string[]>; layers?: Record<string, { hidden: string[]; locked: string[] }> };
 
 export type ChatRow = { id: string; agent: AcpId; title: string; updatedAt: number; running: boolean };
 
@@ -576,6 +576,7 @@ export const PREVIEW_CLEAR_ALL = 'feega:preview:clear-all';
 export const PREVIEW_SETTLE = 'feega:preview:settle';
 export const PREVIEW_SETTLED = 'feega:preview:settled';
 export const LOCATION = 'feega:location';
+export const LINKS = 'feega:links';
 export const BRIDGE_READY = 'feega:source-map:ready';
 export const MODE = 'feega:mode';
 export const HIDE = 'feega:hide';

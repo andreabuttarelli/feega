@@ -14,7 +14,13 @@ describe('openOf', () => {
     expect(openOf(frames[i])).toEqual({ route, size });
   });
 
-  it('opens nothing for a dynamic route', () => {
+  it('opens nothing for a dynamic route without examples', () => {
     expect(openOf(frames[3])).toBeNull();
+  });
+
+  it('opens the example a dynamic route shows', () => {
+    const shown = layoutCanvas([{ route: '/blog/[slug]', dynamic: true, examples: [{ path: '/blog/hi', label: 'hi' }] }], CANVAS_COLUMNS).frames[1];
+
+    expect(openOf(shown)).toEqual({ route: '/blog/hi', size: Size.Tablet });
   });
 });

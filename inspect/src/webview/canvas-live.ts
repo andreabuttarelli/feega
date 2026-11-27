@@ -17,7 +17,7 @@ const gapToCentre = (f: CanvasFrame, view: CanvasView, viewport: Viewport) => Ma
 
 export function liveKeys(frames: CanvasFrame[], view: CanvasView, viewport: Viewport, margin: number, cap: number): string[] {
   return frames
-    .filter((f) => !f.dynamic && touches(f, view, viewport, margin))
+    .filter((f) => f.target !== null && touches(f, view, viewport, margin))
     .sort((a, b) => gapToCentre(a, view, viewport) - gapToCentre(b, view, viewport))
     .slice(0, cap)
     .map((f) => f.key);

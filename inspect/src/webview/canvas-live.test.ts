@@ -50,11 +50,17 @@ describe('liveKeys', () => {
     expect(distance(live[0])).toBe(best);
   });
 
-  it('skips dynamic routes', () => {
+  it('skips dynamic routes without an example', () => {
     const live = liveKeys(frames, { scale: 0.02, x: 0, y: 0 }, { w: 4000, h: 40000 }, 0, 99);
 
     expect(live.some((key) => key.startsWith('/p9'))).toBe(false);
     expect(live).toHaveLength(27);
+  });
+
+  it('keeps a dynamic route that shows an example', () => {
+    const shown = layoutCanvas([{ route: '/blog/[slug]', dynamic: true, examples: [{ path: '/blog/a', label: 'a' }] }], CANVAS_COLUMNS).frames;
+
+    expect(liveKeys(shown, { scale: 0.02, x: 0, y: 0 }, { w: 4000, h: 40000 }, 0, 99)).toHaveLength(3);
   });
 });
 

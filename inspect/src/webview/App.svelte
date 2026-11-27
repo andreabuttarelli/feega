@@ -64,7 +64,7 @@
   import PagesList from './PagesList.svelte';
   import PagesCanvas from './PagesCanvas.svelte';
   import LayoutGrid from '@lucide/svelte/icons/layout-grid';
-  import { pageRows, seenRoutes } from './pages';
+  import { addExample, linkedRoutes, pageRows, seenRoutes } from './pages';
   import type { PageRoute } from '../host/page-route';
   import { fontCss } from './fonts';
   import MissingFont from './MissingFont.svelte';
@@ -222,7 +222,9 @@
   let canvasOpen = $state(false);
   let projectRoutes = $state<PageRoute[]>([]);
   let seen = $state<string[]>([]);
-  const pages = $derived(pageRows(projectRoutes, seen, route));
+  let linked = $state<string[]>([]);
+  let manual = $state<Record<string, string[]>>({});
+  const pages = $derived(pageRows(projectRoutes, { seen, linked, manual }, route));
   let share = $state<Extract<ViewMessage, { kind: ToView.Share }> | null>(null);
   let cloud = $state<{ enabled: boolean; comments: CloudComment[]; review: CloudRevisions; error: string }>({ enabled: false, comments: [], review: { status: 'open', revisions: [] }, error: '' });
   let composing = $state(false);
@@ -356,6 +358,7 @@
     },
     focusReady: () => untrack(() => viewing === View.Focus && syncView()),
     moved: (path) => (visited(path), bridge.tree()),
+    links: (paths) => (linked = linkedRoutes(linked, paths)),
     tree: (tree) => ((layers = tree), askPalette()),
     mounted: (status) => {
       mount = { controls: controlsOf(status.controls, status.props), values: status.props, touched: mount?.touched ?? [], dynamic: mount?.dynamic ?? [] };
@@ -584,6 +587,11 @@
     canvasOpen = true;
   }
 
+  function typedExample(pattern: string, path: string) {
+    manual = addExample(manual, pattern, path);
+    savePrefs();
+  }
+
   function openFromCanvas(target: { route: string; size: Size }) {
     canvasOpen = false;
     pickSize(target.size);
@@ -701,7 +709,7 @@
   }
 
   function savePrefs() {
-    toHost({ kind: ToHost.Prefs, prefs: { size, custom, barClosed, route, anchor, dock: docked ?? undefined, barWidth, leftWidth, leftClosed, layers: layerFlags.saved() } });
+    toHost({ kind: ToHost.Prefs, prefs: { size, custom, barClosed, route, anchor, dock: docked ?? undefined, barWidth, leftWidth, leftClosed, examples: $state.snapshot(manual), layers: layerFlags.saved() } });
   }
 
   function restore(prefs: Prefs | null) {
@@ -718,6 +726,7 @@
     barWidth = prefs.barWidth ?? barWidth;
     leftWidth = prefs.leftWidth ?? leftWidth;
     leftClosed = prefs.leftClosed ?? leftClosed;
+    manual = prefs.examples ?? manual;
     for (const [r, flags] of Object.entries((prefs.layers ?? {}) as SavedLayers)) {
       flags.hidden.forEach((k) => layerFlags.toggle('hidden', r, k));
       flags.locked.forEach((k) => layerFlags.toggle('locked', r, k));
@@ -1620,7 +1629,7 @@
     </div>
     </Tabs.Content>
     <Tabs.Content value={LeftTab.Pages}>
-      <PagesList rows={pages} onopen={go} />
+      <PagesList rows={pages} onopen={go} onadd={typedExample} />
     </Tabs.Content>
     </Tabs.Root>
     {/if}
@@ -1647,7 +1656,7 @@
       {#if share?.available}<SharePanel view={share} onstart={(name, canEdit) => toHost({ kind: ToHost.ShareStart, name, canEdit })} onstop={() => toHost({ kind: ToHost.ShareStop })} onkick={(userId) => toHost({ kind: ToHost.ShareKick, userId })} onrole={(userId, role) => toHost({ kind: ToHost.ShareRole, userId, role })} />{/if}
       <button type="button" class="icon" class:on={!barClosed} title="Properties (⌘\)" onclick={toggleBar} data-testid="bar-toggle"><PanelRight size={15} /></button>
     </header>
-    {#if canvasOpen && url}<PagesCanvas rows={pages} base={url} onopen={openFromCanvas} onclose={() => (canvasOpen = false)} />{/if}
+    {#if canvasOpen && url}<PagesCanvas rows={pages} base={url} onopen={openFromCanvas} onadd={typedExample} onclose={() => (canvasOpen = false)} />{/if}
     {#if focus}<FocusTabs name={focus.name} {route} active={viewing} notice={snapshotNotice} scheme={shownScheme} onscheme={switchScheme} transparent={transparentCanvas} ontransparent={toggleTransparent} zoom={zoomNow} onzoom={(request) => bridge.zoom(request)} onstep={(direction) => bridge.zoom({ mode: 'set', value: stepZoom(zoomNow, direction) })} onselect={showTab} onclose={exitFocus} bind:height={tabsH} />{/if}
 
     <div class="backdrop" role="presentation" bind:clientWidth={stage.w} bind:clientHeight={stage.h} onpointermove={resizeFrame} onpointerup={endDrag}>

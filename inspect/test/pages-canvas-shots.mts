@@ -11,23 +11,37 @@ const panel = await openPanel(process.env.INSPECT_APP_ROOT!);
 const { page } = panel;
 
 await page.locator('[data-testid="pages-tab"]').click();
+await page.locator('[data-testid="page-example"]').first().waitFor();
 await page.locator('[data-testid="canvas-open-pages"]').click();
 await page.locator('[data-testid="pages-canvas"]').waitFor();
 
 const frames = page.locator('[data-testid="canvas-frame"]');
-assert.equal(await frames.count(), 9);
+assert.equal(await frames.count(), 12);
 assert.deepEqual(
   await page.locator('[data-testid="canvas-row"]').evaluateAll((rows) => rows.map((r) => r.firstChild?.textContent)),
-  ['/', '/about', '/blog/[slug]']
+  ['/', '/about', '/blog/[slug]', '/docs/[...rest]']
 );
+assert.equal(await page.locator('[data-testid="canvas-example"]').first().textContent(), 'primo-post');
 
 const live = () => page.locator('[data-testid="canvas-frame"][data-live="true"]').count();
 await page.waitForTimeout(4000);
 assert.ok((await live()) <= 6, 'live frames stay under the cap');
 assert.equal(await page.locator('[data-testid="canvas-frame"] iframe').count() <= 12, true);
-assert.equal(await page.locator('[data-testid="canvas-frame"][data-key^="/blog"] iframe').count(), 0);
+assert.equal(await page.locator('[data-testid="canvas-frame"][data-key^="/docs"] iframe').count(), 0);
+const srcPath = (selector: string) => page.locator(selector).first().getAttribute('src').then((src) => new URL(src!).pathname);
+assert.equal(await srcPath('[data-testid="canvas-frame"][data-key^="/blog"] iframe'), '/blog/primo-post');
+
+const docsInput = page.locator('[data-testid="canvas-frame"][data-key="/docs/[...rest]::desktop"] [data-testid="example-input"]');
+assert.equal(await docsInput.count(), 1);
 
 await page.screenshot({ path: SHOT });
+
+await docsInput.fill('guide/start');
+await docsInput.press('Enter');
+await docsInput.waitFor({ state: 'detached' });
+assert.equal(await page.locator('[data-testid="canvas-example"]').last().textContent(), 'guide/start');
+assert.equal(await page.locator('[data-testid="canvas-frame"][data-key^="/docs"] [data-testid="canvas-open"]').first().isDisabled(), false);
+await page.screenshot({ path: SHOT.replace(/\.png$/, '-typed.png') });
 
 const percent = () => page.locator('[data-testid="canvas-percent"]').textContent();
 const fitted = await percent();

@@ -8,12 +8,13 @@
   import { openOf, type CanvasOpen } from './canvas-open';
   import { shotOf } from './canvas-shot';
   import { CanvasKey, actualView, canvasKeyOf, fitView, panBy, percentOf, stepView, wheelOf, zoomAround, type CanvasView, type Point } from './canvas-view';
+  import ExampleField from './ExampleField.svelte';
   import type { PageRow } from './pages';
   import { SIZES } from './sizes';
 
-  type Props = { rows: PageRow[]; base: string; onopen: (target: CanvasOpen) => void; onclose: () => void };
+  type Props = { rows: PageRow[]; base: string; onopen: (target: CanvasOpen) => void; onadd: (pattern: string, path: string) => void; onclose: () => void };
 
-  let { rows, base, onopen, onclose }: Props = $props();
+  let { rows, base, onopen, onadd, onclose }: Props = $props();
 
   const MIDDLE_BUTTON = 1;
   const SPACE_CODE = 'Space';
@@ -141,6 +142,9 @@
   }
 
   function onkeydown(e: KeyboardEvent) {
+    if (e.target instanceof HTMLInputElement) {
+      return;
+    }
     if (e.code === SPACE_CODE) {
       e.preventDefault();
       held = true;
@@ -180,19 +184,19 @@
 >
   <div class="world" style={`transform:translate(${view.x}px,${view.y}px) scale(${view.scale});--zoom:${view.scale}`}>
     {#each layout.rows as row (row.route)}
-      <h2 class="row-label" class:on={row.route === currentRoute} style={`left:0;top:${row.y}px`} data-testid="canvas-row">{row.route}{#if row.dynamic}<span class="tag">dynamic</span>{/if}</h2>
+      <h2 class="row-label" class:on={row.route === currentRoute} style={`left:0;top:${row.y}px`} data-testid="canvas-row">{row.route}{#if row.dynamic}<span class="tag" data-testid="canvas-example">{row.example?.label ?? 'dynamic'}</span>{/if}</h2>
     {/each}
 
     {#each layout.frames as frame (frame.key)}
       <div class="frame" class:dynamic={frame.dynamic} style={`left:${frame.x}px;top:${frame.y}px;width:${frame.width}px;height:${frame.height}px`} data-testid="canvas-frame" data-key={frame.key} data-live={live.includes(frame.key)}>
         <span class="frame-label">{dimsOf(frame)}</span>
         {#if shots[frame.key]}<img class="shot" src={shots[frame.key]} alt="" draggable="false" />{:else}
-          <div class="card"><b>{frame.route}</b><span>{frame.dynamic ? 'Dynamic route' : dimsOf(frame)}</span></div>
+          <div class="card"><b>{frame.route}</b><span>{frame.dynamic ? 'Dynamic route' : dimsOf(frame)}</span>{#if frame.target === null}<div class="manual"><ExampleField pattern={frame.route} onadd={(path) => onadd(frame.route, path)} /></div>{/if}</div>
         {/if}
-        {#if mounted.has(frame.key)}
-          <iframe use:register={frame.key} src={new URL(frame.route, base).toString()} title={`${frame.route} ${SIZES[frame.size].label}`} tabindex="-1" onload={() => loaded(frame.key)} style={`width:${frame.width}px;height:${frame.height}px`}></iframe>
+        {#if mounted.has(frame.key) && frame.target !== null}
+          <iframe use:register={frame.key} src={new URL(frame.target, base).toString()} title={`${frame.target} ${SIZES[frame.size].label}`} tabindex="-1" onload={() => loaded(frame.key)} style={`width:${frame.width}px;height:${frame.height}px`}></iframe>
         {/if}
-        <button type="button" class="hit" disabled={frame.dynamic} title={frame.dynamic ? 'Dynamic route: open it from a link in the preview' : `Open ${frame.route} at ${SIZES[frame.size].label}`} aria-label={`Open ${frame.route} at ${SIZES[frame.size].label}`} data-testid="canvas-open" onclick={() => open(frame)}></button>
+        <button type="button" class="hit" disabled={frame.target === null} title={frame.target === null ? 'Dynamic route: type a value to open it' : `Open ${frame.target} at ${SIZES[frame.size].label}`} aria-label={`Open ${frame.target ?? frame.route} at ${SIZES[frame.size].label}`} data-testid="canvas-open" onclick={() => open(frame)}></button>
       </div>
     {/each}
   </div>
@@ -294,6 +298,22 @@
     gap: calc(4px / var(--zoom));
     color: var(--ui-text-2);
     font-size: min(calc(13px / var(--zoom)), 120px);
+  }
+
+  .manual {
+    position: relative;
+    z-index: 1;
+    width: 60%;
+    margin-top: calc(8px / var(--zoom));
+    font-size: min(calc(13px / var(--zoom)), 120px);
+  }
+
+  .manual :global(.field) {
+    font-size: inherit;
+  }
+
+  .manual :global(input) {
+    height: 1.8em;
   }
 
   .card b {
