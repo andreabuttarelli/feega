@@ -8,7 +8,7 @@ export enum View {
 
 export type FocusUsage = { at: Source; which: { index: number; count: number } };
 
-export type Focus = { name: string; source: Source; index: number; usage: FocusUsage | null };
+export type Focus = { name: string; source: Source; index: number; usage: FocusUsage | null; alone?: true };
 
 type Row = Omit<LayerNode, 'tag' | 'display' | 'direction' | 'position' | 'children'>;
 

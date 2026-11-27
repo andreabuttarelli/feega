@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { basename, join, relative, resolve } from 'node:path';
+import { basename, join, posix, relative, resolve } from 'node:path';
 import { appsIn } from '@feega/dev-run/run-plan';
 import { GIT_MISSING, gitPanel } from './git-panel';
 import { AddKind, type AddPlace } from '@feega/live-edit/add-node';
@@ -65,6 +65,8 @@ import { editorMcp } from './ai/editor-mcp';
 import { viewAsker } from './view-ask';
 import { machineEnv } from './agents';
 import { listRoutes } from './project-routes';
+import { listComponents } from './component-list';
+import { projectLive } from './project-live';
 
 const ADAPTER_DIR = 'feega-adapters';
 const START_WITH_FEEGA = 'Start with Feega';
@@ -312,8 +314,26 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     await edits.structure({ op: StructureOp.Add, at, add: { kind: AddKind.Image, src: copied.url, place } }).then((out) => edited(out, null));
   }
 
+  const appRootNow = () => join(root, running?.plan.appDir ?? '');
+  const routesNow = () => listRoutes(appRootNow());
+  const componentsNow = () => {
+    const appDir = running?.plan.appDir ?? '';
+    return listComponents(appRootNow(), async (file) => (await usages.usersOf(posix.join(appDir, file))).length);
+  };
+  const live = projectLive({ appRoot: appRootNow, routes: routesNow, components: componentsNow, post });
+
   async function routesShown() {
-    await post({ kind: ToView.Routes, routes: await listRoutes(join(root, running?.plan.appDir ?? '')) });
+    const routes = await routesNow();
+    live.routesSent(routes);
+    live.watch();
+    await post({ kind: ToView.Routes, routes });
+  }
+
+  async function componentsShown() {
+    const components = await componentsNow();
+    live.componentsSent(components);
+    live.watch();
+    await post({ kind: ToView.Components, components });
   }
 
   async function libraryShown() {
@@ -898,6 +918,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.ShareRole]: (m) => sharing.setRole(m.userId, m.role),
     [ToHost.LibraryList]: libraryShown,
     [ToHost.Routes]: routesShown,
+    [ToHost.Components]: componentsShown,
     [ToHost.LibraryInsert]: libraryInserted,
     [ToHost.NewPage]: pageCreated,
     [ToHost.Plugin]: async (m) => post({ kind: ToView.Plugin, id: m.id, result: await pluginRun(m.ask) }),
@@ -980,6 +1001,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     stop: async () => {
       close();
       ai.close();
+      live.dispose();
       usages.dispose();
       classes.dispose();
       pluginList?.stop();

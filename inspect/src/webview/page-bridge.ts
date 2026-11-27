@@ -171,7 +171,7 @@ export function pageBridge(frame: () => HTMLIFrameElement | null, on: PageEvents
     hide: (source: Source, hidden: boolean) => send({ type: HIDE, source: sourceText(source), hidden }),
     mode: (mode: Mode) => send({ type: MODE, mode }),
     reveal: (source: Source, index = 0) => send({ type: REVEAL, source: sourceText(source), index }),
-    focus: (source: Source | null, shown = true, index?: number) => send({ type: FOCUS, source: source ? sourceText(source) : null, shown, index }, Target.Page),
+    focus: (source: Source | null, shown = true, index?: number, alone?: boolean) => send({ type: FOCUS, source: source ? sourceText(source) : null, shown, index, alone }, Target.Page),
     canvas: (scheme: string | null, transparent: boolean) => send({ type: FOCUS_CANVAS, scheme, transparent }, Target.Page),
     zoom: (request: ZoomRequest) => send({ type: FOCUS_ZOOM, ...request }, Target.Page),
     mountProps: (props: Record<string, unknown>, variants: Variant[] | null) => send({ type: MOUNT_PROPS, props, variants }, Target.Focus),

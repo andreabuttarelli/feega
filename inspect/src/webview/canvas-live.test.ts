@@ -44,3 +44,17 @@ describe('liveSet and dynamic routes', () => {
     expect(liveSet(blog([]), wide, big, [])).toEqual([]);
   });
 });
+
+describe('liveSet minimum width', () => {
+  const frames = [{ key: 'a', target: 'a', x: 0, y: 0, width: 480, height: 320 }];
+  const small = { scale: 0.3, x: 0, y: 0 };
+  const viewport = { w: 1000, h: 800 };
+
+  it('keeps a frame that is too small on screen asleep by default', () => {
+    expect(liveSet(frames, small, viewport, [])).toEqual([]);
+  });
+
+  it('wakes it when the canvas has no minimum width', () => {
+    expect(liveSet(frames, small, viewport, [], 0)).toEqual(['a']);
+  });
+});

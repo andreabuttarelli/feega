@@ -1,201 +1,29 @@
 <script lang="ts">
-  import Maximize from '@lucide/svelte/icons/maximize';
-  import Minus from '@lucide/svelte/icons/minus';
-  import Plus from '@lucide/svelte/icons/plus';
+  import CanvasShell from './CanvasShell.svelte';
   import { CANVAS_COLUMNS, layoutCanvas, type CanvasFrame } from './canvas-layout';
-  import { liveSet } from './canvas-live';
-  import { LOAD_TIMEOUT_MS, MAX_LOADING, PAINT_DELAY_MS, POOL_CAP, SETTLE_MS, planPool, settler } from './canvas-pool';
+  import { MIN_LIVE_WIDTH } from './canvas-live';
   import { openOf, type CanvasOpen } from './canvas-open';
-  import { shotOf } from './canvas-shot';
-  import { CanvasKey, actualView, canvasKeyOf, fitView, panBy, percentOf, stepView, wheelOf, zoomAround, type CanvasView, type Point } from './canvas-view';
-  import { untrack } from 'svelte';
+  import { pageKeysOf } from './canvas-stale';
   import ExampleField from './ExampleField.svelte';
+  import type { FilesChange } from './files-change';
   import type { PageRow } from './pages';
   import { SIZES } from './sizes';
 
-  type Props = { rows: PageRow[]; base: string; onopen: (target: CanvasOpen) => void; onadd: (pattern: string, path: string) => void; onclose: () => void };
+  type Props = { rows: PageRow[]; base: string; onopen: (target: CanvasOpen) => void; onadd: (pattern: string, path: string) => void; onclose: () => void; changed: FilesChange | null };
 
-  let { rows, base, onopen, onadd, onclose }: Props = $props();
-
-  const MIDDLE_BUTTON = 1;
-  const SPACE_CODE = 'Space';
-  const FIRST_SHOT_DELAY_MS = 800;
-
-  let root = $state<HTMLElement | null>(null);
-  let viewport = $state({ w: 0, h: 0 });
-  let view = $state<CanvasView>({ scale: 1, x: 0, y: 0 });
-  let touched = $state(false);
-  let held = $state(false);
-  let panning = $state(false);
-  let shots = $state<Record<string, string>>({});
-  let retiring = $state<string[]>([]);
-  let settledView = $state<CanvasView>({ scale: 1, x: 0, y: 0 });
-  let live = $state<string[]>([]);
-  let pool = $state<string[]>([]);
-  let loaded = $state(new Set<string>());
-  let ready = $state(new Set<string>());
-  const frameEls: Record<string, HTMLIFrameElement | undefined> = {};
-  let queue: Promise<void> = Promise.resolve();
+  let { rows, base, onopen, onadd, onclose, changed }: Props = $props();
 
   const layout = $derived(layoutCanvas(rows, CANVAS_COLUMNS));
-  const mounted = $derived(new Set([...pool, ...retiring]));
-  const settle = settler(() => (settledView = view), SETTLE_MS);
+  const stale = $derived(changed ? { keys: pageKeysOf(layout.frames, changed.files) } : null);
   const currentRoute = $derived(rows.find((r) => r.current)?.route ?? null);
 
   const dimsOf = (f: CanvasFrame) => `${SIZES[f.size].label} · ${f.width} × ${f.height}`;
 
-  function fit() {
-    view = fitView(layout.bounds, viewport);
-    touched = false;
-  }
-
-  $effect(() => {
-    if (!touched && viewport.w > 0) {
-      view = fitView(layout.bounds, viewport);
-    }
+  const hitOf = (f: CanvasFrame) => ({
+    label: `Open ${f.target ?? f.route} at ${SIZES[f.size].label}`,
+    title: f.target === null ? 'Dynamic route: type a value to open it' : `Open ${f.target} at ${SIZES[f.size].label}`,
+    enabled: f.target !== null
   });
-
-  function shoot(key: string): Promise<void> {
-    queue = queue.then(async () => {
-      const el = frameEls[key];
-      const png = el ? await shotOf(el) : null;
-      if (png) {
-        shots[key] = png;
-      }
-    });
-
-    return queue;
-  }
-
-  $effect(() => {
-    void view;
-    settle();
-  });
-
-  $effect(() => {
-    const next = liveSet(layout.frames, settledView, viewport, untrack(() => live));
-    if (next.join() !== untrack(() => live).join()) {
-      live = next;
-    }
-  });
-
-  function forget(key: string) {
-    loaded = new Set([...loaded].filter((k) => k !== key));
-    ready = new Set([...ready].filter((k) => k !== key));
-  }
-
-  function evict(key: string) {
-    retiring = [...retiring, key];
-    void shoot(key).finally(() => {
-      retiring = retiring.filter((k) => k !== key);
-      forget(key);
-    });
-  }
-
-  $effect(() => {
-    const plan = planPool({ pool: untrack(() => pool), wanted: live, settled: loaded, cap: POOL_CAP, maxLoading: MAX_LOADING });
-    if (plan.pool.join() !== untrack(() => pool).join()) {
-      pool = plan.pool;
-    }
-    plan.evicted.forEach(evict);
-  });
-
-  function settled(key: string) {
-    if (!loaded.has(key)) {
-      loaded = new Set([...loaded, key]);
-    }
-  }
-
-  function onload(key: string) {
-    settled(key);
-    setTimeout(() => (ready = new Set([...ready, key])), PAINT_DELAY_MS);
-    setTimeout(() => void shoot(key), FIRST_SHOT_DELAY_MS);
-  }
-
-  function register(node: HTMLIFrameElement, key: string) {
-    frameEls[key] = node;
-    const giveUp = setTimeout(() => settled(key), LOAD_TIMEOUT_MS);
-
-    return { destroy: () => (clearTimeout(giveUp), delete frameEls[key]) };
-  }
-
-  const pointOf = (e: { clientX: number; clientY: number }): Point => {
-    const box = root!.getBoundingClientRect();
-
-    return { x: e.clientX - box.left, y: e.clientY - box.top };
-  };
-
-  function onwheel(e: WheelEvent) {
-    e.preventDefault();
-    touched = true;
-    const action = wheelOf(e);
-    view = action.kind === 'zoom' ? zoomAround(view, action.factor, pointOf(e)) : panBy(view, action.dx, action.dy);
-  }
-
-  function attach(node: HTMLElement) {
-    node.addEventListener('wheel', onwheel, { passive: false });
-
-    return { destroy: () => node.removeEventListener('wheel', onwheel) };
-  }
-
-  function drag(start: PointerEvent) {
-    let last = { x: start.clientX, y: start.clientY };
-    const move = (e: PointerEvent) => {
-      view = panBy(view, e.clientX - last.x, e.clientY - last.y);
-      last = { x: e.clientX, y: e.clientY };
-    };
-    const end = () => {
-      panning = false;
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', end);
-    };
-    panning = true;
-    touched = true;
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', end);
-  }
-
-  function press(e: PointerEvent) {
-    if (e.button === MIDDLE_BUTTON || (held && e.button === 0)) {
-      e.preventDefault();
-      e.stopPropagation();
-      drag(e);
-    }
-  }
-
-  function step(direction: 1 | -1) {
-    touched = true;
-    view = stepView(view, direction, viewport);
-  }
-
-  function run(key: CanvasKey) {
-    const actions: Record<CanvasKey, () => void> = {
-      [CanvasKey.In]: () => step(1),
-      [CanvasKey.Out]: () => step(-1),
-      [CanvasKey.Fit]: fit,
-      [CanvasKey.Actual]: () => ((touched = true), (view = actualView(view, viewport))),
-      [CanvasKey.Close]: onclose
-    };
-    actions[key]();
-  }
-
-  function onkeydown(e: KeyboardEvent) {
-    if (e.target instanceof HTMLInputElement) {
-      return;
-    }
-    if (e.code === SPACE_CODE) {
-      e.preventDefault();
-      held = true;
-      return;
-    }
-    const key = canvasKeyOf(e);
-    if (key) {
-      e.preventDefault();
-      run(key);
-    }
-  }
-
-  const onkeyup = (e: KeyboardEvent) => e.code === SPACE_CODE && (held = false);
 
   function open(frame: CanvasFrame) {
     const target = openOf(frame);
@@ -205,72 +33,31 @@
   }
 </script>
 
-<svelte:window {onkeydown} {onkeyup} onblur={() => (held = false)} />
-
-<div
-  class="canvas"
-  role="application"
-  aria-label="Pages canvas"
-  data-testid="pages-canvas"
-  data-scale={view.scale}
-  bind:this={root}
-  bind:clientWidth={viewport.w}
-  bind:clientHeight={viewport.h}
-  use:attach
-  onpointerdowncapture={press}
-  style={`background-position:${view.x}px ${view.y}px`}
+<CanvasShell
+  frames={layout.frames}
+  bounds={layout.bounds}
+  label="Pages canvas"
+  testid="pages-canvas"
+  minLiveWidth={MIN_LIVE_WIDTH}
+  frameLabel={dimsOf}
+  srcOf={(f) => (f.target === null ? null : new URL(f.target, base).toString())}
+  {hitOf}
+  onopen={open}
+  {onclose}
+  {stale}
 >
-  <div class="world" style={`transform:translate(${view.x}px,${view.y}px) scale(${view.scale});--zoom:${view.scale}`}>
+  {#snippet world()}
     {#each layout.rows as row (row.route)}
       <h2 class="row-label" class:on={row.route === currentRoute} style={`left:0;top:${row.y}px`} data-testid="canvas-row">{row.route}{#if row.dynamic}<span class="tag" data-testid="canvas-example">{row.example?.label ?? 'dynamic'}</span>{/if}</h2>
     {/each}
-
-    {#each layout.frames as frame (frame.key)}
-      <div class="frame" class:dynamic={frame.dynamic} style={`left:${frame.x}px;top:${frame.y}px;width:${frame.width}px;height:${frame.height}px`} data-testid="canvas-frame" data-key={frame.key} data-live={live.includes(frame.key)}>
-        <span class="frame-label">{dimsOf(frame)}</span>
-        {#if shots[frame.key]}<img class="shot" src={shots[frame.key]} alt="" draggable="false" />{:else}
-          <div class="card"><b>{frame.route}</b><span>{frame.dynamic ? 'Dynamic route' : dimsOf(frame)}</span>{#if frame.target === null}<div class="manual"><ExampleField pattern={frame.route} onadd={(path) => onadd(frame.route, path)} /></div>{/if}</div>
-        {/if}
-        {#if mounted.has(frame.key) && frame.target !== null}
-          <iframe use:register={frame.key} src={new URL(frame.target, base).toString()} title={`${frame.target} ${SIZES[frame.size].label}`} tabindex="-1" data-ready={ready.has(frame.key)} class:shown={live.includes(frame.key) && ready.has(frame.key)} onload={() => onload(frame.key)} style={`width:${frame.width}px;height:${frame.height}px`}></iframe>
-        {/if}
-        <button type="button" class="hit" disabled={frame.target === null} title={frame.target === null ? 'Dynamic route: type a value to open it' : `Open ${frame.target} at ${SIZES[frame.size].label}`} aria-label={`Open ${frame.target ?? frame.route} at ${SIZES[frame.size].label}`} data-testid="canvas-open" onclick={() => open(frame)}></button>
-      </div>
-    {/each}
-  </div>
-
-  {#if held}<div class="panner" class:grabbing={panning} data-testid="canvas-panner"></div>{/if}
-
-  <div class="zoombar" data-testid="canvas-zoom">
-    <button type="button" aria-label="Zoom out" title="Zoom out (-)" onclick={() => step(-1)}><Minus size={14} /></button>
-    <span class="percent" data-testid="canvas-percent">{percentOf(view.scale)}</span>
-    <button type="button" aria-label="Zoom in" title="Zoom in (+)" onclick={() => step(1)}><Plus size={14} /></button>
-    <button type="button" aria-label="Zoom to fit" title="Zoom to fit (0)" data-testid="canvas-fit" onclick={fit}><Maximize size={14} /></button>
-  </div>
-</div>
+  {/snippet}
+  {#snippet card(frame: CanvasFrame)}
+    <b>{frame.route}</b><span>{frame.dynamic ? 'Dynamic route' : dimsOf(frame)}</span>
+    {#if frame.target === null}<div class="manual"><ExampleField pattern={frame.route} onadd={(path) => onadd(frame.route, path)} /></div>{/if}
+  {/snippet}
+</CanvasShell>
 
 <style>
-  .canvas {
-    position: absolute;
-    inset: var(--top-row) 0 0 0;
-    z-index: 20;
-    overflow: hidden;
-    background-color: var(--ui-backdrop);
-    background-image: radial-gradient(circle, color-mix(in srgb, var(--ui-text) 14%, transparent) 1px, transparent 1px);
-    background-size: 24px 24px;
-    user-select: none;
-  }
-
-  .world {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 0;
-    height: 0;
-    transform-origin: 0 0;
-    --label: min(calc(12px / var(--zoom)), 80px);
-  }
-
   .row-label {
     position: absolute;
     margin: 0;
@@ -293,57 +80,6 @@
     font-weight: 400;
   }
 
-  .frame {
-    position: absolute;
-    background: var(--ui-panel);
-    box-shadow: 0 0 0 calc(1px / var(--zoom)) var(--ui-divider);
-  }
-
-  .frame-label {
-    position: absolute;
-    bottom: 100%;
-    left: 0;
-    padding-bottom: calc(6px / var(--zoom));
-    color: var(--ui-text-2);
-    font-size: var(--label);
-    white-space: nowrap;
-  }
-
-  .shot,
-  iframe {
-    position: absolute;
-    inset: 0;
-    display: block;
-    width: 100%;
-    height: 100%;
-    border: 0;
-    pointer-events: none;
-  }
-
-  iframe {
-    visibility: hidden;
-    opacity: 0;
-    background: white;
-  }
-
-  iframe.shown {
-    visibility: visible;
-    opacity: 1;
-    transition: opacity 160ms ease-out;
-  }
-
-  .card {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: calc(4px / var(--zoom));
-    color: var(--ui-text-2);
-    font-size: min(calc(13px / var(--zoom)), 120px);
-  }
-
   .manual {
     position: relative;
     z-index: 1;
@@ -358,83 +94,5 @@
 
   .manual :global(input) {
     height: 1.8em;
-  }
-
-  .card b {
-    color: var(--ui-text);
-    font-weight: 500;
-  }
-
-  .hit {
-    position: absolute;
-    inset: 0;
-    padding: 0;
-    border: 0;
-    background: none;
-    cursor: pointer;
-  }
-
-  .hit:hover:not(:disabled),
-  .hit:focus-visible {
-    outline: calc(2px / var(--zoom)) solid var(--ui-accent);
-    outline-offset: calc(2px / var(--zoom));
-  }
-
-  .hit:disabled {
-    cursor: default;
-  }
-
-  .frame:has(.hit:hover:not(:disabled)) .frame-label {
-    color: var(--ui-accent-text);
-  }
-
-  .panner {
-    position: absolute;
-    inset: 0;
-    z-index: 5;
-    cursor: grab;
-  }
-
-  .panner.grabbing {
-    cursor: grabbing;
-  }
-
-
-  .zoombar {
-    position: absolute;
-    bottom: 12px;
-    left: 50%;
-    display: flex;
-    align-items: center;
-    gap: 2px;
-    padding: 3px;
-    border-radius: var(--ui-radius-lg);
-    background: var(--ui-panel);
-    transform: translateX(-50%);
-  }
-
-  .zoombar button {
-    display: grid;
-    place-items: center;
-    width: 26px;
-    height: 26px;
-    border: 0;
-    border-radius: var(--ui-radius-sm);
-    background: none;
-    color: var(--ui-text-2);
-    cursor: pointer;
-  }
-
-  .zoombar button:hover {
-    background: var(--ui-input);
-    color: var(--ui-text);
-  }
-
-  .percent {
-    min-width: 44px;
-    color: var(--ui-text-2);
-    font-size: var(--ui-text-xs);
-    font-variant-numeric: tabular-nums;
-    text-align: center;
   }
 </style>

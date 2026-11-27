@@ -172,7 +172,7 @@ function exportedNames(clause: string): string[] | null {
   return braces.split(',').map((part) => part.trim().split(/\s+as\s+/).pop()!).filter(Boolean);
 }
 
-function componentNames(file: string, text: string): Set<string> | null {
+export function componentNames(file: string, text: string): Set<string> | null {
   if (SINGLE_COMPONENT_FILE.test(file)) {
     return new Set([DEFAULT_NAME]);
   }

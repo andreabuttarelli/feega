@@ -1,5 +1,6 @@
 import type { SupportItem } from './support';
 import type { PageRoute } from './host/page-route';
+import type { ComponentRow } from './host/component-list';
 import type { AcpAgent, AcpId } from './host/ai/acp-agents';
 import type { AgentEvent, ConfigView, ModeView } from './host/ai/agent-session';
 import type { Alert } from './host/ai/agent-alert';
@@ -228,6 +229,7 @@ export enum ToHost {
   ShareRole = 'share-role',
   LibraryList = 'library-list',
   Routes = 'routes',
+  Components = 'components',
   LibraryInsert = 'library-insert',
   NewPage = 'new-page',
   Plugin = 'plugin',
@@ -383,7 +385,9 @@ export enum ToView {
   PageCreated = 'page-created',
   Git = 'git',
   GitResult = 'git-result',
-  Routes = 'routes'
+  Routes = 'routes',
+  Components = 'components',
+  FilesChanged = 'files-changed'
 }
 
 export enum ShareState {
@@ -489,6 +493,7 @@ export type HostMessage =
   | { kind: ToHost.ShareRole; userId: string; role: VisitorRole }
   | { kind: ToHost.LibraryList }
   | { kind: ToHost.Routes }
+  | { kind: ToHost.Components }
   | { kind: ToHost.LibraryInsert; id: string; at: string; place: AddPlace }
   | { kind: ToHost.NewPage; route: string; item: string | null }
   | { kind: ToHost.Plugin; id: number; ask: PluginAsk }
@@ -545,6 +550,8 @@ export type ViewMessage =
   | { kind: ToView.Share; state: ShareState; available: boolean; name: string; canEdit: boolean; url?: string; expiresAt?: string; visitors: Present[]; notice: boolean; error?: string }
   | { kind: ToView.Library; items: LibraryEntry[] }
   | { kind: ToView.Routes; routes: PageRoute[] }
+  | { kind: ToView.Components; components: ComponentRow[] }
+  | { kind: ToView.FilesChanged; files: string[] }
   | { kind: ToView.Plugin; id: number; result: PluginResult }
   | { kind: ToView.Plugins; catalog: Catalog; canInstall: boolean }
   | { kind: ToView.Reload }
