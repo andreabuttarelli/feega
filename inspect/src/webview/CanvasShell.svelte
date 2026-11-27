@@ -20,7 +20,7 @@
     testid: string;
     minLiveWidth: number;
     frameLabel: (frame: F) => string;
-    srcOf: (frame: F) => string;
+    srcOf: (frame: F) => string | null;
     hitOf: (frame: F) => Hit;
     onopen: (frame: F) => void;
     onclose: () => void;
@@ -194,6 +194,9 @@
   }
 
   function onkeydown(e: KeyboardEvent) {
+    if (e.target instanceof HTMLInputElement) {
+      return;
+    }
     if (e.code === SPACE_CODE) {
       e.preventDefault();
       held = true;
@@ -239,13 +242,13 @@
 
     {#each frames as frame (frame.key)}
       {@const hit = hitOf(frame)}
-      <div class="frame" class:dynamic={frame.dynamic} style={`left:${frame.x}px;top:${frame.y}px;width:${frame.width}px;height:${frame.height}px`} data-testid="canvas-frame" data-key={frame.key} data-live={live.includes(frame.key)} data-rendered={!failed.includes(frame.key)}>
+      <div class="frame" style={`left:${frame.x}px;top:${frame.y}px;width:${frame.width}px;height:${frame.height}px`} data-testid="canvas-frame" data-key={frame.key} data-live={live.includes(frame.key)} data-rendered={!failed.includes(frame.key)}>
         <span class="frame-label">{frameLabel(frame)}</span>
         {#if shots[frame.key]}<img class="shot" src={shots[frame.key]} alt="" draggable="false" />{:else}
           <div class="card">{@render card(frame, failed.includes(frame.key))}</div>
         {/if}
-        {#if mounted.has(frame.key)}
-          <iframe use:register={frame.key} src={srcOf(frame)} title={frameLabel(frame)} tabindex="-1" data-ready={ready.has(frame.key)} class:shown={live.includes(frame.key) && ready.has(frame.key)} onload={() => onload(frame.key)} style={`width:${frame.width}px;height:${frame.height}px`}></iframe>
+        {#if mounted.has(frame.key) && srcOf(frame) !== null}
+          <iframe use:register={frame.key} src={srcOf(frame)!} title={frameLabel(frame)} tabindex="-1" data-ready={ready.has(frame.key)} class:shown={live.includes(frame.key) && ready.has(frame.key)} onload={() => onload(frame.key)} style={`width:${frame.width}px;height:${frame.height}px`}></iframe>
         {/if}
         <button type="button" class="hit" disabled={!hit.enabled} title={hit.title} aria-label={hit.label} data-testid="canvas-open" onclick={() => onopen(frame)}></button>
       </div>
