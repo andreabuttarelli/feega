@@ -1,3 +1,4 @@
+import type { GitRun } from './git-panel';
 import type { PublishedBridge } from './local-bridge/publish';
 import type { BridgeState } from './local-bridge/server';
 import type { AgentId, HostMessage, Source, ViewMessage } from '../messages';
@@ -57,6 +58,7 @@ export type Platform = Transport & {
   openExternal: (url: string) => unknown;
   openSettings: (key: SettingKey) => unknown;
   sourceControl: () => unknown;
+  git?: (root: string) => GitRun;
   notify: (text: string) => unknown;
   warn: (text: string, action?: string) => Promise<boolean>;
   pickImage?: () => Promise<ChosenImage | null>;

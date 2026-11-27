@@ -247,7 +247,11 @@ export enum ToHost {
   AiDelete = 'ai-delete',
   AgentAnswer = 'agent-answer',
   AiRetry = 'ai-retry',
-  Usage = 'usage'
+  Usage = 'usage',
+  GitRefresh = 'git-refresh',
+  GitCommit = 'git-commit',
+  GitPush = 'git-push',
+  GitPull = 'git-pull'
 }
 
 export enum WebviewUsage {
@@ -261,6 +265,30 @@ export enum WebviewUsage {
 }
 
 export type WebviewUsageDims = Partial<{ variant: string; mode: string; control: string; prop_count: number; state: string; breakpoint: string; error_class: string; area: string }>;
+
+export enum GitState {
+  NoGit = 'no-git',
+  NotRepo = 'not-repo',
+  Ready = 'ready'
+}
+
+export enum GitScope {
+  Feega = 'feega',
+  All = 'all'
+}
+
+export enum GitAfter {
+  Stay = 'stay',
+  Push = 'push'
+}
+
+export enum GitAction {
+  Commit = 'commit',
+  Push = 'push',
+  Pull = 'pull'
+}
+
+export type GitView = { state: GitState; branch: string | null; upstream: string | null; remote: string | null; ahead: number; behind: number; feega: string[]; others: string[]; message: string };
 
 export type ChangeRow = { id: number; at: string; prop: string; value: string; scope: string; files: string[]; time: number; by?: string };
 
@@ -329,7 +357,9 @@ export enum ToView {
   ShowChat = 'show-chat',
   AgentAsk = 'agent-ask',
   Adapters = 'adapters',
-  PageCreated = 'page-created'
+  PageCreated = 'page-created',
+  Git = 'git',
+  GitResult = 'git-result'
 }
 
 export enum ShareState {
@@ -455,6 +485,10 @@ export type HostMessage =
   | { kind: ToHost.AiRename; chat: string; title: string }
   | { kind: ToHost.AiDelete; chat: string }
   | { kind: ToHost.AiRetry }
+  | { kind: ToHost.GitRefresh }
+  | { kind: ToHost.GitCommit; message: string; scope: GitScope; after: GitAfter }
+  | { kind: ToHost.GitPush }
+  | { kind: ToHost.GitPull }
   | { kind: ToHost.AgentAnswer; id: number; png: string | null; text: string | null };
 
 export type Authored = HostMessage & { by?: Author };
@@ -500,6 +534,8 @@ export type ViewMessage =
   | { kind: ToView.ShowChat; chat: string }
   | { kind: ToView.AgentAsk; id: number; ask: AgentAsk; selection: boolean }
   | { kind: ToView.Adapters; rows: AdapterRow[] }
+  | { kind: ToView.Git; view: GitView }
+  | { kind: ToView.GitResult; action: GitAction; ok: boolean; text: string; pull: boolean }
   | { kind: ToView.AiChat; chat: string | null; agent?: AcpId; state: AiState; items: Item[]; modes: ModeView[]; mode: string | null; configs: ConfigView[]; images?: boolean };
 
 export const INSPECT = 'feega:inspect';

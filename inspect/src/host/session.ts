@@ -3,6 +3,7 @@ import { readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, relative, resolve } from 'node:path';
 import { appsIn } from '@feega/dev-run/run-plan';
+import { GIT_MISSING, gitPanel } from './git-panel';
 import { AddKind, type AddPlace } from '@feega/live-edit/add-node';
 import { inside, liveAtOf, reader } from '@feega/live-edit/live-ask';
 import { readProps } from '@feega/live-edit/read-props';
@@ -393,6 +394,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     ? pluginsSession({ host: { root: platform.plugins.root, dev: () => platform.plugins!.dev().map((folder) => resolve(root, folder)) }, post, notify: platform.notify, onInstalled: () => usage?.track(UsageKind.PluginInstalled) })
     : null;
 
+  const gitChanges = gitPanel({ run: async (args) => (platform.git ? platform.git(root)(args) : { code: GIT_MISSING, out: '', err: '' }), post, rows: () => edits.history() });
   const comments = commentsHost(platform.cloud, post, () => edits.history());
   const sharing = shareSession({ platform, workspace, appUrl: () => running?.url ?? null, post });
 
@@ -858,6 +860,10 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.Selected]: (m) => (m.at && usage?.track(UsageKind.ElementSelected), void published?.then((bridge) => bridge?.touch()), sharing.hostSelected(m.at), syncSelection(m.at)),
     [ToHost.Context]: (m) => void (agentContext = m.text),
     [ToHost.Copy]: (m) => (m.text === MCP_COMMAND && usage?.track(UsageKind.OnboardingStep, { step: OnboardingStep.Agents, outcome: 'completed', choice: ONBOARDING_MCP_CHOICE }), platform.copyText?.(m.text)),
+    [ToHost.GitRefresh]: () => gitChanges.refresh(),
+    [ToHost.GitCommit]: (m) => gitChanges.commit(m.message, m.scope, m.after),
+    [ToHost.GitPush]: () => gitChanges.push(),
+    [ToHost.GitPull]: () => gitChanges.pull(),
     [ToHost.Usage]: (m) => usage?.track(WEBVIEW_USAGE[m.event], webviewDimsOf(m.dims)),
     [ToHost.Comments]: comments.show,
     [ToHost.CommentAdd]: (m) => (usage?.track(UsageKind.CloudAction, { action: 'comment_add' }), comments.add(m.draft)),

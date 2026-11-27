@@ -8,6 +8,7 @@ import { Column, openTarget, revealColumn } from './open-source';
 import { accountToken, type Account, type AccountStore } from './account';
 import { cloudApi } from './cloud-api';
 import { IMAGE_EXTENSIONS } from './image-copy';
+import { nodeGit } from './node-git';
 import { catalogFile } from './library';
 import { pluginsRoot } from '@feega/plugin-store/registry';
 import { machineAgents } from './agents';
@@ -160,6 +161,7 @@ export function vsCodePlatform(host: VsCodeHost, panel: PanelLike, befores: Map<
     openExternal: (url) => vscode.env.openExternal(vscode.Uri.parse(url)),
     openSettings: (key) => vscode.commands.executeCommand('workbench.action.openSettings', key),
     sourceControl: () => vscode.commands.executeCommand('workbench.view.scm'),
+    git: (at) => nodeGit(at),
     notify: (text) => vscode.window.showInformationMessage(`Feega: ${text}`),
     warn: async (text, action) => (await vscode.window.showWarningMessage(`Feega: ${text}`, ...(action ? [action] : []))) === action,
     alerts,
