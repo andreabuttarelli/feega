@@ -6,6 +6,7 @@ import { DATE_MARK, FUNCTION_MARK, JSX_MARK, MOUNT_PROPS, MOUNT_STATUS, Status }
 export const Reason = { NoExport: 'The component is not exported', Empty: 'It rendered nothing' };
 
 const SETTLE_MS = 350;
+const HARMLESS_ERROR = /ResizeObserver loop/i;
 const GIVE_UP_MS = 8000;
 const GAP_PX = 24;
 const CAPTION_PX = 11;
@@ -53,7 +54,8 @@ export function runMount({ Target, name, file, props, controlsUrl, win = window,
   const fail = (reason) => post({ status: ready ? Status.Error : Status.Failed, reason });
   const draw = render({ container, fail });
 
-  win.addEventListener('error', (event) => !ready && post({ status: Status.Failed, reason: String(event.message) }));
+  const breaksMount = (event) => !ready && !HARMLESS_ERROR.test(String(event.message)) && rendersNothing(container);
+  win.addEventListener('error', (event) => breaksMount(event) && post({ status: Status.Failed, reason: String(event.message) }));
   win.addEventListener('message', (event) => {
     if (event.data?.type === MOUNT_PROPS) {
       current = { props: event.data.props ?? current.props, variants: event.data.variants ?? null };
