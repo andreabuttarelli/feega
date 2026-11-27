@@ -57,13 +57,17 @@ export function rowFocus(node: Row): Focus | null {
   return { name: node.name, source: node.source, index: node.instance, usage: null };
 }
 
-export function focusKeyOf(key: string, state: { focused: boolean; available: boolean }): FocusKey | null {
+export function focusKeyOf(key: string, state: { open: boolean; available: boolean }): FocusKey | null {
   const pressed = key.toLowerCase();
-  if (state.focused) {
+  if (state.open) {
     return pressed === ESCAPE ? FocusKey.Exit : null;
   }
   return pressed === FOCUS_LETTER && state.available ? FocusKey.Enter : null;
 }
+
+const HOME_ROUTE = '/';
+
+export const backLabelOf = (route: string): string => (route && route !== HOME_ROUTE ? route : 'Home');
 
 export enum Scheme {
   Light = 'light',
