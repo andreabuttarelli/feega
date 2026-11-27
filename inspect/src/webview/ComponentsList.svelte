@@ -16,7 +16,7 @@
 </script>
 
 <div class="components" data-testid="components">
-  <ActionBanner hint="See every component side by side" testid="canvas-open-components" onopen={oncanvas} />
+  <ActionBanner testid="canvas-open-components" onopen={oncanvas} />
   <div class="search"><SearchField label="Search components" value={query} placeholder="Search components" onsearch={(text) => (query = text)} /></div>
 
   {#each groups as group (group.folder)}

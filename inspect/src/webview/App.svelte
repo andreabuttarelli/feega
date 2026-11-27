@@ -1710,7 +1710,7 @@
       <Tabs.Trigger value={LeftTab.Components} class="tab" data-testid="components-tab">Components</Tabs.Trigger>
     </Tabs.List>
     <Tabs.Content value={LeftTab.Layers}>
-    <ActionBanner title="Add element" hint={picked ? 'Insert after the selection (/)' : 'Select an element first'} testid="add-button" icon={Plus} disabled={!picked} onopen={(e) => openAddMenu(e.clientX, e.clientY)} />
+    <ActionBanner title="Add element" testid="add-button" icon={Plus} disabled={!picked} onopen={(e) => openAddMenu(e.clientX, e.clientY)} />
     <div class="layers" role="tree" aria-label="Layers" data-testid="layers">
       <LayersTree nodes={layers} {picked} selected={selectedKeys} badge={badgeOf(elementState)} open={layersOpen} onselect={selectRow} onhover={hoverLayer} onopen={(at) => toHost({ kind: ToHost.Open, at })} onmove={moveLayer} onusage={moveUsage} dragging={layerDrag} hidden={hiddenNow} locked={lockedNow} ontoggle={toggleFlag} oncontext={openLayerMenu} onadd={layerAdd} onfocus={(node) => viewing === View.Page && enterFocus(rowFocus(node))} ondelete={deleteRow} />
     </div>
