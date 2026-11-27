@@ -56,6 +56,7 @@
   import { hasSourceInfo } from './source-info';
   import ChangesList from './ChangesList.svelte';
   import DeviceBar from './DeviceBar.svelte';
+  import DeviceChrome from './DeviceChrome.svelte';
   import Redo2 from '@lucide/svelte/icons/redo-2';
   import { Scope } from '@feega/live-edit/scoped-rule';
   import { Tabs } from 'bits-ui';
@@ -99,7 +100,7 @@
   import { modeOfKey } from './modes';
   import { browseHistory } from './history';
   import { DEFAULT_ANCHOR, anchorBox, isAnchor, nearestAnchor, nextAnchor, type Anchor } from './anchors';
-  import { PRESETS, SIZES, Size, Snap, fitOf, sizeForKey, snapped } from './sizes';
+  import { PRESETS, SIZES, Size, Snap, fitOf, frameOf, savedSize, sizeForKey, snapped } from './sizes';
   import { breakpointOfSize } from './usage-report';
   import { Where } from '@feega/plugin-api/manifest';
   import type { Place as PluginPlace } from '@feega/plugin-api/protocol';
@@ -309,6 +310,7 @@
   const history = browseHistory();
   let savedPrefs = false;
   const fit = $derived(fitOf(size, custom, stage));
+  const deviceFrame = $derived(frameOf(size));
   const target = $derived(writeTarget(reach, size !== Size.Full, breakpoints, fit.width));
   const reachBadge = $derived(badgeText(breakpoints, target, fit.width));
   $effect(() => {
@@ -683,7 +685,7 @@
       return;
     }
     savedPrefs = true;
-    size = PRESETS.includes(prefs.size as Size) || prefs.size === Size.Custom ? (prefs.size as Size) : Size.Full;
+    size = savedSize(prefs.size);
     custom = prefs.custom;
     barClosed = prefs.barClosed;
     route = prefs.route ?? route;
@@ -1593,8 +1595,9 @@
     {#if focus}<FocusTabs name={focus.name} active={viewing} notice={snapshotNotice} scheme={shownScheme} onscheme={switchScheme} transparent={transparentCanvas} ontransparent={toggleTransparent} zoom={zoomNow} onzoom={(request) => bridge.zoom(request)} onstep={(direction) => bridge.zoom({ mode: 'set', value: stepZoom(zoomNow, direction) })} onselect={showTab} onclose={exitFocus} bind:height={tabsH} />{/if}
 
     <div class="backdrop" role="presentation" bind:clientWidth={stage.w} bind:clientHeight={stage.h} onpointermove={resizeFrame} onpointerup={endDrag}>
-      <div class="frame" class:framed={size !== Size.Full} style={`width:${fit.width * fit.scale}px;height:${fit.height * fit.scale}px`}>
+      <div class="frame" class:framed={size !== Size.Full} class:device={deviceFrame} style={`width:${fit.width * fit.scale}px;height:${fit.height * fit.scale}px${deviceFrame ? `;--bezel:${deviceFrame.bezel * fit.scale}px;--screen-radius:${deviceFrame.radius * fit.scale}px` : ''}`}>
         {#if url}<iframe bind:this={frame} src={start} title="App" data-testid="app-frame" style={`width:${fit.width}px;height:${fit.height}px;transform:scale(${fit.scale})`}></iframe>{/if}
+        {#if deviceFrame}<DeviceChrome frame={deviceFrame} scale={fit.scale} landscape={fit.width > fit.height} />{/if}
         {#if restarting}<div class="restarting" data-testid="restarting" role="status"><span class="server-dot-inline amber"></span>Restarting dev server…</div>{/if}
         {#if mode === Mode.Design && bridged && !editing}
           <div class="overlay" role="presentation" onpointerdown={pressOverlay} onpointermove={(e) => (pointed(e), dragOverlay(e))} onpointerleave={() => ((hover = null), toHost({ kind: ToHost.Cursor, at: null }))} onclick={onPick} oncontextmenu={onMenu} ondragover={overAdd} ondragleave={() => (addSpot = null)} ondrop={dropAdd} ondblclick={onDouble} onwheel={wheelOnFocus}>
@@ -1915,6 +1918,11 @@
 
   .frame.framed {
     box-shadow: 0 0 0 1px var(--ui-divider), 0 8px 24px rgb(0 0 0 / 0.18);
+  }
+
+  .frame.device {
+    border-radius: var(--screen-radius);
+    box-shadow: 0 0 0 var(--bezel) #111, 0 0 0 calc(var(--bezel) + 1px) #3a3a3c, 0 12px 32px rgb(0 0 0 / 0.3);
   }
 
   iframe {

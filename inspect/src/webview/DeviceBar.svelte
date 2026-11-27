@@ -8,7 +8,7 @@
   import Smartphone from '@lucide/svelte/icons/smartphone';
   import Tablet from '@lucide/svelte/icons/tablet';
   import type { Component } from 'svelte';
-  import { SIZES, Size, rotated, type Fit } from './sizes';
+  import { DEVICE_MENU, SIZES, Size, rotated, type Fit } from './sizes';
 
   type Props = { size: Size; fit: Fit; onsize: (size: Size) => void; onwidth: (width: number) => void };
 
@@ -23,6 +23,14 @@
     [Size.PhoneLarge]: Smartphone,
     [Size.Phone]: Smartphone,
     [Size.PhoneSmall]: Smartphone,
+    [Size.Iphone15]: Smartphone,
+    [Size.Iphone15Landscape]: Smartphone,
+    [Size.IphoneSe]: Smartphone,
+    [Size.IphoneSeLandscape]: Smartphone,
+    [Size.Pixel8]: Smartphone,
+    [Size.Pixel8Landscape]: Smartphone,
+    [Size.Ipad]: Tablet,
+    [Size.IpadLandscape]: Tablet,
     [Size.Custom]: Maximize
   };
 
@@ -30,7 +38,8 @@
   const GROUPS: { label: string; sizes: Size[] }[] = [
     { label: 'Desktop', sizes: [Size.Full, Size.Desktop, Size.Laptop] },
     { label: 'Tablet', sizes: [Size.Tablet, Size.TabletLandscape] },
-    { label: 'Phone', sizes: [Size.PhoneLarge, Size.Phone, Size.PhoneSmall] }
+    { label: 'Phone', sizes: [Size.PhoneLarge, Size.Phone, Size.PhoneSmall] },
+    { label: 'Device frames', sizes: DEVICE_MENU }
   ];
 
   const dims = (s: Size) => (SIZES[s].width ? `${SIZES[s].width} × ${SIZES[s].height}` : 'fits the panel');
