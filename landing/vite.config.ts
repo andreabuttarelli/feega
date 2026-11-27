@@ -9,6 +9,7 @@ import { defineConfig } from 'vitest/config';
 const CHANGELOG_MODULE = 'virtual:changelog-entries';
 const CHANGELOG_DIR = resolve(import.meta.dirname, '../src/lib/content/changelog');
 const LIBRARY_DIR = resolve(import.meta.dirname, '../packages/library');
+const PLUGIN_REGISTRY_DIR = resolve(import.meta.dirname, '../packages/plugin-registry');
 const ENTRY_FILE = /^2.*\.ts$/;
 const TEST_FILE = /\.test\.ts$/;
 const OG_IMAGE_FILE = resolve(import.meta.dirname, 'static/og.png');
@@ -66,6 +67,6 @@ export default defineConfig(async () => ({
   define: { __FEEGA_VERSION__: JSON.stringify(await latestVersion()), __OG_IMAGE_VERSION__: JSON.stringify(ogImageVersion()) },
   esbuild: { tsconfigRaw: '{}' },
   plugins: [sveltekit(), changelogEntries()],
-  server: { fs: { allow: [CHANGELOG_DIR, LIBRARY_DIR] } },
+  server: { fs: { allow: [CHANGELOG_DIR, LIBRARY_DIR, PLUGIN_REGISTRY_DIR] } },
   test: { css: { include: [/packages\/library\/.+\.css/] } }
 }));

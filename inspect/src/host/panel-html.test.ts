@@ -14,6 +14,10 @@ describe('panel content security policy', () => {
     expect(directive('connect-src')).toBe("connect-src 'self' ws://localhost:* ws://127.0.0.1:*");
   });
 
+  it('shows plugin screenshots from the website and no other remote image', () => {
+    expect(directive('img-src')).toBe("img-src 'self' data: https://www.feega.app");
+  });
+
   it('only runs the panel script', () => {
     expect(directive('script-src')).toBe("script-src 'nonce-abc'");
   });
