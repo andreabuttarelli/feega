@@ -1,4 +1,5 @@
 import type { SupportItem } from './support';
+import type { PageRoute } from './host/page-route';
 import type { AcpAgent, AcpId } from './host/ai/acp-agents';
 import type { AgentEvent, ConfigView, ModeView } from './host/ai/agent-session';
 import type { Alert } from './host/ai/agent-alert';
@@ -226,6 +227,7 @@ export enum ToHost {
   ShareKick = 'share-kick',
   ShareRole = 'share-role',
   LibraryList = 'library-list',
+  Routes = 'routes',
   LibraryInsert = 'library-insert',
   NewPage = 'new-page',
   Plugin = 'plugin',
@@ -329,7 +331,8 @@ export enum ToView {
   ShowChat = 'show-chat',
   AgentAsk = 'agent-ask',
   Adapters = 'adapters',
-  PageCreated = 'page-created'
+  PageCreated = 'page-created',
+  Routes = 'routes'
 }
 
 export enum ShareState {
@@ -434,6 +437,7 @@ export type HostMessage =
   | { kind: ToHost.ShareKick; userId: string }
   | { kind: ToHost.ShareRole; userId: string; role: VisitorRole }
   | { kind: ToHost.LibraryList }
+  | { kind: ToHost.Routes }
   | { kind: ToHost.LibraryInsert; id: string; at: string; place: AddPlace }
   | { kind: ToHost.NewPage; route: string; item: string | null }
   | { kind: ToHost.Plugin; id: number; ask: PluginAsk }
@@ -481,6 +485,7 @@ export type ViewMessage =
   | { kind: ToView.Comments; enabled: boolean; comments: CloudComment[]; review?: CloudRevisions; error?: string }
   | { kind: ToView.Share; state: ShareState; available: boolean; name: string; canEdit: boolean; url?: string; expiresAt?: string; visitors: Present[]; notice: boolean; error?: string }
   | { kind: ToView.Library; items: LibraryEntry[] }
+  | { kind: ToView.Routes; routes: PageRoute[] }
   | { kind: ToView.Plugin; id: number; result: PluginResult }
   | { kind: ToView.Plugins; catalog: Catalog; canInstall: boolean }
   | { kind: ToView.Reload }
