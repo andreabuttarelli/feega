@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Move } from '../messages';
-import { BINDINGS, MOVES, Shortcut, shortcutOf, typingIn } from './selection-keys';
+import { BINDINGS, MOVES, Shortcut, letterOf, shortcutOf, typingIn } from './selection-keys';
 
 const press = (key: string, mods: { shift?: boolean; mod?: boolean } = {}, mac = true) => shortcutOf({ key, shiftKey: Boolean(mods.shift), metaKey: mac && Boolean(mods.mod), ctrlKey: !mac && Boolean(mods.mod) }, mac);
 
@@ -20,6 +20,24 @@ describe('selection shortcuts', () => {
 
   it('⇧⌘G arrives as an upper-case key and still unwraps', () => {
     expect(press('G', { mod: true, shift: true })).toBe(Shortcut.Unwrap);
+  });
+
+  it('letter shortcuts follow the physical key on a non-Latin layout', () => {
+    const cyrillic = { key: 'в', code: 'KeyD', shiftKey: false, metaKey: true, ctrlKey: false };
+
+    expect(shortcutOf(cyrillic, true)).toBe(Shortcut.Duplicate);
+    expect(letterOf({ key: 'я', code: 'KeyZ' })).toBe('z');
+  });
+
+  it('a Latin layout keeps its own letter, so QWERTZ still undoes on Z', () => {
+    expect(letterOf({ key: 'z', code: 'KeyY' })).toBe('z');
+    expect(letterOf({ key: 'Z', code: 'KeyY' })).toBe('z');
+  });
+
+  it('keys without a letter code keep their name', () => {
+    expect(letterOf({ key: 'Delete', code: 'Delete' })).toBe('delete');
+    expect(letterOf({ key: '[', code: 'BracketLeft' })).toBe('[');
+    expect(letterOf({ key: 'х', code: 'BracketLeft' })).toBe('[');
   });
 
   it('Ctrl takes the place of ⌘ off the Mac, and ⌘ does nothing there', () => {
