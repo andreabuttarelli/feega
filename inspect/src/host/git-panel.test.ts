@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, realpathSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { GitAction, GitAfter, GitScope, GitState, ToView, type GitView, type ViewMessage } from '../messages';
+import { GitAction, GitAfter, GitFix, GitScope, GitState, ToView, type GitView, type ViewMessage } from '../messages';
 import { GIT_MISSING, gitPanel, type GitRun } from './git-panel';
 import { nodeGit } from './node-git';
 
@@ -147,7 +147,7 @@ describe('git panel against a real repository', () => {
     const { p, result, view } = panel(root);
     await p.commit('Mine', GitScope.Feega, GitAfter.Push);
 
-    expect(result()).toMatchObject({ action: GitAction.Push, ok: false, pull: true });
+    expect(result()).toMatchObject({ action: GitAction.Push, ok: false, fix: GitFix.PullAndPush });
     expect(result().text).toContain('Pull');
 
     sh(top, 'reset', '--keep', 'HEAD~1');
@@ -174,7 +174,109 @@ describe('git panel against a real repository', () => {
 
     expect(result()).toMatchObject({ action: GitAction.Pull, ok: false });
     expect(result().text).toContain('diverged');
+    expect(result().fix).toBe(GitFix.Sync);
     expect(sh(top, 'rev-parse', 'HEAD')).toBe(before);
+  });
+
+  it('pulls and pushes in one go when only behind', async () => {
+    const { top, root, remote } = repo();
+    const other = tmp('other');
+    sh(other, 'clone', remote, '.');
+    writeFileSync(join(other, 'remote.txt'), 'r\n');
+    sh(other, 'add', '-A');
+    sh(other, 'commit', '-m', 'remote change');
+    sh(other, 'push');
+    const { p, result, view } = panel(root);
+    await p.pullAndPush();
+
+    expect(result()).toMatchObject({ ok: true });
+    expect(sh(top, 'log', '-1', '--format=%s')).toBe('remote change');
+    expect(view()).toMatchObject({ behind: 0, ahead: 0 });
+  });
+
+  it('pulls and pushes a local commit when the remote can fast-forward', async () => {
+    const { top, root, remote } = repo();
+    edit(root);
+    const { p } = panel(root);
+    await p.commit('Mine', GitScope.Feega, GitAfter.Stay);
+    await p.pullAndPush();
+
+    expect(sh(remote, 'log', '-1', '--format=%s', 'main')).toBe('Mine');
+    expect(sh(top, 'rev-parse', 'HEAD')).toBe(sh(remote, 'rev-parse', 'main'));
+  });
+
+  it('stops pull and push at diverged branches and offers a sync', async () => {
+    const { top, root, remote } = repo();
+    const other = tmp('other');
+    sh(other, 'clone', remote, '.');
+    writeFileSync(join(other, 'remote.txt'), 'r\n');
+    sh(other, 'add', '-A');
+    sh(other, 'commit', '-m', 'remote change');
+    sh(other, 'push');
+    edit(root);
+    const { p, result } = panel(root);
+    await p.commit('Mine', GitScope.Feega, GitAfter.Stay);
+    const before = sh(top, 'rev-parse', 'HEAD');
+    await p.pullAndPush();
+
+    expect(result()).toMatchObject({ ok: false, fix: GitFix.Sync });
+    expect(sh(top, 'rev-parse', 'HEAD')).toBe(before);
+    expect(sh(remote, 'log', '-1', '--format=%s', 'main')).toBe('remote change');
+  });
+
+  it('saves a name and email for this repository only', async () => {
+    const { top, root } = repo();
+    const { p, result } = panel(root);
+    await p.identity('Ada Lovelace', 'ada@example.dev');
+
+    expect(sh(top, 'config', '--local', 'user.name')).toBe('Ada Lovelace');
+    expect(sh(top, 'config', '--local', 'user.email')).toBe('ada@example.dev');
+    expect(result()).toMatchObject({ ok: true });
+  });
+
+  it('refuses an empty name or email', async () => {
+    const { root } = repo();
+    const { p, result, calls } = panel(root);
+    await p.identity('  ', 'a@b.dev');
+
+    expect(result()).toMatchObject({ ok: false, fix: GitFix.Identity });
+    expect(calls.flat()).not.toContain('config');
+  });
+
+  it('hands a failed commit hook to the agent with the hook output', async () => {
+    const { top, root } = repo();
+    writeFileSync(join(top, '.git/hooks/pre-commit'), '#!/bin/sh\necho "lint failed: no tabs" >&2\nexit 1\n', { mode: 0o755 });
+    edit(root);
+    const { p, result } = panel(root);
+    await p.commit('Blocked', GitScope.Feega, GitAfter.Stay);
+
+    expect(result()).toMatchObject({ ok: false, fix: GitFix.Agent });
+    expect(await p.fixPrompt()).toContain('lint failed: no tabs');
+  });
+
+  it('describes the diverged branches to the agent', async () => {
+    const { root, remote } = repo();
+    const other = tmp('other');
+    sh(other, 'clone', remote, '.');
+    writeFileSync(join(other, 'remote.txt'), 'r\n');
+    sh(other, 'add', '-A');
+    sh(other, 'commit', '-m', 'remote change');
+    sh(other, 'push');
+    edit(root);
+    const { p } = panel(root);
+    await p.commit('Mine', GitScope.Feega, GitAfter.Stay);
+    await p.pull();
+    const prompt = await p.fixPrompt();
+
+    expect(prompt).toContain('1 ahead, 1 behind origin/main');
+    expect(prompt).toContain('fast-forward');
+  });
+
+  it('has no prompt when nothing failed', async () => {
+    const { root } = repo();
+    const { p } = panel(root);
+
+    expect(await p.fixPrompt()).toBeNull();
   });
 
   it('explains a repository without a remote', async () => {
@@ -230,7 +332,7 @@ describe('git panel with a stubbed command', () => {
     const { p, result } = panel('/x', ['src/Hero.svelte'], run);
     await p.push();
 
-    expect(result()).toMatchObject({ ok: false, pull: false });
+    expect(result()).toMatchObject({ ok: false, fix: GitFix.SignIn });
     expect(result().text).toContain('terminal');
     expect(result().text).toContain('Feega does not store credentials');
   });
@@ -240,6 +342,7 @@ describe('git panel with a stubbed command', () => {
     const { p, result } = panel('/x', ['src/Hero.svelte'], run);
     await p.commit('m', GitScope.Feega, GitAfter.Stay);
 
-    expect(result().text).toContain('user.email');
+    expect(result()).toMatchObject({ fix: GitFix.Identity });
+    expect(result().text).toContain('name and email');
   });
 });

@@ -1,5 +1,5 @@
-import { GitAction, GitAfter, GitScope, GitState, ToView, type GitView, type ViewMessage } from '../messages';
-import { GitFailure, commitMessage, failureOf, parseStatus, splitFiles, type EditedRow, type GitStatus } from './git-status';
+import { GitAction, GitAfter, GitFix, GitScope, GitState, ToView, type GitView, type ViewMessage } from '../messages';
+import { GitFailure, commitMessage, failureOf, fixFor, fixPrompt, parseStatus, splitFiles, type EditedRow, type GitFailed, type GitStatus } from './git-status';
 
 export const GIT_MISSING = -1;
 
@@ -25,7 +25,9 @@ const NOTHING_TO_PUSH = 'Nothing to push.';
 const AUTH = 'Git could not sign in to the remote. Sign in to git or GitHub in a terminal (for example `gh auth login`), then try again. Feega does not store credentials.';
 const NEEDS_PULL = 'The remote has commits you do not have. Pull, then push again.';
 const DIVERGED = 'Your branch and the remote have diverged. Feega only fast-forwards: run `git pull --rebase` in a terminal.';
-const IDENTITY = 'Git does not know who you are. Run `git config --global user.name "Your Name"` and `git config --global user.email "you@example.com"` in a terminal.';
+const IDENTITY = 'Git does not know who you are. Enter a name and email to save for this repository.';
+const NEED_IDENTITY = 'Enter both a name and an email.';
+const IDENTITY_SAVED = 'Saved for this repository. Commit again.';
 
 const FAILURE_TEXT: Record<GitFailure, string | null> = {
   [GitFailure.Auth]: AUTH,
@@ -46,6 +48,7 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 export function gitPanel({ run, post, rows }: GitPanelHost) {
   let turn: Promise<unknown> = Promise.resolve();
+  let last: GitFailed | null = null;
 
   const inTurn = <T>(work: () => Promise<T>): Promise<T> => {
     const next = turn.then(work, work);
@@ -81,7 +84,12 @@ export function gitPanel({ run, post, rows }: GitPanelHost) {
     return view;
   };
 
-  const say = (action: GitAction, ok: boolean, text: string, pull = false) => post({ kind: ToView.GitResult, action, ok, text, pull });
+  const say = (action: GitAction, ok: boolean, text: string, fix = GitFix.None) => post({ kind: ToView.GitResult, action, ok, text, fix });
+
+  async function fail(action: GitAction, err: string) {
+    last = { action, stderr: err };
+    await say(action, false, explain(err), fixFor(failureOf(err)));
+  }
 
   async function addAndCommit(view: GitView, message: string, scope: GitScope) {
     const specs = view.feega.map((p) => `${TOP}${p}`);
@@ -112,7 +120,7 @@ export function gitPanel({ run, post, rows }: GitPanelHost) {
     }
     const done = await addAndCommit(view, text, scope);
     if (done.code !== 0) {
-      await say(GitAction.Commit, false, explain(done.err || done.out));
+      await fail(GitAction.Commit, done.err || done.out);
       await show();
       return;
     }
@@ -148,8 +156,7 @@ export function gitPanel({ run, post, rows }: GitPanelHost) {
       await show();
       return;
     }
-    const failure = failureOf(done.err);
-    await say(GitAction.Push, false, explain(done.err), failure === GitFailure.NeedsPull);
+    await fail(GitAction.Push, done.err);
     await show();
   }
 
@@ -160,14 +167,50 @@ export function gitPanel({ run, post, rows }: GitPanelHost) {
       await show();
       return;
     }
-    await say(GitAction.Pull, false, explain(done.err));
+    await fail(GitAction.Pull, done.err);
     await show();
+  }
+
+  async function doPullPush() {
+    const pulled = await run(['pull', '--ff-only']);
+    if (pulled.code !== 0) {
+      await fail(GitAction.Pull, pulled.err);
+      await show();
+      return;
+    }
+    const { view } = await snapshot();
+    if (!view.ahead) {
+      await say(GitAction.Pull, true, 'Pulled the latest commits.');
+      await show();
+      return;
+    }
+    await doPush();
+  }
+
+  async function doIdentity(name: string, email: string) {
+    if (!name.trim() || !email.trim()) {
+      await say(GitAction.Commit, false, NEED_IDENTITY, GitFix.Identity);
+      return;
+    }
+    const saved = (await run(['config', '--local', 'user.name', name.trim()])).code === 0 && (await run(['config', '--local', 'user.email', email.trim()])).code === 0;
+    await say(GitAction.Commit, saved, saved ? IDENTITY_SAVED : 'Could not write the repository git config.');
+  }
+
+  async function doFixPrompt(): Promise<string | null> {
+    if (!last) {
+      return null;
+    }
+    const { status } = await snapshot();
+    return fixPrompt(last, status);
   }
 
   return {
     refresh: () => inTurn(show),
     commit: (message: string, scope: GitScope, after: GitAfter) => inTurn(() => doCommit(message, scope, after)),
     push: () => inTurn(doPush),
-    pull: () => inTurn(doPull)
+    pull: () => inTurn(doPull),
+    pullAndPush: () => inTurn(doPullPush),
+    identity: (name: string, email: string) => inTurn(() => doIdentity(name, email)),
+    fixPrompt: () => inTurn(doFixPrompt)
   };
 }

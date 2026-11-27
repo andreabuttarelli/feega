@@ -1769,7 +1769,7 @@
         {/if}
       </Tabs.Content>
       <Tabs.Content value={Tab.Changes}>
-        <ChangesList {changes} onselect={select} onopen={(at) => toHost({ kind: ToHost.Open, at })} ondiff={(id) => toHost({ kind: ToHost.Diff, id })} onrevert={(id) => toHost({ kind: ToHost.Revert, id })} onrevertall={() => toHost({ kind: ToHost.Revert, id: null })} onscm={() => toHost({ kind: ToHost.SourceControl })} />
+        <ChangesList {changes} onselect={select} onopen={(at) => toHost({ kind: ToHost.Open, at })} ondiff={(id) => toHost({ kind: ToHost.Diff, id })} onrevert={(id) => toHost({ kind: ToHost.Revert, id })} onrevertall={() => toHost({ kind: ToHost.Revert, id: null })} onscm={() => toHost({ kind: ToHost.SourceControl })} onai={() => (tab = Tab.Ai)} />
       </Tabs.Content>
       {#each plugins.sidePanel as panel (panel.plugin + panel.entry.id)}
         <Tabs.Content value={`plugin:${panel.plugin}/${panel.entry.id}`}>

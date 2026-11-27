@@ -251,7 +251,10 @@ export enum ToHost {
   GitRefresh = 'git-refresh',
   GitCommit = 'git-commit',
   GitPush = 'git-push',
-  GitPull = 'git-pull'
+  GitPull = 'git-pull',
+  GitPullPush = 'git-pull-push',
+  GitIdentity = 'git-identity',
+  GitFix = 'git-fix'
 }
 
 export enum WebviewUsage {
@@ -286,6 +289,18 @@ export enum GitAction {
   Commit = 'commit',
   Push = 'push',
   Pull = 'pull'
+}
+
+export enum GitFix {
+  None = 'none',
+  Pull = 'pull',
+  PullAndPush = 'pull-and-push',
+  Sync = 'sync',
+  Agent = 'agent',
+  SignIn = 'sign-in',
+  Identity = 'identity',
+  CopyInit = 'copy-init',
+  CopyRemote = 'copy-remote'
 }
 
 export type GitView = { state: GitState; branch: string | null; upstream: string | null; remote: string | null; ahead: number; behind: number; feega: string[]; others: string[]; message: string };
@@ -489,6 +504,9 @@ export type HostMessage =
   | { kind: ToHost.GitCommit; message: string; scope: GitScope; after: GitAfter }
   | { kind: ToHost.GitPush }
   | { kind: ToHost.GitPull }
+  | { kind: ToHost.GitPullPush }
+  | { kind: ToHost.GitIdentity; name: string; email: string }
+  | { kind: ToHost.GitFix; agent: AcpId }
   | { kind: ToHost.AgentAnswer; id: number; png: string | null; text: string | null };
 
 export type Authored = HostMessage & { by?: Author };
@@ -535,7 +553,7 @@ export type ViewMessage =
   | { kind: ToView.AgentAsk; id: number; ask: AgentAsk; selection: boolean }
   | { kind: ToView.Adapters; rows: AdapterRow[] }
   | { kind: ToView.Git; view: GitView }
-  | { kind: ToView.GitResult; action: GitAction; ok: boolean; text: string; pull: boolean }
+  | { kind: ToView.GitResult; action: GitAction; ok: boolean; text: string; fix: GitFix }
   | { kind: ToView.AiChat; chat: string | null; agent?: AcpId; state: AiState; items: Item[]; modes: ModeView[]; mode: string | null; configs: ConfigView[]; images?: boolean };
 
 export const INSPECT = 'feega:inspect';

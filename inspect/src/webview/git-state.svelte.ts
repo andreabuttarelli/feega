@@ -1,6 +1,6 @@
-import { ToView, type GitAction, type GitView, type ViewMessage } from '../messages';
+import { ToView, type GitAction, type GitFix, type GitView, type ViewMessage } from '../messages';
 
-export type GitResult = { action: GitAction; ok: boolean; text: string; pull: boolean };
+export type GitResult = { action: GitAction; ok: boolean; text: string; fix: GitFix };
 
 export const git = $state<{ view: GitView | null; result: GitResult | null; pending: boolean }>({ view: null, result: null, pending: false });
 
@@ -10,7 +10,7 @@ export function gitHeard(message: ViewMessage) {
     return;
   }
   if (message.kind === ToView.GitResult) {
-    git.result = { action: message.action, ok: message.ok, text: message.text, pull: message.pull };
+    git.result = { action: message.action, ok: message.ok, text: message.text, fix: message.fix };
     git.pending = false;
   }
 }

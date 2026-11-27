@@ -1,8 +1,9 @@
 <script lang="ts">
   import type { ChangeRow, Source } from '../messages';
   import GitCommit from './GitCommit.svelte';
+  import { git } from './git-state.svelte';
 
-  let { changes, onselect, onopen, ondiff, onrevert, onrevertall, onscm }: { changes: ChangeRow[]; onselect: (source: Source) => void; onopen: (source: Source) => void; ondiff: (id: number) => void; onrevert: (id: number) => void; onrevertall: () => void; onscm: () => void } = $props();
+  let { changes, onselect, onopen, ondiff, onrevert, onrevertall, onscm, onai }: { changes: ChangeRow[]; onselect: (source: Source) => void; onopen: (source: Source) => void; ondiff: (id: number) => void; onrevert: (id: number) => void; onrevertall: () => void; onscm: () => void; onai: () => void } = $props();
 
   const AT = /^(.+):(\d+):(\d+)$/;
   const sourceOf = (at: string): Source | null => {
@@ -51,8 +52,8 @@
     <button type="button" class="link" onclick={onscm}>Source Control</button>
     <button type="button" class="link danger" disabled={!changes.length || reverting !== null} aria-busy={reverting === ALL} onclick={() => revert(ALL)}>{#if reverting === ALL}{@render spinner()}Reverting…{:else}Revert all{/if}</button>
   </header>
-  <GitCommit {changes} />
-  {#if !changes.length}<p class="empty">No edits yet in this workspace.</p>{/if}
+  <GitCommit {changes} {onai} />
+  {#if !changes.length}<p class="empty">No edits yet in this workspace.</p>{:else}<h4 class="list-title" data-testid="changes-title">{git.view?.feega.length ? 'Included in this commit' : 'Edits'}</h4>{/if}
   {#each changes as change (change.id)}
     {@const source = sourceOf(change.at)}
     <div class="row">
@@ -169,6 +170,14 @@
 
   .danger {
     color: #ff453a;
+  }
+
+  .list-title {
+    margin: 0;
+    padding: 8px 12px 0;
+    color: var(--ui-text-2);
+    font-size: var(--ui-text-xs);
+    font-weight: 500;
   }
 
   .empty {

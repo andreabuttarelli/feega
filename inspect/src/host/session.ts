@@ -41,6 +41,7 @@ import { scalesOf } from './scales';
 import { themesOf } from './themes';
 import { MCP_COMMAND } from '../webview/onboarding-slides';
 import { EditKind, UsageKind, usageSession, type EditDetails } from './usage';
+import type { AcpId } from './ai/acp-agents';
 import { aiUsage } from './ai/ai-usage';
 import { breakpointOf, fileExtOf, identifierOf, linesOf, propCategoryOf, stateOf, targetOf, webviewDimsOf } from './usage-dims';
 import { editKindOf } from './edit-kind';
@@ -395,6 +396,18 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     : null;
 
   const gitChanges = gitPanel({ run: async (args) => (platform.git ? platform.git(root)(args) : { code: GIT_MISSING, out: '', err: '' }), post, rows: () => edits.history() });
+  async function agentFixes(agent: AcpId) {
+    const prompt = await gitChanges.fixPrompt();
+    if (!prompt) {
+      return;
+    }
+    aiAgent = agent;
+    aiStats?.started(agent);
+    await ai.start(agent);
+    aiStats?.sent();
+    await ai.send(prompt, null, []);
+  }
+
   const comments = commentsHost(platform.cloud, post, () => edits.history());
   const sharing = shareSession({ platform, workspace, appUrl: () => running?.url ?? null, post });
 
@@ -864,6 +877,9 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.GitCommit]: (m) => gitChanges.commit(m.message, m.scope, m.after),
     [ToHost.GitPush]: () => gitChanges.push(),
     [ToHost.GitPull]: () => gitChanges.pull(),
+    [ToHost.GitPullPush]: () => gitChanges.pullAndPush(),
+    [ToHost.GitIdentity]: (m) => gitChanges.identity(m.name, m.email),
+    [ToHost.GitFix]: (m) => agentFixes(m.agent),
     [ToHost.Usage]: (m) => usage?.track(WEBVIEW_USAGE[m.event], webviewDimsOf(m.dims)),
     [ToHost.Comments]: comments.show,
     [ToHost.CommentAdd]: (m) => (usage?.track(UsageKind.CloudAction, { action: 'comment_add' }), comments.add(m.draft)),

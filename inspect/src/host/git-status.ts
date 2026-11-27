@@ -1,3 +1,5 @@
+import { GitFix } from '../messages';
+
 export type GitStatus = { branch: string | null; upstream: string | null; ahead: number; behind: number; paths: string[] };
 
 export type EditedRow = { at: string; prop: string; files: string[] };
@@ -96,4 +98,29 @@ export function commitMessage(rows: EditedRow[]): string {
 
 export function failureOf(stderr: string): GitFailure {
   return FAILURES.find(([pattern]) => pattern.test(stderr))?.[1] ?? GitFailure.Other;
+}
+
+const FIXES: Record<GitFailure, GitFix> = {
+  [GitFailure.NeedsPull]: GitFix.PullAndPush,
+  [GitFailure.Diverged]: GitFix.Sync,
+  [GitFailure.Auth]: GitFix.SignIn,
+  [GitFailure.Identity]: GitFix.Identity,
+  [GitFailure.Other]: GitFix.Agent
+};
+
+export const fixFor = (failure: GitFailure): GitFix => FIXES[failure];
+
+export type GitFailed = { action: string; stderr: string };
+
+export function fixPrompt(failed: GitFailed, status: GitStatus): string {
+  const branch = status.branch ?? 'no branch (detached HEAD)';
+  const sync = `${status.ahead} ahead, ${status.behind} behind ${status.upstream ?? 'no upstream'}`;
+  const changed = status.paths.length ? status.paths.join(', ') : 'none';
+  return [
+    `Feega tried to ${failed.action} in this project and git failed. Resolve it safely.`,
+    `Branch: ${branch} (${sync}).`,
+    `Uncommitted files: ${changed}.`,
+    `Git said:\n${failed.stderr.trim()}`,
+    'Never force push, never discard uncommitted work, and never rewrite commits that are already pushed. Explain what you did when you are done.'
+  ].join('\n');
 }

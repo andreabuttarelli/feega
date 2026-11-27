@@ -9,32 +9,35 @@ The **Changes** tab has a commit area above the list of edits. It runs the `git`
 
 ## What you see
 
+- A header such as **Commit 2 changes in 1 file**. One commit holds every edit listed under **Included in this commit**, together. Edits are not committed one at a time.
 - The current branch, and how many commits it is ahead of or behind its upstream.
 - A commit message, prefilled from your edits, for example `Update padding and font size in Hero`. Change it freely.
-- The files that will be committed. By default these are the files Feega edited. Choose **All changes** to include every changed or new file in the repository.
+- A switch between **Feega edits** (the default: the files Feega edited) and **All changes** (every changed or new file in the repository), and the list of files that will be committed.
 
 ## Buttons
 
 | Button | What it does |
 |---|---|
+| **Commit & push** | Commits, then pushes. A branch without an upstream is pushed to `origin` and tracks it from then on. Without a remote this is just **Commit**. |
 | **Commit** | Commits the listed files. Other changes, staged or not, stay as they are. |
-| **Commit & push** | Commits, then pushes. A branch without an upstream is pushed to `origin` and tracks it from then on. |
-| **Push** | Pushes the commits that are ahead. |
-| **Pull** | Runs `git pull --ff-only`. It shows when the branch is behind or a push was rejected. |
+| **Push** | Shown only when commits are waiting to be pushed. |
 
 Feega never force pushes.
 
-## When it cannot go on
+## When something goes wrong
 
-| Message | What to do |
+Every message comes with the button that fixes it.
+
+| Message | Button |
 |---|---|
-| Git is not installed | Install git and make sure it is on your `PATH`. |
-| Not a git repository | Run `git init` in a terminal. Feega does not create repositories. |
-| Nothing to commit | Edit something, or switch to **All changes**. |
-| No remote | Add one with `git remote add origin <url>`. |
-| The remote has commits you do not have | Press **Pull**, then push again. |
-| Branches have diverged | Run `git pull --rebase` in a terminal. Feega only fast-forwards. |
-| Git could not sign in | Sign in to git or GitHub in a terminal, for example with `gh auth login`, then try again. |
-| Git does not know who you are | Set `user.name` and `user.email` with `git config --global`. |
+| The branch is behind its upstream | **Pull** runs `git pull --ff-only`. |
+| The push was rejected | **Pull and push** runs `git pull --ff-only`, then pushes. |
+| Branches have diverged | **Ask your agent to sync** starts your local AI agent in the AI tab with the git state and error, and asks it to resolve it without force pushing. |
+| A hook failed, a conflict, or anything else git cannot solve with a safe command | **Fix with your agent**, the same way. Without an installed agent the button takes you to the AI tab to install one. |
+| Git could not sign in | **Copy `gh auth login`**. Run it in a terminal, then try again. |
+| Git does not know who you are | Type a name and email and press **Save**. They are written to this repository's git config with `git config user.name` and `git config user.email`. |
+| Not a git repository | **Copy `git init`**. Feega does not create repositories. |
+| No remote | **Copy `git remote add origin <url>`**. |
+| Nothing to commit, git not installed | Nothing to press: edit something, or install git. |
 
 Feega never asks for, reads or stores credentials. Pushes use your own git setup: credential helper, SSH keys or `gh`. Git is told not to prompt, so a missing sign-in fails with a message instead of hanging.

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { GitFailure, commitMessage, failureOf, parseStatus, splitFiles } from './git-status';
+import { GitFix } from '../messages';
+import { GitFailure, commitMessage, failureOf, fixFor, fixPrompt, parseStatus, splitFiles } from './git-status';
 
 const PORCELAIN = [
   '# branch.oid 1234',
@@ -78,5 +79,38 @@ describe('failureOf', () => {
     ['fatal: no upstream configured', GitFailure.Other]
   ])('classifies %j', (err, expected) => {
     expect(failureOf(err)).toBe(expected);
+  });
+});
+
+describe('fixFor', () => {
+  it.each([
+    [GitFailure.NeedsPull, GitFix.PullAndPush],
+    [GitFailure.Diverged, GitFix.Sync],
+    [GitFailure.Auth, GitFix.SignIn],
+    [GitFailure.Identity, GitFix.Identity],
+    [GitFailure.Other, GitFix.Agent]
+  ])('%s offers %s', (failure, fix) => {
+    expect(fixFor(failure)).toBe(fix);
+  });
+});
+
+describe('fixPrompt', () => {
+  const failed = { action: 'push', stderr: '! [rejected] main -> main (fetch first)' };
+  const state = { branch: 'main', upstream: 'origin/main', ahead: 1, behind: 2, paths: ['src/Hero.svelte'] };
+
+  it('describes the branch, the changed files and the git error', () => {
+    const prompt = fixPrompt(failed, state);
+
+    expect(prompt).toContain('push');
+    expect(prompt).toContain('main');
+    expect(prompt).toContain('origin/main');
+    expect(prompt).toContain('1 ahead');
+    expect(prompt).toContain('2 behind');
+    expect(prompt).toContain('src/Hero.svelte');
+    expect(prompt).toContain('fetch first');
+  });
+
+  it('forbids force pushing and asks for a safe resolution', () => {
+    expect(fixPrompt(failed, state)).toMatch(/never force push/i);
   });
 });
