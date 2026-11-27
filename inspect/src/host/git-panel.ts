@@ -26,6 +26,7 @@ const AUTH = 'Git could not sign in to the remote. Sign in to git or GitHub in a
 const NEEDS_PULL = 'The remote has commits you do not have. Pull, then push again.';
 const DIVERGED = 'Your branch and the remote have diverged. Feega only fast-forwards: run `git pull --rebase` in a terminal.';
 const IDENTITY = 'Git does not know who you are. Enter a name and email to save for this repository.';
+const DIRTY_TREE = 'You have uncommitted changes, so Feega will not rebase over them.';
 const NEED_IDENTITY = 'Enter both a name and an email.';
 const IDENTITY_SAVED = 'Saved for this repository. Commit again.';
 
@@ -171,8 +172,33 @@ export function gitPanel({ run, post, rows }: GitPanelHost) {
     await show();
   }
 
+  async function rebased(): Promise<GitOut> {
+    const clean = await run(['status', '--porcelain', '--untracked-files=no']);
+    if (clean.out.trim()) {
+      return { code: 1, out: '', err: DIRTY_TREE };
+    }
+    const done = await run(['pull', '--rebase']);
+    if (done.code !== 0) {
+      await run(['rebase', '--abort']);
+    }
+    return done;
+  }
+
+  async function syncFailed(err: string) {
+    last = { action: GitAction.Pull, stderr: err };
+    await say(GitAction.Pull, false, DIVERGED, GitFix.Sync);
+  }
+
   async function doPullPush() {
-    const pulled = await run(['pull', '--ff-only']);
+    let pulled = await run(['pull', '--ff-only']);
+    if (pulled.code !== 0 && failureOf(pulled.err) === GitFailure.Diverged) {
+      pulled = await rebased();
+      if (pulled.code !== 0) {
+        await syncFailed(pulled.err || pulled.out);
+        await show();
+        return;
+      }
+    }
     if (pulled.code !== 0) {
       await fail(GitAction.Pull, pulled.err);
       await show();

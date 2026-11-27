@@ -31,7 +31,7 @@ Every message comes with the button that fixes it.
 | Message | Button |
 |---|---|
 | The branch is behind its upstream | **Pull** runs `git pull --ff-only`. |
-| The push was rejected | **Pull and push** runs `git pull --ff-only`, then pushes. |
+| The push was rejected | **Pull and push** runs `git pull --ff-only`. If the branches diverged and your working tree is clean, it runs `git pull --rebase` instead, then pushes. On a conflict it runs `git rebase --abort`, leaves everything as it was and offers the agent. |
 | Branches have diverged | **Ask your agent to sync** starts your local AI agent in the AI tab with the git state and error, and asks it to resolve it without force pushing. |
 | A hook failed, a conflict, or anything else git cannot solve with a safe command | **Fix with your agent**, the same way. Without an installed agent the button takes you to the AI tab to install one. |
 | Git could not sign in | **Copy `gh auth login`**. Run it in a terminal, then try again. |

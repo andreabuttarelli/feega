@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, realpathSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -205,15 +205,33 @@ describe('git panel against a real repository', () => {
     expect(sh(top, 'rev-parse', 'HEAD')).toBe(sh(remote, 'rev-parse', 'main'));
   });
 
-  it('stops pull and push at diverged branches and offers a sync', async () => {
-    const { top, root, remote } = repo();
+  const diverge = (top: string, remote: string, remoteFile: string, remoteText: string) => {
     const other = tmp('other');
     sh(other, 'clone', remote, '.');
-    writeFileSync(join(other, 'remote.txt'), 'r\n');
+    writeFileSync(join(other, remoteFile), remoteText);
     sh(other, 'add', '-A');
     sh(other, 'commit', '-m', 'remote change');
     sh(other, 'push');
+    return top;
+  };
+
+  it('rebases a diverged branch without conflicts and pushes in one click', async () => {
+    const { top, root, remote } = repo();
+    diverge(top, remote, 'remote.txt', 'r\n');
     edit(root);
+    const { p, result } = panel(root);
+    await p.commit('Mine', GitScope.Feega, GitAfter.Stay);
+    await p.pullAndPush();
+
+    expect(result()).toMatchObject({ action: GitAction.Push, ok: true });
+    expect(sh(remote, 'log', '-2', '--format=%s', 'main')).toBe('Mine\nremote change');
+    expect(sh(top, 'rev-parse', 'HEAD')).toBe(sh(remote, 'rev-parse', 'main'));
+  });
+
+  it('aborts the rebase on a conflict, leaves the repository as it was and offers the agent', async () => {
+    const { top, root, remote } = repo();
+    diverge(top, remote, 'src/Hero.svelte', '<h1>remote</h1>\n');
+    writeFileSync(join(root, 'src/Hero.svelte'), '<h1>mine</h1>\n');
     const { p, result } = panel(root);
     await p.commit('Mine', GitScope.Feega, GitAfter.Stay);
     const before = sh(top, 'rev-parse', 'HEAD');
@@ -221,7 +239,27 @@ describe('git panel against a real repository', () => {
 
     expect(result()).toMatchObject({ ok: false, fix: GitFix.Sync });
     expect(sh(top, 'rev-parse', 'HEAD')).toBe(before);
+    expect(sh(top, 'status', '--porcelain')).toBe('');
+    expect(existsSync(join(top, '.git/rebase-merge'))).toBe(false);
+    expect(existsSync(join(top, '.git/rebase-apply'))).toBe(false);
     expect(sh(remote, 'log', '-1', '--format=%s', 'main')).toBe('remote change');
+  });
+
+  it('does not rebase over unrelated uncommitted work and offers the agent', async () => {
+    const { top, root, remote } = repo();
+    diverge(top, remote, 'remote.txt', 'r\n');
+    edit(root);
+    const { p, result, calls } = panel(root);
+    await p.commit('Mine', GitScope.Feega, GitAfter.Stay);
+    edit(root, 'src/Other.svelte');
+    const before = sh(top, 'rev-parse', 'HEAD');
+    await p.pullAndPush();
+
+    expect(result()).toMatchObject({ ok: false, fix: GitFix.Sync });
+    expect(sh(top, 'rev-parse', 'HEAD')).toBe(before);
+    expect(sh(top, 'status', '--porcelain')).toBe('M src/Other.svelte');
+    expect(calls.flat()).not.toContain('--rebase');
+    expect(calls.flat()).not.toContain('--autostash');
   });
 
   it('saves a name and email for this repository only', async () => {
