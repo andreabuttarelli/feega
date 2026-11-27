@@ -6,7 +6,7 @@
   import type { Bounds } from './canvas-layout';
   import { LIVE_CAP, liveSet } from './canvas-live';
   import { LOAD_TIMEOUT_MS, MAX_LOADING, PAINT_DELAY_MS, POOL_CAP, SETTLE_MS, planPool, settler } from './canvas-pool';
-  import { CardState, statusOf } from './canvas-card';
+  import { CardState, statusOf, type MountStatus } from './canvas-card';
   import { shotOf } from './canvas-shot';
   import type { Hit } from './canvas-open';
   import type { Placed } from './canvas-live';
@@ -28,12 +28,13 @@
     snug?: boolean;
     liveCap?: number;
     frameBadge?: (frame: F) => string | null;
-    onready?: (key: string, report: { size: { width: number; height: number } | null; props: Record<string, unknown> }) => void;
+    onstatus?: (key: string, status: MountStatus) => void;
+    reload?: Record<string, number>;
     world?: Snippet;
     card: Snippet<[F, CardState, string]>;
   };
 
-  let { frames, bounds, label, testid, minLiveWidth, frameLabel, srcOf, hitOf, onopen, onclose, stale = null, snug = false, liveCap = LIVE_CAP, frameBadge, onready, world, card }: Props = $props();
+  let { frames, bounds, label, testid, minLiveWidth, frameLabel, srcOf, hitOf, onopen, onclose, stale = null, snug = false, liveCap = LIVE_CAP, frameBadge, onstatus, reload = {}, world, card }: Props = $props();
 
   const MIDDLE_BUTTON = 1;
   const SPACE_CODE = 'Space';
@@ -99,6 +100,21 @@
         }
         setTimeout(() => void shoot(key), RECAPTURE_DELAY_MS);
       }
+    });
+  });
+
+  let reloaded: Record<string, number> = {};
+
+  $effect(() => {
+    const now = $state.snapshot(reload);
+    untrack(() => {
+      for (const key of Object.keys(now).filter((k) => now[k] !== reloaded[k])) {
+        failed = failed.filter((k) => k !== key);
+        delete reasons[key];
+        delete shots[key];
+        forget(key);
+      }
+      reloaded = now;
     });
   });
 
@@ -238,11 +254,8 @@
     if (!status || !key) {
       return;
     }
-    if (status.kind === 'ready') {
-      onready?.(key, { size: status.size, props: status.props });
-      return;
-    }
-    if (!failed.includes(key)) {
+    onstatus?.(key, status);
+    if (status.kind === 'failed' && !failed.includes(key)) {
       failed = [...failed, key];
       reasons[key] = status.reason;
     }
@@ -275,7 +288,7 @@
           <div class="card" data-covered={ready.has(frame.key) && !failed.includes(frame.key)} data-state={failed.includes(frame.key) ? CardState.Failed : CardState.Loading}>{@render card(frame, failed.includes(frame.key) ? CardState.Failed : CardState.Loading, reasons[frame.key] ?? '')}</div>
         {/if}
         {#if mounted.has(frame.key) && srcOf(frame) !== null}
-          <iframe use:register={frame.key} src={srcOf(frame)!} title={frameLabel(frame)} tabindex="-1" data-ready={ready.has(frame.key)} class:shown={live.includes(frame.key) && ready.has(frame.key)} onload={() => onload(frame.key)} style={`width:${frame.width}px;height:${frame.height}px`}></iframe>
+          {#key reload[frame.key] ?? 0}<iframe use:register={frame.key} src={srcOf(frame)!} title={frameLabel(frame)} tabindex="-1" data-ready={ready.has(frame.key)} class:shown={live.includes(frame.key) && ready.has(frame.key)} onload={() => onload(frame.key)} style={`width:${frame.width}px;height:${frame.height}px`}></iframe>{/key}
         {/if}
         <button type="button" class="hit" disabled={!hit.enabled} title={hit.title} aria-label={hit.label} data-testid="canvas-open" onclick={() => onopen(frame)}></button>
       </div>
@@ -350,6 +363,13 @@
   .snug .card[data-state='loading'] {
     background: linear-gradient(100deg, transparent 30%, color-mix(in srgb, var(--ui-text) 7%, transparent) 50%, transparent 70%) 0 0 / 200% 100%;
     animation: shimmer 1.4s linear infinite;
+  }
+
+  .snug .card :global(.interactive) {
+    position: relative;
+    z-index: 2;
+    max-width: 100%;
+    pointer-events: auto;
   }
 
   .snug .card :global(.note) {

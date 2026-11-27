@@ -47,8 +47,8 @@ describe('components of the project', () => {
     await send({ kind: ToHost.Components });
 
     expect(componentsSent(sent).at(-1)?.components).toEqual([
-      { name: 'Card', file: 'src/lib/Card.svelte', folder: 'lib', uses: 1 },
-      { name: 'Button', file: 'src/lib/ui/Button.svelte', folder: 'lib/ui', uses: 1 }
+      { name: 'Card', file: 'src/lib/Card.svelte', folder: 'lib', uses: 1, examples: [{ id: 'src/routes/+page.svelte:4', file: 'src/routes/+page.svelte', line: 4, props: {}, unresolved: [] }] },
+      { name: 'Button', file: 'src/lib/ui/Button.svelte', folder: 'lib/ui', uses: 1, examples: [{ id: 'src/lib/Card.svelte:4', file: 'src/lib/Card.svelte', line: 4, props: {}, unresolved: [] }] }
     ]);
   });
 

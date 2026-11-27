@@ -1,6 +1,7 @@
 import type { SupportItem } from './support';
 import type { PageRoute } from './host/page-route';
 import type { ComponentRow } from './host/component-list';
+import type { SavedComponents } from './webview/component-props';
 import type { AcpAgent, AcpId } from './host/ai/acp-agents';
 import type { AgentEvent, ConfigView, ModeView } from './host/ai/agent-session';
 import type { Alert } from './host/ai/agent-alert';
@@ -317,7 +318,7 @@ export type GitView = { state: GitState; branch: string | null; upstream: string
 
 export type ChangeRow = { id: number; at: string; prop: string; value: string; scope: string; files: string[]; time: number; by?: string };
 
-export type Prefs = { size: string; custom: number | null; barClosed: boolean; route?: string; anchor?: string; dock?: { edge: string; offset: number }; barWidth?: number; leftWidth?: number; leftClosed?: boolean; gitOpen?: boolean; examples?: Record<string, string[]>; layers?: Record<string, { hidden: string[]; locked: string[] }> };
+export type Prefs = { size: string; custom: number | null; barClosed: boolean; route?: string; anchor?: string; dock?: { edge: string; offset: number }; barWidth?: number; leftWidth?: number; leftClosed?: boolean; gitOpen?: boolean; examples?: Record<string, string[]>; components?: SavedComponents; layers?: Record<string, { hidden: string[]; locked: string[] }> };
 
 export type ChatRow = { id: string; agent: AcpId; title: string; updatedAt: number; running: boolean };
 

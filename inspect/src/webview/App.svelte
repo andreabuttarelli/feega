@@ -68,6 +68,7 @@
   import PagesList from './PagesList.svelte';
   import PagesCanvas from './PagesCanvas.svelte';
   import ComponentsCanvas from './ComponentsCanvas.svelte';
+  import { ExampleProps } from './component-props.svelte';
   import ComponentsList from './ComponentsList.svelte';
   import type { FilesChange } from './files-change';
   import { componentFocus } from './components';
@@ -740,8 +741,10 @@
     }
   }
 
+  const componentProps = new ExampleProps(() => savePrefs());
+
   function savePrefs() {
-    toHost({ kind: ToHost.Prefs, prefs: { size, custom, barClosed, route, anchor, dock: docked ?? undefined, barWidth, leftWidth, leftClosed, examples: $state.snapshot(manual), layers: layerFlags.saved() } });
+    toHost({ kind: ToHost.Prefs, prefs: { size, custom, barClosed, route, anchor, dock: docked ?? undefined, barWidth, leftWidth, leftClosed, examples: $state.snapshot(manual), components: componentProps.saved(), layers: layerFlags.saved() } });
   }
 
   function restore(prefs: Prefs | null) {
@@ -759,6 +762,7 @@
     leftWidth = prefs.leftWidth ?? leftWidth;
     leftClosed = prefs.leftClosed ?? leftClosed;
     manual = prefs.examples ?? manual;
+    componentProps.load(prefs.components);
     for (const [r, flags] of Object.entries((prefs.layers ?? {}) as SavedLayers)) {
       flags.hidden.forEach((k) => layerFlags.toggle('hidden', r, k));
       flags.locked.forEach((k) => layerFlags.toggle('locked', r, k));
@@ -1700,7 +1704,7 @@
       <PagesList rows={pages} onopen={go} onadd={typedExample} oncanvas={() => openCanvas(CanvasKind.Pages)} />
     </Tabs.Content>
     <Tabs.Content value={LeftTab.Components}>
-      <ComponentsList rows={projectComponents} onopen={openComponent} oncanvas={() => openCanvas(CanvasKind.Components)} />
+      <ComponentsList rows={projectComponents} props={componentProps} onopen={openComponent} oncanvas={() => openCanvas(CanvasKind.Components)} />
     </Tabs.Content>
     </Tabs.Root>
     {/if}
@@ -1728,7 +1732,7 @@
       <button type="button" class="icon" class:on={!barClosed} title="Properties (⌘\)" onclick={toggleBar} data-testid="bar-toggle"><PanelRight size={15} /></button>
     </header>
     {#if shown === ViewKind.PagesCanvas && url}<PagesCanvas rows={pages} base={url} onopen={openFromCanvas} onadd={typedExample} onclose={() => showView(ViewKind.Editor)} changed={filesChanged} />{/if}
-    {#if shown === ViewKind.ComponentsCanvas && url}<ComponentsCanvas rows={projectComponents} base={url} onopen={openFromComponentsCanvas} onclose={() => showView(ViewKind.Editor)} changed={filesChanged} />{/if}
+    {#if shown === ViewKind.ComponentsCanvas && url}<ComponentsCanvas rows={projectComponents} props={componentProps} base={url} onopen={openFromComponentsCanvas} onclose={() => showView(ViewKind.Editor)} changed={filesChanged} />{/if}
 
     <div class="backdrop" role="presentation" bind:clientWidth={stage.w} bind:clientHeight={stage.h} onpointermove={resizeFrame} onpointerup={endDrag}>
       <div class="frame" class:framed={size !== Size.Full} class:device={deviceFrame} style={`width:${fit.width * fit.scale}px;height:${fit.height * fit.scale}px${deviceFrame ? `;--bezel:${deviceFrame.bezel * fit.scale}px;--screen-radius:${deviceFrame.radius * fit.scale}px` : ''}`}>

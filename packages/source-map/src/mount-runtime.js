@@ -1,7 +1,7 @@
 import { CANVAS_CSS, CANVAS_ID } from './focus.js';
 import { gridOf } from './variant-grid.js';
 
-import { DATE_MARK, FUNCTION_MARK, JSX_MARK, MOUNT_PROPS, MOUNT_STATUS, Status, TEXT_MARK } from './mount-protocol.js';
+import { DATE_MARK, FUNCTION_MARK, JSX_MARK, MOUNT_CONTROLS, MOUNT_PROPS, MOUNT_STATUS, Status, TEXT_MARK } from './mount-protocol.js';
 
 export const Reason = { NoExport: 'The component is not exported', Empty: 'It rendered nothing' };
 
@@ -48,7 +48,22 @@ export function runMount({ Target, name, file, props, controlsUrl, win = window,
   style.textContent = fits ? CANVAS_CSS + FIT_CSS : CANVAS_CSS;
   doc.head.append(style);
 
-  const post = (message) => win.parent.postMessage({ type: MOUNT_STATUS, ...message }, '*');
+  const send = (message) => win.parent.postMessage(message, '*');
+  const askedControls = () => win.fetch(controlsUrl).then((r) => r.json()).then((body) => body.controls).catch(() => null);
+  let controlsSent = false;
+  const sendControls = async () => {
+    if (controlsSent) {
+      return;
+    }
+    controlsSent = true;
+    send({ type: MOUNT_CONTROLS, controls: await askedControls() });
+  };
+  const post = (message) => {
+    send({ type: MOUNT_STATUS, ...message });
+    if (message.status === Status.Failed && message.reason !== Reason.NoExport) {
+      void sendControls();
+    }
+  };
   if (!Target) {
     post({ status: Status.Failed, reason: Reason.NoExport });
     return;
@@ -79,7 +94,7 @@ export function runMount({ Target, name, file, props, controlsUrl, win = window,
       post({ status: Status.Failed, reason: Reason.Empty });
       return;
     }
-    const controls = await win.fetch(controlsUrl).then((r) => r.json()).then((body) => body.controls).catch(() => null);
+    const controls = await askedControls();
     ready = true;
     const box = container.getBoundingClientRect();
     const padding = fits ? FIT_PADDING_PX * 2 : 0;

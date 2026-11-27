@@ -13,9 +13,9 @@ const LAZY = /import\(\s*['"]([^'"]+)['"]\s*\)/g;
 const NOT_A_USE = /\.(test|spec|stories)\.[jt]sx?$|(^|\/)__tests__\//;
 const EXTENSIONS = ['.tsx', '.jsx', '.ts', '.js', '.svelte', '.vue', '.astro', '.mjs'];
 const KNOWN_EXTENSION = /\.(tsx|jsx|ts|js|svelte|vue|astro|mjs)$/;
-type Alias = { prefix: string; target: string; exact: boolean };
+export type Alias = { prefix: string; target: string; exact: boolean };
 
-const ALIASES: Alias[] = [
+export const ALIASES: Alias[] = [
   { prefix: '$lib/', target: 'src/lib/', exact: false },
   { prefix: '@/', target: 'src/', exact: false },
   { prefix: '~/', target: 'src/', exact: false }

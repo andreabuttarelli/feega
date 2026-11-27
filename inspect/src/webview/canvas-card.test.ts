@@ -1,14 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { PropsSource } from '../props-source';
-import { Badge, REASON_MAX, badgeOf, reasonOf, statusOf } from './canvas-card';
+import { FAILED_TEXT, NOTHING_TEXT, REASON_MAX, failedTextOf, reasonOf, statusOf } from './canvas-card';
 
 describe('statusOf', () => {
   it('reads a ready report with its size and the props it was drawn with', () => {
-    expect(statusOf({ type: 'feega:mount:status', status: 'ready', size: { width: 200, height: 90 }, props: { a: 1 } })).toEqual({ kind: 'ready', size: { width: 200, height: 90 }, props: { a: 1 } });
+    expect(statusOf({ type: 'feega:mount:status', status: 'ready', size: { width: 200, height: 90 }, props: { a: 1 } })).toEqual({ kind: 'ready', size: { width: 200, height: 90 }, props: { a: 1 }, controls: null });
   });
 
   it('reads a failed report with a one-line reason', () => {
     expect(statusOf({ type: 'feega:mount:status', status: 'failed', reason: 'Cannot read properties of undefined\n\n\tin <unknown>' })).toEqual({ kind: 'failed', reason: 'Cannot read properties of undefined' });
+  });
+
+  it('reads the props a failed component declares', () => {
+    expect(statusOf({ type: 'feega:mount:controls', controls: [{ name: 'title', kind: 'text', required: true }] })).toEqual({ kind: 'controls', controls: [{ name: 'title', kind: 'text', required: true }] });
+    expect(statusOf({ type: 'feega:mount:controls', controls: null })).toEqual({ kind: 'controls', controls: null });
   });
 
   it('ignores anything else', () => {
@@ -18,7 +22,7 @@ describe('statusOf', () => {
   });
 
   it('reads a ready report without a usable size as ready with no size', () => {
-    expect(statusOf({ type: 'feega:mount:status', status: 'ready', size: { width: 0, height: 0 } })).toEqual({ kind: 'ready', size: null, props: {} });
+    expect(statusOf({ type: 'feega:mount:status', status: 'ready', size: { width: 0, height: 0 } })).toEqual({ kind: 'ready', size: null, props: {}, controls: null });
   });
 });
 
@@ -32,17 +36,12 @@ describe('reasonOf', () => {
   });
 });
 
-describe('badgeOf', () => {
-  it('says the props come from the code when a use of the component gave them', () => {
-    expect(badgeOf({ props: { a: 1 }, source: PropsSource.Code }, { a: 1 })).toBe(Badge.Code);
+describe('failedTextOf', () => {
+  it('says a component that drew nothing is not broken, it just has nothing to show', () => {
+    expect(failedTextOf('It rendered nothing')).toBe(NOTHING_TEXT);
   });
 
-  it('says the props are sample ones when only the types gave them', () => {
-    expect(badgeOf(undefined, { title: 'title' })).toBe(Badge.Sample);
-  });
-
-  it('has no badge when the component took no props', () => {
-    expect(badgeOf(undefined, {})).toBeNull();
-    expect(badgeOf(undefined, undefined)).toBeNull();
+  it('asks for props for any other failure', () => {
+    expect(failedTextOf("Cannot read properties of undefined (reading 'length')")).toBe(FAILED_TEXT);
   });
 });

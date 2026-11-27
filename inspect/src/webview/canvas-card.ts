@@ -1,4 +1,3 @@
-import type { PropsSample } from '../host/component-list';
 import type { CellSize } from './canvas-layout';
 
 export enum CardState {
@@ -8,12 +7,18 @@ export enum CardState {
 
 export enum Badge {
   Code = 'from code',
+  Edited = 'edited',
   Sample = 'sample'
 }
 
-export type MountStatus = { kind: 'ready'; size: CellSize | null; props: Record<string, unknown> } | { kind: 'failed'; reason: string };
+export type Control = { name: string; kind: string; required: boolean; options?: unknown[]; default?: unknown };
+
+export type Controls = Control[] | null;
+
+export type MountStatus = { kind: 'ready'; size: CellSize | null; props: Record<string, unknown>; controls: Controls } | { kind: 'failed'; reason: string } | { kind: 'controls'; controls: Controls };
 
 export const MOUNT_STATUS = 'feega:mount:status';
+export const MOUNT_CONTROLS = 'feega:mount:controls';
 export const REASON_MAX = 160;
 const NO_REASON = 'The component could not render here';
 const READY = 'ready';
@@ -27,21 +32,22 @@ export function reasonOf(raw: unknown): string {
 
 const sizeOf = (size: { width?: number; height?: number } | undefined): CellSize | null => (size && size.width && size.height ? { width: size.width, height: size.height } : null);
 
-export function statusOf(data: { type?: string; status?: string; reason?: string; size?: { width?: number; height?: number }; props?: Record<string, unknown> } | null): MountStatus | null {
+export function statusOf(data: { type?: string; status?: string; reason?: string; size?: { width?: number; height?: number }; props?: Record<string, unknown>; controls?: Controls } | null): MountStatus | null {
+  if (data?.type === MOUNT_CONTROLS) {
+    return { kind: 'controls', controls: data.controls ?? null };
+  }
   if (data?.type !== MOUNT_STATUS) {
     return null;
   }
   if (data.status === READY) {
-    return { kind: 'ready', size: sizeOf(data.size), props: data.props ?? {} };
+    return { kind: 'ready', size: sizeOf(data.size), props: data.props ?? {}, controls: data.controls ?? null };
   }
 
   return data.status === FAILED ? { kind: 'failed', reason: reasonOf(data.reason) } : null;
 }
 
-export function badgeOf(sample: PropsSample | undefined, shown: Record<string, unknown> | undefined): Badge | null {
-  if (sample) {
-    return Badge.Code;
-  }
+export const FAILED_TEXT = 'Needs props';
+export const NOTHING_TEXT = 'Nothing to show';
+const RENDERED_NOTHING = 'It rendered nothing';
 
-  return shown && Object.keys(shown).length > 0 ? Badge.Sample : null;
-}
+export const failedTextOf = (reason: string): string => (reason === RENDERED_NOTHING ? NOTHING_TEXT : FAILED_TEXT);
