@@ -46,17 +46,24 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  position: relative;
   height: 34px;
   max-width: 210px;
-  padding: 0 8px 0 14px;
+  padding: 0 14px;
   border-radius: 999px;
   color: var(--sx-ink-2);
 }
 
 .tab-bar .tab.view {
   max-width: 280px;
-  padding-left: 12px;
-  margin-left: -4px;
+}
+
+.tab-bar .tab.on:has(.x) {
+  padding-right: 34px;
+}
+
+.tab-bar .tab:not(.on):hover .name {
+  mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
 }
 
 .tab-bar .tab.fresh {
@@ -89,7 +96,10 @@
   height: 18px;
   border-radius: 999px;
   opacity: 0;
-  margin-left: -2px;
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
 }
 
 .tab-bar .tab:hover .x,
