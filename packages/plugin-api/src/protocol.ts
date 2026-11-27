@@ -67,8 +67,12 @@ export enum Control {
   Select = 'select',
   Button = 'button',
   List = 'list',
+  Search = 'search',
+  Grid = 'grid',
   Note = 'note'
 }
+
+export type GridItem = { id: string; label: string; image?: string; swatch?: string };
 
 export type UiNode =
   | { type: Control.Slider; id: string; label: string; min: number; max: number; step: number; value: number }
@@ -77,6 +81,8 @@ export type UiNode =
   | { type: Control.Select; id: string; label: string; value: string; options: { value: string; label: string }[] }
   | { type: Control.Button; id: string; label: string }
   | { type: Control.List; id: string; label: string; selected: string | null; items: { id: string; label: string; swatch?: string }[] }
+  | { type: Control.Search; id: string; label: string; value: string; placeholder: string }
+  | { type: Control.Grid; id: string; label: string; selected: string | null; items: GridItem[] }
   | { type: Control.Note; text: string };
 
 export type Handle = { id: string; x: number; y: number; color: string; selected: boolean };

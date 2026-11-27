@@ -538,6 +538,7 @@ export const MOUNT_STATUS = 'feega:mount:status';
 export const MOUNT_PROPS = 'feega:mount:props';
 export const TEXT_EDIT = 'feega:text:edit';
 export const TEXT_DONE = 'feega:text:done';
+export const TEXT_CANCEL = 'feega:text:cancel';
 export const TEXT_RESTORE = 'feega:text:restore';
 export const TRACK = 'feega:track';
 export const TRACKED = 'feega:tracked';
