@@ -29,3 +29,9 @@ A component that cannot render alone, because it needs props or a provider, show
 **Open canvas** at the top of the list shows every component in a grid, each one rendered on its own with its name above it. It has the same zoom, pan and fit controls as the [Pages canvas](/editing/pages-canvas/), and the same limit of six live frames. Other frames show a snapshot. A component that cannot render alone is drawn as a card with its name.
 
 Click a frame to open that component in Focus.
+
+## Live updates
+
+The Pages and Components lists and both canvases follow your files. When you, an AI agent or any other tool creates, deletes or renames a page or a component, the list updates on its own and a new entry is briefly highlighted. Zoom and pan on a canvas stay where they are.
+
+When a file changes, the canvas frames that show it take a fresh snapshot once the dev server has applied the change. For a page, that is the page whose route file changed; for a component, its own file.

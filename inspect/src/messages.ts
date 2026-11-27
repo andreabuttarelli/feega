@@ -386,7 +386,8 @@ export enum ToView {
   Git = 'git',
   GitResult = 'git-result',
   Routes = 'routes',
-  Components = 'components'
+  Components = 'components',
+  FilesChanged = 'files-changed'
 }
 
 export enum ShareState {
@@ -550,6 +551,7 @@ export type ViewMessage =
   | { kind: ToView.Library; items: LibraryEntry[] }
   | { kind: ToView.Routes; routes: PageRoute[] }
   | { kind: ToView.Components; components: ComponentRow[] }
+  | { kind: ToView.FilesChanged; files: string[] }
   | { kind: ToView.Plugin; id: number; result: PluginResult }
   | { kind: ToView.Plugins; catalog: Catalog; canInstall: boolean }
   | { kind: ToView.Reload }

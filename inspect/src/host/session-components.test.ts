@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -31,7 +31,7 @@ function setup(files: Record<string, string>) {
     watchFiles: () => ({ dispose: () => undefined })
   } as unknown as Platform;
   inspectSession(platform, root);
-  return { sent, send: (m: HostMessage) => deliver(m) };
+  return { root, sent, send: (m: HostMessage) => deliver(m) };
 }
 
 const componentsSent = (sent: ViewMessage[]) => sent.filter((m) => m.kind === ToView.Components) as Extract<ViewMessage, { kind: ToView.Components }>[];
@@ -58,5 +58,29 @@ describe('components of the project', () => {
     await send({ kind: ToHost.Components });
 
     expect(componentsSent(sent).at(-1)?.components).toEqual([]);
+  });
+});
+
+const LIVE_WAIT_MS = 1500;
+const FIXTURE_SETTLE_MS = 400;
+const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+describe('the project changing while the view is open', () => {
+  it('pushes the new page and the new component without being asked, and drops the deleted one', async () => {
+    const { root, sent, send } = setup({ 'src/routes/+page.svelte': '<h1 />', 'src/lib/Card.svelte': '<div />' });
+    await pause(FIXTURE_SETTLE_MS);
+    await send({ kind: ToHost.Routes });
+    await send({ kind: ToHost.Components });
+    await pause(FIXTURE_SETTLE_MS);
+
+    mkdirSync(join(root, 'src/routes/pricing'), { recursive: true });
+    writeFileSync(join(root, 'src/routes/pricing/+page.svelte'), '<h1 />');
+    writeFileSync(join(root, 'src/lib/Badge.svelte'), '<b />');
+    rmSync(join(root, 'src/lib/Card.svelte'));
+    await pause(LIVE_WAIT_MS);
+
+    const routes = sent.filter((m) => m.kind === ToView.Routes) as Extract<ViewMessage, { kind: ToView.Routes }>[];
+    expect(routes.at(-1)?.routes.map((r) => r.route)).toEqual(['/', '/pricing']);
+    expect(componentsSent(sent).at(-1)?.components.map((c) => c.name)).toEqual(['Badge']);
   });
 });

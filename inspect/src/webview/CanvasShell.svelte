@@ -24,15 +24,17 @@
     hitOf: (frame: F) => Hit;
     onopen: (frame: F) => void;
     onclose: () => void;
+    stale?: { keys: string[] } | null;
     world?: Snippet;
     card: Snippet<[F, boolean]>;
   };
 
-  let { frames, bounds, label, testid, minLiveWidth, frameLabel, srcOf, hitOf, onopen, onclose, world, card }: Props = $props();
+  let { frames, bounds, label, testid, minLiveWidth, frameLabel, srcOf, hitOf, onopen, onclose, stale = null, world, card }: Props = $props();
 
   const MIDDLE_BUTTON = 1;
   const SPACE_CODE = 'Space';
   const FIRST_SHOT_DELAY_MS = 800;
+  const RECAPTURE_DELAY_MS = 1200;
   const MOUNT_STATUS = 'feega:mount:status';
   const MOUNT_FAILED = 'failed';
 
@@ -80,6 +82,22 @@
 
     return queue;
   }
+
+  $effect(() => {
+    const keys = stale?.keys;
+    if (!keys) {
+      return;
+    }
+    untrack(() => {
+      for (const key of keys) {
+        if (!mounted.has(key)) {
+          delete shots[key];
+          continue;
+        }
+        setTimeout(() => void shoot(key), RECAPTURE_DELAY_MS);
+      }
+    });
+  });
 
   $effect(() => {
     void view;

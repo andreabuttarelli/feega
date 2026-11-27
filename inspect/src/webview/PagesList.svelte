@@ -1,6 +1,7 @@
 <script lang="ts">
   import CanvasBanner from './CanvasBanner.svelte';
   import ExampleField from './ExampleField.svelte';
+  import { freshKeys } from './fresh-keys.svelte';
   import { EXAMPLE_LIMIT, type PageRow } from './pages';
 
   type Props = { rows: PageRow[]; onopen: (route: string) => void; onadd: (pattern: string, path: string) => void; oncanvas: () => void };
@@ -8,6 +9,8 @@
   let { rows, onopen, onadd, oncanvas }: Props = $props();
 
   let expanded = $state<string[]>([]);
+
+  const fresh = freshKeys(() => rows.map((row) => row.route));
 
   const shownOf = (row: PageRow) => (expanded.includes(row.route) ? row.examples : row.examples.slice(0, EXAMPLE_LIMIT));
   const hiddenOf = (row: PageRow) => row.examples.length - shownOf(row).length;
@@ -39,7 +42,7 @@
       </li>
     {:else}
       <li>
-        <button type="button" class="page" class:on={row.current} aria-current={row.current ? 'page' : undefined} title={`Open ${row.route}`} data-testid="page-row" data-route={row.route} onclick={() => onopen(row.route)}>
+        <button type="button" class="page" class:on={row.current} class:fresh={fresh.has(row.route)} aria-current={row.current ? 'page' : undefined} title={`Open ${row.route}`} data-testid="page-row" data-route={row.route} onclick={() => onopen(row.route)}>
           <span class="route">{row.route}</span>
         </button>
       </li>
@@ -100,6 +103,16 @@
   button.page:hover {
     background: var(--ui-input);
     color: var(--ui-text);
+  }
+
+  .page.fresh {
+    animation: flash 2.5s ease-out;
+  }
+
+  @keyframes flash {
+    from {
+      background: color-mix(in srgb, var(--ui-accent) 35%, transparent);
+    }
   }
 
   .page.on {

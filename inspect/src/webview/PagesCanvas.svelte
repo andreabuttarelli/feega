@@ -3,15 +3,18 @@
   import { CANVAS_COLUMNS, layoutCanvas, type CanvasFrame } from './canvas-layout';
   import { MIN_LIVE_WIDTH } from './canvas-live';
   import { openOf, type CanvasOpen } from './canvas-open';
+  import { pageKeysOf } from './canvas-stale';
   import ExampleField from './ExampleField.svelte';
+  import type { FilesChange } from './files-change';
   import type { PageRow } from './pages';
   import { SIZES } from './sizes';
 
-  type Props = { rows: PageRow[]; base: string; onopen: (target: CanvasOpen) => void; onadd: (pattern: string, path: string) => void; onclose: () => void };
+  type Props = { rows: PageRow[]; base: string; onopen: (target: CanvasOpen) => void; onadd: (pattern: string, path: string) => void; onclose: () => void; changed: FilesChange | null };
 
-  let { rows, base, onopen, onadd, onclose }: Props = $props();
+  let { rows, base, onopen, onadd, onclose, changed }: Props = $props();
 
   const layout = $derived(layoutCanvas(rows, CANVAS_COLUMNS));
+  const stale = $derived(changed ? { keys: pageKeysOf(layout.frames, changed.files) } : null);
   const currentRoute = $derived(rows.find((r) => r.current)?.route ?? null);
 
   const dimsOf = (f: CanvasFrame) => `${SIZES[f.size].label} · ${f.width} × ${f.height}`;
@@ -41,6 +44,7 @@
   {hitOf}
   onopen={open}
   {onclose}
+  {stale}
 >
   {#snippet world()}
     {#each layout.rows as row (row.route)}
