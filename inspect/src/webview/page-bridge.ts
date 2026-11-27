@@ -1,7 +1,7 @@
 import type { PropControl, Variant } from './prop-controls';
 import type { ElementState } from '@feega/live-edit/element-state';
 import type { Apply } from '@feega/live-edit/themes';
-import { BRIDGE_READY, CAPTURE, CAPTURED, INSPECT, INSPECT_RESULT, LOCAL_ORIGIN, LOCATION, MODE, PREVIEW, PREVIEW_CLEAR, PREVIEW_CLEAR_ALL, PREVIEW_SETTLE, PREVIEW_SETTLED, SCROLL, SCROLLED, REVEAL, FOCUS, FOCUS_CANVAS, FOCUS_ZOOM, FOCUS_ZOOMED, FOCUSED, MOUNT_PROPS, MOUNT_STATUS, HIDE, PALETTE, PALETTE_RESULT, type Palette, TREE, TREE_RESULT, type LayerNode, TEXT_CANCEL, TEXT_DONE, TEXT_EDIT, TEXT_RESTORE, TRACK, TRACKED, LEAVE, FORCE, THEME, type Slot, type Mode, type Move, type Pick, type Source } from '../messages';
+import { BRIDGE_READY, CAPTURE, CAPTURED, INSPECT, INSPECT_RESULT, LINKS, LOCAL_ORIGIN, LOCATION, MODE, PREVIEW, PREVIEW_CLEAR, PREVIEW_CLEAR_ALL, PREVIEW_SETTLE, PREVIEW_SETTLED, SCROLL, SCROLLED, REVEAL, FOCUS, FOCUS_CANVAS, FOCUS_ZOOM, FOCUS_ZOOMED, FOCUSED, MOUNT_PROPS, MOUNT_STATUS, HIDE, PALETTE, PALETTE_RESULT, type Palette, TREE, TREE_RESULT, type LayerNode, TEXT_CANCEL, TEXT_DONE, TEXT_EDIT, TEXT_RESTORE, TRACK, TRACKED, LEAVE, FORCE, THEME, type Slot, type Mode, type Move, type Pick, type Source } from '../messages';
 
 export enum FocusMode {
   Mount = 'mount',
@@ -29,6 +29,7 @@ export const sourceText = (s: Source) => `${s.file}:${s.line}:${s.col}`;
 export type PageEvents = {
   ready: (path: string, restored: boolean) => void;
   moved: (path: string) => void;
+  links: (paths: string[]) => void;
   scrolled: () => void;
   tree: (tree: LayerNode[]) => void;
   palette: (palette: Palette) => void;
@@ -95,6 +96,10 @@ export function pageBridge(frame: () => HTMLIFrameElement | null, on: PageEvents
     }
     if (data?.type === LOCATION) {
       on.moved(data.path);
+      return;
+    }
+    if (data?.type === LINKS) {
+      on.links(data.paths ?? []);
       return;
     }
     if (data?.type === PREVIEW_SETTLED) {

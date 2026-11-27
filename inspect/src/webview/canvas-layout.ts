@@ -6,11 +6,13 @@ export const COLUMN_GAP = 160;
 export const ROW_GAP = 240;
 export const ROW_HEAD = 240;
 
-export type CanvasPage = { route: string; dynamic: boolean };
+export type CanvasExample = { path: string; label: string };
 
-export type CanvasFrame = { key: string; route: string; size: Size; dynamic: boolean; x: number; y: number; width: number; height: number };
+export type CanvasPage = { route: string; dynamic: boolean; examples?: CanvasExample[] };
 
-export type CanvasRow = { route: string; dynamic: boolean; y: number; height: number };
+export type CanvasFrame = { key: string; route: string; size: Size; dynamic: boolean; target: string | null; x: number; y: number; width: number; height: number };
+
+export type CanvasRow = { route: string; dynamic: boolean; example: CanvasExample | null; y: number; height: number };
 
 export type Bounds = { x: number; y: number; width: number; height: number };
 
@@ -25,13 +27,15 @@ export function layoutCanvas(pages: CanvasPage[], columns: Size[]) {
   let y = 0;
 
   for (const page of pages) {
+    const example = page.dynamic ? (page.examples?.[0] ?? null) : null;
+    const target = page.dynamic ? (example?.path ?? null) : page.route;
     let x = 0;
     for (const size of columns) {
       const { width, height } = dimsOf(size);
-      frames.push({ key: keyOf(page.route, size), route: page.route, size, dynamic: page.dynamic, x, y: y + ROW_HEAD, width, height });
+      frames.push({ key: keyOf(page.route, size), route: page.route, size, dynamic: page.dynamic, target, x, y: y + ROW_HEAD, width, height });
       x += width + COLUMN_GAP;
     }
-    rows.push({ route: page.route, dynamic: page.dynamic, y, height: ROW_HEAD + tallest });
+    rows.push({ route: page.route, dynamic: page.dynamic, example, y, height: ROW_HEAD + tallest });
     y += ROW_HEAD + tallest + ROW_GAP;
   }
 
@@ -48,13 +52,13 @@ export const GRID_GAP_Y = 160;
 
 export type GridItem = { key: string; name: string };
 
-export type GridFrame = GridItem & { dynamic: false; x: number; y: number; width: number; height: number };
+export type GridFrame = GridItem & { target: string; x: number; y: number; width: number; height: number };
 
 export function layoutGrid(items: GridItem[], columns: number) {
   const frames: GridFrame[] = items.map(({ key, name }, i) => ({
     key,
     name,
-    dynamic: false,
+    target: key,
     x: (i % columns) * (GRID_CELL_WIDTH + GRID_GAP_X),
     y: Math.floor(i / columns) * (GRID_CELL_HEIGHT + GRID_GAP_Y),
     width: GRID_CELL_WIDTH,

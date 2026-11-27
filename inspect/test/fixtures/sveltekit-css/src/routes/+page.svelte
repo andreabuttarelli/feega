@@ -58,7 +58,7 @@ const plans = [
     <Benefits />
     <Faq />
   </main>
-  <footer class="footer">© Northwind</footer>
+  <footer class="footer">© Northwind <a href="/blog/primo-post">First post</a> <a href="/blog/ciao-mondo">Hello world</a></footer>
 </div>
 
 <style>
