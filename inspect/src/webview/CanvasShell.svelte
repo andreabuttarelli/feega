@@ -73,7 +73,7 @@
   }
 
   $effect(() => {
-    if (!touched && !fitted && viewport.w > 0) {
+    if (!touched && (!fitted || snapshots) && viewport.w > 0) {
       view = fitView(bounds, viewport);
       fitted = true;
     }
@@ -334,6 +334,11 @@
     font-size: var(--label);
     line-height: 1.25;
     white-space: nowrap;
+  }
+
+  .shot {
+    object-fit: cover;
+    object-position: top;
   }
 
   .shot,

@@ -35,6 +35,7 @@ assert.equal(await page.locator('[data-testid="canvas-frame"] iframe').count(), 
 
 await page.locator('[data-testid="canvas-fit"]').click();
 await page.waitForTimeout(500);
+console.log(`FIT ${await page.locator('[data-testid="canvas-percent"]').textContent()}`);
 await page.screenshot({ path: SHOT });
 
 await panel.close();

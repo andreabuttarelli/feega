@@ -32,7 +32,8 @@
   publish();
 
   const heights = $derived(Object.fromEntries(Object.entries(snaps).filter(([, snap]) => snap.height > 0).map(([key, snap]) => [key, snap.height])));
-  const layout = $derived(layoutCanvas(rows, CANVAS_COLUMNS, heights));
+  const layout = $derived(layoutCanvas(rows, CANVAS_COLUMNS, heights, viewport));
+  const shown = $derived(Object.fromEntries(layout.frames.filter((f) => snaps[f.key]).map((f) => [f.key, { url: snaps[f.key].url, capped: snaps[f.key].capped || snaps[f.key].height > f.height }])));
 
   const jobOf = (f: CanvasFrame): SnapJob => ({ key: f.key, target: f.target!, x: f.x, y: f.y, width: f.width, height: f.height, device: { w: SIZES[f.size].width ?? f.width, h: SIZES[f.size].height ?? f.height } });
 
@@ -54,7 +55,7 @@
   const watch = (next: CanvasView, size: Viewport) => ((view = next), (viewport = size));
   const currentRoute = $derived(rows.find((r) => r.current)?.route ?? null);
 
-  const dimsOf = (f: CanvasFrame) => `${SIZES[f.size].label} · ${f.width} × ${f.height}`;
+  const dimsOf = (f: CanvasFrame) => `${SIZES[f.size].label} · ${f.width} × ${f.pageHeight}`;
 
   const hitOf = (f: CanvasFrame) => ({
     label: `Open ${f.target ?? f.route} at ${SIZES[f.size].label}`,
@@ -76,7 +77,7 @@
   label="Pages canvas"
   testid="pages-canvas"
   frameLabel={dimsOf}
-  snapshots={snaps}
+  snapshots={shown}
   {unrendered}
   onview={watch}
   {hitOf}
@@ -85,7 +86,7 @@
 >
   {#snippet world()}
     {#each layout.rows as row (row.route)}
-      <h2 class="row-label" class:on={row.route === currentRoute} style={`left:0;top:${row.y}px`} data-testid="canvas-row">{row.route}{#if row.dynamic}<span class="tag" data-testid="canvas-example">{row.example?.label ?? 'dynamic'}</span>{/if}</h2>
+      <h2 class="row-label" class:on={row.route === currentRoute} style={`left:${row.x}px;top:${row.y}px`} data-testid="canvas-row">{row.route}{#if row.dynamic}<span class="tag" data-testid="canvas-example">{row.example?.label ?? 'dynamic'}</span>{/if}</h2>
     {/each}
   {/snippet}
   {#snippet card(frame: CanvasFrame)}

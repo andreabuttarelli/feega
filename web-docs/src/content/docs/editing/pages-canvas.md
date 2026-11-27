@@ -5,7 +5,7 @@ sidebar:
   order: 8
 ---
 
-The Pages canvas shows all the pages of your app together. Each page is one row, labelled with its route, with the Desktop, Tablet and Phone sizes side by side.
+The Pages canvas shows all the pages of your app together. Each page is a group, labelled with its route, with the Desktop, Tablet and Phone sizes side by side. Groups flow left to right in route order and wrap into rows, so the whole canvas fits the window as large as possible. A page taller than three screens is cut there with a fade; open it to see all of it.
 
 Open it with the **Open canvas** banner at the top of the Pages tab, or with the grid button in the toolbar. It opens as a view tab, in the tab row above the editor or, in Feega desktop, in the window's top bar as `project · Pages canvas`. Press `Esc` or switch to the Page tab to go back, and close the tab when you are done.
 

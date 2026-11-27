@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { Size } from './sizes';
-import { CANVAS_COLUMNS, COLUMN_GAP, GRID_GAP_X, GRID_GAP_Y, ROW_GAP, ROW_HEAD, layoutCanvas, layoutGrid } from './canvas-layout';
+import { CANVAS_COLUMNS, COLUMN_GAP, COMPACT_HEIGHT, GRID_GAP_X, GRID_GAP_Y, GROUP_GAP, HEIGHT_CAP_FACTOR, ROW_GAP, ROW_HEAD, columnsFor, groupWidth, layoutCanvas, layoutGrid } from './canvas-layout';
+import { Size, SIZES } from './sizes';
 
 describe('layoutGrid', () => {
   const items = ['a', 'b', 'c', 'd', 'e'].map((key) => ({ key, name: key.toUpperCase() }));
@@ -109,15 +109,15 @@ describe('frames take the height of their captured page', () => {
   const heights = { '/::desktop': 3200, '/::tablet': 5000, '/::phone': 9100, '/about::phone': 700 };
   const { frames, rows, bounds } = layoutCanvas(pages, CANVAS_COLUMNS, heights);
 
-  it('uses the captured height and falls back to the device height', () => {
-    expect(frames.filter((f) => f.route === '/').map((f) => f.height)).toEqual([3200, 5000, 9100]);
+  it('uses the captured height up to the cap and falls back to the device height', () => {
+    expect(frames.filter((f) => f.route === '/').map((f) => f.height)).toEqual([2700, 3072, 2532]);
     expect(frames.find((f) => f.key === '/about::desktop')!.height).toBe(900);
     expect(frames.find((f) => f.key === '/about::phone')!.height).toBe(700);
   });
 
   it('sizes a row to its tallest frame and pushes the next row below it', () => {
-    expect(rows[0].height).toBe(ROW_HEAD + 9100);
-    expect(rows[1].y).toBe(rows[0].y + ROW_HEAD + 9100 + ROW_GAP);
+    expect(rows[0].height).toBe(ROW_HEAD + 3072);
+    expect(rows[1].y).toBe(rows[0].y + ROW_HEAD + 3072 + ROW_GAP);
     expect(rows[1].height).toBe(ROW_HEAD + 1024);
   });
 
@@ -139,5 +139,117 @@ describe('bounds', () => {
 
   it('are empty without pages', () => {
     expect(layoutCanvas([], CANVAS_COLUMNS).bounds).toEqual({ x: 0, y: 0, width: 0, height: 0 });
+  });
+});
+
+const many = (count: number) => Array.from({ length: count }, (_, i) => ({ route: `/p${i}`, dynamic: false }));
+const WIDE = { w: 1480, h: 900 };
+const TALL = { w: 600, h: 1400 };
+
+describe('layoutCanvas packs pages into a wrapping grid', () => {
+  it('flows groups left to right and wraps after the chosen column count', () => {
+    const { rows } = layoutCanvas(many(7), CANVAS_COLUMNS, {}, WIDE);
+    const perRow = new Set(rows.map((r) => r.y)).size;
+    const first = rows.filter((r) => r.y === rows[0].y);
+
+    expect(first.length).toBeGreaterThan(1);
+    expect(perRow).toBe(Math.ceil(7 / first.length));
+    expect(first.map((r) => r.x)).toEqual(first.map((_, i) => i * (groupWidth(CANVAS_COLUMNS) + GROUP_GAP)));
+  });
+
+  it('keeps the route order, row by row', () => {
+    const { rows } = layoutCanvas(many(9), CANVAS_COLUMNS, {}, WIDE);
+
+    expect(rows.map((r) => r.route)).toEqual(many(9).map((p) => p.route));
+    const ordered = [...rows].sort((a, b) => a.y - b.y || a.x - b.x).map((r) => r.route);
+    expect(ordered).toEqual(rows.map((r) => r.route));
+  });
+
+  it('puts the frames of one page side by side under its route label, tops aligned', () => {
+    const { rows, frames } = layoutCanvas(many(5), CANVAS_COLUMNS, {}, WIDE);
+    const group = frames.filter((f) => f.route === '/p3');
+
+    expect(new Set(group.map((f) => f.y)).size).toBe(1);
+    expect(group[0].x).toBe(rows[3].x);
+    expect(group[0].y).toBe(rows[3].y + ROW_HEAD);
+    expect(group[1].x).toBe(group[0].x + group[0].width + COLUMN_GAP);
+  });
+
+  it('shows at most three device heights of a long page', () => {
+    const { frames } = layoutCanvas(many(1), CANVAS_COLUMNS, { '/p0::desktop': 20000, '/p0::phone': 50000, '/p0::tablet': 2000 }, WIDE);
+    const heights = Object.fromEntries(frames.map((f) => [f.size, f.height]));
+
+    expect(heights[Size.Desktop]).toBe(HEIGHT_CAP_FACTOR * SIZES[Size.Desktop].height!);
+    expect(heights[Size.Phone]).toBe(HEIGHT_CAP_FACTOR * SIZES[Size.Phone].height!);
+    expect(heights[Size.Tablet]).toBe(2000);
+  });
+
+  it('keeps the real page height on the frame', () => {
+    const { frames } = layoutCanvas(many(1), CANVAS_COLUMNS, { '/p0::desktop': 20000 }, WIDE);
+
+    expect(frames[0].pageHeight).toBe(20000);
+  });
+
+  it('sizes a row to its tallest capped group', () => {
+    const heights = { '/p0::desktop': 90000, '/p1::phone': 1500 };
+    const { rows, frames } = layoutCanvas(many(2), CANVAS_COLUMNS, heights, { w: 6000, h: 1000 });
+    const capped = HEIGHT_CAP_FACTOR * SIZES[Size.Desktop].height!;
+
+    expect(rows[0].y).toBe(rows[1].y);
+    expect(rows[0].height).toBe(ROW_HEAD + capped);
+    expect(frames.filter((f) => f.route === '/p1').every((f) => f.y === rows[1].y + ROW_HEAD)).toBe(true);
+  });
+
+  it('leaves a gutter between rows', () => {
+    const { rows } = layoutCanvas(many(3), CANVAS_COLUMNS, {}, TALL);
+
+    expect(new Set(rows.map((r) => r.x)).size).toBe(1);
+    expect(rows[1].y).toBe(rows[0].y + rows[0].height + ROW_GAP);
+    expect(rows[2].y).toBe(rows[1].y + rows[1].height + ROW_GAP);
+  });
+
+  it('keeps a dynamic page without an example compact', () => {
+    const { frames, rows } = layoutCanvas([{ route: '/blog/[slug]', dynamic: true }], CANVAS_COLUMNS, {}, WIDE);
+
+    expect(frames.every((f) => f.height === COMPACT_HEIGHT)).toBe(true);
+    expect(rows[0].height).toBe(ROW_HEAD + COMPACT_HEIGHT);
+  });
+
+  it('bounds wrap every group', () => {
+    const { frames, bounds } = layoutCanvas(many(6), CANVAS_COLUMNS, { '/p2::desktop': 3000 }, WIDE);
+
+    expect(bounds.width).toBe(Math.max(...frames.map((f) => f.x + f.width)));
+    expect(bounds.height).toBe(Math.max(...frames.map((f) => f.y + f.height)));
+  });
+});
+
+describe('columnsFor', () => {
+  const heights = Array(12).fill(ROW_HEAD + 900);
+
+  it('uses a single column without a viewport', () => {
+    expect(columnsFor(heights, groupWidth(CANVAS_COLUMNS), null)).toBe(1);
+  });
+
+  it('spreads groups wider in a wide window than in a tall one', () => {
+    expect(columnsFor(heights, groupWidth(CANVAS_COLUMNS), WIDE)).toBeGreaterThan(columnsFor(heights, groupWidth(CANVAS_COLUMNS), TALL));
+  });
+
+  it('never uses more columns than groups', () => {
+    expect(columnsFor([ROW_HEAD + 900], groupWidth(CANVAS_COLUMNS), WIDE)).toBe(1);
+  });
+
+  it('picks the count with the largest fit zoom', () => {
+    const scaleOf = (columns: number) => {
+      const rows = Math.ceil(heights.length / columns);
+      const width = columns * groupWidth(CANVAS_COLUMNS) + (columns - 1) * GROUP_GAP;
+      const height = rows * (ROW_HEAD + 900) + (rows - 1) * ROW_GAP;
+
+      return Math.min(WIDE.w / width, WIDE.h / height);
+    };
+    const best = columnsFor(heights, groupWidth(CANVAS_COLUMNS), WIDE);
+
+    for (let c = 1; c <= heights.length; c++) {
+      expect(scaleOf(best)).toBeGreaterThanOrEqual(scaleOf(c) - 1e-12);
+    }
   });
 });
