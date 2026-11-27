@@ -3,6 +3,7 @@ import { readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, relative, resolve } from 'node:path';
 import { appsIn } from '@feega/dev-run/run-plan';
+import { GIT_MISSING, gitPanel } from './git-panel';
 import { AddKind, type AddPlace } from '@feega/live-edit/add-node';
 import { inside, liveAtOf, reader } from '@feega/live-edit/live-ask';
 import { readProps } from '@feega/live-edit/read-props';
@@ -40,6 +41,7 @@ import { scalesOf } from './scales';
 import { themesOf } from './themes';
 import { MCP_COMMAND } from '../webview/onboarding-slides';
 import { EditKind, UsageKind, usageSession, type EditDetails } from './usage';
+import type { AcpId } from './ai/acp-agents';
 import { aiUsage } from './ai/ai-usage';
 import { breakpointOf, fileExtOf, identifierOf, linesOf, propCategoryOf, stateOf, targetOf, webviewDimsOf } from './usage-dims';
 import { editKindOf } from './edit-kind';
@@ -398,6 +400,19 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   const pluginList = platform.plugins
     ? pluginsSession({ host: { root: platform.plugins.root, dev: () => platform.plugins!.dev().map((folder) => resolve(root, folder)) }, post, notify: platform.notify, onInstalled: () => usage?.track(UsageKind.PluginInstalled) })
     : null;
+
+  const gitChanges = gitPanel({ opened: () => platform.stored<Prefs>(Stored.Prefs)?.gitOpen ?? false, run: async (args) => (platform.git ? platform.git(root)(args) : { code: GIT_MISSING, out: '', err: '' }), post, rows: () => edits.history() });
+  async function agentFixes(agent: AcpId) {
+    const prompt = await gitChanges.fixPrompt();
+    if (!prompt) {
+      return;
+    }
+    aiAgent = agent;
+    aiStats?.started(agent);
+    await ai.start(agent);
+    aiStats?.sent();
+    await ai.send(prompt, null, []);
+  }
 
   const comments = commentsHost(platform.cloud, post, () => edits.history());
   const sharing = shareSession({ platform, workspace, appUrl: () => running?.url ?? null, post });
@@ -821,7 +836,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.Picked]: (m) => (picks.get(m.id)?.(m.pick), picks.delete(m.id)),
     [ToHost.Restart]: () => startServer(),
     [ToHost.External]: (m) => platform.openExternal(m.url),
-    [ToHost.Prefs]: (m) => platform.store(Stored.Prefs, m.prefs),
+    [ToHost.Prefs]: (m) => platform.store(Stored.Prefs, { ...m.prefs, gitOpen: platform.stored<Prefs>(Stored.Prefs)?.gitOpen }),
     [ToHost.Server]: (m) => SERVER_ACTIONS[m.action](),
     [ToHost.SaveVariable]: (m) => edits.saveVariable(m.ask, m.name).then((out) => edited(out, m.ask)),
     [ToHost.Font]: (m) => edits.font(m.ask, m.google).then((out) => edited(out, m.ask)),
@@ -864,6 +879,14 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.Selected]: (m) => (m.at && usage?.track(UsageKind.ElementSelected), void published?.then((bridge) => bridge?.touch()), sharing.hostSelected(m.at), syncSelection(m.at)),
     [ToHost.Context]: (m) => void (agentContext = m.text),
     [ToHost.Copy]: (m) => (m.text === MCP_COMMAND && usage?.track(UsageKind.OnboardingStep, { step: OnboardingStep.Agents, outcome: 'completed', choice: ONBOARDING_MCP_CHOICE }), platform.copyText?.(m.text)),
+    [ToHost.GitRefresh]: () => gitChanges.refresh(),
+    [ToHost.GitCommit]: (m) => gitChanges.commit(m.message, m.scope, m.after),
+    [ToHost.GitPush]: () => gitChanges.push(),
+    [ToHost.GitPull]: () => gitChanges.pull(),
+    [ToHost.GitPullPush]: () => gitChanges.pullAndPush(),
+    [ToHost.GitIdentity]: (m) => gitChanges.identity(m.name, m.email),
+    [ToHost.GitFix]: (m) => agentFixes(m.agent),
+    [ToHost.GitOpen]: (m) => platform.store(Stored.Prefs, { ...platform.stored<Prefs>(Stored.Prefs), gitOpen: m.open }).then(() => gitChanges.refresh()),
     [ToHost.Usage]: (m) => usage?.track(WEBVIEW_USAGE[m.event], webviewDimsOf(m.dims)),
     [ToHost.Comments]: comments.show,
     [ToHost.CommentAdd]: (m) => (usage?.track(UsageKind.CloudAction, { action: 'comment_add' }), comments.add(m.draft)),

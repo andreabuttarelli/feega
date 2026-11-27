@@ -90,6 +90,7 @@
   import { browserAlerts, desktopBridge } from './alerts';
   import { answerAsk } from './agent-ask';
   import { ai, aiHeard } from './ai-state.svelte';
+  import { gitHeard } from './git-state.svelte';
   import { withImpact } from './ai-context';
   import type { CloudComment, CloudRevisions, CommentDraft } from '../host/cloud-api';
   import { pinIdOf, pinSlot, pinsOf, sourceOfComment, threadsOf } from './comments';
@@ -799,6 +800,8 @@
     [ToView.AiPolicy]: aiHeard,
     [ToView.Adapters]: (m) => (adapters = m.rows),
     [ToView.AiChats]: aiHeard,
+    [ToView.Git]: gitHeard,
+    [ToView.GitResult]: gitHeard,
     [ToView.Alert]: (m) => void pageAlerts.show(m.alert),
     [ToView.AlertClear]: (m) => pageAlerts.clear(m.chat),
     [ToView.ShowChat]: (m) => ((tab = Tab.Ai), (barClosed = false)),
@@ -1789,7 +1792,7 @@
         {/if}
       </Tabs.Content>
       <Tabs.Content value={Tab.Changes}>
-        <ChangesList {changes} onselect={select} onopen={(at) => toHost({ kind: ToHost.Open, at })} ondiff={(id) => toHost({ kind: ToHost.Diff, id })} onrevert={(id) => toHost({ kind: ToHost.Revert, id })} onrevertall={() => toHost({ kind: ToHost.Revert, id: null })} onscm={() => toHost({ kind: ToHost.SourceControl })} />
+        <ChangesList {changes} onselect={select} onopen={(at) => toHost({ kind: ToHost.Open, at })} ondiff={(id) => toHost({ kind: ToHost.Diff, id })} onrevert={(id) => toHost({ kind: ToHost.Revert, id })} onrevertall={() => toHost({ kind: ToHost.Revert, id: null })} onscm={() => toHost({ kind: ToHost.SourceControl })} onai={() => (tab = Tab.Ai)} />
       </Tabs.Content>
       {#each plugins.sidePanel as panel (panel.plugin + panel.entry.id)}
         <Tabs.Content value={`plugin:${panel.plugin}/${panel.entry.id}`}>
