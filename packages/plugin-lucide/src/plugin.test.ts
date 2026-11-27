@@ -3,8 +3,11 @@ import { createApi, type Port } from '@feega/plugin-api/client';
 import { createPluginHost, type EditorPort } from '@feega/plugin-api/host';
 import { parseManifest } from '@feega/plugin-api/manifest';
 import { Control, OpKind, Place, type HostMessage, type PluginMessage, type ProjectInfo, type Proposal, type Selection, type UiNode } from '@feega/plugin-api/protocol';
+import { OFFLINE_NOTE } from '@feega/plugin-icon-kit/cdn';
+import { localCdn } from '@feega/plugin-icon-kit/cdn-fixture';
 import manifest from '../feega-plugin.json';
-import { CHOSEN, COLOUR, INHERIT, INSERT, LABEL, PAGE_SIZE, QUERY, SECTION, SIZE, STROKE, lucidePlugin } from './plugin';
+import { VERSION } from './icons';
+import { CHOSEN, COLOUR, INHERIT, INSERT, LABEL, PAGE_SIZE, QUERY, RETRY, SECTION, SIZE, STROKE, lucidePlugin } from './plugin';
 
 const at = (file: string): Selection => ({ source: { file, line: 4, col: 3 }, component: null, tag: 'section', name: 'section', classes: 'hero', rect: { x: 0, y: 0, width: 400, height: 200 }, styles: {}, attributes: [] });
 
@@ -22,6 +25,7 @@ function load(initial: Selection | null, project: ProjectInfo = PLAIN) {
   let selection = initial;
   const proposals: Proposal[] = [];
   const notes: string[] = [];
+  const cdn = localCdn();
   let toHost: (m: PluginMessage) => void = () => undefined;
   let toPlugin: (m: HostMessage) => void = () => undefined;
   const editor: EditorPort = {
@@ -30,7 +34,7 @@ function load(initial: Selection | null, project: ProjectInfo = PLAIN) {
     sourceText: async () => null,
     propose: async (p) => (proposals.push(p), { ok: true }),
     preview: () => undefined,
-    fetch: async () => ({ status: 200, text: '' }),
+    fetch: cdn.fetch,
     pickFile: async () => null,
     notify: (text) => notes.push(text)
   };
@@ -49,15 +53,20 @@ function load(initial: Selection | null, project: ProjectInfo = PLAIN) {
   };
   const ui = () => host.ui(parsed.manifest.id, SECTION);
   const control = async (id: string, value: string | number | boolean, live = false) => {
+    const before = proposals.length + notes.length;
     host.control(parsed.manifest.id, SECTION, id, value, live);
     await settle();
+    if (id === INSERT) {
+      await vi.waitFor(() => expect(proposals.length + notes.length).toBeGreaterThan(before), { timeout: ICONS_READY_MS });
+    }
   };
+  const drawn = () => vi.waitFor(() => expect(grid(ui())?.items.length && grid(ui())?.items.every((item) => item.image)).toBeTruthy(), { timeout: ICONS_READY_MS });
   const select = async (next: Selection | null) => {
     selection = next;
     host.selectionChanged(next);
     await settle();
   };
-  return { settle, ui, control, select, proposals, notes, manifest: parsed.manifest };
+  return { settle, ui, control, select, drawn, cdn, proposals, notes, manifest: parsed.manifest };
 }
 
 const node = <T extends UiNode['type']>(tree: UiNode[], type: T, id?: string) => tree.find((n) => n.type === type && (id === undefined || ('id' in n && n.id === id)));
@@ -79,7 +88,7 @@ describe('manifest', () => {
 
     expect(m.contributions.rightBar).toEqual([{ id: SECTION, title: 'Lucide icons', when: ['selection'] }]);
     expect([...m.grants].sort()).toEqual(['edit.insert', 'project', 'selection']);
-    expect(m.hosts).toEqual([]);
+    expect(m.hosts).toEqual(['cdn.jsdelivr.net', 'unpkg.com']);
   });
 });
 
@@ -94,11 +103,12 @@ describe('picker', () => {
   it('offers common icons before anything is typed, each drawn from its own svg', async () => {
     const plugin = load(SVELTE);
     await plugin.settle();
+    await plugin.drawn();
     const items = grid(plugin.ui())?.items ?? [];
 
     expect(items.length).toBeGreaterThan(20);
     expect(items.length).toBeLessThanOrEqual(PAGE_SIZE);
-    expect(items.every((item) => item.image?.startsWith('<svg'))).toBe(true);
+    expect(items.every((item) => item.image?.includes('<svg'))).toBe(true);
     expect(items.map((item) => item.id)).toContain('camera');
   });
 
@@ -142,6 +152,70 @@ describe('picker', () => {
     await plugin.control(INHERIT, false);
 
     expect(node(plugin.ui(), Control.Colour, COLOUR)).toBeTruthy();
+  });
+});
+
+describe('icon files', () => {
+  it('fetches only the icons on show, pinned to the version of the bundled index', async () => {
+    const plugin = load(SVELTE);
+    await plugin.settle();
+    await plugin.drawn();
+
+    expect(plugin.cdn.requests.length).toBeGreaterThan(20);
+    expect(plugin.cdn.requests.length).toBeLessThanOrEqual(PAGE_SIZE);
+    expect(plugin.cdn.requests.every((url) => url.startsWith(`https://cdn.jsdelivr.net/npm/lucide-static@${VERSION}/icons/`))).toBe(true);
+  });
+
+  it('does not fetch an icon twice', async () => {
+    const plugin = load(SVELTE);
+    await plugin.settle();
+    await plugin.drawn();
+    const first = plugin.cdn.requests.length;
+    await plugin.control(QUERY, 'camera', true);
+    await plugin.control(QUERY, '', true);
+
+    expect(plugin.cdn.requests.length).toBeGreaterThanOrEqual(first);
+    expect(new Set(plugin.cdn.requests).size).toBe(plugin.cdn.requests.length);
+  });
+
+  it('keeps the icons it has and says what is missing when there is no internet', async () => {
+    const plugin = load(SVELTE);
+    await plugin.settle();
+    await plugin.drawn();
+    plugin.cdn.offline = true;
+    await plugin.control(QUERY, 'camera', true);
+
+    await vi.waitFor(() => expect(node(plugin.ui(), Control.Note)).toMatchObject({ text: OFFLINE_NOTE }), { timeout: ICONS_READY_MS });
+    const items = grid(plugin.ui())?.items ?? [];
+    expect(items.find((item) => item.id === 'camera')?.image).toBeTruthy();
+    expect(items.some((item) => !item.image)).toBe(true);
+    expect(node(plugin.ui(), Control.Button, RETRY)).toBeTruthy();
+  });
+
+  it('draws the missing icons after a retry once the connection is back', async () => {
+    const plugin = load(SVELTE);
+    plugin.cdn.offline = true;
+    await plugin.settle();
+    await vi.waitFor(() => expect(node(plugin.ui(), Control.Note)).toMatchObject({ text: OFFLINE_NOTE }), { timeout: ICONS_READY_MS });
+    plugin.cdn.offline = false;
+    await plugin.control(RETRY, true);
+    await plugin.drawn();
+
+    expect(node(plugin.ui(), Control.Note)).toBeUndefined();
+  });
+
+  it('refuses to insert an icon it cannot get, with a note, and writes nothing', async () => {
+    const plugin = load(SVELTE);
+    await plugin.settle();
+    await plugin.drawn();
+    await plugin.control(QUERY, 'zzz-none', true);
+    plugin.cdn.offline = true;
+    await plugin.control(QUERY, 'sun', true);
+    await plugin.control(CHOSEN, 'sun-dim');
+    await plugin.control(INSERT, true);
+
+    expect(plugin.proposals).toEqual([]);
+    expect(plugin.notes).toEqual([OFFLINE_NOTE]);
   });
 });
 

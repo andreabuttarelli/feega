@@ -1,7 +1,11 @@
 import { unpack } from '@feega/plugin-icon-kit/unpack';
-import { PACKED } from './packed.generated';
+import { PACKED, VERSION } from './packed.generated';
 
-export type Logo = { name: string; title: string; hex: string; path: string; words: string[] };
+export { VERSION };
+
+export type Logo = { name: string; title: string; hex: string; words: string[] };
+
+export const SOURCE = { name: 'simple-icons', version: VERSION };
 
 export const VIEW_BOX = '0 0 24 24';
 export const DEFAULT_SIZE = 24;
@@ -14,13 +18,9 @@ export const POPULAR = [
 ];
 
 export async function loadLogos(): Promise<Logo[]> {
-  const packed = await unpack<Record<string, [string, string, string]>>(PACKED);
+  const packed = await unpack<Record<string, [string, string]>>(PACKED);
 
-  return Object.entries(packed).map(([name, [title, hex, path]]) => ({ name, title, hex, path, words: [title.toLowerCase()] }));
+  return Object.entries(packed).map(([name, [title, hex]]) => ({ name, title, hex, words: [title.toLowerCase()] }));
 }
 
-export const glyphOf = (logo: Logo): string => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${VIEW_BOX}"><path d="${logo.path}"/></svg>`;
-
-export const escaped = (text: string): string => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
-export const bodyOf = (logo: Logo): string => `<title>${escaped(logo.title)}</title><path d="${logo.path}"/>`;
+export const fileOf = (logo: Logo): string => `icons/${logo.name}.svg`;
