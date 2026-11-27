@@ -9,7 +9,7 @@ The **Changes** tab has a commit area above the list of edits. It runs the `git`
 
 ## What you see
 
-The commit area starts collapsed as one row: **Commit 2 changes**, the branch, and a **Commit & push** button. The arrow opens the rest, and Feega remembers whether you left it open. A message that needs action, such as a rejected push, opens it by itself.
+The commit area starts collapsed as one row: the branch (with the GitHub mark for GitHub remotes) and its ahead and behind counts, a revert-all button, and **Commit & push**. The arrow opens the rest, including **Open in Source Control**, and Feega remembers whether you left it open. A message that needs action, such as a rejected push, opens it by itself.
 
 Open, it shows:
 

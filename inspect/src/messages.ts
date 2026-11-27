@@ -292,6 +292,11 @@ export enum GitAction {
   Pull = 'pull'
 }
 
+export enum GitHost {
+  GitHub = 'github',
+  Other = 'other'
+}
+
 export enum GitFix {
   None = 'none',
   Pull = 'pull',
@@ -304,7 +309,7 @@ export enum GitFix {
   CopyRemote = 'copy-remote'
 }
 
-export type GitView = { state: GitState; branch: string | null; upstream: string | null; remote: string | null; ahead: number; behind: number; feega: string[]; others: string[]; message: string; open: boolean };
+export type GitView = { state: GitState; branch: string | null; upstream: string | null; remote: string | null; ahead: number; behind: number; feega: string[]; others: string[]; message: string; open: boolean; host: GitHost };
 
 export type ChangeRow = { id: number; at: string; prop: string; value: string; scope: string; files: string[]; time: number; by?: string };
 

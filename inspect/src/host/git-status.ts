@@ -1,4 +1,4 @@
-import { GitFix } from '../messages';
+import { GitFix, GitHost } from '../messages';
 
 export type GitStatus = { branch: string | null; upstream: string | null; ahead: number; behind: number; paths: string[] };
 
@@ -124,3 +124,7 @@ export function fixPrompt(failed: GitFailed, status: GitStatus): string {
     'Never force push, never discard uncommitted work, and never rewrite commits that are already pushed. Explain what you did when you are done.'
   ].join('\n');
 }
+
+const GITHUB_REMOTE = /^(?:[a-z+]+:\/\/(?:[^@/]+@)?|[^@/\s]+@)github\.com[/:]/i;
+
+export const hostOf = (url: string): GitHost => (GITHUB_REMOTE.test(url.trim()) ? GitHost.GitHub : GitHost.Other);

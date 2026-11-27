@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { GitFix } from '../messages';
-import { GitFailure, commitMessage, failureOf, fixFor, fixPrompt, parseStatus, splitFiles } from './git-status';
+import { GitFix, GitHost } from '../messages';
+import { GitFailure, commitMessage, failureOf, fixFor, fixPrompt, hostOf, parseStatus, splitFiles } from './git-status';
 
 const PORCELAIN = [
   '# branch.oid 1234',
@@ -112,5 +112,21 @@ describe('fixPrompt', () => {
 
   it('forbids force pushing and asks for a safe resolution', () => {
     expect(fixPrompt(failed, state)).toMatch(/never force push/i);
+  });
+});
+
+describe('hostOf', () => {
+  it.each([
+    ['https://github.com/acme/site.git', GitHost.GitHub],
+    ['https://user@github.com/acme/site', GitHost.GitHub],
+    ['git@github.com:acme/site.git', GitHost.GitHub],
+    ['ssh://git@github.com/acme/site.git', GitHost.GitHub],
+    ['https://gitlab.com/acme/site.git', GitHost.Other],
+    ['https://github.com.example.org/acme/site.git', GitHost.Other],
+    ['https://example.org/github.com/site.git', GitHost.Other],
+    ['/tmp/remote.git', GitHost.Other],
+    ['', GitHost.Other]
+  ])('%s is %s', (url, host) => {
+    expect(hostOf(url)).toBe(host);
   });
 });

@@ -1,5 +1,5 @@
-import { GitAction, GitAfter, GitFix, GitScope, GitState, ToView, type GitView, type ViewMessage } from '../messages';
-import { GitFailure, commitMessage, failureOf, fixFor, fixPrompt, parseStatus, splitFiles, type EditedRow, type GitFailed, type GitStatus } from './git-status';
+import { GitAction, GitAfter, GitFix, GitHost, GitScope, GitState, ToView, type GitView, type ViewMessage } from '../messages';
+import { GitFailure, commitMessage, failureOf, fixFor, fixPrompt, hostOf, parseStatus, splitFiles, type EditedRow, type GitFailed, type GitStatus } from './git-status';
 
 export const GIT_MISSING = -1;
 
@@ -57,7 +57,7 @@ export function gitPanel({ opened, run, post, rows }: GitPanelHost) {
     return next;
   };
 
-  const empty = (state: GitState): GitView => ({ state, branch: null, upstream: null, remote: null, ahead: 0, behind: 0, feega: [], others: [], message: '', open: opened() });
+  const empty = (state: GitState): GitView => ({ state, branch: null, upstream: null, remote: null, ahead: 0, behind: 0, feega: [], others: [], message: '', open: opened(), host: GitHost.Other });
 
   async function snapshot(): Promise<Snapshot> {
     const none = { branch: null, upstream: null, ahead: 0, behind: 0, paths: [] };
@@ -72,11 +72,12 @@ export function gitPanel({ opened, run, post, rows }: GitPanelHost) {
     const parsed = parseStatus(status.out);
     const names = remotes.out.split('\n').filter(Boolean);
     const remote = names.includes(DEFAULT_REMOTE) ? DEFAULT_REMOTE : (names[0] ?? null);
+    const url = remote ? await run(['remote', 'get-url', remote]) : null;
     const edited = rows();
     const inRepo = new Set(edited.flatMap((r) => r.files.map((f) => prefix.out.trim() + f)));
     const { feega, others } = splitFiles(parsed.paths, inRepo);
     const message = commitMessage(edited);
-    return { view: { state: GitState.Ready, branch: parsed.branch, upstream: parsed.upstream, remote, ahead: parsed.ahead, behind: parsed.behind, feega, others, message, open: opened() }, status: parsed };
+    return { view: { state: GitState.Ready, branch: parsed.branch, upstream: parsed.upstream, remote, ahead: parsed.ahead, behind: parsed.behind, feega, others, message, open: opened(), host: hostOf(url?.out ?? '') }, status: parsed };
   }
 
   const show = async () => {

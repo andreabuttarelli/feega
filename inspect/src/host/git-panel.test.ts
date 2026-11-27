@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, realpathSync, writeFileSync } from 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { GitAction, GitAfter, GitFix, GitScope, GitState, ToView, type GitView, type ViewMessage } from '../messages';
+import { GitAction, GitAfter, GitFix, GitHost, GitScope, GitState, ToView, type GitView, type ViewMessage } from '../messages';
 import { GIT_MISSING, gitPanel, type GitRun } from './git-panel';
 import { nodeGit } from './node-git';
 
@@ -351,6 +351,22 @@ describe('git panel against a real repository', () => {
 });
 
 describe('git panel with a stubbed command', () => {
+  it('knows when the remote is on GitHub', async () => {
+    const run: GitRun = async (args) => ({ code: 0, out: args.includes('get-url') ? 'git@github.com:acme/site.git\n' : args.includes('remote') ? 'origin\n' : '', err: '' });
+    const { p, view } = panel('/x', [], run);
+    await p.refresh();
+
+    expect(view().host).toBe(GitHost.GitHub);
+  });
+
+  it('reports another host for a local remote', async () => {
+    const { root } = repo();
+    const { p, view } = panel(root);
+    await p.refresh();
+
+    expect(view().host).toBe(GitHost.Other);
+  });
+
   const answer = (map: Record<string, { code: number; out?: string; err?: string }>): GitRun => async (args) => {
     const hit = Object.entries(map).find(([key]) => args.includes(key));
     const found = hit?.[1] ?? { code: 0 };
