@@ -33,6 +33,16 @@ export const SOURCES: readonly PluginSource[] = [
     tier: 'free',
     latestVersion: '1.0.0',
     permissions: ['selection', 'project', 'edit.insert', 'edit.attributes', 'edit.dependency', 'edit.asset', 'file.pick']
+  },
+  {
+    id: 'lucide-icons',
+    manifestId: 'feega.lucide-icons',
+    name: 'Lucide icons',
+    summary: 'Search the Lucide icon set and insert an icon with the size, stroke and colour you want.',
+    author: 'Feega',
+    tier: 'free',
+    latestVersion: '1.0.0',
+    permissions: ['selection', 'project', 'edit.insert']
   }
 ];
 
@@ -46,5 +56,10 @@ export const COPY: Readonly<Record<string, PluginCopy>> = {
     icon: 'object-3d',
     description:
       'Add a cube, sphere, torus knot, 3D text or your own .glb model to the selected element. Feega writes a small scene component and the three.js code into your project, adds the dependency, and lets you change material, lights, rotation and colour from the right bar. Everything is one undoable step you can review in Changes.'
+  },
+  'lucide-icons': {
+    icon: 'lucide',
+    description:
+      'Select an element, search the Lucide set of over 2,000 icons, pick one and set its size, stroke width and colour. Feega inserts it as a small component with the SVG inline, or, when the project already uses lucide-react, lucide-svelte or lucide-vue-next, as a component of that library. Nothing is added to package.json. One undoable step. Lucide is released under the ISC licence, Copyright Lucide Contributors (lucide.dev).'
   }
 };

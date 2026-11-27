@@ -1,0 +1,9 @@
+{
+  "id": "feega.lucide-icons",
+  "name": "Lucide icons",
+  "version": "1.0.0",
+  "permissions": ["selection", "project", "edit.insert"],
+  "contributions": {
+    "rightBar": [{ "id": "icons", "title": "Lucide icons", "when": ["selection"] }]
+  }
+}

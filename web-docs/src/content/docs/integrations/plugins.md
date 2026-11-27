@@ -1,12 +1,12 @@
 ---
 title: Plugins
-description: Two plugins ship with Feega Inspect, Mesh gradient and 3D object. Plugins run sandboxed and change your code only through the same edit engine as manual edits.
+description: Plugins ship with Feega Inspect, Mesh gradient, 3D object and Lucide icons. Plugins run sandboxed and change your code only through the same edit engine as manual edits.
 sidebar:
   order: 4
 ---
 
-Plugins add controls to Feega Inspect. Two are built in and on by default: **Mesh gradient** and
-**3D object**. You can also install third-party plugins or load one from a folder while you build
+Plugins add controls to Feega Inspect. Three are built in and on by default: **Mesh gradient**,
+**3D object** and **Lucide icons**. You can also install third-party plugins or load one from a folder while you build
 it: see [Write a plugin](/integrations/write-a-plugin/).
 
 ## Browse plugins
@@ -66,6 +66,29 @@ attributes on the component tag. Models keep their own materials.
 
 The scene is 16:9 and fills the width until you set a **Height** (0 means automatic). The Svelte
 component uses runes, so it needs Svelte 5.
+
+## Lucide icons
+
+Select an element. In **Properties**, the **Lucide icons** section has a search box and a grid of
+icons. With nothing typed it shows common icons. Type a name or a word ("arrow", "cart", "weather")
+to search the whole set. Click an icon, set the options, then press **Insert**.
+
+- **Size** and **Stroke** set the icon's width, height and line weight.
+- **Text colour** makes the icon follow the surrounding text colour. Turn it off to pick a **Colour**.
+
+Insert is one undoable step. It places the icon next to the selected element, or inside it when it
+is a container, and writes `src/feega/icons/<Name>Icon` (`.svelte`, `.vue`, `.astro`, `.tsx` or
+`.jsx`, matching the file you add it to). Size, stroke and colour are written as props on the tag,
+only when they differ from the defaults (24, 2, current colour).
+
+- By default the icon file holds the SVG inline. Nothing is added to `package.json`.
+- If the project already depends on `lucide-react`, `lucide-svelte`, `@lucide/svelte` or
+  `lucide-vue-next`, the icon file re-exports that library's component instead, so the project keeps
+  one icon implementation. The icon must exist in the installed version. Astro always uses inline SVG.
+- The Svelte component uses runes in Svelte 5 projects and `export let` in Svelte 4.
+
+The icons are [Lucide](https://lucide.dev), released under the ISC licence, Copyright Lucide
+Contributors. The set is bundled with Feega and works offline.
 
 ## Safety
 
