@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Move } from '../messages';
-import { BINDINGS, MOVES, Shortcut, letterOf, shortcutOf, typingIn } from './selection-keys';
+import { BINDINGS, MOVES, Shortcut, isRedo, letterOf, shortcutOf, typingIn } from './selection-keys';
 
 const press = (key: string, mods: { shift?: boolean; mod?: boolean } = {}, mac = true) => shortcutOf({ key, shiftKey: Boolean(mods.shift), metaKey: mac && Boolean(mods.mod), ctrlKey: !mac && Boolean(mods.mod) }, mac);
 
@@ -91,5 +91,31 @@ describe('selection shortcuts', () => {
     expect(typingIn({ tagName: 'DIV', isContentEditable: true })).toBe(true);
     expect(typingIn({ tagName: 'DIV', isContentEditable: false })).toBe(false);
     expect(typingIn(null)).toBe(false);
+  });
+});
+
+describe('redo shortcut', () => {
+  const key = (k: string, mods: { shift?: boolean; ctrl?: boolean; meta?: boolean }, code?: string) => ({ key: k, code, shiftKey: Boolean(mods.shift), ctrlKey: Boolean(mods.ctrl), metaKey: Boolean(mods.meta) });
+
+  it('Ctrl+Y redoes off the Mac', () => {
+    expect(isRedo(key('y', { ctrl: true }), false)).toBe(true);
+  });
+
+  it('Ctrl+Y and Cmd+Y do nothing on the Mac', () => {
+    expect(isRedo(key('y', { ctrl: true }), true)).toBe(false);
+    expect(isRedo(key('y', { meta: true }), true)).toBe(false);
+  });
+
+  it('Shift+Z with the modifier still redoes', () => {
+    expect(isRedo(key('z', { meta: true, shift: true }), true)).toBe(true);
+    expect(isRedo(key('z', { ctrl: true, shift: true }), false)).toBe(true);
+  });
+
+  it('plain undo is not redo', () => {
+    expect(isRedo(key('z', { ctrl: true }), false)).toBe(false);
+  });
+
+  it('follows the physical key on a Cyrillic layout', () => {
+    expect(isRedo(key('н', { ctrl: true }, 'KeyY'), false)).toBe(true);
   });
 });
