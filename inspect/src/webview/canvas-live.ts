@@ -6,7 +6,7 @@ export const VISIBLE_MARGIN = 200;
 export const MIN_LIVE_WIDTH = 240;
 export const STICKY_MARGIN = 300;
 
-type Placed = Pick<CanvasFrame, 'key' | 'dynamic' | 'x' | 'y' | 'width' | 'height'>;
+export type Placed = Pick<CanvasFrame, 'key' | 'dynamic' | 'x' | 'y' | 'width' | 'height'>;
 
 const touches = (f: Placed, view: CanvasView, viewport: Viewport, margin: number) => {
   const left = f.x * view.scale + view.x;
