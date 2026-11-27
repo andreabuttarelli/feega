@@ -1,6 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { CANVAS_COLUMNS, layoutCanvas } from './canvas-layout';
-import { LIVE_CAP, VISIBLE_MARGIN, leaving, liveKeys, visibleKeys } from './canvas-live';
+import { VISIBLE_MARGIN, liveSet, visibleKeys } from './canvas-live';
+
+describe('liveSet minimum width', () => {
+  const frames = [{ key: 'a', dynamic: false as const, x: 0, y: 0, width: 480, height: 320 }];
+  const small = { scale: 0.3, x: 0, y: 0 };
+  const viewport = { w: 1000, h: 800 };
+
+  it('keeps a frame that is too small on screen asleep by default', () => {
+    expect(liveSet(frames, small, viewport, [])).toEqual([]);
+  });
+
+  it('wakes it when the canvas has no minimum width', () => {
+    expect(liveSet(frames, small, viewport, [], 0)).toEqual(['a']);
+  });
+});
 
 const pages = Array.from({ length: 10 }, (_, i) => ({ route: `/p${i}`, dynamic: i === 9 }));
 const { frames } = layoutCanvas(pages, CANVAS_COLUMNS);
@@ -28,39 +42,5 @@ describe('visibleKeys', () => {
     const far = { scale: 0.1, x: 0, y: -frames[3].y * 0.1 };
 
     expect(visibleKeys(frames, far, viewport, 0)).toContain('/p1::desktop');
-  });
-});
-
-describe('liveKeys', () => {
-  const zoomedOut = { scale: 0.05, x: 0, y: 0 };
-
-  it('never runs more than the cap', () => {
-    expect(visibleKeys(frames, zoomedOut, viewport, 0).length).toBeGreaterThan(LIVE_CAP);
-    expect(liveKeys(frames, zoomedOut, viewport, 0, LIVE_CAP)).toHaveLength(LIVE_CAP);
-  });
-
-  it('prefers the frames nearest the centre of the viewport', () => {
-    const live = liveKeys(frames, zoomedOut, viewport, 0, 1);
-    const distance = (key: string) => {
-      const f = frames.find((x) => x.key === key)!;
-      return Math.hypot(f.x * 0.05 + (f.width * 0.05) / 2 - viewport.w / 2, f.y * 0.05 + (f.height * 0.05) / 2 - viewport.h / 2);
-    };
-    const best = Math.min(...visibleKeys(frames, zoomedOut, viewport, 0).map(distance));
-
-    expect(distance(live[0])).toBe(best);
-  });
-
-  it('skips dynamic routes', () => {
-    const live = liveKeys(frames, { scale: 0.02, x: 0, y: 0 }, { w: 4000, h: 40000 }, 0, 99);
-
-    expect(live.some((key) => key.startsWith('/p9'))).toBe(false);
-    expect(live).toHaveLength(27);
-  });
-});
-
-describe('leaving', () => {
-  it('names the frames that were live and no longer are', () => {
-    expect(leaving(['a', 'b', 'c'], ['b', 'd'])).toEqual(['a', 'c']);
-    expect(leaving([], ['a'])).toEqual([]);
   });
 });
