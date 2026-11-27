@@ -25,7 +25,7 @@ export enum SnapshotReason {
   UnsupportedFramework = 'unsupported_framework'
 }
 
-const MOUNT_ERROR_DEFAULT = 'Snapshot: it failed to render alone';
+const MOUNT_ERROR_DEFAULT = 'Static copy: this component cannot run on its own';
 
 const MOUNT_ERROR_NOTICE: Record<string, string> = {
   provider: 'Snapshot: needs a provider or context',
