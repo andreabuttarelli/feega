@@ -17,7 +17,7 @@ badge, and an **Enabled** switch. This works the same in the VS Code extension, 
 the desktop app.
 
 - Type in **Search plugins** to filter by name or description.
-- Click a card for its details: a longer description, screenshots, the permissions it asks for
+- Click a card for its details: a longer description, the permissions it asks for
   in words, and a **Docs** button.
 - **Remove** appears on plugins you installed. Built-in plugins can be switched off, not removed.
 - Type a source such as `github:owner/repo@tag` under the grid and press **Install**. Feega asks

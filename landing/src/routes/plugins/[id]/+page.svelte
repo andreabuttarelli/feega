@@ -42,15 +42,6 @@
         {#each plugin.permissions as line (line)}<li>{line}</li>{/each}
       </ul>
     </section>
-
-    <section>
-      <h2>screenshots</h2>
-      <div class="shots">
-        {#each plugin.shots as shot (shot.src)}
-          <img src={shot.src} alt={shot.alt} width={shot.width} height={shot.height} loading="lazy" decoding="async" />
-        {/each}
-      </div>
-    </section>
   </main>
 </div>
 
@@ -143,18 +134,6 @@
     margin: 6px 0;
   }
 
-  .shots {
-    display: grid;
-    gap: 16px;
-  }
-
-  .shots img {
-    display: block;
-    width: 100%;
-    height: auto;
-    border-radius: 10px;
-  }
-
   @media (min-width: 810px) {
     .page {
       padding: 160px 0 var(--site-section);
@@ -163,14 +142,6 @@
 
     h1 {
       font-size: 96px;
-    }
-
-    .shots {
-      grid-template-columns: 1fr 1fr;
-    }
-
-    .shots img:first-child {
-      grid-column: 1 / -1;
     }
   }
 </style>
