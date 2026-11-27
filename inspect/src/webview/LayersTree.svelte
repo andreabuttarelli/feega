@@ -14,6 +14,7 @@
   import { hiddenHere } from './layer-state';
   import { Shortcut, isMac, shortcutOf } from './selection-keys';
   import Self from './LayersTree.svelte';
+  import './tree-rows.css';
 
   type Props = {
     nodes: LayerNode[];
@@ -118,7 +119,7 @@
 {#each nodes as node (key(node))}
   {@const id = key(node)}
   <div
-    class="row"
+    class="row tree-row"
     class:picked={selected.has(id)}
     class:dim={hidden.has(id)}
     class:drop-before={dragging.hint?.id === id && dragging.hint.place === AddPlace.Before}
@@ -143,12 +144,12 @@
     ondrop={(e) => onDrop(e, node)}
   >
     {#if node.children.length}
-      <button type="button" class="twist" class:open={open[id]} aria-label={open[id] ? 'Collapse' : 'Expand'} onclick={(e) => (e.stopPropagation(), (open[id] = !open[id]))}><ChevronRight size={12} /></button>
+      <button type="button" class="twist tree-twist" class:open={open[id]} aria-label={open[id] ? 'Collapse' : 'Expand'} onclick={(e) => (e.stopPropagation(), (open[id] = !open[id]))}><ChevronRight size={12} /></button>
     {:else}
-      <span class="twist"></span>
+      <span class="twist tree-twist"></span>
     {/if}
-    <svg class="type" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="0.833" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{@html ICON_SVG[iconOf(node)]}</svg>
-    <span class="name" class:component={node.component}>{node.name}</span>{#if badge && isPicked(node)}<span class="state-badge" data-testid="layer-state-badge">{badge}</span>{/if}
+    <svg class="type tree-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="0.833" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{@html ICON_SVG[iconOf(node)]}</svg>
+    <span class="name tree-name" class:component={node.component}>{node.name}</span>{#if badge && isPicked(node)}<span class="state-badge" data-testid="layer-state-badge">{badge}</span>{/if}
     {#if hiddenHere(node)}<span class="hidden-here" title="Hidden at this size" aria-label="Hidden at this size" data-hidden-here><EyeOff size={11} /></span>{/if}
     {#if floatingOf(node.position)}<span class={`float ${floatingOf(node.position)}`} data-float={floatingOf(node.position)} title={FLOAT_HINT[floatingOf(node.position)!]} aria-label={FLOAT_HINT[floatingOf(node.position)!]}><svg viewBox="0 0 10 10" width="10" height="10" aria-hidden="true">{@html FLOAT_GLYPH[floatingOf(node.position)!]}</svg></span>{/if}
     {#if node.count > 1 && node.source}<span class="count" title={`Rendered ${node.count} times by a loop in ${node.source.file}:${node.source.line} — edits apply to all ${node.count}`}>×{node.count}</span>{:else if !node.source}<span class="count">{node.count}</span>{/if}
@@ -169,27 +170,6 @@
     color: var(--ui-text-3);
   }
 
-  .row {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    height: 26px;
-    padding-right: 8px;
-    color: var(--ui-text);
-    font-size: var(--ui-text-sm);
-    cursor: default;
-    outline: none;
-    user-select: none;
-  }
-
-  .row:hover {
-    background: var(--ui-input);
-  }
-
-  .row:focus-visible {
-    box-shadow: inset 0 0 0 1px var(--ui-accent);
-  }
-
   .row.drop-before {
     box-shadow: inset 0 2px 0 var(--ui-accent);
   }
@@ -203,32 +183,6 @@
     background: color-mix(in srgb, var(--ui-accent) 14%, transparent);
   }
 
-  .row.picked {
-    background: color-mix(in srgb, var(--ui-accent) 22%, transparent);
-  }
-
-  .twist {
-    display: grid;
-    place-items: center;
-    width: 14px;
-    height: 14px;
-    padding: 0;
-    border: 0;
-    background: none;
-    color: var(--ui-text-3);
-    cursor: pointer;
-    transition: transform 120ms ease;
-  }
-
-  .twist.open {
-    transform: rotate(90deg);
-  }
-
-  .type {
-    flex: none;
-    color: var(--ui-text-3);
-  }
-
   .state-badge {
     flex: none;
     padding: 0 4px;
@@ -237,12 +191,6 @@
     color: var(--ui-accent-ink);
     font-size: 10px;
     line-height: 14px;
-  }
-
-  .name {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 
   .name.component {
