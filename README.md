@@ -17,7 +17,7 @@
 
 ## What it is
 
-Feega is a VS Code extension, also available for Cursor, Windsurf and VSCodium, plus a standalone `npx feega` for any browser. It opens your running app, lets you select any element and edit size, spacing, colour, type and layout from a design panel. Feega finds the source of the element and writes the change as Tailwind classes or real CSS.
+Feega is a VS Code extension, also available for Cursor, Windsurf and VSCodium, a standalone `npx feega` for any browser, and a desktop app for macOS, Windows and Linux. It opens your running app, lets you select any element and edit size, spacing, colour, type and layout from a design panel. Feega finds the source of the element and writes the change as Tailwind classes or real CSS.
 
 It runs on macOS, Windows and Linux. Everything is local: no account, and nothing about your code or your app leaves your machine.
 
@@ -33,6 +33,7 @@ It runs on macOS, Windows and Linux. Everything is local: no account, and nothin
 
 - **VS Code**: [Marketplace](https://marketplace.visualstudio.com/items?itemName=andreabuttarelli.feega)
 - **Cursor, Windsurf, VSCodium**: [Open VSX](https://open-vsx.org/extension/AndreaButtarelli/feega)
+- **Desktop app** (macOS, Windows beta, Linux): [feega.app/download](https://www.feega.app/download)
 - **Any browser**: `npx feega`
 
 ## How it works
