@@ -30,6 +30,12 @@ describe('the app a click designs', () => {
     expect(await appRootOf(n('/repo/landing/src/Hero.svelte'), n('/repo'), fs.has)).toBe(n('/repo/landing'));
   });
 
+  it('a folder with a dot in its name is a folder, not a file', async () => {
+    const fs = tree([n('/code/traidue.com/package.json')]);
+
+    expect(await chosenApp(n('/code/traidue.com'), n('/code/traidue.com'), fs, async () => null)).toBe(n('/code/traidue.com'));
+  });
+
   it('nothing above the workspace counts', async () => {
     const fs = tree([n('/package.json')]);
 
