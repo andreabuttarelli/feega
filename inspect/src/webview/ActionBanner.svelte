@@ -2,15 +2,17 @@
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import LayoutGrid from '@lucide/svelte/icons/layout-grid';
 
-  type Props = { hint: string; testid: string; onopen: () => void };
+  import type { Component } from 'svelte';
 
-  let { hint, testid, onopen }: Props = $props();
+  type Props = { title?: string; hint: string; testid: string; icon?: Component; disabled?: boolean; onopen: (event: MouseEvent) => void };
+
+  let { title = 'Open canvas', hint, testid, icon: Icon = LayoutGrid, disabled = false, onopen }: Props = $props();
 </script>
 
-<button type="button" class="banner" data-testid={testid} onclick={onopen}>
-  <span class="glyph"><LayoutGrid size={14} /></span>
+<button type="button" class="banner" data-testid={testid} {disabled} onclick={onopen}>
+  <span class="glyph"><Icon size={14} /></span>
   <span class="text">
-    <b>Open canvas</b>
+    <b>{title}</b>
     <span>{hint}</span>
   </span>
   <ChevronRight size={14} />
@@ -34,7 +36,12 @@
     cursor: pointer;
   }
 
-  .banner:hover,
+  .banner:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  .banner:hover:not(:disabled),
   .banner:focus-visible {
     border-color: var(--ui-accent);
     background: color-mix(in srgb, var(--ui-accent) 10%, var(--ui-input));
