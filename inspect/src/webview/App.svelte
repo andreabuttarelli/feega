@@ -11,7 +11,7 @@
   import { ElementState } from '@feega/live-edit/element-state';
   import type { Styles } from './controls';
   import { untrack } from 'svelte';
-  import { MOVES, Shortcut, isMac, needsBareFocus, shortcutOf, typingIn } from './selection-keys';
+  import { MOVES, Shortcut, isMac, letterOf, needsBareFocus, shortcutOf, typingIn } from './selection-keys';
   import { Click, NONE, Surface, clickOf, contains, extend, keyOf, only, primary, refOf, siblingsOf, toggle, visibleRows, type Selection } from './selection';
   import type { SupportItem } from '../support';
   import { AccountState, type AgentId, Mode, Onboarding, OnboardingOutcome, OnboardingStep, Move, ServerAction, Slot, type ChangeRow, type FontChoice, type LayerNode, type LibraryEntry, type Palette, ServerState, type ServerInfo, Styling, ToHost, ToView, WebviewUsage, type AdapterRow, type Impact, type ImpactAsk, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
@@ -1445,6 +1445,14 @@
     }
   }
 
+  function deleteRow(source: Source, instance: number) {
+    if (several || (picked && sourceText(picked.source) === sourceText(source) && picked.instanceIndex === instance)) {
+      restructure(StructureOp.Delete);
+      return;
+    }
+    toHost({ kind: ToHost.Structure, op: StructureOp.Delete, at: sourceText(source), instance });
+  }
+
   function pickFont(font: FontChoice) {
     if (!picked) {
       return;
@@ -1528,20 +1536,21 @@
       ']': () => go(history.forward()),
       r: () => go(route)
     };
-    if (cmd && shortcuts[e.key.toLowerCase()] && !(e.key.toLowerCase() === 'z' && typing(e))) {
+    const letter = letterOf(e);
+    if (cmd && shortcuts[letter] && !(letter === 'z' && typing(e))) {
       e.preventDefault();
-      shortcuts[e.key.toLowerCase()]();
+      shortcuts[letter]();
       return;
     }
     if (cmd || typing(e)) {
       return;
     }
-    if (cloudOn && e.key.toLowerCase() === COMMENT_KEY && picked && mode === Mode.Design && !editing) {
+    if (cloudOn && letter === COMMENT_KEY && picked && mode === Mode.Design && !editing) {
       e.preventDefault();
       startComment();
       return;
     }
-    const next = modeOfKey(e.key);
+    const next = modeOfKey(letter);
     if (next) {
       setMode(next);
       return;
@@ -1567,7 +1576,7 @@
     {:else}
     <header class="left-head">Layers<button type="button" class="add" title="Add an element (/)" aria-label="Add" data-testid="add-button" disabled={!picked} onclick={(e) => openAddMenu(e.clientX, e.clientY)}>+ Add</button></header>
     <div class="layers" role="tree" aria-label="Layers" data-testid="layers">
-      <LayersTree nodes={layers} {picked} selected={selectedKeys} badge={badgeOf(elementState)} open={layersOpen} onselect={selectRow} onhover={hoverLayer} onopen={(at) => toHost({ kind: ToHost.Open, at })} onmove={moveLayer} onusage={moveUsage} dragging={layerDrag} hidden={hiddenNow} locked={lockedNow} ontoggle={toggleFlag} oncontext={openLayerMenu} onadd={layerAdd} onfocus={(node) => viewing === View.Page && enterFocus(rowFocus(node))} />
+      <LayersTree nodes={layers} {picked} selected={selectedKeys} badge={badgeOf(elementState)} open={layersOpen} onselect={selectRow} onhover={hoverLayer} onopen={(at) => toHost({ kind: ToHost.Open, at })} onmove={moveLayer} onusage={moveUsage} dragging={layerDrag} hidden={hiddenNow} locked={lockedNow} ontoggle={toggleFlag} oncontext={openLayerMenu} onadd={layerAdd} onfocus={(node) => viewing === View.Page && enterFocus(rowFocus(node))} ondelete={deleteRow} />
     </div>
     {/if}
     {#if !leftClosed}<span class="edge-right" role="separator" aria-orientation="vertical" aria-label="Resize Layers" title="Drag to resize, double-click to reset" onpointerdown={(e) => ((e.currentTarget as HTMLElement).setPointerCapture(e.pointerId), (leftSizing = { x: e.clientX, width: leftPx }))} onpointermove={(e) => leftSizing && (leftWidth = leftSizing.width + (e.clientX - leftSizing.x))} onpointerup={() => leftSizing && ((leftSizing = null), (leftWidth = leftPx), savePrefs())} ondblclick={() => ((leftWidth = LEFT_DEFAULT_PX), savePrefs())}></span>{/if}
