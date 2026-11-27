@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LayerIcon, ICON_SVG, iconOf, floatingOf, Floating } from './layer-icons';
+import { LayerIcon, ICON_SVG, iconOf, floatingOf, Floating, FLOAT_HINT } from './layer-icons';
 
 const node = (tag: string, display = 'block', direction = 'row', extra: { component?: boolean; count?: number; position?: string } = {}) => ({ tag, display, direction, component: false, count: 1, position: 'static', ...extra });
 
@@ -50,5 +50,13 @@ describe('floating layers', () => {
 
   it('the tag names absolute, fixed and sticky only', () => {
     expect(['absolute', 'fixed', 'sticky', 'relative', 'static', ''].map(floatingOf)).toEqual([Floating.Absolute, Floating.Fixed, Floating.Sticky, null, null, null]);
+  });
+
+  it('every position badge explains itself on hover', () => {
+    expect(Object.values(Floating).map((f) => FLOAT_HINT[f])).toEqual([
+      'Absolute: placed relative to its nearest positioned parent',
+      'Fixed: stays in place on the screen while the page scrolls',
+      'Sticky: scrolls with the page, then sticks at its offset'
+    ]);
   });
 });
