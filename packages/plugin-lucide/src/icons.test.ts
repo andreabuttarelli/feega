@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { PACKED } from './packed.generated';
-import { packedIcons } from '../scripts/pack-icons';
+import { unpack } from '@feega/plugin-icon-kit/unpack';
+import { iconsData } from '../scripts/pack-icons';
 import { POPULAR, glyphOf, loadIcons } from './icons';
 
 describe('lucide icon data', () => {
-  it('is the data of the installed lucide-static package', () => {
-    expect(PACKED).toBe(packedIcons());
+  it('is the data of the installed lucide-static package', async () => {
+    expect(await unpack(PACKED)).toEqual(iconsData());
   });
 
   it('holds the whole set, each icon with drawing markup', async () => {
