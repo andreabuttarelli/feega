@@ -48,7 +48,7 @@ export const Mode = { Navigate: 'navigate', Design: 'design' };
 const INSTALLED = Symbol.for('feega.source-map.bridge');
 const EDITABLE = 'plaintext-only';
 const TREE_REFRESH_MS = 150;
-const TREE_ATTRIBUTES = ['class', 'id', 'style', SOURCE_ATTR];
+const TREE_ATTRIBUTES = ['class', 'id', 'style', 'aria-label', 'alt', SOURCE_ATTR];
 const THEME_REBUILD_MS = 100;
 
 export function installBridge(win, { nested = false, emit = null, twin = null, render = null } = {}) {
@@ -178,7 +178,7 @@ export function installBridge(win, { nested = false, emit = null, twin = null, r
   });
 
   new win.MutationObserver(() => (keepPreviews(doc), refreshTree(), refreshForced(), refreshTheme(), refreshLinks(), tab.changed())).observe(doc.documentElement, { childList: true, subtree: true });
-  new win.MutationObserver(() => (refreshTree(), tab.changed())).observe(doc.documentElement, { subtree: true, attributes: true, attributeFilter: TREE_ATTRIBUTES });
+  new win.MutationObserver(() => (refreshTree(), tab.changed())).observe(doc.documentElement, { subtree: true, attributes: true, attributeFilter: TREE_ATTRIBUTES, characterData: true });
 
   if (!nested) {
     reportRoutes(win);
