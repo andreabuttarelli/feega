@@ -28,6 +28,12 @@ const GO_PAGE_CODE = /(goto\(|location\.href = |\$router\.push\()'\/pricing'/;
 const OPEN_WAIT_MS = 5000;
 const OPEN_POLL_MS = 250;
 const OUTLINE_TOLERANCE_PX = 2;
+const TITLE_ROW = /^\s*Plan your launch/;
+const LEAD_ROW = /^\s*Briefs, timelines/;
+const NEW_HEADING_ROW = /^\s*Heading/;
+const NEW_CONTAINER_ROW = /^\s*(Stack|Row|Grid|Frame|Page|App)/;
+const LINK_CRUMB = /^(Link|Start free|Read docs|Features)/;
+const SELECTED_ROW = '[data-testid="layers"] [data-layer][aria-selected="true"]';
 const SPACER_PX = 3000;
 const CLIENT_PAGE_MS = 60_000;
 const TOPICS = ['Briefs', 'Timelines', 'Assets'];
@@ -116,6 +122,12 @@ try {
   });
 
   const layerRow = (pattern) => page.locator('[data-testid="layers"] [data-layer]').filter({ hasText: pattern }).first();
+  const rowOfElement = async (element, position) => {
+    await element.click({ position });
+    await page.waitForTimeout(800);
+    const id = await page.locator(SELECTED_ROW).first().getAttribute('data-layer');
+    return page.locator(`[data-testid="layers"] [data-layer=${JSON.stringify(id)}]`);
+  };
   const sameBox = (a, b, what) => {
     for (const side of ['x', 'y', 'width', 'height']) {
       assert.ok(Math.abs(a[side] - b[side]) <= OUTLINE_TOLERANCE_PX, `${what} ${side}: outline ${a[side]} vs element ${b[side]}`);
@@ -131,9 +143,9 @@ try {
   await check('hovering a layer outlines the element on the page; clicking it selects it and the selection box matches its rect', async () => {
     await frame.locator('h1').first().click();
     await page.waitForTimeout(800);
-    await outlinesElement(layerRow(/^\s*h1/), frame.locator('h1').first(), 'hover');
-    await layerRow(/^\s*h1/).click();
-    await outlinesElement(layerRow(/^\s*h1/), frame.locator('h1').first(), 'picked');
+    await outlinesElement(layerRow(TITLE_ROW), frame.locator('h1').first(), 'hover');
+    await layerRow(TITLE_ROW).click();
+    await outlinesElement(layerRow(TITLE_ROW), frame.locator('h1').first(), 'picked');
     await page.mouse.move(0, 0);
     assert.equal(await page.locator('.outline.hover').count(), 0, 'the hover outline goes away with the pointer');
   });
@@ -329,8 +341,8 @@ try {
     await frame.locator('h1').first().click();
     await page.waitForTimeout(800);
     const layers = page.locator('[data-testid="layers"] [data-layer]');
-    const title = layers.filter({ hasText: /^\s*h1/ }).first();
-    const lead = layers.filter({ hasText: /^\s*p(\b|\.|_)/ }).first();
+    const title = layers.filter({ hasText: TITLE_ROW }).first();
+    const lead = layers.filter({ hasText: LEAD_ROW }).first();
     await title.dragTo(lead, { targetPosition: { x: 60, y: 20 } });
     await page.waitForTimeout(SETTLE_MS);
     assert.ok(changedFiles().length > 0, 'the source order changed');
@@ -379,8 +391,12 @@ try {
     await frame.locator('h1').first().click();
     await page.waitForTimeout(800);
     const layers = page.locator('[data-testid="layers"] [data-layer]');
-    const title = layers.filter({ hasText: /^\s*h1/ }).first();
-    const grid = layers.filter({ hasText: /^\s*section/ }).first();
+    const title = layers.filter({ hasText: TITLE_ROW }).first();
+    const section = frame.locator('section#pricing');
+    const [outer, first, second] = await Promise.all([section.boundingBox(), section.locator('> article').nth(0).boundingBox(), section.locator('> article').nth(1).boundingBox()]);
+    const grid = await rowOfElement(section, { x: (first.x + first.width + second.x) / 2 - outer.x, y: first.y + first.height / 2 - outer.y });
+    await frame.locator('h1').first().click();
+    await page.waitForTimeout(800);
     const classes = await frame.locator('h1').first().getAttribute('class');
     await title.dragTo(grid, { targetPosition: { x: 60, y: 13 } });
     await page.waitForTimeout(SETTLE_MS);
@@ -418,7 +434,7 @@ try {
     assert.equal(await frame.locator('main > h2').count(), 1, 'the heading is on the page');
     assert.ok(/text-2xl|font-size|fontSize/.test(diffText()), 'the heading carries minimal styling');
     const picked = await page.locator('[data-testid="layers"] [data-layer][aria-selected="true"]').first().innerText();
-    assert.ok(/^\s*h2/.test(picked), `the new heading is selected, selection is ${picked}`);
+    assert.ok(NEW_HEADING_ROW.test(picked), `the new heading is selected, selection is ${picked}`);
     await undo();
     assert.deepEqual(changedFiles(), [], 'undo removes it');
   });
@@ -431,7 +447,7 @@ try {
     await page.waitForTimeout(SETTLE_MS);
     assert.equal(await frame.locator('main > div > p').count(), 1, 'the paragraph is inside a new container');
     const picked = await page.locator('[data-testid="layers"] [data-layer][aria-selected="true"]').first().innerText();
-    assert.ok(/^\s*div/.test(picked), `the new container is selected, selection is ${picked}`);
+    assert.ok(NEW_CONTAINER_ROW.test(picked), `the new container is selected, selection is ${picked}`);
     await page.keyboard.press('ControlOrMeta+Shift+g');
     await page.waitForTimeout(SETTLE_MS);
     assert.equal(await frame.locator('main > div > p').count(), 0, 'the container is gone from the page');
@@ -555,7 +571,7 @@ try {
       await frame.locator(`a[href="${href}"]`).first().click();
       await page.waitForTimeout(800);
       const crumbs = (await page.getByTestId('breadcrumb').first().innerText()).trim();
-      assert.ok(/\ba\b/i.test(crumbs.split('›').pop()), `breadcrumb ends with the link: ${crumbs}`);
+      assert.ok(LINK_CRUMB.test(crumbs.split('›').pop().trim()), `breadcrumb ends with the link: ${crumbs}`);
     });
 
     await check(`double-clicking the link "${label}" edits only that link's text`, async () => {

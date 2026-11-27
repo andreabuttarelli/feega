@@ -1,3 +1,5 @@
+import { layerName } from './layer-names.js';
+
 export const SOURCE_ATTR = 'data-feega-src';
 export const ICON_ATTR = 'data-feega-icon';
 export const FORCE_ATTR = 'data-feega-force';
@@ -343,9 +345,7 @@ export function nameOf(element) {
   if (parent && fileOf(parent) !== fileOf(element)) {
     return componentName(fileOf(element));
   }
-  const tag = element.tagName.toLowerCase();
-  const first = element.classList?.[0];
-  return element.id ? `${tag}#${element.id}` : first ? `${tag}.${first}` : tag;
+  return layerName(element);
 }
 
 const pageAncestor = (tag) => ({ source: parseSource(PAGE_SOURCES[tag]), name: tag });

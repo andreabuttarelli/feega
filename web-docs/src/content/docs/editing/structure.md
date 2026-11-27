@@ -5,6 +5,8 @@ sidebar:
   order: 8
 ---
 
+Layers name each element by its text, `alt` or `aria-label`, then by a readable `id` or class, then by its type: Frame, Row, Stack, Grid, Button, Link, Image and so on. Components keep their component name. Utility classes such as Tailwind's are never used as names.
+
 Right-click an element, on the page or in Layers, for the structure menu. Right-clicking a layer selects it first. Use the arrow keys to move through the menu, `Enter` to pick and `Esc` to close.
 
 | Action | Shortcut (macOS) |
