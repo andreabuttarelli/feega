@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ArrowLeft from '@lucide/svelte/icons/arrow-left';
   import ComponentIcon from '@lucide/svelte/icons/component';
   import Grid from '@lucide/svelte/icons/grid-2x2';
   import House from '@lucide/svelte/icons/house';
@@ -8,11 +9,12 @@
   import Scan from '@lucide/svelte/icons/scan';
   import Sun from '@lucide/svelte/icons/sun';
   import X from '@lucide/svelte/icons/x';
-  import { REAL_SIZE, Scheme, View } from './focus';
+  import { REAL_SIZE, Scheme, View, backLabelOf } from './focus';
   import type { ZoomRequest } from './page-bridge';
 
   type Props = {
     name: string;
+    route: string;
     active: View;
     onselect: (view: View) => void;
     onclose: () => void;
@@ -27,12 +29,14 @@
     height?: number;
   };
 
-  let { name, active, onselect, onclose, notice = null, scheme, onscheme, transparent = false, ontransparent = () => undefined, zoom = REAL_SIZE, onzoom = () => undefined, onstep = () => undefined, height = $bindable(0) }: Props = $props();
+  let { name, route, active, onselect, onclose, notice = null, scheme, onscheme, transparent = false, ontransparent = () => undefined, zoom = REAL_SIZE, onzoom = () => undefined, onstep = () => undefined, height = $bindable(0) }: Props = $props();
 
+  const back = $derived(backLabelOf(route));
   const percent = $derived(`${Math.round(zoom * 100)}%`);
 </script>
 
 <div class="tabs" role="tablist" data-testid="focus-tabs" bind:clientHeight={height}>
+  <button type="button" class="back" data-testid="focus-back" title="Back to page (Esc)" aria-label="Back to page {back}" onclick={onclose}><ArrowLeft size={14} />{back}</button>
   <button type="button" role="tab" aria-selected={active === View.Page} class:on={active === View.Page} data-testid="tab-page" onclick={() => onselect(View.Page)}><House size={14} />Page</button>
   <span class="tab" class:on={active === View.Focus}>
     <button type="button" role="tab" aria-selected={active === View.Focus} data-testid="tab-focus" onclick={() => onselect(View.Focus)}><ComponentIcon size={14} />{name}</button>
@@ -96,6 +100,20 @@
     height: 100%;
     padding: 0;
     font-weight: 600;
+  }
+
+  .tabs > .back {
+    align-self: center;
+    height: 22px;
+    margin: 0 6px 4px 0;
+    padding: 0 8px 0 6px;
+    border-radius: var(--ui-radius-sm, 4px);
+    color: var(--ui-text);
+    font-weight: 600;
+  }
+
+  .back:hover {
+    background: var(--ui-divider);
   }
 
   .on {
