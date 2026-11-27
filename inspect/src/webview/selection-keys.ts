@@ -70,6 +70,13 @@ export function shortcutOf(e: Press, mac: boolean): Shortcut | null {
   return BINDINGS.find((b) => b.key === key && b.mod === mod && (b.shift === undefined || b.shift === e.shiftKey))?.shortcut ?? null;
 }
 
+export function isRedo(e: Press, mac: boolean): boolean {
+  const mod = mac ? e.metaKey : e.ctrlKey;
+  const key = letterOf(e);
+
+  return mod && ((key === 'z' && e.shiftKey) || (key === 'y' && !mac && !e.shiftKey));
+}
+
 const FIELDS = new Set(['INPUT', 'TEXTAREA', 'SELECT']);
 
 export const typingIn = (target: { tagName: string; isContentEditable?: boolean } | null): boolean => target !== null && (FIELDS.has(target.tagName) || Boolean(target.isContentEditable));
