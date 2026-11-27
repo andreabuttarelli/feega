@@ -37,14 +37,4 @@ await page.locator('[data-testid="canvas-fit"]').click();
 await page.waitForTimeout(500);
 await page.screenshot({ path: SHOT });
 
-const ZOOM_STEPS = 9;
-const SCROLL_TOP_PX = -200000;
-await page.locator('[data-testid="pages-canvas"]').hover();
-for (let i = 0; i < ZOOM_STEPS; i++) {
-  await page.locator('[data-testid="canvas-zoom"] button[aria-label="Zoom in"]').click();
-}
-await page.mouse.wheel(0, SCROLL_TOP_PX);
-await page.waitForTimeout(500);
-await page.screenshot({ path: SHOT.replace(/\.png$/, '-zoomed.png') });
-
 await panel.close();
