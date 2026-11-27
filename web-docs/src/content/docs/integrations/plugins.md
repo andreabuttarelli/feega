@@ -88,7 +88,13 @@ only when they differ from the defaults (24, 2, current colour).
 - The Svelte component uses runes in Svelte 5 projects and `export let` in Svelte 4.
 
 The icons are [Lucide](https://lucide.dev), released under the ISC licence, Copyright Lucide
-Contributors. The set is bundled with Feega and works offline.
+Contributors. Feega bundles only the list of icon names and search words. Each icon file is
+downloaded when it first appears in the grid or is inserted, from jsDelivr
+(`cdn.jsdelivr.net`, with `unpkg.com` as a fallback), at the exact `lucide-static` version the list
+was built from. **The first use needs internet.** Icons already shown stay available for the
+session; the others show "Icons need internet the first time." with a **Retry** button. The
+plugin declares those two hosts as its network permission, and the downloads go through Feega, not
+the panel.
 
 ## Safety
 

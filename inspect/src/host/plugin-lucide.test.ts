@@ -6,6 +6,7 @@ import { createApi, type Port } from '@feega/plugin-api/client';
 import { createPluginHost, type EditorPort } from '@feega/plugin-api/host';
 import { parseManifest } from '@feega/plugin-api/manifest';
 import type { HostMessage, PluginMessage, Selection } from '@feega/plugin-api/protocol';
+import { localCdn } from '@feega/plugin-icon-kit/cdn-fixture';
 import manifest from '@feega/plugin-lucide/manifest';
 import { CHOSEN, INSERT, QUERY, SECTION, lucidePlugin } from '@feega/plugin-lucide/plugin';
 import { fileEdits } from './file-edits';
@@ -37,7 +38,7 @@ async function insertCamera(file: string, page: string, packages: Record<string,
       return written.ok ? { ok: true } : { ok: false, reason: written.reason };
     },
     preview: () => undefined,
-    fetch: async () => ({ status: 200, text: '' }),
+    fetch: localCdn().fetch,
     pickFile: async () => null,
     notify: () => undefined
   };
@@ -54,6 +55,7 @@ async function insertCamera(file: string, page: string, packages: Record<string,
     host.control(parsed.manifest.id, SECTION, id, value);
     await settle();
   }
+  await vi.waitFor(() => expect(edits.history()).toHaveLength(1), { timeout: ICONS_READY_MS });
   return { read: (path: string) => readFileSync(join(root, path), 'utf8'), edits };
 }
 

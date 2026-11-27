@@ -2,8 +2,22 @@
   "id": "feega.lucide-icons",
   "name": "Lucide icons",
   "version": "1.0.0",
-  "permissions": ["selection", "project", "edit.insert"],
+  "permissions": [
+    "selection",
+    "project",
+    "edit.insert",
+    "network:cdn.jsdelivr.net",
+    "network:unpkg.com"
+  ],
   "contributions": {
-    "rightBar": [{ "id": "icons", "title": "Lucide icons", "when": ["selection"] }]
+    "rightBar": [
+      {
+        "id": "icons",
+        "title": "Lucide icons",
+        "when": [
+          "selection"
+        ]
+      }
+    ]
   }
 }
