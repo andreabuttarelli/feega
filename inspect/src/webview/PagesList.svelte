@@ -1,5 +1,5 @@
 <script lang="ts">
-  import CanvasBanner from './CanvasBanner.svelte';
+  import ActionBanner from './ActionBanner.svelte';
   import ExampleField from './ExampleField.svelte';
   import { freshKeys } from './fresh-keys.svelte';
   import { EXAMPLE_LIMIT, type PageRow } from './pages';
@@ -17,7 +17,7 @@
   const expand = (route: string) => (expanded = [...expanded, route]);
 </script>
 
-<CanvasBanner hint="See every page at every size" testid="canvas-open-pages" onopen={oncanvas} />
+<ActionBanner hint="See every page at every size" testid="canvas-open-pages" onopen={oncanvas} />
 
 <ul class="pages" data-testid="pages">
   {#each rows as row (row.route)}
