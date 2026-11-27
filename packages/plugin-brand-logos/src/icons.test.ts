@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { PACKED } from './packed.generated';
-import { packedLogos } from '../scripts/pack-icons';
+import { unpack } from '@feega/plugin-icon-kit/unpack';
+import { logosData } from '../scripts/pack-icons';
 import { POPULAR, bodyOf, escaped, glyphOf, loadLogos } from './icons';
 
 describe('brand logo data', () => {
-  it('is the data of the installed simple-icons package', () => {
-    expect(PACKED).toBe(packedLogos());
+  it('is the data of the installed simple-icons package', async () => {
+    expect(await unpack(PACKED)).toEqual(logosData());
   });
 
   it('holds thousands of brands, each with a title, a hex colour and a path', async () => {
