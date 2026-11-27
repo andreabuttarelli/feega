@@ -1421,3 +1421,7 @@ non solo con la build.
 ## `npx feega` attaches to itself
 
 **Signal:** the log says "attaching to the dev server already running on http://localhost:N/" with no dev server running, and the editor shows "The page has no Feega source map". **Move:** the editor's own listener runs in the CLI process, in the app folder; `portsServing` excludes only spawned child pids, so it must also exclude `process.pid` (`inspect/src/host/listener.ts`).
+
+## Design mode follows links after a text edit that never ended
+
+**Signal:** in Design mode a click navigates the preview instead of selecting, and reload does not help. **Move:** the click overlay is hidden while `editing` is true; every way a text edit can end without a change (Escape, a double click on an element with no source) must reply `TEXT_CANCEL`, or the overlay stays gone and clicks reach the page (`editText` in `packages/source-map/src/bridge.js`).

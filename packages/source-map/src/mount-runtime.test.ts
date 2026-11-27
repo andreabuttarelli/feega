@@ -88,6 +88,32 @@ describe('startMount', () => {
     expect(posted).toContainEqual({ type: 'feega:mount:status', status: 'ready', name: 'Card', file: 'src/Card.tsx', controls: [{ name: 'size' }], props: { size: 'sm' } });
   });
 
+  it('ignores a page error once the component is on screen', async () => {
+    const { start, win, posted, wait } = setup({ draw: (el) => (el.innerHTML = '<b>hi</b>') });
+    start();
+    win.dispatchEvent(new (win as unknown as { ErrorEvent: typeof ErrorEvent }).ErrorEvent('error', { message: 'Script error.' }));
+    await wait(450);
+
+    expect(posted.map((message) => message.status)).toEqual(['ready']);
+  });
+
+  it('ignores the ResizeObserver loop notice even before anything is drawn', async () => {
+    const { start, win, posted, wait } = setup({ draw: (el) => setTimeout(() => (el.innerHTML = '<b>late</b>'), 100) });
+    start();
+    win.dispatchEvent(new (win as unknown as { ErrorEvent: typeof ErrorEvent }).ErrorEvent('error', { message: 'ResizeObserver loop completed with undelivered notifications.' }));
+    await wait(600);
+
+    expect(posted.map((message) => message.status)).toEqual(['ready']);
+  });
+
+  it('still fails on a real error before anything is drawn', () => {
+    const { start, win, posted } = setup();
+    start();
+    win.dispatchEvent(new (win as unknown as { ErrorEvent: typeof ErrorEvent }).ErrorEvent('error', { message: 'Cannot read properties of undefined' }));
+
+    expect(posted).toContainEqual({ type: 'feega:mount:status', status: 'failed', reason: 'Cannot read properties of undefined' });
+  });
+
   it('draws again with the props and the variants it is sent', () => {
     const { start, win, rendered } = setup();
     start();
