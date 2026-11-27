@@ -28,10 +28,10 @@ async function live(files: string[]) {
   files.forEach((file) => write(root, file));
   await pause(FIXTURE_SETTLE_MS);
   const posted: ViewMessage[] = [];
-  const index = projectLive({ appRoot: () => root, routes: () => listRoutes(root), components: () => listComponents(root, async () => 0), post: (m) => posted.push(m), debounceMs: DEBOUNCE_MS });
+  const index = projectLive({ appRoot: () => root, routes: () => listRoutes(root), components: () => listComponents(root, async () => []), post: (m) => posted.push(m), debounceMs: DEBOUNCE_MS });
   closers.push(index.dispose);
   index.routesSent(await listRoutes(root));
-  index.componentsSent(await listComponents(root, async () => 0));
+  index.componentsSent(await listComponents(root, async () => []));
   index.watch();
   await pause(ARM_MS);
   return { root, posted, index };

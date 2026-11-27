@@ -8,7 +8,7 @@ export const PROVIDERS_QUERY = 'feega-providers';
 export const NESTED_HOST = "Symbol.for('feega.nested-host')";
 
 export type MountRequest = { file: string; name: string; props: Record<string, unknown> };
-export type MountPage = { runtimeUrl: string; domRuntimeUrl: string; componentUrl: string; providersUrl: string | null };
+export type MountPage = { runtimeUrl: string; domRuntimeUrl: string; componentUrl: string; providersUrl: string | null; styleUrls: string[] };
 
 function propsOf(text: string | null): Record<string, unknown> {
   try {
@@ -36,6 +36,7 @@ export function mountHtml(query: string): string {
 <head>
 <meta charset="utf-8">
 <script>window[${NESTED_HOST}] = true;</script>
+<script>globalThis.__sveltekit_dev ??= { env: {}, base: '' };</script>
 <script>window.addEventListener('error', (event) => window.parent.postMessage({ type: '${MOUNT_STATUS}', status: '${Status.Failed}', reason: String(event.message || 'The component could not load') }, '*'), true);</script>
 </head>
 <body>
@@ -46,12 +47,14 @@ export function mountHtml(query: string): string {
 `;
 }
 
-export function reactModule({ file, name, props }: MountRequest, { runtimeUrl, componentUrl, providersUrl }: MountPage): string {
+const styleImports = (urls: string[]) => urls.map((url) => `import ${JSON.stringify(url)};\n`).join('');
+
+export function reactModule({ file, name, props }: MountRequest, { runtimeUrl, componentUrl, providersUrl, styleUrls }: MountPage): string {
   const controlsUrl = `${PROPS_ROUTE}?${new URLSearchParams({ file, name })}`;
   const providers = providersUrl ? `await import(${JSON.stringify(providersUrl)}).then((m) => m.Providers).catch(() => null)` : 'null';
   const start = JSON.stringify({ name, file, props, controlsUrl });
 
-  return `import * as react from "react";
+  return `${styleImports(styleUrls)}import * as react from "react";
 import { createRoot } from "react-dom/client";
 import * as mod from ${JSON.stringify(componentUrl)};
 import { startMount } from ${JSON.stringify(runtimeUrl)};
@@ -60,11 +63,11 @@ startMount({ react, createRoot, mod, providers, ...${start} });
 `;
 }
 
-function domModule({ file, name, props }: MountRequest, { domRuntimeUrl, componentUrl }: MountPage, library: string, mounter: string): string {
+function domModule({ file, name, props }: MountRequest, { domRuntimeUrl, componentUrl, styleUrls }: MountPage, library: string, mounter: string): string {
   const controlsUrl = `${PROPS_ROUTE}?${new URLSearchParams({ file, name })}`;
   const start = JSON.stringify({ name, file, props, controlsUrl });
 
-  return `import * as library from ${JSON.stringify(library)};
+  return `${styleImports(styleUrls)}import * as library from ${JSON.stringify(library)};
 import mod from ${JSON.stringify(componentUrl)};
 import { startDomMount, ${mounter} } from ${JSON.stringify(domRuntimeUrl)};
 startDomMount({ mountInto: ${mounter}(library, mod), mod: { default: mod }, ...${start} });

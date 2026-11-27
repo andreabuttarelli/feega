@@ -80,4 +80,19 @@ describe('the framework mounters', () => {
 
     expect(calls).toEqual(['{"a":1}', 'instance']);
   });
+
+  it('gives a Svelte component sample text as the snippet it renders, so {@render children()} has something to draw', () => {
+    const made: string[] = [];
+    const lib = { createRawSnippet: (fn: () => { render: () => string }) => (made.push(fn().render()), 'snippet'), mount: (_c: unknown, o: { props: Record<string, unknown> }) => (made.push(String(o.props.children)), 'instance'), unmount: () => undefined };
+
+    svelteMount(lib, {})(null as unknown as Element, { children: 'Text' })();
+
+    expect(made).toEqual(['<span>Text</span>', 'snippet']);
+  });
+
+  it('leaves a Svelte component without children alone', () => {
+    const lib = { createRawSnippet: () => { throw new Error('no snippet wanted'); }, mount: () => 'instance', unmount: () => undefined };
+
+    expect(() => svelteMount(lib, {})(null as unknown as Element, { a: 1 })()).not.toThrow();
+  });
 });

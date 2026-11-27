@@ -213,7 +213,7 @@ export async function openPanel(appRoot: string, theme = DARK, cloud?: CommentsC
       await reply({ kind: ToView.Routes, routes: await listRoutes(appRoot) });
     }
     if (m.kind === ToHost.Components) {
-      await reply({ kind: ToView.Components, components: await listComponents(appRoot, async () => 0) });
+      await reply({ kind: ToView.Components, components: await listComponents(appRoot, async () => []) });
     }
     if (m.kind === ToHost.LibraryInsert) {
       const ask = insertAskOf(catalog, m.id as string);

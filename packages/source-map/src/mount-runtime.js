@@ -1,7 +1,7 @@
 import { CANVAS_CSS, CANVAS_ID } from './focus.js';
 import { gridOf } from './variant-grid.js';
 
-import { DATE_MARK, FUNCTION_MARK, JSX_MARK, MOUNT_PROPS, MOUNT_STATUS, Status } from './mount-protocol.js';
+import { DATE_MARK, FUNCTION_MARK, JSX_MARK, MOUNT_PROPS, MOUNT_STATUS, Status, TEXT_MARK } from './mount-protocol.js';
 
 export const Reason = { NoExport: 'The component is not exported', Empty: 'It rendered nothing' };
 
@@ -10,10 +10,14 @@ const HARMLESS_ERROR = /ResizeObserver loop/i;
 const GIVE_UP_MS = 8000;
 const GAP_PX = 24;
 const CAPTION_PX = 11;
+const FIT_PARAM = 'fit';
+const FIT_PADDING_PX = 16;
+const FIT_CSS = `body{padding:${FIT_PADDING_PX}px!important}`;
 
 const MARKS = [
   { mark: FUNCTION_MARK, matches: (value) => value === true, revive: () => () => undefined },
   { mark: JSX_MARK, matches: (value) => value === true, revive: () => undefined },
+  { mark: TEXT_MARK, matches: (value) => typeof value === 'string', revive: (value) => value },
   { mark: DATE_MARK, matches: (value) => typeof value === 'string', revive: (value) => new Date(value) }
 ];
 
@@ -40,7 +44,8 @@ export function runMount({ Target, name, file, props, controlsUrl, win = window,
   const container = doc.getElementById('root');
   const style = doc.createElement('style');
   style.id = CANVAS_ID;
-  style.textContent = CANVAS_CSS;
+  const fits = new URLSearchParams(win.location.search).has(FIT_PARAM);
+  style.textContent = fits ? CANVAS_CSS + FIT_CSS : CANVAS_CSS;
   doc.head.append(style);
 
   const post = (message) => win.parent.postMessage({ type: MOUNT_STATUS, ...message }, '*');
@@ -76,7 +81,9 @@ export function runMount({ Target, name, file, props, controlsUrl, win = window,
     }
     const controls = await win.fetch(controlsUrl).then((r) => r.json()).then((body) => body.controls).catch(() => null);
     ready = true;
-    post({ status: Status.Ready, name, file, controls, props: current.props });
+    const box = container.getBoundingClientRect();
+    const padding = fits ? FIT_PADDING_PX * 2 : 0;
+    post({ status: Status.Ready, name, file, controls, props: current.props, size: { width: Math.ceil(box.width) + padding, height: Math.ceil(box.height) + padding } });
   };
   win.setTimeout(settle, SETTLE_MS);
 }

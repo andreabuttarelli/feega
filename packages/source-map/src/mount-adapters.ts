@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { astroControlsOf } from './astro-props.ts';
 import { controlsOf, type PropControl } from './component-props.ts';
 import { astroModule, reactModule, svelteModule, vueModule, type MountPage, type MountRequest } from './mount-page.ts';
-import { NOOP, PropKind } from './prop-model.ts';
+import { NOOP, PropKind, SAMPLE_TEXT } from './prop-model.ts';
 import { svelteControlsOf } from './svelte-props.ts';
 import { vueControlsOf } from './vue-props.ts';
 
@@ -29,14 +29,14 @@ const projectModule = <T>(root: string, id: string): T | null => {
 };
 
 export const ADAPTERS: Record<MountFramework, MountAdapter> = {
-  [MountFramework.React]: { module: reactModule, controls: (code, file, name) => controlsOf(code, file, name), seedsProps: false },
+  [MountFramework.React]: { module: reactModule, controls: (code, file, name) => controlsOf(code, file, name), seedsProps: true },
   [MountFramework.Vue]: {
     module: vueModule,
     controls: (code, file, _name, root) => {
       const compiler = projectModule<Parameters<typeof vueControlsOf>[2]>(root, 'vue/compiler-sfc');
       return compiler && vueControlsOf(code, file, compiler);
     },
-    seedsProps: false
+    seedsProps: true
   },
   [MountFramework.Svelte]: {
     module: svelteModule,
@@ -70,7 +70,7 @@ const SEEDS: Record<PropKind, (control: PropControl) => unknown> = {
   [PropKind.Toggle]: () => false,
   [PropKind.Number]: () => 0,
   [PropKind.Text]: ({ name }) => name,
-  [PropKind.Children]: () => undefined,
+  [PropKind.Children]: () => SAMPLE_TEXT,
   [PropKind.Array]: () => [],
   [PropKind.Object]: () => ({}),
   [PropKind.Callback]: () => NOOP,

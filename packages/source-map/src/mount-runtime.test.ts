@@ -4,8 +4,8 @@ import { reviveProps, rendersNothing, startMount } from './mount-runtime.js';
 
 type Posted = Record<string, unknown>;
 
-function setup(options: { exports?: Record<string, unknown>; draw?: (el: Element, tree: unknown) => void } = {}) {
-  const win = new JSDOM('<!doctype html><body><div id="root"></div></body>', { pretendToBeVisual: true }).window;
+function setup(options: { exports?: Record<string, unknown>; draw?: (el: Element, tree: unknown) => void; url?: string } = {}) {
+  const win = new JSDOM('<!doctype html><body><div id="root"></div></body>', { pretendToBeVisual: true, url: options.url ?? 'http://localhost/' }).window;
   const posted: Posted[] = [];
   Object.defineProperty(win, 'parent', { value: { postMessage: (data: Posted) => posted.push(data) } });
   const rendered: unknown[] = [];
@@ -28,6 +28,10 @@ describe('reviveProps', () => {
 
   it('leaves out a prop that was JSX on the page, which cannot be sent', () => {
     expect(reviveProps({ icon: { $jsx: true }, size: 'sm' })).toEqual({ icon: undefined, size: 'sm' });
+  });
+
+  it('turns the text mark back into its text, which stands in for children', () => {
+    expect(reviveProps({ children: { $text: 'Text' } }).children).toBe('Text');
   });
 
   it('turns the date marks back into dates', () => {
@@ -85,7 +89,39 @@ describe('startMount', () => {
     start();
     await wait(450);
 
-    expect(posted).toContainEqual({ type: 'feega:mount:status', status: 'ready', name: 'Card', file: 'src/Card.tsx', controls: [{ name: 'size' }], props: { size: 'sm' } });
+    expect(posted).toContainEqual({ type: 'feega:mount:status', status: 'ready', name: 'Card', file: 'src/Card.tsx', controls: [{ name: 'size' }], props: { size: 'sm' }, size: { width: 0, height: 0 } });
+  });
+
+  it('reports how big the component came out, so a frame can be cut to it', async () => {
+    const { start, win, posted, wait } = setup({ draw: (el) => (el.innerHTML = '<b>hi</b>') });
+    win.document.getElementById('root')!.getBoundingClientRect = () => ({ width: 200.4, height: 89.2 }) as DOMRect;
+    start();
+    await wait(450);
+
+    expect(posted).toContainEqual(expect.objectContaining({ status: 'ready', size: { width: 201, height: 90 } }));
+  });
+
+  it('adds the fit padding to the size it reports when the canvas asks to fit', async () => {
+    const { start, win, posted, wait } = setup({ draw: (el) => (el.innerHTML = '<b>hi</b>'), url: 'http://localhost/m?fit=1' });
+    win.document.getElementById('root')!.getBoundingClientRect = () => ({ width: 200, height: 90 }) as DOMRect;
+    start();
+    await wait(450);
+
+    expect(posted).toContainEqual(expect.objectContaining({ size: { width: 232, height: 122 } }));
+  });
+
+  it('tightens the padding around the component when the canvas asks to fit it', () => {
+    const { start, win } = setup({ url: 'http://localhost/m?fit=1' });
+    start();
+
+    expect(win.document.getElementById('feega-focus-canvas')!.textContent).toContain('padding:16px');
+  });
+
+  it('keeps the focus padding otherwise', () => {
+    const { start, win } = setup();
+    start();
+
+    expect(win.document.getElementById('feega-focus-canvas')!.textContent).not.toContain('padding:16px');
   });
 
   it('ignores a page error once the component is on screen', async () => {

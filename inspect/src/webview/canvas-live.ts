@@ -21,13 +21,13 @@ const gapToCentre = (f: Placed, view: CanvasView, viewport: Viewport) => Math.hy
 
 const STICKY_PULL = 400;
 
-export function liveSet(frames: Placed[], view: CanvasView, viewport: Viewport, current: string[], minWidth = MIN_LIVE_WIDTH): string[] {
+export function liveSet(frames: Placed[], view: CanvasView, viewport: Viewport, current: string[], minWidth = MIN_LIVE_WIDTH, cap = LIVE_CAP): string[] {
   const held = (f: Placed) => current.includes(f.key);
   const rank = (f: Placed) => gapToCentre(f, view, viewport) - (held(f) ? STICKY_PULL : 0);
 
   return frames
     .filter((f) => f.target !== null && f.width * view.scale >= minWidth && touches(f, view, viewport, VISIBLE_MARGIN + (held(f) ? STICKY_MARGIN : 0)))
     .sort((a, b) => rank(a) - rank(b))
-    .slice(0, LIVE_CAP)
+    .slice(0, cap)
     .map((f) => f.key);
 }

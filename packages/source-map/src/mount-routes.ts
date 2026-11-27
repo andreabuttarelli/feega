@@ -4,6 +4,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { join, resolve, sep } from 'node:path';
 import type { ViteDevServer } from 'vite';
 import { renderAstro } from './astro-render.ts';
+import { layoutStylesOf } from './layout-styles.ts';
 import { adapterOf, seededProps } from './mount-adapters.ts';
 import { ASTRO_ROUTE, MODULE_ROUTE, MOUNT_ROUTE, PROPS_ROUTE, PROVIDERS_QUERY, mountHtml, mountRequestOf } from './mount-page.ts';
 import { fsUrl } from './source-id.ts';
@@ -55,7 +56,8 @@ export function mountRoutes(server: ViteDevServer, { root, runtimeDir }: Routes)
         runtimeUrl: fsUrl(join(runtimeDir, RUNTIME_FILE)),
         domRuntimeUrl: fsUrl(join(runtimeDir, DOM_RUNTIME_FILE)),
         componentUrl: sameRoot ? `/${request.file}` : fsUrl(resolve(root(), request.file)),
-        providersUrl: entry && existsSync(join(root(), entry)) ? `/${entry}?${PROVIDERS_QUERY}` : null
+        providersUrl: entry && existsSync(join(root(), entry)) ? `/${entry}?${PROVIDERS_QUERY}` : null,
+        styleUrls: layoutStylesOf(root())
       }
     };
   }
