@@ -49,7 +49,7 @@ export function runMount({ Target, name, file, props, controlsUrl, win = window,
   doc.head.append(style);
 
   const send = (message) => win.parent.postMessage(message, '*');
-  const askedControls = () => win.fetch(controlsUrl).then((r) => r.json()).then((body) => body.controls).catch(() => null);
+  const askedControls = () => Promise.resolve().then(() => win.fetch(controlsUrl)).then((r) => r.json()).then((body) => body.controls).catch(() => null);
   let controlsSent = false;
   const sendControls = async () => {
     if (controlsSent) {
