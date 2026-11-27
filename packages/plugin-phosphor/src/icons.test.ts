@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { PACKED } from './packed.generated';
-import { packedPhosphor } from '../scripts/pack-icons';
+import { unpack } from '@feega/plugin-icon-kit/unpack';
+import { phosphorData } from '../scripts/pack-icons';
 import { POPULAR, WEIGHTS, bodyOf, Weight, glyphOf, loadIcons } from './icons';
 
 describe('phosphor icon data', () => {
-  it('is the data of the installed @phosphor-icons/core package', () => {
-    expect(PACKED).toBe(packedPhosphor());
+  it('is the data of the installed @phosphor-icons/core package', async () => {
+    expect(await unpack(PACKED)).toEqual(phosphorData());
   });
 
   it('holds the whole set with one drawing per weight', async () => {

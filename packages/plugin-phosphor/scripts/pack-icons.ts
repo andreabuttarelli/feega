@@ -14,12 +14,12 @@ const assetOf = (name: string, weight: string) => `@phosphor-icons/core/assets/$
 
 const bodyOf = (name: string, weight: string): string => (readFileSync(require.resolve(assetOf(name, weight)), 'utf8').match(INNER) as RegExpMatchArray)[1].trim();
 
-export function packedPhosphor(): string {
+export function phosphorData(): Record<string, unknown> {
   const sorted = [...icons].sort((a, b) => a.name.localeCompare(b.name));
 
-  return pack(Object.fromEntries(sorted.map((icon) => [icon.name, [WEIGHTS.map((weight) => bodyOf(icon.name, weight)), icon.tags.filter((tag) => tag !== NEW_MARK)]])));
+  return Object.fromEntries(sorted.map((icon) => [icon.name, [WEIGHTS.map((weight) => bodyOf(icon.name, weight)), icon.tags.filter((tag) => tag !== NEW_MARK)]]));
 }
 
 if (process.argv[1] === new URL(import.meta.url).pathname) {
-  writeFileSync(GENERATED, `export const PACKED = '${packedPhosphor()}';\n`);
+  writeFileSync(GENERATED, `export const PACKED = '${pack(phosphorData())}';\n`);
 }
