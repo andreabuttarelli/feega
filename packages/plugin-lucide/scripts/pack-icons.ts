@@ -13,14 +13,12 @@ const read = (file: string) => JSON.parse(readFileSync(require.resolve(`lucide-s
 
 const markup = (nodes: Node[]) => nodes.map(([tag, attributes]) => `<${tag} ${Object.entries(attributes).map(([name, value]) => `${name}="${value}"`).join(' ')}/>`).join('');
 
-export function packedIcons(): string {
+export function iconsData(): Packed {
   const nodes: Record<string, Node[]> = read('icon-nodes.json');
   const tags: Record<string, string[]> = read('tags.json');
-  const icons: Packed = Object.fromEntries(Object.entries(nodes).map(([name, children]) => [name, [markup(children), tags[name] ?? []]]));
-
-  return pack(icons);
+  return Object.fromEntries(Object.entries(nodes).map(([name, children]) => [name, [markup(children), tags[name] ?? []]]));
 }
 
 if (process.argv[1] === new URL(import.meta.url).pathname) {
-  writeFileSync(GENERATED, `export const PACKED = '${packedIcons()}';\n`);
+  writeFileSync(GENERATED, `export const PACKED = '${pack(iconsData())}';\n`);
 }
