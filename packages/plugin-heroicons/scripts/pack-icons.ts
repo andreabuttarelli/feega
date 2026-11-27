@@ -17,12 +17,12 @@ const bodyOf = (source: string, name: string): string => {
   return existsSync(file) ? (readFileSync(file, 'utf8').match(INNER) as RegExpMatchArray)[1].replace(COMPACT, '') : '';
 };
 
-export function packedHeroicons(): string {
+export function heroiconsData(): Record<string, string[]> {
   const names = readdirSync(join(ROOT, SOURCES[0])).map((file) => file.replace(SVG_SUFFIX, '')).sort();
 
-  return pack(Object.fromEntries(names.map((name) => [name, SOURCES.map((source) => bodyOf(source, name))])));
+  return Object.fromEntries(names.map((name) => [name, SOURCES.map((source) => bodyOf(source, name))]));
 }
 
 if (process.argv[1] === new URL(import.meta.url).pathname) {
-  writeFileSync(GENERATED, `export const PACKED = '${packedHeroicons()}';\n`);
+  writeFileSync(GENERATED, `export const PACKED = '${pack(heroiconsData())}';\n`);
 }

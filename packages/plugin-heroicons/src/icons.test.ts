@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { PACKED } from './packed.generated';
-import { packedHeroicons } from '../scripts/pack-icons';
+import { unpack } from '@feega/plugin-icon-kit/unpack';
+import { heroiconsData } from '../scripts/pack-icons';
 import { POPULAR, STYLES, Style, loadIcons } from './icons';
 
 describe('heroicons data', () => {
-  it('is the data of the installed heroicons package', () => {
-    expect(PACKED).toBe(packedHeroicons());
+  it('is the data of the installed heroicons package', async () => {
+    expect(await unpack(PACKED)).toEqual(heroiconsData());
   });
 
   it('holds every icon in outline and solid, with a drawing per style or none', async () => {
