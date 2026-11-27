@@ -33,6 +33,7 @@ export const PALETTE_RESULT = 'feega:palette:result';
 export const MODE = 'feega:mode';
 export const TEXT_EDIT = 'feega:text:edit';
 export const TEXT_DONE = 'feega:text:done';
+export const TEXT_CANCEL = 'feega:text:cancel';
 export const TEXT_RESTORE = 'feega:text:restore';
 export const TRACK = 'feega:track';
 export const TRACKED = 'feega:tracked';
@@ -210,6 +211,7 @@ function restoreText(doc, unsaved, source) {
 function editText(win, target, request, reply, unsaved) {
   const element = target?.closest(`[${SOURCE_ATTR}]`);
   if (!element) {
+    reply({ type: TEXT_CANCEL });
     return;
   }
 
@@ -225,6 +227,7 @@ function editText(win, target, request, reply, unsaved) {
     element.removeAttribute('contenteditable');
     if (!commit) {
       element.innerHTML = wasHtml;
+      reply({ type: TEXT_CANCEL });
       return;
     }
     unsaved.set(element.getAttribute(SOURCE_ATTR), wasHtml);

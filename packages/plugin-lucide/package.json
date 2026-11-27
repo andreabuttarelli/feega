@@ -1,0 +1,17 @@
+{
+  "name": "@feega/plugin-lucide",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "pack": "node --experimental-transform-types scripts/pack-icons.ts"
+  },
+  "exports": {
+    "./manifest": "./feega-plugin.json",
+    "./worker": "./src/worker.ts",
+    "./*": "./src/*.ts"
+  },
+  "devDependencies": {
+    "lucide-static": "1.82.0"
+  }
+}

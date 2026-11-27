@@ -16,6 +16,12 @@ aggiunto non compare; il CSS servito (`?svelte&type=style`) non contiene la rego
 riavviare il dev server della propria porta prima di ogni giro e2e che deve vedere un edit; un
 verde ottenuto prima del riavvio non vale.
 
+### Un test che confronta dati compressi con quelli ricostruiti è rosso su un'altra versione di Node
+Segnale: `expected '7L3Jj…' to be '7L3Lj…'` solo in CI, sui dati dei plugin icone (`PACKED`). Lo
+stesso input dà byte diversi con zlib o con l'ordine delle chiavi di un'altra versione. Mossa:
+confrontare i dati decompressi (`unpack(PACKED)` contro la funzione che li produce), mai la
+stringa compressa.
+
 ### Verde in locale, rosso in CI: una chiave del `.env` sceglie il ramo
 Il `.env` copiato nel worktree porta chiavi (es. `EXA_API_KEY`) che la CI non ha: in locale il
 codice prende un altro ramo e i mock del test non vengono mai toccati. Segnale: `No "X" export is
@@ -1415,3 +1421,7 @@ non solo con la build.
 ## `npx feega` attaches to itself
 
 **Signal:** the log says "attaching to the dev server already running on http://localhost:N/" with no dev server running, and the editor shows "The page has no Feega source map". **Move:** the editor's own listener runs in the CLI process, in the app folder; `portsServing` excludes only spawned child pids, so it must also exclude `process.pid` (`inspect/src/host/listener.ts`).
+
+## Design mode follows links after a text edit that never ended
+
+**Signal:** in Design mode a click navigates the preview instead of selecting, and reload does not help. **Move:** the click overlay is hidden while `editing` is true; every way a text edit can end without a change (Escape, a double click on an element with no source) must reply `TEXT_CANCEL`, or the overlay stays gone and clicks reach the page (`editText` in `packages/source-map/src/bridge.js`).
