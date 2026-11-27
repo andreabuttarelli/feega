@@ -30,6 +30,6 @@ describe('lucide icon data', () => {
   it('draws a glyph as a standalone svg', async () => {
     const [first] = await loadIcons();
 
-    expect(glyphOf(first)).toMatch(/^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg" viewBox="0 0 24 24"/);
+    expect(glyphOf(first.body)).toMatch(/^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg" viewBox="0 0 24 24"/);
   });
 });

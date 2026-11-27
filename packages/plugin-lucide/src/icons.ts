@@ -22,4 +22,4 @@ export async function loadIcons(): Promise<LucideIcon[]> {
 
 const GLYPH_STROKE = `fill="none" stroke="#000" stroke-width="${DEFAULT_STROKE}" stroke-linecap="round" stroke-linejoin="round"`;
 
-export const glyphOf = (icon: LucideIcon): string => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${VIEW_BOX}" ${GLYPH_STROKE}>${icon.body}</svg>`;
+export const glyphOf = (body: string): string => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${VIEW_BOX}" ${GLYPH_STROKE}>${body}</svg>`;
