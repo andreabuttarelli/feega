@@ -23,6 +23,11 @@ describe('component names', () => {
     expect(componentName('grid-2x2')).toBe('Grid2x2Icon');
   });
 
+  it('puts a variant before the suffix', () => {
+    expect(componentName('camera', 'bold')).toBe('CameraBoldIcon');
+    expect(componentName('camera', '')).toBe('CameraIcon');
+  });
+
   it('starts with a letter even when the icon name starts with a digit', () => {
     expect(componentName('1password')).toBe('Icon1passwordIcon');
   });

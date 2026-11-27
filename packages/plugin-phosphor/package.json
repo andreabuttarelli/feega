@@ -1,0 +1,17 @@
+{
+  "name": "@feega/plugin-phosphor",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "pack": "node --experimental-transform-types scripts/pack-icons.ts"
+  },
+  "exports": {
+    "./manifest": "./feega-plugin.json",
+    "./worker": "./src/worker.ts",
+    "./*": "./src/*.ts"
+  },
+  "devDependencies": {
+    "@phosphor-icons/core": "2.1.1"
+  }
+}

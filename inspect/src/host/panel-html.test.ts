@@ -14,6 +14,10 @@ describe('panel content security policy', () => {
     expect(directive('connect-src')).toBe("connect-src 'self' ws://localhost:* ws://127.0.0.1:*");
   });
 
+  it('does not open to the icon CDNs: plugins download through the host', () => {
+    expect(policy).not.toMatch(/jsdelivr|unpkg/);
+  });
+
   it('loads no remote image', () => {
     expect(directive('img-src')).toBe("img-src 'self' data:");
   });

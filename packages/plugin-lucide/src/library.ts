@@ -1,9 +1,6 @@
 import { Framework } from '@feega/plugin-api/protocol';
-import { ICON_DIR, pascalOf, type ComponentSource, type Env } from '@feega/plugin-icon-kit/svg-component';
-
-type Wrap = (iconName: string, componentName: string, env: Env) => ComponentSource;
-
-type Library = { framework: Framework; wrap: Wrap };
+import { libraryIn, type Library, type Wrap } from '@feega/plugin-icon-kit/library';
+import { ICON_DIR, pascalOf } from '@feega/plugin-icon-kit/svg-component';
 
 const file = (componentName: string, extension: string) => `${ICON_DIR}/${componentName}.${extension}`;
 
@@ -24,12 +21,11 @@ const vue: Wrap = (iconName, componentName) => ({
   source: `<script setup>\nimport { ${pascalOf(iconName)} } from 'lucide-vue-next';\n</script>\n\n<template>\n  <${pascalOf(iconName)} />\n</template>\n`
 });
 
-export const LIBRARIES: Record<string, Library> = {
+const LIBRARIES: Record<string, Library> = {
   'lucide-react': { framework: Framework.React, wrap: react },
   'lucide-svelte': { framework: Framework.Svelte, wrap: svelteFrom('lucide-svelte') },
   '@lucide/svelte': { framework: Framework.Svelte, wrap: svelteFrom('@lucide/svelte') },
   'lucide-vue-next': { framework: Framework.Vue, wrap: vue }
 };
 
-export const libraryFor = (framework: Framework, packages: Record<string, string>): Library | null =>
-  Object.entries(LIBRARIES).find(([name, library]) => library.framework === framework && name in packages)?.[1] ?? null;
+export const libraryFor = (framework: Framework, packages: Record<string, string>): Library | null => libraryIn(LIBRARIES, framework, packages);
