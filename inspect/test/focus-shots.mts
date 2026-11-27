@@ -13,7 +13,7 @@ mkdirSync(SHOTS, { recursive: true });
 
 const panel = await openPanel(process.env.INSPECT_APP_ROOT!);
 const { page, frame } = panel;
-const tabs = page.locator('[data-testid=focus-tabs]');
+const tabs = page.locator('[data-testid=view-tabs]');
 const shot = (name: string) => page.screenshot({ path: join(SHOTS, `${name}.png`) });
 const inFocus = frame.frameLocator('#feega-focus');
 const sizeInFocus = (selector: string) => frame.locator('#feega-focus').evaluate((f, sel) => getComputedStyle((f as HTMLIFrameElement).contentDocument!.querySelector(sel)!).fontSize, selector);
@@ -31,7 +31,7 @@ await inFocus.locator(TITLE).first().waitFor({ timeout: 8000 }).catch(async (err
 });
 await page.waitForTimeout(800);
 await shot('2-focus-tab');
-assert.equal(await page.locator('[data-testid=tab-focus]').innerText(), COMPONENT);
+assert.equal(await page.locator('[data-testid=view-focus]').innerText(), COMPONENT);
 assert.equal(await inFocus.locator(TITLE).count(), 1, 'one instance, nothing else');
 assert.equal(await inFocus.locator('footer, header, nav').count(), 0, 'nothing else of the page');
 
@@ -75,13 +75,13 @@ assert.ok(written.trim(), 'the edit reached the source');
 const shown = await sizeInFocus(TITLE);
 assert.ok([NEW_SIZE, await sizeInPage(TITLE)].includes(shown), 'the focus tab shows the edit, or what the page shows');
 
-await page.locator('[data-testid=tab-page]').click();
+await page.locator('[data-testid=view-editor]').click();
 await page.waitForTimeout(800);
 await shot('5-page-tab-after-edit');
 assert.equal(await sizeInPage(TITLE), shown, 'the page and the focus tab agree');
-assert.equal(await page.locator('[data-testid=focus-tabs]').count(), 1, 'the focus tab stays open');
+assert.equal(await page.locator('[data-testid=view-tabs]').count(), 1, 'the focus tab stays open');
 
-await page.locator('[data-testid=tab-focus]').click();
+await page.locator('[data-testid=view-focus]').click();
 await page.waitForTimeout(600);
 await shot('6-back-to-focus-tab');
 

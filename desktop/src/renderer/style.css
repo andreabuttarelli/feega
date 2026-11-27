@@ -127,6 +127,12 @@ html[data-platform='linux'] #bar {
   color: var(--sx-ink-2);
 }
 
+.tab.view {
+  max-width: 280px;
+  padding-left: 12px;
+  margin-left: -4px;
+}
+
 .tab.fresh {
   animation: tab-in 260ms var(--ease) both;
 }

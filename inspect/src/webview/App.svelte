@@ -15,7 +15,7 @@
   import { Click, NONE, Surface, clickOf, contains, extend, keyOf, only, primary, refOf, siblingsOf, toggle, visibleRows, type Selection } from './selection';
   import type { SupportItem } from '../support';
   import { AccountState, type AgentId, Mode, Onboarding, OnboardingOutcome, OnboardingStep, Move, ServerAction, Slot, type ChangeRow, type FontChoice, type LayerNode, type LibraryEntry, type Palette, ServerState, type ServerInfo, Styling, ToHost, ToView, WebviewUsage, type AdapterRow, type Impact, type ImpactAsk, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
-  import { fromHost, inVscode, toHost } from './host';
+  import { desktopShell, fromHost, hostKind, inVscode, toHost } from './host';
   import { imageSaved } from './image-file.svelte';
   import { iconDrawn, iconsFound } from './icon-search.svelte';
   import { pageBridge, sourceText } from './page-bridge';
@@ -45,7 +45,9 @@
   import ServerPopover from './ServerPopover.svelte';
   import SharePanel from './SharePanel.svelte';
   import LayersTree from './LayersTree.svelte';
-  import FocusTabs from './FocusTabs.svelte';
+  import FocusControls from './FocusControls.svelte';
+  import ViewTabs from './ViewTabs.svelte';
+  import { Presentation, ViewKind, barControlsOf, presentationOf, shellTabsOf, tabsOf } from './views';
   import ComponentProps from './ComponentProps.svelte';
   import { propTally } from './focus-usage';
   import { applyAskOf } from './apply-plan';
@@ -220,6 +222,7 @@
   let tab = $state<string>(Tab.Properties);
   let leftTab = $state<string>(LeftTab.Layers);
   let canvasOpen = $state(false);
+  let canvasShown = $state(false);
   let projectRoutes = $state<PageRoute[]>([]);
   let seen = $state<string[]>([]);
   const pages = $derived(pageRows(projectRoutes, seen, route));
@@ -333,7 +336,7 @@
       }
     });
   });
-  const area = $derived({ x: leftPx, y: toolbarH + (focus ? tabsH : 0), w: stage.w, h: stage.h });
+  const area = $derived({ x: leftPx, y: toolbarH, w: stage.w, h: stage.h });
   const barAt = $derived(moving ? { x: moving.x, y: moving.y } : anchorBox(anchor, area, bar));
   const canBack = $derived((navTick, history.canBack()));
   const canForward = $derived((navTick, history.canForward()));
@@ -582,10 +585,16 @@
   function openCanvas() {
     toHost({ kind: ToHost.Routes });
     canvasOpen = true;
+    canvasShown = true;
+  }
+
+  function closeCanvas() {
+    canvasOpen = false;
+    canvasShown = false;
   }
 
   function openFromCanvas(target: { route: string; size: Size }) {
-    canvasOpen = false;
+    showView(ViewKind.Editor);
     pickSize(target.size);
     go(target.route);
   }
@@ -1277,7 +1286,6 @@
   }
   let viewing = $state(View.Page);
   let reopening = false;
-  let tabsH = $state(0);
 
   function syncView() {
     bridge.mode(mode);
@@ -1310,6 +1318,7 @@
     }
     reportPropsChanged();
     focusReported = false;
+    canvasShown = false;
     focus = next;
     viewing = View.Focus;
     reopening = false;
@@ -1346,6 +1355,36 @@
       syncView();
     }
   }
+
+  const shown = $derived(canvasShown ? ViewKind.PagesCanvas : focus && viewing === View.Focus ? ViewKind.Focus : ViewKind.Editor);
+  const viewTabs = $derived(tabsOf({ focus: focus?.name ?? null, canvas: canvasOpen }, shown));
+
+  const SHOW_VIEW: Record<ViewKind, () => void> = {
+    [ViewKind.Editor]: () => ((canvasShown = false), showTab(View.Page)),
+    [ViewKind.PagesCanvas]: () => (canvasShown = true),
+    [ViewKind.Focus]: () => ((canvasShown = false), showTab(View.Focus))
+  };
+
+  const CLOSE_VIEW: Record<ViewKind, () => void> = {
+    [ViewKind.Editor]: () => undefined,
+    [ViewKind.PagesCanvas]: closeCanvas,
+    [ViewKind.Focus]: exitFocus
+  };
+
+  const showView = (kind: ViewKind) => SHOW_VIEW[kind]();
+  const closeView = (kind: ViewKind) => CLOSE_VIEW[kind]();
+
+  const viewsAt = presentationOf(hostKind);
+
+  $effect(() => {
+    if (viewsAt !== Presentation.ShellTabs) {
+      return;
+    }
+    desktopShell?.views({ tabs: shellTabsOf(viewTabs).map(({ id, title, closable }) => ({ id, title, closable })), active: shown });
+  });
+
+  desktopShell?.onShow((id) => showView(id as ViewKind));
+  desktopShell?.onClose((id) => closeView(id as ViewKind));
 
   function detach() {
     if (picked?.component) {
@@ -1540,7 +1579,7 @@
   const HISTORY_LETTERS = new Set(['z', 'y']);
 
   function onKey(e: KeyboardEvent) {
-    if (canvasOpen) {
+    if (shown === ViewKind.PagesCanvas) {
       return;
     }
     const cmd = e.metaKey || e.ctrlKey;
@@ -1634,6 +1673,7 @@
       <button type="button" class="icon" title="Forward (⌘])" disabled={!canForward} onclick={() => go(history.forward())}><ArrowRight size={15} /></button>
       <button type="button" class="icon" title="Reload (⌘R)" onclick={() => go(route)}><RotateCw size={14} /></button>
       <button type="button" class="icon" title="Pages canvas" aria-label="Pages canvas" data-testid="canvas-toggle" onclick={openCanvas}><LayoutGrid size={14} /></button>
+      {#if viewsAt === Presentation.Strip && viewTabs.length > 1}<ViewTabs tabs={viewTabs} onselect={showView} onclose={closeView} />{/if}
       <NewPage items={libraryItems} onopen={() => toHost({ kind: ToHost.LibraryList })} oncreate={(route, item) => toHost({ kind: ToHost.NewPage, route, item })} />
       <form class="address" onsubmit={(e) => (e.preventDefault(), go(address))}>
         <ServerPopover state={server} reason={serverReason} info={serverInfo} onopen={(link) => toHost({ kind: ToHost.External, url: link })} onaction={(action) => (action === ServerAction.ReloadPage ? go(route) : toHost({ kind: ToHost.Server, action }))} />
@@ -1647,8 +1687,7 @@
       {#if share?.available}<SharePanel view={share} onstart={(name, canEdit) => toHost({ kind: ToHost.ShareStart, name, canEdit })} onstop={() => toHost({ kind: ToHost.ShareStop })} onkick={(userId) => toHost({ kind: ToHost.ShareKick, userId })} onrole={(userId, role) => toHost({ kind: ToHost.ShareRole, userId, role })} />{/if}
       <button type="button" class="icon" class:on={!barClosed} title="Properties (⌘\)" onclick={toggleBar} data-testid="bar-toggle"><PanelRight size={15} /></button>
     </header>
-    {#if canvasOpen && url}<PagesCanvas rows={pages} base={url} onopen={openFromCanvas} onclose={() => (canvasOpen = false)} />{/if}
-    {#if focus}<FocusTabs name={focus.name} {route} active={viewing} notice={snapshotNotice} scheme={shownScheme} onscheme={switchScheme} transparent={transparentCanvas} ontransparent={toggleTransparent} zoom={zoomNow} onzoom={(request) => bridge.zoom(request)} onstep={(direction) => bridge.zoom({ mode: 'set', value: stepZoom(zoomNow, direction) })} onselect={showTab} onclose={exitFocus} bind:height={tabsH} />{/if}
+    {#if shown === ViewKind.PagesCanvas && url}<PagesCanvas rows={pages} base={url} onopen={openFromCanvas} onclose={() => showView(ViewKind.Editor)} />{/if}
 
     <div class="backdrop" role="presentation" bind:clientWidth={stage.w} bind:clientHeight={stage.h} onpointermove={resizeFrame} onpointerup={endDrag}>
       <div class="frame" class:framed={size !== Size.Full} class:device={deviceFrame} style={`width:${fit.width * fit.scale}px;height:${fit.height * fit.scale}px${deviceFrame ? `;--bezel:${deviceFrame.bezel * fit.scale}px;--screen-radius:${deviceFrame.radius * fit.scale}px` : ''}`}>
@@ -1733,6 +1772,7 @@
         <ModeSwitch {mode} onmode={setMode} />
         <button type="button" class="icon" title="Undo (⌘Z)" disabled={!canUndo} onclick={() => toHost({ kind: ToHost.Undo })}><Undo2 size={14} /></button>
         <button type="button" class="icon" title="Redo (⇧⌘Z)" disabled={!canRedo} onclick={() => toHost({ kind: ToHost.Redo })}><Redo2 size={14} /></button>
+        {#if barControlsOf(shown).length}<FocusControls controls={barControlsOf(shown)} notice={snapshotNotice} scheme={shownScheme} onscheme={switchScheme} transparent={transparentCanvas} ontransparent={toggleTransparent} zoom={zoomNow} onzoom={(request) => bridge.zoom(request)} onstep={(direction) => bridge.zoom({ mode: 'set', value: stepZoom(zoomNow, direction) })} />{/if}
       </div>
 
       {#if docked}<DockTab edge={docked.edge} box={tabBox(docked, area)} onrestore={undock} />{/if}

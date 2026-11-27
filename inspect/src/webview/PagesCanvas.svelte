@@ -1,5 +1,4 @@
 <script lang="ts">
-  import ArrowLeft from '@lucide/svelte/icons/arrow-left';
   import Maximize from '@lucide/svelte/icons/maximize';
   import Minus from '@lucide/svelte/icons/minus';
   import Plus from '@lucide/svelte/icons/plus';
@@ -199,8 +198,6 @@
 
   {#if held}<div class="panner" class:grabbing={panning} data-testid="canvas-panner"></div>{/if}
 
-  <button type="button" class="back" data-testid="canvas-close" title="Back to the editor (Esc)" onclick={onclose}><ArrowLeft size={14} />Editor</button>
-
   <div class="zoombar" data-testid="canvas-zoom">
     <button type="button" aria-label="Zoom out" title="Zoom out (-)" onclick={() => step(-1)}><Minus size={14} /></button>
     <span class="percent" data-testid="canvas-percent">{percentOf(view.scale)}</span>
@@ -212,7 +209,7 @@
 <style>
   .canvas {
     position: absolute;
-    inset: 0;
+    inset: var(--top-row) 0 0 0;
     z-index: 20;
     overflow: hidden;
     background-color: var(--ui-backdrop);
@@ -335,23 +332,6 @@
     cursor: grabbing;
   }
 
-  .back {
-    position: absolute;
-    top: 12px;
-    left: 12px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    height: 28px;
-    padding: 0 10px;
-    border: 0;
-    border-radius: var(--ui-radius-lg);
-    background: var(--ui-panel);
-    color: var(--ui-text);
-    font: inherit;
-    font-size: var(--ui-text-sm);
-    cursor: pointer;
-  }
 
   .zoombar {
     position: absolute;
@@ -378,8 +358,7 @@
     cursor: pointer;
   }
 
-  .zoombar button:hover,
-  .back:hover {
+  .zoombar button:hover {
     background: var(--ui-input);
     color: var(--ui-text);
   }

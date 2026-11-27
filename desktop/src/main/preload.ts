@@ -21,6 +21,8 @@ contextBridge.exposeInMainWorld('feega', {
   chooseApp: (id: string, app: string) => call(Channel.ChooseApp, id, app),
   retryTab: (id: string) => call(Channel.RetryTab, id),
   activate: (id: string | null) => call(Channel.Activate, id),
+  pickView: (id: string, view: string) => call(Channel.PickView, id, view),
+  dropView: (id: string, view: string) => call(Channel.DropView, id, view),
   setPreferences: (change: Partial<Preferences>) => call(Channel.SetPreferences, change),
   openLink: (link: Link) => call(Channel.OpenLink, link),
   overlay: (open: boolean) => call(Channel.Overlay, open),

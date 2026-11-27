@@ -65,10 +65,6 @@ export function focusKeyOf(key: string, state: { open: boolean; available: boole
   return pressed === FOCUS_LETTER && state.available ? FocusKey.Enter : null;
 }
 
-const HOME_ROUTE = '/';
-
-export const backLabelOf = (route: string): string => (route && route !== HOME_ROUTE ? route : 'Home');
-
 export enum Scheme {
   Light = 'light',
   Dark = 'dark'
