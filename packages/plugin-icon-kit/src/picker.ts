@@ -17,6 +17,7 @@ export type PickerConfig<I extends PickerIcon> = {
   load: () => Promise<I[]>;
   popular: string[];
   glyph: (icon: I, values: Values) => string;
+  available?: (icon: I, values: Values) => boolean;
   initial: Values;
   options: (values: Values) => UiNode[];
   component: (icon: I, values: Values, info: ProjectInfo, framework: Framework) => ComponentFile;
@@ -35,7 +36,7 @@ export function iconPicker<I extends PickerIcon>(api: PluginApi, config: PickerC
   let values: Values = config.initial;
 
   async function matches(): Promise<I[]> {
-    const all = await icons;
+    const all = (await icons).filter((icon) => config.available?.(icon, values) ?? true);
     if (query.trim()) {
       return search(all, query, all.length);
     }

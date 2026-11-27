@@ -1,0 +1,9 @@
+{
+  "id": "feega.heroicons",
+  "name": "Heroicons",
+  "version": "1.0.0",
+  "permissions": ["selection", "project", "edit.insert"],
+  "contributions": {
+    "rightBar": [{ "id": "heroicons", "title": "Heroicons", "when": ["selection"] }]
+  }
+}

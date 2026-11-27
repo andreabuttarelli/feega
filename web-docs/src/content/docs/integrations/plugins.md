@@ -1,12 +1,13 @@
 ---
 title: Plugins
-description: Plugins ship with Feega Inspect, Mesh gradient, 3D object, Lucide icons, Brand logos, Gradient presets and Phosphor icons. Plugins run sandboxed and change your code only through the same edit engine as manual edits.
+description: Plugins ship with Feega Inspect, Mesh gradient, 3D object, Lucide icons, Brand logos, Gradient presets, Phosphor icons and Heroicons. Plugins run sandboxed and change your code only through the same edit engine as manual edits.
 sidebar:
   order: 4
 ---
 
-Plugins add controls to Feega Inspect. Six are built in and on by default: **Mesh gradient**,
-**3D object**, **Lucide icons**, **Brand logos**, **Gradient presets** and **Phosphor icons**. You can also install third-party plugins or load one from a folder while you build
+Plugins add controls to Feega Inspect. Seven are built in and on by default: **Mesh gradient**,
+**3D object**, **Lucide icons**, **Brand logos**, **Gradient presets**, **Phosphor icons** and
+**Heroicons**. You can also install third-party plugins or load one from a folder while you build
 it: see [Write a plugin](/integrations/write-a-plugin/).
 
 ## Browse plugins
@@ -133,6 +134,22 @@ depends on `@phosphor-icons/react` or `@phosphor-icons/vue`, the file re-exports
 and Svelte or Astro files use inline SVG. Nothing is added to `package.json`.
 
 Phosphor Icons are released under the MIT licence, Copyright Phosphor Icons.
+
+## Heroicons
+
+Works like Lucide icons: search box (by name), grid, **Insert**. Options:
+
+- **Style**: Outline 24, Solid 24, Mini 20 or Micro 16. A few icons do not exist in Micro; they
+  drop out of the grid when that style is chosen.
+- **Size** and **Text colour** or **Colour**.
+
+Insert writes `src/feega/icons/<Name>Icon` (`<Name>SolidIcon`, `<Name>MiniIcon`,
+`<Name>MicroIcon` for the other styles). If the project depends on `@heroicons/react` or
+`@heroicons/vue`, the file re-exports (React) or wraps (Vue) that library's component for the
+chosen style and the size is written as `width` and `height`. Otherwise, and in Svelte and Astro
+files, the SVG is inline. Nothing is added to `package.json`.
+
+Heroicons are released under the MIT licence, Copyright Tailwind Labs, Inc.
 
 ## Safety
 

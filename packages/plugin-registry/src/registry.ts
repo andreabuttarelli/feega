@@ -73,6 +73,16 @@ export const SOURCES: readonly PluginSource[] = [
     tier: 'free',
     latestVersion: '1.0.0',
     permissions: ['selection', 'project', 'edit.insert']
+  },
+  {
+    id: 'heroicons',
+    manifestId: 'feega.heroicons',
+    name: 'Heroicons',
+    summary: 'Search Heroicons in outline, solid, mini and micro styles and insert one with your size and colour.',
+    author: 'Feega',
+    tier: 'free',
+    latestVersion: '1.0.0',
+    permissions: ['selection', 'project', 'edit.insert']
   }
 ];
 
@@ -106,5 +116,10 @@ export const COPY: Readonly<Record<string, PluginCopy>> = {
     icon: 'phosphor',
     description:
       'Select an element, search the Phosphor set of over 1,500 icons by name or tag, choose a weight (thin, light, regular, bold, fill or duotone), size and colour, and insert it. Feega writes a small component with the SVG inline, or, when the project already uses @phosphor-icons/react or @phosphor-icons/vue, a component of that library with the weight as a prop. Nothing is added to package.json. One undoable step. Phosphor Icons are released under the MIT licence, Copyright Phosphor Icons.'
+  },
+  heroicons: {
+    icon: 'heroicons',
+    description:
+      'Select an element, search the 324 Heroicons, choose a style (outline, solid, mini or micro), size and colour, and insert it. Feega writes a small component with the SVG inline, or, when the project already uses @heroicons/react or @heroicons/vue, a component of that library, sized with width and height. Nothing is added to package.json. One undoable step. Heroicons are released under the MIT licence, Copyright Tailwind Labs, Inc.'
   }
 };
