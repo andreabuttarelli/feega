@@ -4,15 +4,16 @@
   import Minus from '@lucide/svelte/icons/minus';
   import Plus from '@lucide/svelte/icons/plus';
   import type { ComponentRow } from '../host/component-list';
-  import { untrack } from 'svelte';
   import { GRID_COLUMNS, layoutGrid, type GridFrame } from './canvas-layout';
-  import { LIVE_CAP, VISIBLE_MARGIN, leaving, liveKeys } from './canvas-live';
+  import { liveSet } from './canvas-live';
+  import { LOAD_TIMEOUT_MS, MAX_LOADING, PAINT_DELAY_MS, POOL_CAP, SETTLE_MS, planPool, settler } from './canvas-pool';
+  import { shotOf } from './canvas-shot';
+  import { CanvasKey, actualView, canvasKeyOf, fitView, panBy, percentOf, stepView, wheelOf, zoomAround, type CanvasView, type Point } from './canvas-view';
+  import { untrack } from 'svelte';
   import { componentKeysOf } from './canvas-stale';
   import { keyOfComponent } from './components';
   import type { FilesChange } from './files-change';
   import { mountUrlOf } from './component-mount';
-  import { shotOf } from './canvas-shot';
-  import { CanvasKey, actualView, canvasKeyOf, fitView, panBy, percentOf, stepView, wheelOf, zoomAround, type CanvasView, type Point } from './canvas-view';
 
   type Props = { rows: ComponentRow[]; base: string; onopen: (row: ComponentRow) => void; onclose: () => void; changed: FilesChange | null };
 
@@ -24,6 +25,7 @@
   const RECAPTURE_DELAY_MS = 1200;
   const MOUNT_STATUS = 'feega:mount:status';
   const MOUNT_FAILED = 'failed';
+  const ALWAYS_LIVE_WIDTH = 0;
 
   let root = $state<HTMLElement | null>(null);
   let viewport = $state({ w: 0, h: 0 });
@@ -35,14 +37,18 @@
   let shots = $state<Record<string, string>>({});
   let retiring = $state<string[]>([]);
   let cannotRender = $state<string[]>([]);
+  let settledView = $state<CanvasView>({ scale: 1, x: 0, y: 0 });
+  let live = $state<string[]>([]);
+  let pool = $state<string[]>([]);
+  let loaded = $state(new Set<string>());
+  let ready = $state(new Set<string>());
   const frameEls: Record<string, HTMLIFrameElement | undefined> = {};
-  let wasLive: string[] = [];
   let queue: Promise<void> = Promise.resolve();
 
   const byKey = $derived(new Map(rows.map((row) => [keyOfComponent(row), row])));
   const layout = $derived(layoutGrid(rows.map((row) => ({ key: keyOfComponent(row), name: row.name })), GRID_COLUMNS));
-  const live = $derived(liveKeys(layout.frames, view, viewport, VISIBLE_MARGIN, LIVE_CAP));
-  const mounted = $derived(new Set([...live, ...retiring].filter((key) => !cannotRender.includes(key))));
+  const mounted = $derived(new Set([...pool, ...retiring].filter((key) => !cannotRender.includes(key))));
+  const settle = settler(() => (settledView = view), SETTLE_MS);
 
   const rowOf = (frame: GridFrame) => byKey.get(frame.key)!;
 
@@ -68,6 +74,18 @@
     }
   });
 
+  function shoot(key: string): Promise<void> {
+    queue = queue.then(async () => {
+      const el = frameEls[key];
+      const png = el ? await shotOf(el) : null;
+      if (png) {
+        shots[key] = png;
+      }
+    });
+
+    return queue;
+  }
+
   $effect(() => {
     if (!changed) {
       return;
@@ -84,35 +102,56 @@
     });
   });
 
-  function shoot(key: string): Promise<void> {
-    queue = queue.then(async () => {
-      const el = frameEls[key];
-      const png = el ? await shotOf(el) : null;
-      if (png) {
-        shots[key] = png;
-      }
-    });
-
-    return queue;
-  }
+  $effect(() => {
+    void view;
+    settle();
+  });
 
   $effect(() => {
-    const gone = leaving(wasLive, live);
-    wasLive = live;
-    for (const key of gone) {
-      retiring = [...retiring, key];
-      void shoot(key).finally(() => (retiring = retiring.filter((k) => k !== key)));
+    const next = liveSet(layout.frames, settledView, viewport, untrack(() => live), ALWAYS_LIVE_WIDTH);
+    if (next.join() !== untrack(() => live).join()) {
+      live = next;
     }
   });
 
-  function loaded(key: string) {
+  function forget(key: string) {
+    loaded = new Set([...loaded].filter((k) => k !== key));
+    ready = new Set([...ready].filter((k) => k !== key));
+  }
+
+  function evict(key: string) {
+    retiring = [...retiring, key];
+    void shoot(key).finally(() => {
+      retiring = retiring.filter((k) => k !== key);
+      forget(key);
+    });
+  }
+
+  $effect(() => {
+    const plan = planPool({ pool: untrack(() => pool), wanted: live, settled: loaded, cap: POOL_CAP, maxLoading: MAX_LOADING });
+    if (plan.pool.join() !== untrack(() => pool).join()) {
+      pool = plan.pool;
+    }
+    plan.evicted.forEach(evict);
+  });
+
+  function settled(key: string) {
+    if (!loaded.has(key)) {
+      loaded = new Set([...loaded, key]);
+    }
+  }
+
+  function onload(key: string) {
+    settled(key);
+    setTimeout(() => (ready = new Set([...ready, key])), PAINT_DELAY_MS);
     setTimeout(() => void shoot(key), FIRST_SHOT_DELAY_MS);
   }
 
   function register(node: HTMLIFrameElement, key: string) {
     frameEls[key] = node;
+    const giveUp = setTimeout(() => settled(key), LOAD_TIMEOUT_MS);
 
-    return { destroy: () => delete frameEls[key] };
+    return { destroy: () => (clearTimeout(giveUp), delete frameEls[key]) };
   }
 
   const pointOf = (e: { clientX: number; clientY: number }): Point => {
@@ -216,7 +255,7 @@
           <div class="card"><b>{frame.name}</b><span>{cannotRender.includes(frame.key) ? 'Needs props or context to render' : rowOf(frame).file}</span></div>
         {/if}
         {#if mounted.has(frame.key)}
-          <iframe use:register={frame.key} src={mountUrlOf(base, rowOf(frame))} title={frame.name} tabindex="-1" onload={() => loaded(frame.key)} style={`width:${frame.width}px;height:${frame.height}px`}></iframe>
+          <iframe use:register={frame.key} src={mountUrlOf(base, rowOf(frame))} title={frame.name} tabindex="-1" data-ready={ready.has(frame.key)} class:shown={live.includes(frame.key) && ready.has(frame.key)} onload={() => onload(frame.key)} style={`width:${frame.width}px;height:${frame.height}px`}></iframe>
         {/if}
         <button type="button" class="hit" title={`Open ${frame.name} on its own`} aria-label={`Open ${frame.name}`} data-testid="canvas-open" onclick={() => open(frame)}></button>
       </div>
@@ -285,7 +324,15 @@
   }
 
   iframe {
+    visibility: hidden;
+    opacity: 0;
     background: white;
+  }
+
+  iframe.shown {
+    visibility: visible;
+    opacity: 1;
+    transition: opacity 160ms ease-out;
   }
 
   .card {
