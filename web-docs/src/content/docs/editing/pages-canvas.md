@@ -9,6 +9,8 @@ The Pages canvas shows all the pages of your app together. Each page is one row,
 
 Open it with the **Open canvas** banner at the top of the Pages tab, or with the grid button in the toolbar. It opens as a view tab, in the tab row above the editor or, in Feega desktop, in the window's top bar as `project · Pages canvas`. Press `Esc` or switch to the Page tab to go back, and close the tab when you are done.
 
+While the canvas tab is open, the Layers, Pages and Components bar, the toolbar and the Properties bar are hidden: the canvas fills the whole area and keeps only its zoom controls. They come back with the Page tab. The Components canvas works the same way.
+
 ## Move around
 
 The canvas is the only place with zoom and pan. The editor itself stays at its fitted size.
