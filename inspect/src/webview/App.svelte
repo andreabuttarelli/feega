@@ -11,7 +11,7 @@
   import { ElementState } from '@feega/live-edit/element-state';
   import type { Styles } from './controls';
   import { untrack } from 'svelte';
-  import { MOVES, Shortcut, isMac, letterOf, needsBareFocus, shortcutOf, typingIn } from './selection-keys';
+  import { MOVES, Shortcut, isMac, isRedo, letterOf, needsBareFocus, shortcutOf, typingIn } from './selection-keys';
   import { Click, NONE, Surface, clickOf, contains, extend, keyOf, only, primary, refOf, siblingsOf, toggle, visibleRows, type Selection } from './selection';
   import type { SupportItem } from '../support';
   import { AccountState, type AgentId, Mode, Onboarding, OnboardingOutcome, OnboardingStep, Move, ServerAction, Slot, type ChangeRow, type FontChoice, type LayerNode, type LibraryEntry, type Palette, ServerState, type ServerInfo, Styling, ToHost, ToView, WebviewUsage, type AdapterRow, type Impact, type ImpactAsk, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
@@ -1510,6 +1510,7 @@
   }
 
   const COMMENT_KEY = 'c';
+  const HISTORY_LETTERS = new Set(['z', 'y']);
 
   function onKey(e: KeyboardEvent) {
     const cmd = e.metaKey || e.ctrlKey;
@@ -1528,7 +1529,8 @@
       return;
     }
     const shortcuts: Record<string, () => void> = {
-      z: () => toHost({ kind: e.shiftKey ? ToHost.Redo : ToHost.Undo }),
+      z: () => toHost({ kind: isRedo(e, isMac) ? ToHost.Redo : ToHost.Undo }),
+      y: () => isRedo(e, isMac) && toHost({ kind: ToHost.Redo }),
       '\\': () => (e.shiftKey ? ((leftClosed = !leftClosed), savePrefs()) : toggleBar()),
       '|': () => ((leftClosed = !leftClosed), savePrefs()),
       h: () => e.shiftKey && picked && toggleFlag('hidden', picked.source),
