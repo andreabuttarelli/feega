@@ -60,7 +60,7 @@
       {#if open.description}<p>{open.description}</p>{:else if open.summary}<p>{open.summary}</p>{/if}
 
       <div class="actions">
-        <label class="toggle"><input type="checkbox" checked={open.enabled} aria-label={`Enable ${open.name}`} data-testid="plugin-enable" onchange={(e) => onenable(open.id, e.currentTarget.checked)} />{open.enabled ? 'Enabled' : 'Off'}</label>
+        <label class="toggle"><input type="checkbox" role="switch" checked={open.enabled} aria-label={`Enable ${open.name}`} data-testid="plugin-enable" onchange={(e) => onenable(open.id, e.currentTarget.checked)} /><span class="track"></span>{open.enabled ? 'Enabled' : 'Off'}</label>
         {#if open.removable}<button type="button" class="action" data-testid="plugin-remove" onclick={() => (onremove(open.id), (openId = null))}>Remove</button>{/if}
         <button type="button" class="action" data-testid="plugin-docs" onclick={() => onlink(LINKS.plugins)}>Docs</button>
       </div>
@@ -85,7 +85,7 @@
             <span class="summary">{card.summary}</span>
           </button>
           <div class="foot">
-            <label class="toggle"><input type="checkbox" checked={card.enabled} aria-label={`Enable ${card.name}`} data-testid="plugin-enable" onchange={(e) => onenable(card.id, e.currentTarget.checked)} />{card.enabled ? 'Enabled' : 'Off'}</label>
+            <label class="toggle"><input type="checkbox" role="switch" checked={card.enabled} aria-label={`Enable ${card.name}`} data-testid="plugin-enable" onchange={(e) => onenable(card.id, e.currentTarget.checked)} /><span class="track"></span>{card.enabled ? 'Enabled' : 'Off'}</label>
             {#if card.removable}<button type="button" class="action" data-testid="plugin-remove" onclick={() => onremove(card.id)}>Remove</button>{/if}
           </div>
         </div>
@@ -283,8 +283,49 @@
   .toggle {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 8px;
     font-size: var(--ui-text-xs);
+    cursor: pointer;
+  }
+
+  .toggle input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .track {
+    position: relative;
+    flex: none;
+    width: 30px;
+    height: 18px;
+    border-radius: var(--ui-radius-full);
+    background: var(--ui-line-strong);
+    transition: background var(--ui-dur-fast);
+  }
+
+  .track::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 14px;
+    height: 14px;
+    border-radius: var(--ui-radius-full);
+    background: var(--ui-thumb);
+    transition: transform var(--ui-dur-fast);
+  }
+
+  .toggle input:checked + .track {
+    background: var(--ui-accent);
+  }
+
+  .toggle input:checked + .track::after {
+    transform: translateX(12px);
+  }
+
+  .toggle input:focus-visible + .track {
+    outline: 2px solid var(--ui-accent);
   }
 
   .action,
