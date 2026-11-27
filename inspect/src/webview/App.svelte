@@ -1730,7 +1730,7 @@
     {#if shown === ViewKind.ComponentsCanvas && url}<ComponentsCanvas rows={projectComponents} base={url} onopen={openFromComponentsCanvas} onclose={() => showView(ViewKind.Editor)} changed={filesChanged} />{/if}
 
     <div class="backdrop" role="presentation" bind:clientWidth={stage.w} bind:clientHeight={stage.h} onpointermove={resizeFrame} onpointerup={endDrag}>
-      <div class="frame" class:framed={size !== Size.Full} class:device={deviceFrame} style={`width:${fit.width * fit.scale}px;height:${fit.height * fit.scale}px${deviceFrame ? `;--bezel:${deviceFrame.bezel * fit.scale}px;--screen-radius:${deviceFrame.radius * fit.scale}px` : ''}`}>
+      <div class="frame" class:framed={size !== Size.Full} class:device={deviceFrame} style={`width:${fit.width * fit.scale}px;height:${fit.height * fit.scale}px${deviceFrame ? `;--bezel:${deviceFrame.bezel * fit.scale}px;--screen-radius:${deviceFrame.radius * fit.scale}px;--page-radius:${deviceFrame.radius}px` : ''}`}>
         {#if url}<iframe bind:this={frame} src={start} title="App" data-testid="app-frame" style={`width:${fit.width}px;height:${fit.height}px;transform:scale(${fit.scale})`}></iframe>{/if}
         {#if deviceFrame}<DeviceChrome frame={deviceFrame} scale={fit.scale} landscape={fit.width > fit.height} />{/if}
         {#if restarting}<div class="restarting" data-testid="restarting" role="status"><span class="server-dot-inline amber"></span>Restarting dev server…</div>{/if}
@@ -2059,6 +2059,7 @@
 
   .frame.device {
     border-radius: var(--screen-radius);
+    background: #111;
     box-shadow: 0 0 0 var(--bezel) #111, 0 0 0 calc(var(--bezel) + 1px) #3a3a3c, 0 12px 32px rgb(0 0 0 / 0.3);
   }
 
@@ -2066,6 +2067,10 @@
     display: block;
     border: 0;
     transform-origin: 0 0;
+  }
+
+  .frame.device iframe {
+    clip-path: inset(0 round var(--page-radius));
   }
 
   .plugin-action {
