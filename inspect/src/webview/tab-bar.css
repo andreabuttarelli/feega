@@ -63,7 +63,7 @@
 }
 
 .tab-bar .tab:not(.on):hover .name {
-  mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent calc(100% - 16px));
 }
 
 .tab-bar .tab.fresh {
