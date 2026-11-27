@@ -2,8 +2,22 @@
   "id": "feega.brand-logos",
   "name": "Brand logos",
   "version": "1.0.0",
-  "permissions": ["selection", "project", "edit.insert"],
+  "permissions": [
+    "selection",
+    "project",
+    "edit.insert",
+    "network:cdn.jsdelivr.net",
+    "network:unpkg.com"
+  ],
   "contributions": {
-    "rightBar": [{ "id": "logos", "title": "Brand logos", "when": ["selection"] }]
+    "rightBar": [
+      {
+        "id": "logos",
+        "title": "Brand logos",
+        "when": [
+          "selection"
+        ]
+      }
+    ]
   }
 }

@@ -42,7 +42,7 @@ export const SOURCES: readonly PluginSource[] = [
     author: 'Feega',
     tier: 'free',
     latestVersion: '1.0.0',
-    permissions: ['selection', 'project', 'edit.insert']
+    permissions: ['selection', 'project', 'edit.insert', 'network:cdn.jsdelivr.net', 'network:unpkg.com']
   },
   {
     id: 'brand-logos',
@@ -52,7 +52,7 @@ export const SOURCES: readonly PluginSource[] = [
     author: 'Feega',
     tier: 'free',
     latestVersion: '1.0.0',
-    permissions: ['selection', 'project', 'edit.insert']
+    permissions: ['selection', 'project', 'edit.insert', 'network:cdn.jsdelivr.net', 'network:unpkg.com']
   },
   {
     id: 'gradient-presets',
@@ -72,7 +72,7 @@ export const SOURCES: readonly PluginSource[] = [
     author: 'Feega',
     tier: 'free',
     latestVersion: '1.0.0',
-    permissions: ['selection', 'project', 'edit.insert']
+    permissions: ['selection', 'project', 'edit.insert', 'network:cdn.jsdelivr.net', 'network:unpkg.com']
   },
   {
     id: 'heroicons',
@@ -82,7 +82,7 @@ export const SOURCES: readonly PluginSource[] = [
     author: 'Feega',
     tier: 'free',
     latestVersion: '1.0.0',
-    permissions: ['selection', 'project', 'edit.insert']
+    permissions: ['selection', 'project', 'edit.insert', 'network:cdn.jsdelivr.net', 'network:unpkg.com']
   }
 ];
 
@@ -100,12 +100,12 @@ export const COPY: Readonly<Record<string, PluginCopy>> = {
   'lucide-icons': {
     icon: 'lucide',
     description:
-      'Select an element, search the Lucide set of over 2,000 icons, pick one and set its size, stroke width and colour. Feega inserts it as a small component with the SVG inline, or, when the project already uses lucide-react, lucide-svelte or lucide-vue-next, as a component of that library. Nothing is added to package.json. One undoable step. Lucide is released under the ISC licence, Copyright Lucide Contributors (lucide.dev).'
+      'Select an element, search the Lucide set of over 2,000 icons, pick one and set its size, stroke width and colour. Feega inserts it as a small component with the SVG inline, or, when the project already uses lucide-react, lucide-svelte or lucide-vue-next, as a component of that library. Nothing is added to package.json. Icons are downloaded from jsDelivr (unpkg as fallback) the first time they are shown, so the first use needs internet. One undoable step. Lucide is released under the ISC licence, Copyright Lucide Contributors (lucide.dev).'
   },
   'brand-logos': {
     icon: 'brand-logos',
     description:
-      'Select an element, search over 3,000 brand logos, pick one and set its size and whether it keeps the official brand colour or follows the text colour. Feega inserts it as a small component with the SVG inline and an accessible title. Nothing is added to package.json. One undoable step. Logo shapes come from Simple Icons (CC0). The logos are trademarks of their owners: brand guidelines apply to how you use them.'
+      'Select an element, search over 3,000 brand logos, pick one and set its size and whether it keeps the official brand colour or follows the text colour. Feega inserts it as a small component with the SVG inline and an accessible title. Nothing is added to package.json. Logos are downloaded from jsDelivr (unpkg as fallback) the first time they are shown, so the first use needs internet. One undoable step. Logo shapes come from Simple Icons (CC0). The logos are trademarks of their owners: brand guidelines apply to how you use them.'
   },
   'gradient-presets': {
     icon: 'gradient-presets',
@@ -115,11 +115,11 @@ export const COPY: Readonly<Record<string, PluginCopy>> = {
   'phosphor-icons': {
     icon: 'phosphor',
     description:
-      'Select an element, search the Phosphor set of over 1,500 icons by name or tag, choose a weight (thin, light, regular, bold, fill or duotone), size and colour, and insert it. Feega writes a small component with the SVG inline, or, when the project already uses @phosphor-icons/react or @phosphor-icons/vue, a component of that library with the weight as a prop. Nothing is added to package.json. One undoable step. Phosphor Icons are released under the MIT licence, Copyright Phosphor Icons.'
+      'Select an element, search the Phosphor set of over 1,500 icons by name or tag, choose a weight (thin, light, regular, bold, fill or duotone), size and colour, and insert it. Feega writes a small component with the SVG inline, or, when the project already uses @phosphor-icons/react or @phosphor-icons/vue, a component of that library with the weight as a prop. Nothing is added to package.json. Icons are downloaded from jsDelivr (unpkg as fallback) the first time they are shown, so the first use needs internet. One undoable step. Phosphor Icons are released under the MIT licence, Copyright Phosphor Icons.'
   },
   heroicons: {
     icon: 'heroicons',
     description:
-      'Select an element, search the 324 Heroicons, choose a style (outline, solid, mini or micro), size and colour, and insert it. Feega writes a small component with the SVG inline, or, when the project already uses @heroicons/react or @heroicons/vue, a component of that library, sized with width and height. Nothing is added to package.json. One undoable step. Heroicons are released under the MIT licence, Copyright Tailwind Labs, Inc.'
+      'Select an element, search the 324 Heroicons, choose a style (outline, solid, mini or micro), size and colour, and insert it. Feega writes a small component with the SVG inline, or, when the project already uses @heroicons/react or @heroicons/vue, a component of that library, sized with width and height. Nothing is added to package.json. Icons are downloaded from jsDelivr (unpkg as fallback) the first time they are shown, so the first use needs internet. One undoable step. Heroicons are released under the MIT licence, Copyright Tailwind Labs, Inc.'
   }
 };

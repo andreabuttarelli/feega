@@ -1,19 +1,24 @@
 import { describe, expect, it } from 'vitest';
-import { PACKED } from './packed.generated';
 import { unpack } from '@feega/plugin-icon-kit/unpack';
-import { iconsData } from '../scripts/pack-icons';
-import { POPULAR, glyphOf, loadIcons } from './icons';
+import { indexData, version } from '../scripts/pack-icons';
+import { PACKED, VERSION } from './packed.generated';
+import { POPULAR, SOURCE, fileOf, loadIcons } from './icons';
 
-describe('lucide icon data', () => {
-  it('is the data of the installed lucide-static package', async () => {
-    expect(await unpack(PACKED)).toEqual(iconsData());
+describe('lucide icon index', () => {
+  it('is the index of the installed lucide-static package', async () => {
+    expect(await unpack(PACKED)).toEqual(indexData());
   });
 
-  it('holds the whole set, each icon with drawing markup', async () => {
+  it('names the exact version the icon files are fetched at', () => {
+    expect(VERSION).toBe(version());
+    expect(SOURCE).toEqual({ name: 'lucide-static', version: VERSION });
+  });
+
+  it('holds the whole set by name, and carries no drawing', async () => {
     const icons = await loadIcons();
 
     expect(icons.length).toBeGreaterThan(1500);
-    expect(icons.every((icon) => icon.body.startsWith('<'))).toBe(true);
+    expect(Object.keys(icons[0]).sort()).toEqual(['name', 'words']);
   });
 
   it('keeps the search words of an icon', async () => {
@@ -28,9 +33,9 @@ describe('lucide icon data', () => {
     expect(POPULAR.filter((name) => !names.has(name))).toEqual([]);
   });
 
-  it('draws a glyph as a standalone svg', async () => {
+  it('points at the svg file of the icon in the package', async () => {
     const [first] = await loadIcons();
 
-    expect(glyphOf(first.body)).toMatch(/^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg" viewBox="0 0 24 24"/);
+    expect(fileOf(first)).toBe(`icons/${first.name}.svg`);
   });
 });

@@ -1,12 +1,13 @@
 import type { PluginApi } from '@feega/plugin-api/client';
 import { Control, type UiNode } from '@feega/plugin-api/protocol';
 import { envOf } from '@feega/plugin-icon-kit/env';
-import { CHOSEN, INSERT, QUERY, iconPicker, type PickerConfig, type Values } from '@feega/plugin-icon-kit/picker';
+import { CHOSEN, INSERT, QUERY, RETRY, iconPicker, type PickerConfig, type Values } from '@feega/plugin-icon-kit/picker';
+import { innerOf } from '@feega/plugin-icon-kit/cdn';
 import { attributesOf, componentName, svgComponent, type Prop, type SvgSpec } from '@feega/plugin-icon-kit/svg-component';
-import { CURRENT_COLOUR, DEFAULT_SIZE, LOOKS, OUTLINE_STROKE, POPULAR, STYLES, Style, bodyOf, glyphOf, hasStyle, loadIcons, type Hero } from './icons';
+import { CURRENT_COLOUR, DEFAULT_SIZE, LOOKS, OUTLINE_STROKE, POPULAR, SOURCE, STYLES, Style, fileOf, hasStyle, loadIcons, type Hero } from './icons';
 import { libraryFor } from './library';
 
-export { CHOSEN, INSERT, QUERY };
+export { CHOSEN, INSERT, QUERY, RETRY };
 export const SECTION = 'heroicons';
 export const STYLE = 'style';
 export const SIZE = 'size';
@@ -33,13 +34,13 @@ const LABELS: Record<Style, string> = { [Style.Outline]: 'Outline 24', [Style.So
 
 const variantOf = (style: Style) => (style === Style.Outline ? '' : style);
 
-const specOf = (icon: Hero, style: Style): SvgSpec => {
+const specOf = (icon: Hero, style: Style, svg: string): SvgSpec => {
   const { grid, stroked } = LOOKS[style];
 
   return {
     name: componentName(icon.name, variantOf(style)),
     viewBox: `0 0 ${grid} ${grid}`,
-    body: bodyOf(icon, style),
+    body: innerOf(svg),
     fixed: stroked ? { fill: 'none', 'stroke-width': OUTLINE_STROKE, 'aria-hidden': 'true' } : { 'aria-hidden': 'true' },
     bound: stroked ? { width: 'size', height: 'size', stroke: 'color' } : { width: 'size', height: 'size', fill: 'color' },
     props: INLINE_PROPS
@@ -58,11 +59,12 @@ const CONFIG: PickerConfig<Hero> = {
   label: LABEL,
   load: loadIcons,
   popular: POPULAR,
-  glyph: (icon, values) => glyphOf(icon, values[STYLE] as Style),
+  source: SOURCE,
+  file: (icon, values) => fileOf(icon, values[STYLE] as Style),
   available: (icon, values) => hasStyle(icon, values[STYLE] as Style),
   initial: { [STYLE]: Style.Outline, [SIZE]: DEFAULT_SIZE, [INHERIT]: true, [COLOUR]: DEFAULT_COLOUR },
   options: optionsOf,
-  component: (icon, values, info, framework) => {
+  component: (icon, values, info, framework, svg) => {
     const env = envOf(info);
     const style = values[STYLE] as Style;
     const name = componentName(icon.name, variantOf(style));
@@ -73,7 +75,7 @@ const CONFIG: PickerConfig<Hero> = {
       const file = library.wrap(icon.name, name, env);
       return { name, file: file.file, source: file.source, attributes: attributesOf(framework, LIBRARY_PROPS, { width: size, height: size, color }) };
     }
-    const file = svgComponent(specOf(icon, style), framework, env);
+    const file = svgComponent(specOf(icon, style, svg), framework, env);
 
     return { name, file: file.file, source: file.source, attributes: attributesOf(framework, INLINE_PROPS, { size, color }) };
   }

@@ -1,24 +1,21 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { pack } from '@feega/plugin-icon-kit/pack';
+import { generatedSource, installedVersion } from '@feega/plugin-icon-kit/pack';
 
-type Node = [string, Record<string, string>];
-
-type Packed = Record<string, [string, string[]]>;
+const PACKAGE = 'lucide-static';
 
 const require = createRequire(import.meta.url);
 const GENERATED = new URL('../src/packed.generated.ts', import.meta.url);
 
-const read = (file: string) => JSON.parse(readFileSync(require.resolve(`lucide-static/${file}`), 'utf8'));
+export const version = (): string => installedVersion(PACKAGE);
 
-const markup = (nodes: Node[]) => nodes.map(([tag, attributes]) => `<${tag} ${Object.entries(attributes).map(([name, value]) => `${name}="${value}"`).join(' ')}/>`).join('');
+export function indexData(): Record<string, string[]> {
+  const tags: Record<string, string[]> = JSON.parse(readFileSync(require.resolve(`${PACKAGE}/tags.json`), 'utf8'));
+  const names = Object.keys(JSON.parse(readFileSync(require.resolve(`${PACKAGE}/icon-nodes.json`), 'utf8'))).sort();
 
-export function iconsData(): Packed {
-  const nodes: Record<string, Node[]> = read('icon-nodes.json');
-  const tags: Record<string, string[]> = read('tags.json');
-  return Object.fromEntries(Object.entries(nodes).map(([name, children]) => [name, [markup(children), tags[name] ?? []]]));
+  return Object.fromEntries(names.map((name) => [name, tags[name] ?? []]));
 }
 
 if (process.argv[1] === new URL(import.meta.url).pathname) {
-  writeFileSync(GENERATED, `export const PACKED = '${pack(iconsData())}';\n`);
+  writeFileSync(GENERATED, generatedSource(version(), indexData()));
 }

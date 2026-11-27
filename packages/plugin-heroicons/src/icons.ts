@@ -1,5 +1,5 @@
 import { unpack } from '@feega/plugin-icon-kit/unpack';
-import { PACKED } from './packed.generated';
+import { PACKED, VERSION } from './packed.generated';
 
 export enum Style {
   Outline = 'outline',
@@ -10,7 +10,11 @@ export enum Style {
 
 export const STYLES: Style[] = [Style.Outline, Style.Solid, Style.Mini, Style.Micro];
 
-export type Hero = { name: string; bodies: string[]; words: string[] };
+export { VERSION };
+
+export type Hero = { name: string; styles: Style[]; words: string[] };
+
+export const SOURCE = { name: 'heroicons', version: VERSION };
 
 type Look = { grid: number; directory: string; stroked: boolean };
 
@@ -32,18 +36,11 @@ export const POPULAR = [
 ];
 
 export async function loadIcons(): Promise<Hero[]> {
-  const packed = await unpack<Record<string, string[]>>(PACKED);
+  const packed = await unpack<Record<string, string>>(PACKED);
 
-  return Object.entries(packed).map(([name, bodies]) => ({ name, bodies, words: [] }));
+  return Object.entries(packed).map(([name, has]) => ({ name, styles: STYLES.filter((_, index) => has[index] === '1'), words: [] }));
 }
 
-export const bodyOf = (icon: Hero, style: Style): string => icon.bodies[STYLES.indexOf(style)];
+export const hasStyle = (icon: Hero, style: Style): boolean => icon.styles.includes(style);
 
-export const hasStyle = (icon: Hero, style: Style): boolean => bodyOf(icon, style) !== '';
-
-export const glyphOf = (icon: Hero, style: Style): string => {
-  const { grid, stroked } = LOOKS[style];
-  const paint = stroked ? `fill="none" stroke="#000" stroke-width="${OUTLINE_STROKE}"` : 'fill="#000"';
-
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${grid} ${grid}" ${paint}>${bodyOf(icon, style)}</svg>`;
-};
+export const fileOf = (icon: Hero, style: Style): string => `${LOOKS[style].directory}/${icon.name}.svg`;

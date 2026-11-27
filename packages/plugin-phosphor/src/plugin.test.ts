@@ -3,7 +3,10 @@ import { createApi, type Port } from '@feega/plugin-api/client';
 import { createPluginHost, type EditorPort } from '@feega/plugin-api/host';
 import { parseManifest } from '@feega/plugin-api/manifest';
 import { Control, OpKind, type HostMessage, type PluginMessage, type ProjectInfo, type Proposal, type Selection, type UiNode } from '@feega/plugin-api/protocol';
+import { OFFLINE_NOTE } from '@feega/plugin-icon-kit/cdn';
+import { localCdn } from '@feega/plugin-icon-kit/cdn-fixture';
 import manifest from '../feega-plugin.json';
+import { VERSION } from './icons';
 import { CHOSEN, COLOUR, INSERT, LABEL, QUERY, SECTION, SIZE, WEIGHT, phosphorPlugin } from './plugin';
 
 const at = (file: string): Selection => ({ source: { file, line: 4, col: 3 }, component: null, tag: 'section', name: 'section', classes: '', rect: { x: 0, y: 0, width: 1, height: 1 }, styles: {}, attributes: [] });
@@ -19,6 +22,8 @@ function load(initial: Selection | null, project: ProjectInfo = PLAIN) {
     throw new Error(parsed.reason);
   }
   const proposals: Proposal[] = [];
+  const notes: string[] = [];
+  const cdn = localCdn();
   let toHost: (m: PluginMessage) => void = () => undefined;
   let toPlugin: (m: HostMessage) => void = () => undefined;
   const editor: EditorPort = {
@@ -27,9 +32,9 @@ function load(initial: Selection | null, project: ProjectInfo = PLAIN) {
     sourceText: async () => null,
     propose: async (p) => (proposals.push(p), { ok: true }),
     preview: () => undefined,
-    fetch: async () => ({ status: 200, text: '' }),
+    fetch: cdn.fetch,
     pickFile: async () => null,
-    notify: () => undefined
+    notify: (text) => notes.push(text)
   };
   const host = createPluginHost({ editor, sandbox: () => ({ post: (m) => queueMicrotask(() => toPlugin(m)), listen: (h) => (toHost = h), close: () => undefined }) });
   host.load(parsed.manifest, '');
@@ -43,10 +48,16 @@ function load(initial: Selection | null, project: ProjectInfo = PLAIN) {
   };
   const ui = () => host.ui(parsed.manifest.id, SECTION);
   const control = async (id: string, value: string | number | boolean) => {
+    const before = proposals.length + notes.length;
     host.control(parsed.manifest.id, SECTION, id, value);
     await settle();
+    if (id === INSERT) {
+      await vi.waitFor(() => expect(proposals.length + notes.length).toBeGreaterThan(before), { timeout: ICONS_READY_MS });
+    }
   };
-  return { settle, ui, control, proposals, manifest: parsed.manifest };
+  const imageOf = (name: string) => grid(ui())?.items.find((item) => item.id === name)?.image;
+  const drawn = (name: string) => vi.waitFor(() => expect(imageOf(name)).toBeTruthy(), { timeout: ICONS_READY_MS });
+  return { settle, ui, control, imageOf, drawn, cdn, proposals, notes, manifest: parsed.manifest };
 }
 
 const node = <T extends UiNode['type']>(tree: UiNode[], type: T, id?: string) => tree.find((n) => n.type === type && (id === undefined || ('id' in n && n.id === id)));
@@ -76,6 +87,7 @@ describe('manifest', () => {
 
     expect(m.contributions.rightBar).toEqual([{ id: SECTION, title: 'Phosphor icons', when: ['selection'] }]);
     expect([...m.grants].sort()).toEqual(['edit.insert', 'project', 'selection']);
+    expect(m.hosts).toEqual(['cdn.jsdelivr.net', 'unpkg.com']);
   });
 });
 
@@ -98,12 +110,25 @@ describe('phosphor picker', () => {
   it('draws the grid in the chosen weight', async () => {
     const plugin = load(SVELTE);
     await plugin.settle();
-    const regular = grid(plugin.ui())?.items.find((item) => item.id === 'camera')?.image;
+    await plugin.drawn('camera');
+    const regular = plugin.imageOf('camera');
     await plugin.control(WEIGHT, 'fill');
-    const fill = grid(plugin.ui())?.items.find((item) => item.id === 'camera')?.image;
+    await plugin.drawn('camera');
 
-    expect(regular).toBeTruthy();
-    expect(fill).not.toBe(regular);
+    expect(plugin.imageOf('camera')).not.toBe(regular);
+    expect(plugin.cdn.requests.some((url) => url.endsWith(`@phosphor-icons/core@${VERSION}/assets/fill/camera-fill.svg`))).toBe(true);
+  });
+
+  it('refuses to insert an icon it cannot get, with a note', async () => {
+    const plugin = load(SVELTE);
+    await plugin.settle();
+    plugin.cdn.offline = true;
+    await plugin.control(QUERY, 'anchor');
+    await plugin.control(CHOSEN, 'anchor');
+    await plugin.control(INSERT, true);
+
+    expect(plugin.proposals).toEqual([]);
+    expect(plugin.notes).toEqual([OFFLINE_NOTE]);
   });
 });
 

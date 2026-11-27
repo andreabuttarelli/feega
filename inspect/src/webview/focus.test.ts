@@ -77,8 +77,8 @@ describe('snapshotNoticeOf', () => {
     ['mount_error', 'provider', 'Snapshot: needs a provider or context'],
     ['mount_error', 'not_exported', 'Snapshot: the component is not exported'],
     ['mount_error', 'load', 'Snapshot: its module failed to load'],
-    ['mount_error', 'other', 'Snapshot: it failed to render alone'],
-    ['mount_error', undefined, 'Snapshot: it failed to render alone'],
+    ['mount_error', 'other', 'Static copy: this component cannot run on its own'],
+    ['mount_error', undefined, 'Static copy: this component cannot run on its own'],
     ['no_adapter', undefined, 'Snapshot: the dev server has no Feega mount page'],
     ['timeout', undefined, 'Snapshot: it rendered nothing in time'],
     ['unsupported_framework', undefined, 'Snapshot: this framework cannot mount alone']

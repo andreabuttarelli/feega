@@ -1,28 +1,26 @@
-import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
-import { pack } from '@feega/plugin-icon-kit/pack';
+import { generatedSource, installedVersion } from '@feega/plugin-icon-kit/pack';
 
-const SOURCES = ['24/outline', '24/solid', '20/solid', '16/solid'];
-const INNER = /<svg[^>]*>([\s\S]*)<\/svg>/;
+const PACKAGE = 'heroicons';
+const DIRECTORIES = ['24/outline', '24/solid', '20/solid', '16/solid'];
 const SVG_SUFFIX = /\.svg$/;
-const COMPACT = /\s*\n\s*/g;
+const HAS = '1';
+const LACKS = '0';
 
 const require = createRequire(import.meta.url);
-const ROOT = dirname(require.resolve('heroicons/package.json'));
+const ROOT = dirname(require.resolve(`${PACKAGE}/package.json`));
 const GENERATED = new URL('../src/packed.generated.ts', import.meta.url);
 
-const bodyOf = (source: string, name: string): string => {
-  const file = join(ROOT, source, `${name}.svg`);
-  return existsSync(file) ? (readFileSync(file, 'utf8').match(INNER) as RegExpMatchArray)[1].replace(COMPACT, '') : '';
-};
+export const version = (): string => installedVersion(PACKAGE);
 
-export function heroiconsData(): Record<string, string[]> {
-  const names = readdirSync(join(ROOT, SOURCES[0])).map((file) => file.replace(SVG_SUFFIX, '')).sort();
+export function indexData(): Record<string, string> {
+  const names = readdirSync(join(ROOT, DIRECTORIES[0])).map((file) => file.replace(SVG_SUFFIX, '')).sort();
 
-  return Object.fromEntries(names.map((name) => [name, SOURCES.map((source) => bodyOf(source, name))]));
+  return Object.fromEntries(names.map((name) => [name, DIRECTORIES.map((directory) => (existsSync(join(ROOT, directory, `${name}.svg`)) ? HAS : LACKS)).join('')]));
 }
 
 if (process.argv[1] === new URL(import.meta.url).pathname) {
-  writeFileSync(GENERATED, `export const PACKED = '${pack(heroiconsData())}';\n`);
+  writeFileSync(GENERATED, generatedSource(version(), indexData()));
 }

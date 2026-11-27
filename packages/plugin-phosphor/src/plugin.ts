@@ -1,12 +1,13 @@
 import type { PluginApi } from '@feega/plugin-api/client';
 import { Control, type UiNode } from '@feega/plugin-api/protocol';
 import { envOf } from '@feega/plugin-icon-kit/env';
-import { CHOSEN, INSERT, QUERY, iconPicker, type PickerConfig, type Values } from '@feega/plugin-icon-kit/picker';
+import { CHOSEN, INSERT, QUERY, RETRY, iconPicker, type PickerConfig, type Values } from '@feega/plugin-icon-kit/picker';
+import { innerOf } from '@feega/plugin-icon-kit/cdn';
 import { attributesOf, componentName, svgComponent, type Prop, type SvgSpec } from '@feega/plugin-icon-kit/svg-component';
-import { CURRENT_COLOUR, DEFAULT_SIZE, POPULAR, VIEW_BOX, WEIGHTS, Weight, bodyOf, glyphOf, loadIcons, type PhosphorIcon } from './icons';
+import { CURRENT_COLOUR, DEFAULT_SIZE, POPULAR, SOURCE, VIEW_BOX, WEIGHTS, Weight, fileOf, loadIcons, type PhosphorIcon } from './icons';
 import { libraryFor } from './library';
 
-export { CHOSEN, INSERT, QUERY };
+export { CHOSEN, INSERT, QUERY, RETRY };
 export const SECTION = 'phosphor';
 export const WEIGHT = 'weight';
 export const SIZE = 'size';
@@ -32,10 +33,10 @@ const LIBRARY_PROPS: Prop[] = [
 
 const variantOf = (weight: Weight) => (weight === Weight.Regular ? '' : weight);
 
-const specOf = (icon: PhosphorIcon, weight: Weight): SvgSpec => ({
+const specOf = (icon: PhosphorIcon, weight: Weight, svg: string): SvgSpec => ({
   name: componentName(icon.name, variantOf(weight)),
   viewBox: VIEW_BOX,
-  body: bodyOf(icon, weight),
+  body: innerOf(svg),
   fixed: {},
   bound: { width: 'size', height: 'size', fill: 'color' },
   props: INLINE_PROPS
@@ -53,10 +54,11 @@ const CONFIG: PickerConfig<PhosphorIcon> = {
   label: LABEL,
   load: loadIcons,
   popular: POPULAR,
-  glyph: (icon, values) => glyphOf(icon, values[WEIGHT] as Weight),
+  source: SOURCE,
+  file: (icon, values) => fileOf(icon, values[WEIGHT] as Weight),
   initial: { [WEIGHT]: Weight.Regular, [SIZE]: DEFAULT_SIZE, [INHERIT]: true, [COLOUR]: DEFAULT_COLOUR },
   options: optionsOf,
-  component: (icon, values, info, framework) => {
+  component: (icon, values, info, framework, svg) => {
     const env = envOf(info);
     const weight = values[WEIGHT] as Weight;
     const color = values[INHERIT] ? CURRENT_COLOUR : String(values[COLOUR]);
@@ -67,7 +69,7 @@ const CONFIG: PickerConfig<PhosphorIcon> = {
       const file = library.wrap(icon.name, name, env);
       return { name, file: file.file, source: file.source, attributes: attributesOf(framework, LIBRARY_PROPS, { size, weight, color }) };
     }
-    const file = svgComponent(specOf(icon, weight), framework, env);
+    const file = svgComponent(specOf(icon, weight, svg), framework, env);
 
     return { name: componentName(icon.name, variantOf(weight)), file: file.file, source: file.source, attributes: attributesOf(framework, INLINE_PROPS, { size, color }) };
   }

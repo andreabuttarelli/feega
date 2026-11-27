@@ -89,7 +89,13 @@ only when they differ from the defaults (24, 2, current colour).
 - The Svelte component uses runes in Svelte 5 projects and `export let` in Svelte 4.
 
 The icons are [Lucide](https://lucide.dev), released under the ISC licence, Copyright Lucide
-Contributors. The set is bundled with Feega and works offline.
+Contributors. Feega bundles only the list of icon names and search words. Each icon file is
+downloaded when it first appears in the grid or is inserted, from jsDelivr
+(`cdn.jsdelivr.net`, with `unpkg.com` as a fallback), at the exact `lucide-static` version the list
+was built from. **The first use needs internet.** Icons already shown stay available for the
+session; the others show "Icons need internet the first time." with a **Retry** button. The
+plugin declares those two hosts as its network permission, and the downloads go through Feega, not
+the panel.
 
 ## Brand logos
 
@@ -100,9 +106,15 @@ box, a grid (common brands when nothing is typed), then **Insert**.
 - **Colour** is **Brand colour**, the brand's official hex, or **Text colour**, which follows the
   surrounding text.
 
-Insert writes `src/feega/icons/<Name>Icon` with the SVG inline and a `<title>` with the brand name,
+Insert writes `src/feega/icons/<Name>Icon` with the downloaded SVG inline and a `<title>` with the brand name,
 imports it and places it like the Lucide icons. Nothing is added to `package.json`. The colour is
 written as a `color` prop on the tag only when it is the brand colour.
+
+Feega bundles only the list of brand names and colours. Each logo file is downloaded when it first
+appears in the grid or is inserted, from jsDelivr (`cdn.jsdelivr.net`, with `unpkg.com` as a
+fallback), at the exact `simple-icons` version the list was built from. **The first use needs
+internet**; logos already shown stay available for the session, the others show "Icons need
+internet the first time." with a **Retry** button. The downloads go through Feega, not the panel.
 
 The shapes come from [Simple Icons](https://simpleicons.org) (CC0). The logos themselves are
 trademarks of their owners: follow each brand's guidelines when you use them. A few brands, such as
@@ -133,6 +145,13 @@ depends on `@phosphor-icons/react` or `@phosphor-icons/vue`, the file re-exports
 (Vue) that library's component and the weight is written as a `weight` prop. `@phosphor-icons/web`
 and Svelte or Astro files use inline SVG. Nothing is added to `package.json`.
 
+Feega bundles only the list of icon names and tags. Each icon file, in the weight you pick, is
+downloaded when it first appears in the grid or is inserted, from jsDelivr (`cdn.jsdelivr.net`,
+with `unpkg.com` as a fallback), at the exact `@phosphor-icons/core` version the list was built
+from. **The first use needs internet**; icons already shown stay available for the session, the
+others show "Icons need internet the first time." with a **Retry** button. The downloads go through
+Feega, not the panel.
+
 Phosphor Icons are released under the MIT licence, Copyright Phosphor Icons.
 
 ## Heroicons
@@ -148,6 +167,13 @@ Insert writes `src/feega/icons/<Name>Icon` (`<Name>SolidIcon`, `<Name>MiniIcon`,
 `@heroicons/vue`, the file re-exports (React) or wraps (Vue) that library's component for the
 chosen style and the size is written as `width` and `height`. Otherwise, and in Svelte and Astro
 files, the SVG is inline. Nothing is added to `package.json`.
+
+Feega bundles only the list of icon names and the styles each exists in. Each icon file, in the
+style you pick, is downloaded when it first appears in the grid or is inserted, from jsDelivr
+(`cdn.jsdelivr.net`, with `unpkg.com` as a fallback), at the exact `heroicons` version the list was
+built from. **The first use needs internet**; icons already shown stay available for the session,
+the others show "Icons need internet the first time." with a **Retry** button. The downloads go
+through Feega, not the panel.
 
 Heroicons are released under the MIT licence, Copyright Tailwind Labs, Inc.
 
