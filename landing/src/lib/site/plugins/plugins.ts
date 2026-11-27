@@ -1,10 +1,11 @@
 import { PixelIcon } from '../alternatives/pixel';
-import { COPY, SOURCES, type PluginTier } from '../../../../../packages/plugin-registry/src/registry';
+import { COPY, SOURCES, creditLine, type PluginCredit, type PluginTier } from '../../../../../packages/plugin-registry/src/registry';
 import { permissionWords } from './permissions';
 
 export const PLUGINS_PATH = '/plugins';
 
-export type { PluginTier };
+export { creditLine };
+export type { PluginCredit, PluginTier };
 
 export type PluginView = {
   id: string;
@@ -16,6 +17,7 @@ export type PluginView = {
   version: string;
   permissions: string[];
   icon: PixelIcon;
+  credit?: PluginCredit;
 };
 
 export const pluginPath = (id: string): string => `${PLUGINS_PATH}/${id}`;
@@ -29,5 +31,6 @@ export const PLUGINS: readonly PluginView[] = SOURCES.map((source) => ({
   tier: source.tier,
   version: source.latestVersion,
   permissions: source.permissions.map(permissionWords),
-  icon: COPY[source.id].icon as PixelIcon
+  icon: COPY[source.id].icon as PixelIcon,
+  credit: source.credit
 }));

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Size, SIZES, Snap, fitOf, rotated, sizeForKey, snapped } from './sizes';
+import { Size, SIZES, Snap, fitOf, frameOf, pageBoxOf, rotated, sizeForKey, snapped } from './sizes';
 
 describe('preview sizes', () => {
   it('full fills the panel at 100%', () => {
@@ -46,5 +46,27 @@ describe('resizing by hand', () => {
     expect(rotated(Size.Tablet)).toBe(Size.TabletLandscape);
     expect(rotated(Size.TabletLandscape)).toBe(Size.Tablet);
     expect(rotated(Size.Full)).toBe(null);
+  });
+});
+
+describe('phone browser viewport', () => {
+  const box = (size: Size) => pageBoxOf(frameOf(size), { width: SIZES[size].width!, height: SIZES[size].height!, scale: 1 });
+
+  it('starts below the top safe area and ends above the bottom one', () => {
+    expect(box(Size.Iphone15)).toEqual({ left: 0, top: 59, width: 393, height: 759 });
+    expect(box(Size.IphoneSe)).toEqual({ left: 0, top: 20, width: 375, height: 647 });
+    expect(box(Size.Ipad)).toEqual({ left: 0, top: 24, width: 820, height: 1136 });
+  });
+
+  it('keeps the side insets of a landscape notch phone', () => {
+    expect(box(Size.Iphone15Landscape)).toEqual({ left: 59, top: 0, width: 734, height: 372 });
+  });
+
+  it('is the whole screen when there is no device frame', () => {
+    expect(pageBoxOf(null, { width: 768, height: 1024, scale: 1 })).toEqual({ left: 0, top: 0, width: 768, height: 1024 });
+  });
+
+  it('leaves the device size alone for the size readout', () => {
+    expect(fitOf(Size.Iphone15, null, { w: 1600, h: 1100 })).toMatchObject({ width: 393, height: 852 });
   });
 });
