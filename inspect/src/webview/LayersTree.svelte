@@ -1,6 +1,6 @@
 <script lang="ts">
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
-  import { FLOAT_GLYPH, ICON_SVG, floatingOf, iconOf } from './layer-icons';
+  import { FLOAT_GLYPH, FLOAT_HINT, ICON_SVG, floatingOf, iconOf } from './layer-icons';
   import Eye from '@lucide/svelte/icons/eye';
   import EyeOff from '@lucide/svelte/icons/eye-off';
   import Lock from '@lucide/svelte/icons/lock';
@@ -150,7 +150,7 @@
     <svg class="type" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="0.833" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{@html ICON_SVG[iconOf(node)]}</svg>
     <span class="name" class:component={node.component}>{node.name}</span>{#if badge && isPicked(node)}<span class="state-badge" data-testid="layer-state-badge">{badge}</span>{/if}
     {#if hiddenHere(node)}<span class="hidden-here" title="Hidden at this size" aria-label="Hidden at this size" data-hidden-here><EyeOff size={11} /></span>{/if}
-    {#if floatingOf(node.position)}<span class={`float ${floatingOf(node.position)}`} data-float={floatingOf(node.position)} title={floatingOf(node.position)} aria-label={floatingOf(node.position)}><svg viewBox="0 0 10 10" width="10" height="10" aria-hidden="true">{@html FLOAT_GLYPH[floatingOf(node.position)!]}</svg></span>{/if}
+    {#if floatingOf(node.position)}<span class={`float ${floatingOf(node.position)}`} data-float={floatingOf(node.position)} title={FLOAT_HINT[floatingOf(node.position)!]} aria-label={FLOAT_HINT[floatingOf(node.position)!]}><svg viewBox="0 0 10 10" width="10" height="10" aria-hidden="true">{@html FLOAT_GLYPH[floatingOf(node.position)!]}</svg></span>{/if}
     {#if node.count > 1 && node.source}<span class="count" title={`Rendered ${node.count} times by a loop in ${node.source.file}:${node.source.line} — edits apply to all ${node.count}`}>×{node.count}</span>{:else if !node.source}<span class="count">{node.count}</span>{/if}
     {#if actions(node).visibility && node.source}<span class="toggles" class:active={hidden.has(id) || locked.has(id)}>
       <button type="button" class="t" title={hidden.has(id) ? 'Show (⇧⌘H)' : 'Hide: display none in code (⇧⌘H)'} aria-label={hidden.has(id) ? 'Show' : 'Hide'} onclick={(e) => (e.stopPropagation(), ontoggle('hidden', node.source!))}>{#if hidden.has(id)}<EyeOff size={12} />{:else}<Eye size={12} />{/if}</button>
