@@ -14,8 +14,8 @@ The Pages canvas and each focused component are view tabs. Page is always there 
 | Where you run Feega | Where the view tabs are |
 |---|---|
 | Feega desktop | In the window's top bar, next to the project tab, as `project · Pages canvas` and `project · Card`. They close and switch like project tabs and share the project's dev server |
-| `npx feega` in the browser | A strip in the editor toolbar, after the grid button |
-| VS Code | The same strip in the editor toolbar |
+| `npx feega` in the browser | A tab row above the editor, styled like the desktop window bar, with the project as the first tab |
+| VS Code | The same tab row above the editor |
 
 While a component is focused, its zoom, light and dark and transparent canvas controls sit in the floating bar at the bottom, next to Design, Navigate, undo and redo.
 

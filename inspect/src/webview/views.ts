@@ -17,7 +17,7 @@ export enum HostKind {
 }
 
 export enum Presentation {
-  Strip = 'strip',
+  TopRow = 'top-row',
   ShellTabs = 'shell-tabs'
 }
 
@@ -36,9 +36,9 @@ export const VIEWS: Record<ViewKind, ViewSpec> = {
 };
 
 const PRESENTATION: Record<HostKind, Presentation> = {
-  [HostKind.Browser]: Presentation.Strip,
+  [HostKind.Browser]: Presentation.TopRow,
   [HostKind.Desktop]: Presentation.ShellTabs,
-  [HostKind.VsCode]: Presentation.Strip
+  [HostKind.VsCode]: Presentation.TopRow
 };
 
 export const presentationOf = (host: HostKind): Presentation => PRESENTATION[host];
@@ -59,6 +59,8 @@ export function tabsOf(open: OpenViews, active: ViewKind): ViewTab[] {
   }
   return tabs;
 }
+
+export const rowTabsOf = (project: string, tabs: ViewTab[]): ViewTab[] => tabs.map((tab) => (tab.kind === ViewKind.Editor ? { ...tab, title: project } : tab));
 
 export const shellTabsOf = (tabs: ViewTab[]): ViewTab[] => tabs.filter((tab) => tab.kind !== ViewKind.Editor);
 

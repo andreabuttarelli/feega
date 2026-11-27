@@ -46,8 +46,8 @@
   import SharePanel from './SharePanel.svelte';
   import LayersTree from './LayersTree.svelte';
   import FocusControls from './FocusControls.svelte';
-  import ViewTabs from './ViewTabs.svelte';
-  import { Presentation, ViewKind, barControlsOf, presentationOf, shellTabsOf, tabsOf } from './views';
+  import TabBar from './TabBar.svelte';
+  import { Presentation, VIEWS, ViewKind, barControlsOf, presentationOf, rowTabsOf, shellTabsOf, tabsOf } from './views';
   import ComponentProps from './ComponentProps.svelte';
   import { propTally } from './focus-usage';
   import { applyAskOf } from './apply-plan';
@@ -221,6 +221,7 @@
 
   let tab = $state<string>(Tab.Properties);
   let leftTab = $state<string>(LeftTab.Layers);
+  let project = $state('');
   let canvasOpen = $state(false);
   let canvasShown = $state(false);
   let projectRoutes = $state<PageRoute[]>([]);
@@ -307,6 +308,7 @@
   let docked = $state<Docked | null>(null);
   let bar = $state({ w: 0, h: 0 });
   let toolbarH = $state(0);
+  let rowH = $state(0);
   let moving = $state<{ dx: number; dy: number; x: number; y: number } | null>(null);
   let settings = $state<Settings | null>(null);
   let facts = $state<ReportFacts | null>(null);
@@ -336,7 +338,7 @@
       }
     });
   });
-  const area = $derived({ x: leftPx, y: toolbarH, w: stage.w, h: stage.h });
+  const area = $derived({ x: leftPx, y: rowH + toolbarH, w: stage.w, h: stage.h });
   const barAt = $derived(moving ? { x: moving.x, y: moving.y } : anchorBox(anchor, area, bar));
   const canBack = $derived((navTick, history.canBack()));
   const canForward = $derived((navTick, history.canForward()));
@@ -742,7 +744,7 @@
   const pageAlerts = browserAlerts(showChat, desktopBridge());
 
   const handlers: { [K in ToView]: (m: Extract<ViewMessage, { kind: K }>) => void } = {
-    [ToView.App]: (m) => (restore(m.prefs), (route = m.route ?? route), (start = new URL(route, m.url).toString()), (url = m.url), (styling = m.styling), (breakpoints = m.breakpoints), (scales = m.scales), (themes = m.themes), (themeName = stillThere(m.themes.map((t) => t.name), themeName)), showTheme()),
+    [ToView.App]: (m) => (restore(m.prefs), (route = m.route ?? route), (start = new URL(route, m.url).toString()), (url = m.url), (project = m.project), (styling = m.styling), (breakpoints = m.breakpoints), (scales = m.scales), (themes = m.themes), (themeName = stillThere(m.themes.map((t) => t.name), themeName)), showTheme()),
     [ToView.History]: (m) => ((changes = m.changes), (canUndo = m.canUndo), (canRedo = m.canRedo)),
     [ToView.Settings]: (m) => {
       settings = m.values;
@@ -1641,7 +1643,8 @@
 
 <svelte:window onkeydown={onKey} />
 
-<main bind:clientWidth={viewW} style={`grid-template-columns: ${leftPx}px minmax(0, 1fr) ${barPx}px; --bar: ${barPx}px; --left: ${leftPx}px`} class:sizing={sizing || leftSizing}>
+{#if viewsAt === Presentation.TopRow}<TabBar tabs={rowTabsOf(project || VIEWS[ViewKind.Editor].title(''), viewTabs)} onselect={showView} onclose={closeView} bind:height={rowH} />{/if}
+<main bind:clientWidth={viewW} style={`--row: ${rowH}px; grid-template-columns: ${leftPx}px minmax(0, 1fr) ${barPx}px; --bar: ${barPx}px; --left: ${leftPx}px`} class:sizing={sizing || leftSizing}>
   <aside class="left" class:closed={leftClosed}>
     {#if libraryOpen}
       <LibraryPanel items={libraryItems} canInsert={!!picked} oninsert={(id) => picked && insertLibrary(id, picked.source, AddPlace.After)} onclose={() => (libraryOpen = false)} />
@@ -1673,7 +1676,6 @@
       <button type="button" class="icon" title="Forward (⌘])" disabled={!canForward} onclick={() => go(history.forward())}><ArrowRight size={15} /></button>
       <button type="button" class="icon" title="Reload (⌘R)" onclick={() => go(route)}><RotateCw size={14} /></button>
       <button type="button" class="icon" title="Pages canvas" aria-label="Pages canvas" data-testid="canvas-toggle" onclick={openCanvas}><LayoutGrid size={14} /></button>
-      {#if viewsAt === Presentation.Strip && viewTabs.length > 1}<ViewTabs tabs={viewTabs} onselect={showView} onclose={closeView} />{/if}
       <NewPage items={libraryItems} onopen={() => toHost({ kind: ToHost.LibraryList })} oncreate={(route, item) => toHost({ kind: ToHost.NewPage, route, item })} />
       <form class="address" onsubmit={(e) => (e.preventDefault(), go(address))}>
         <ServerPopover state={server} reason={serverReason} info={serverInfo} onopen={(link) => toHost({ kind: ToHost.External, url: link })} onaction={(action) => (action === ServerAction.ReloadPage ? go(route) : toHost({ kind: ToHost.Server, action }))} />
@@ -1878,7 +1880,7 @@
     --float-gap: 16px;
     --top-row: 40px;
     display: grid;
-    height: 100vh;
+    height: calc(100vh - var(--row, 0px));
     overflow: hidden;
     transition: grid-template-columns 200ms cubic-bezier(0.16, 1, 0.3, 1);
   }

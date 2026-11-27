@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FocusControl, HostKind, Presentation, VIEWS, ViewKind, barControlsOf, presentationOf, shellTabsOf, shellTitleOf, tabsOf } from './views';
+import { FocusControl, HostKind, Presentation, VIEWS, ViewKind, barControlsOf, presentationOf, shellTabsOf, rowTabsOf, shellTitleOf, tabsOf } from './views';
 
 const NONE = { focus: null, canvas: false };
 
@@ -41,16 +41,32 @@ describe('tabsOf', () => {
 });
 
 describe('presentationOf', () => {
-  it('keeps a strip in the toolbar in the browser', () => {
-    expect(presentationOf(HostKind.Browser)).toBe(Presentation.Strip);
+  it('draws a tab row above the editor in the browser', () => {
+    expect(presentationOf(HostKind.Browser)).toBe(Presentation.TopRow);
   });
 
   it('hands the tabs to the window of the desktop app', () => {
     expect(presentationOf(HostKind.Desktop)).toBe(Presentation.ShellTabs);
   });
 
-  it('keeps a strip in the toolbar in VS Code until each view gets its own panel', () => {
-    expect(presentationOf(HostKind.VsCode)).toBe(Presentation.Strip);
+  it('draws a tab row above the editor in VS Code until each view gets its own panel', () => {
+    expect(presentationOf(HostKind.VsCode)).toBe(Presentation.TopRow);
+  });
+});
+
+describe('rowTabsOf', () => {
+  it('names the first tab after the project, like the desktop window', () => {
+    const tabs = tabsOf({ focus: 'Card', canvas: true }, ViewKind.Editor);
+    expect(rowTabsOf('react-css', tabs).map((t) => t.title)).toEqual(['react-css', 'Pages canvas', 'Card']);
+  });
+
+  it('is one tab for a project with nothing else open', () => {
+    expect(rowTabsOf('react-css', tabsOf(NONE, ViewKind.Editor))).toHaveLength(1);
+  });
+
+  it('keeps the active flag and the closable flag', () => {
+    const tabs = rowTabsOf('react-css', tabsOf({ focus: 'Card', canvas: false }, ViewKind.Focus));
+    expect(tabs.map((t) => [t.active, t.closable])).toEqual([[false, false], [true, true]]);
   });
 });
 

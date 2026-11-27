@@ -116,89 +116,6 @@ html[data-platform='linux'] #bar {
   height: 14px;
 }
 
-.tab {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 34px;
-  max-width: 210px;
-  padding: 0 8px 0 14px;
-  border-radius: 999px;
-  color: var(--sx-ink-2);
-}
-
-.tab.view {
-  max-width: 280px;
-  padding-left: 12px;
-  margin-left: -4px;
-}
-
-.tab.fresh {
-  animation: tab-in 260ms var(--ease) both;
-}
-
-.tab:hover {
-  background: var(--sx-hover);
-  color: #fff;
-}
-
-.tab.on {
-  background: var(--sx-pill);
-  color: #fff;
-}
-
-.tab .name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.tab .x {
-  display: grid;
-  place-items: center;
-  width: 18px;
-  height: 18px;
-  border-radius: 999px;
-  opacity: 0;
-  margin-left: -2px;
-}
-
-.tab:hover .x,
-.tab.on .x {
-  opacity: 0.8;
-}
-
-.tab .x:hover {
-  background: var(--sx-pill);
-  opacity: 1;
-}
-
-.tab .x svg {
-  width: 8px;
-  height: 8px;
-}
-
-.dot {
-  width: 7px;
-  height: 7px;
-  flex: none;
-  border-radius: 50%;
-  background: var(--sx-ink-3);
-}
-
-.dot.starting {
-  animation: pulse 1.2s ease-in-out infinite;
-}
-
-.dot.ready {
-  background: var(--sx-accent);
-  box-shadow: 0 0 10px rgb(255 81 0 / 0.55);
-}
-
-.dot.failed {
-  background: var(--danger);
-}
-
 .chip {
   display: flex;
   align-items: center;
@@ -856,19 +773,6 @@ pre {
   from {
     opacity: 0;
     transform: translateY(10px);
-  }
-}
-
-@keyframes tab-in {
-  from {
-    opacity: 0;
-    transform: scale(0.92);
-  }
-}
-
-@keyframes pulse {
-  50% {
-    opacity: 0.25;
   }
 }
 
