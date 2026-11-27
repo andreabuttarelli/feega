@@ -528,7 +528,7 @@ export type HostMessage =
 export type Authored = HostMessage & { by?: Author };
 
 export type ViewMessage =
-  | { kind: ToView.App; url: string; styling: Styling; prefs: Prefs | null; route?: string; breakpoints: Breakpoints; themes: Theme[]; scales: Scales | null }
+  | { kind: ToView.App; url: string; project: string; styling: Styling; prefs: Prefs | null; route?: string; breakpoints: Breakpoints; themes: Theme[]; scales: Scales | null }
   | { kind: ToView.Server; state: ServerState; reason?: string; info?: ServerInfo }
   | { kind: ToView.Settings; values: Settings; facts: ReportFacts }
   | { kind: ToView.History; changes: ChangeRow[]; canUndo: boolean; canRedo: boolean }

@@ -7,7 +7,9 @@ export enum TabStatus {
 
 export type AppOption = { label: string; app: string; framework: string };
 
-export type TabInfo = { id: string; dir: string; name: string; status: TabStatus; message: string; log: string[]; url: string; apps: AppOption[] };
+export type ViewInfo = { id: string; title: string; closable: boolean };
+
+export type TabInfo = { id: string; dir: string; name: string; status: TabStatus; message: string; log: string[]; url: string; apps: AppOption[]; views: ViewInfo[]; view: string };
 
 export type RecentInfo = { dir: string; name: string; framework: string; at: number };
 
@@ -76,5 +78,10 @@ export enum Channel {
   ReplayOnboarding = 'replay-onboarding',
   OpenUrl = 'open-url',
   Copy = 'copy',
-  DetectAgents = 'detect-agents'
+  DetectAgents = 'detect-agents',
+  Views = 'views',
+  ShowView = 'show-view',
+  CloseView = 'close-view',
+  PickView = 'pick-view',
+  DropView = 'drop-view'
 }

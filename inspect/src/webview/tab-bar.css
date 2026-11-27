@@ -1,0 +1,152 @@
+.tab-bar {
+  --sx-ink-2: #b4b1ab;
+  --sx-ink-3: #8a8780;
+  --sx-accent: #ff5100;
+  --sx-hover: rgb(255 255 255 / 0.07);
+  --sx-pill: rgb(255 255 255 / 0.1);
+  --danger: #ff453a;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: 'BDO Grotesk', system-ui, sans-serif;
+  font-weight: 500;
+  font-size: 15px;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  cursor: default;
+}
+
+.tab-bar button {
+  font: inherit;
+  line-height: 1;
+  letter-spacing: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-transform: lowercase;
+  transition: background 150ms var(--ease), color 150ms var(--ease), opacity 150ms var(--ease);
+}
+
+.tab-bar button:focus-visible {
+  outline: 2px solid var(--sx-accent);
+  outline-offset: 2px;
+}
+
+.tab-bar svg {
+  display: block;
+  flex: none;
+}
+
+.tab-bar .tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+  height: 34px;
+  max-width: 210px;
+  padding: 0 14px;
+  border-radius: 999px;
+  color: var(--sx-ink-2);
+}
+
+.tab-bar .tab.view {
+  max-width: 280px;
+}
+
+.tab-bar .tab.on:has(.x) {
+  padding-right: 34px;
+}
+
+.tab-bar .tab:not(.on):hover .name {
+  mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent calc(100% - 16px));
+}
+
+.tab-bar .tab.fresh {
+  animation: tab-in 260ms var(--ease) both;
+}
+
+.tab-bar .tab:hover {
+  background: var(--sx-hover);
+  color: #fff;
+}
+
+.tab-bar .tab.on {
+  background: var(--sx-pill);
+  color: #fff;
+}
+
+.tab-bar .tab .name {
+  display: block;
+  line-height: 1;
+  padding-bottom: var(--name-lift, 1px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab-bar .tab .x {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  opacity: 0;
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+}
+
+.tab-bar .tab:hover .x,
+.tab-bar .tab.on .x {
+  opacity: 0.8;
+}
+
+.tab-bar .tab .x:hover {
+  background: var(--sx-pill);
+  opacity: 1;
+}
+
+.tab-bar .tab .x svg {
+  width: 8px;
+  height: 8px;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--sx-ink-3);
+}
+
+.dot.starting {
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.dot.ready {
+  background: var(--sx-accent);
+  box-shadow: 0 0 10px rgb(255 81 0 / 0.55);
+}
+
+.dot.failed {
+  background: var(--danger);
+}
+
+@keyframes tab-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.25;
+  }
+}

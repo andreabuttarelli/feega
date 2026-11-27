@@ -1,11 +1,23 @@
 ---
 title: Focus on a component
-description: Open a component in its own tab and try its props and variants.
+description: Open a component in its own view tab and try its props and variants.
 sidebar:
   order: 11
 ---
 
-Select an element inside a component and press `F`, or use the focus action on its row in Layers. The component opens in a tab next to Page. `Esc` closes the tab.
+Select an element inside a component and press `F`, or use the focus action on its row in Layers. The component opens as a view tab named after it. `Esc` or the tab's close button closes it. See [View tabs](#view-tabs) for where the tab lives.
+
+## View tabs
+
+The Pages canvas and each focused component are view tabs. Page is always there and cannot be closed.
+
+| Where you run Feega | Where the view tabs are |
+|---|---|
+| Feega desktop | In the window's top bar, next to the project tab, as `project · Pages canvas` and `project · Card`. They close and switch like project tabs and share the project's dev server |
+| `npx feega` in the browser | A tab row above the editor, styled like the desktop window bar, with the project as the first tab |
+| VS Code | The same tab row above the editor |
+
+While a component is focused, its zoom, light and dark and transparent canvas controls sit in the floating bar at the bottom, next to Design, Navigate, undo and redo.
 
 ## Real component: React, Vue, Svelte, Next.js, Nuxt and Astro
 
@@ -42,15 +54,15 @@ In Next.js the controls are read from the source too, by the same loader that ta
 
 In React the component is wrapped in the providers around your app in the entry file (the `render` call in `main.tsx`), such as a theme, router or query client. Vue and Svelte have no providers: a component that needs a plugin such as a router or store shows the snapshot.
 
-If the component cannot render alone, for example because its provider lives inside `App`, the tab shows a snapshot of the page instead, and says why next to the tab: a provider or context is missing, the component is not exported or failed to load, it rendered nothing in time, Turbopack cannot mount components, the dev server has no Feega mount page, or the framework cannot mount alone. The snapshot has no props section.
+If the component cannot render alone, for example because its provider lives inside `App`, the tab shows a snapshot of the page instead, and says why in the bottom bar, on the info icon: a provider or context is missing, the component is not exported or failed to load, it rendered nothing in time, Turbopack cannot mount components, the dev server has no Feega mount page, or the framework cannot mount alone. The snapshot has no props section.
 
 ## Canvas, light and dark, zoom
 
-The component sits on one of two neutral greys: a dark grey when the background behind the instance on your page is dark, a light grey otherwise, so white text on a dark site stays readable. The checkerboard button in the tab bar switches to a transparent checkerboard instead.
+The component sits on one of two neutral greys: a dark grey when the background behind the instance on your page is dark, a light grey otherwise, so white text on a dark site stays readable. The checkerboard button in the bottom bar switches to a transparent checkerboard instead.
 
-The sun or moon button is always in the tab bar. It starts in the scheme of the page behind the component and also switches the canvas between the two greys. With a dark theme in the project it switches to that theme and back, through the same theme preview as the toolbar. Without one it emulates `prefers-color-scheme: dark` in the tab, and the canvas follows the scheme.
+The sun or moon button is always in the bottom bar. It starts in the scheme of the page behind the component and also switches the canvas between the two greys. With a dark theme in the project it switches to that theme and back, through the same theme preview as the toolbar. Without one it emulates `prefers-color-scheme: dark` in the tab, and the canvas follows the scheme.
 
-The component opens at its real size, centered. Use Fit, minus, plus and the percentage (it resets to 100%) in the tab bar, or Cmd or Ctrl with the mouse wheel, or pinch on a trackpad. Variants show at the same zoom.
+The component opens at its real size, centered. Use Fit, minus, plus and the percentage (it resets to 100%) in the bottom bar, or Cmd or Ctrl with the mouse wheel, or pinch on a trackpad. Variants show at the same zoom.
 
 The real component also gets the page's fonts, stylesheets, `html` and `body` classes and inherited text styles, so text matches the page.
 

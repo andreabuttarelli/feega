@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, posix, relative, resolve } from 'node:path';
+import { basename, join, posix, relative, resolve } from 'node:path';
 import { appsIn } from '@feega/dev-run/run-plan';
 import { GIT_MISSING, gitPanel } from './git-panel';
 import { AddKind, type AddPlace } from '@feega/live-edit/add-node';
@@ -659,7 +659,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
       return;
     }
     const prefs = platform.stored<Prefs>(Stored.Prefs) ?? null;
-    await post({ kind: ToView.App, url: running.url, styling: await stylingOf(root, stylingChoice()), prefs, route, breakpoints: await breakpointsOf(root), themes: await themesOf(root), scales: await scalesOf(root, stylingChoice()) });
+    await post({ kind: ToView.App, url: running.url, project: basename(root), styling: await stylingOf(root, stylingChoice()), prefs, route, breakpoints: await breakpointsOf(root), themes: await themesOf(root), scales: await scalesOf(root, stylingChoice()) });
     await post({ kind: ToView.Server, state: ServerState.Running, info: infoOf(running) });
     await postSettings();
   }

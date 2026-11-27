@@ -1,5 +1,6 @@
 import { SOCKET_PATH, type HostMessage, type ViewMessage } from '../messages';
 import { plain } from './plain';
+import { HostKind } from './views';
 
 declare const acquireVsCodeApi: undefined | (() => { postMessage: (message: HostMessage) => void });
 
@@ -37,6 +38,14 @@ function socketLink(): Link {
 }
 
 export const inVscode = typeof acquireVsCodeApi === 'function';
+
+export type ShellViews = { tabs: { id: string; title: string; closable: boolean }[]; active: string };
+
+export type DesktopShell = { views: (state: ShellViews) => void; onShow: (handle: (id: string) => void) => void; onClose: (handle: (id: string) => void) => void };
+
+export const desktopShell = (window as unknown as { feegaDesktop?: Partial<DesktopShell> }).feegaDesktop as DesktopShell | undefined;
+
+export const hostKind = inVscode ? HostKind.VsCode : desktopShell?.views ? HostKind.Desktop : HostKind.Browser;
 
 function linkOf(): Link {
   if (!inVscode) {

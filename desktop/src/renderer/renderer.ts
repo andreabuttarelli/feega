@@ -7,7 +7,8 @@ import { Step } from '../../../cli/lib/scaffold/step';
 import { el, pill, run, type View } from './dom';
 import type { AcpAgent } from '../../../inspect/src/host/ai/acp-agents';
 import { onboardingView, skipOnboarding, type OnboardingDeps } from './onboarding';
-import { Link, NodeStatus, TabStatus, UpdateState, type RecentInfo, type ShellState, type TabInfo, type UpdateInfo } from '../main/types';
+import { ViewKind, shellTitleOf } from '../../../inspect/src/webview/views';
+import { Link, NodeStatus, TabStatus, UpdateState, type RecentInfo, type ShellState, type TabInfo, type UpdateInfo, type ViewInfo } from '../main/types';
 import { NoticeAction, noticeFor, noticeKey } from './update-notice';
 
 type Bridge = {
@@ -22,6 +23,8 @@ type Bridge = {
   retryTab: (id: string) => Promise<void>;
   chooseApp: (id: string, app: string) => Promise<void>;
   activate: (id: string | null) => Promise<void>;
+  pickView: (id: string, view: string) => Promise<void>;
+  dropView: (id: string, view: string) => Promise<void>;
   setPreferences: (change: Partial<ShellState['preferences']>) => Promise<void>;
   openLink: (link: Link) => Promise<void>;
   overlay: (open: boolean) => Promise<void>;
@@ -114,9 +117,22 @@ let shownKey = '';
 const tabChip = (tab: TabInfo, active: boolean, fresh: boolean) => {
   const close = el('span', { class: 'x', html: CROSS, title: 'close', on: run(() => bridge.closeTab(tab.id)) });
   close.addEventListener('click', (event) => event.stopPropagation());
-  const chip = el('button', { class: `tab${active ? ' on' : ''}${fresh ? ' fresh' : ''}`, on: run(() => bridge.activate(tab.id)) }, el('span', { class: `dot ${tab.status === TabStatus.Choosing ? 'starting' : tab.status}` }), el('span', { class: 'name', text: tab.name }), close);
+  const open = tab.views.length ? () => bridge.pickView(tab.id, ViewKind.Editor) : () => bridge.activate(tab.id);
+  const own = active && tab.view === ViewKind.Editor;
+  return el('button', { class: `tab${own ? ' on' : ''}${fresh ? ' fresh' : ''}`, on: run(open) }, el('span', { class: `dot ${tab.status === TabStatus.Choosing ? 'starting' : tab.status}` }), el('span', { class: 'name', text: tab.name }), close);
+};
+
+const viewChip = (tab: TabInfo, view: ViewInfo, active: boolean, fresh: boolean) => {
+  const close = el('span', { class: 'x', html: CROSS, title: 'close', on: run(() => bridge.dropView(tab.id, view.id)) });
+  close.addEventListener('click', (event) => event.stopPropagation());
+  const chip = el('button', { class: `tab view${active && tab.view === view.id ? ' on' : ''}${fresh ? ' fresh' : ''}`, on: run(() => bridge.pickView(tab.id, view.id)) }, el('span', { class: 'name', text: shellTitleOf(tab.name, view.title) }));
+  if (view.closable) {
+    chip.append(close);
+  }
   return chip;
 };
+
+const tabChips = (tab: TabInfo, active: boolean, known: Set<string>) => [tabChip(tab, active, !known.has(tab.id)), ...tab.views.filter((view) => view.id !== ViewKind.Editor).map((view) => viewChip(tab, view, active, !known.has(`${tab.id}/${view.id}`)))];
 
 const toggleMenu = (open: boolean) => {
   menuOpen = open;
@@ -278,10 +294,10 @@ const settingsView = (state: ShellState): View => ({
 
 const renderBar = (state: ShellState) => {
   const known = rendered;
-  rendered = new Set(state.tabs.map((t) => t.id));
+  rendered = new Set(state.tabs.flatMap((t) => [t.id, ...t.views.map((v) => `${t.id}/${v.id}`)]));
   const home = el('button', { class: `home${state.active === null ? ' on' : ''}`, html: mark(), title: 'projects', on: goHome });
   const add = el('button', { class: 'add', html: PLUS, title: 'new project or open folder', on: run(() => bridge.activate(null)) });
-  bar.replaceChildren(home, ...state.tabs.map((tab) => tabChip(tab, tab.id === state.active, !known.has(tab.id))), add, el('span', { class: 'grow' }), ...invitePill(state), ...updatePill(state), accountChip(state));
+  bar.replaceChildren(home, ...state.tabs.flatMap((tab) => tabChips(tab, tab.id === state.active, known)), add, el('span', { class: 'grow' }), ...invitePill(state), ...updatePill(state), accountChip(state));
   document.querySelector('.menu')?.remove();
   if (menuOpen) {
     document.body.append(accountMenu(state));

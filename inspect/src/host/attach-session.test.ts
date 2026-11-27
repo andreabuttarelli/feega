@@ -1,3 +1,4 @@
+import { basename } from 'node:path';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import { tmpdir } from 'node:os';
@@ -92,6 +93,19 @@ describe.each(ADAPTERS)('attaching to a URL on the %s platform', (_name, make) =
     expect(shown && 'url' in shown && shown.url).not.toBe(target);
     expect(sent).toContainEqual(expect.objectContaining({ kind: ToView.Server, state: ServerState.Running, info: expect.objectContaining({ attached: true, pid: null }) }));
     expect((await fetch(target)).status).toBe(200);
+  });
+
+  it('names the project after its folder for the view tabs', async () => {
+    const { platform, sent } = make();
+    const target = await appServer('<html><head></head><body>hi</body></html>');
+    const workspace = workspaceOf();
+    const session = inspectSession(platform, workspace);
+
+    await session.attachUrl(target);
+    session.stop();
+
+    const app = sent.find((m) => m.kind === ToView.App);
+    expect(app && 'project' in app && app.project).toBe(basename(workspace));
   });
 
   it('tells the preview to load the url before it reports the server running', async () => {
