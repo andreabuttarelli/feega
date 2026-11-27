@@ -1,5 +1,9 @@
 export type PluginTier = 'free' | 'pro';
 
+export type PluginCredit = { name: string; url: string; license: string };
+
+export const creditLine = (credit: PluginCredit | undefined): string => (credit ? `Built on ${credit.name} · ${credit.license}` : '');
+
 export type PluginSource = {
   id: string;
   manifestId: string;
@@ -9,6 +13,7 @@ export type PluginSource = {
   tier: PluginTier;
   latestVersion: string;
   permissions: readonly string[];
+  credit?: PluginCredit;
 };
 
 export type PluginCopy = { description: string; icon: string };
@@ -42,7 +47,8 @@ export const SOURCES: readonly PluginSource[] = [
     author: 'Feega',
     tier: 'free',
     latestVersion: '1.0.0',
-    permissions: ['selection', 'project', 'edit.insert', 'network:cdn.jsdelivr.net', 'network:unpkg.com']
+    permissions: ['selection', 'project', 'edit.insert', 'network:cdn.jsdelivr.net', 'network:unpkg.com'],
+    credit: { name: 'Lucide', url: 'https://lucide.dev', license: 'ISC' }
   },
   {
     id: 'brand-logos',
@@ -52,7 +58,8 @@ export const SOURCES: readonly PluginSource[] = [
     author: 'Feega',
     tier: 'free',
     latestVersion: '1.0.0',
-    permissions: ['selection', 'project', 'edit.insert', 'network:cdn.jsdelivr.net', 'network:unpkg.com']
+    permissions: ['selection', 'project', 'edit.insert', 'network:cdn.jsdelivr.net', 'network:unpkg.com'],
+    credit: { name: 'Simple Icons', url: 'https://simpleicons.org', license: 'CC0' }
   },
   {
     id: 'gradient-presets',
@@ -72,7 +79,8 @@ export const SOURCES: readonly PluginSource[] = [
     author: 'Feega',
     tier: 'free',
     latestVersion: '1.0.0',
-    permissions: ['selection', 'project', 'edit.insert', 'network:cdn.jsdelivr.net', 'network:unpkg.com']
+    permissions: ['selection', 'project', 'edit.insert', 'network:cdn.jsdelivr.net', 'network:unpkg.com'],
+    credit: { name: 'Phosphor Icons', url: 'https://phosphoricons.com', license: 'MIT' }
   },
   {
     id: 'heroicons',
@@ -82,7 +90,8 @@ export const SOURCES: readonly PluginSource[] = [
     author: 'Feega',
     tier: 'free',
     latestVersion: '1.0.0',
-    permissions: ['selection', 'project', 'edit.insert', 'network:cdn.jsdelivr.net', 'network:unpkg.com']
+    permissions: ['selection', 'project', 'edit.insert', 'network:cdn.jsdelivr.net', 'network:unpkg.com'],
+    credit: { name: 'Heroicons', url: 'https://heroicons.com', license: 'MIT' }
   }
 ];
 

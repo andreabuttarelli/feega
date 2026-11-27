@@ -2,7 +2,7 @@
   import Pixel from '../alternatives/Pixel.svelte';
   import { eventAttrs } from '../analytics/attrs';
   import { lower } from '../lower';
-  import { pluginPath, type PluginView } from './plugins';
+  import { creditLine, pluginPath, type PluginView } from './plugins';
   import TierBadge from './TierBadge.svelte';
 
   let { plugin }: { plugin: PluginView } = $props();
@@ -16,6 +16,7 @@
   </div>
 
   <p class="summary">{lower(plugin.summary)}</p>
+  {#if plugin.credit}<p class="credit">{lower(creditLine(plugin.credit))}</p>{/if}
 </a>
 
 <style>
@@ -76,5 +77,12 @@
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 3;
     line-clamp: 3;
+  }
+
+  .credit {
+    margin: 0;
+    font-family: var(--sx-mono);
+    font-size: 13px;
+    opacity: 0.5;
   }
 </style>

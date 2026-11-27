@@ -13,9 +13,11 @@ it: see [Write a plugin](/integrations/write-a-plugin/).
 ## Browse plugins
 
 In the Feega menu (the logo, top left), **Plugins**, then **Browse plugins**, opens a full-panel
-view of every plugin as a card: name, one-line description, an **Official** or **Community**
-badge, and an **Enabled** switch. This works the same in the VS Code extension, `npx feega` and
-the desktop app.
+view of every plugin as a card: name, one-line description, a **By Feega** or **Community**
+badge, and an **Enabled** switch. **By Feega** means we made the plugin, not that the library it
+wraps is ours: plugins built on a third-party library (Lucide, Phosphor, Heroicons, Simple Icons)
+credit it with its license, for example "Built on Lucide · ISC". This works the same in the VS Code
+extension, `npx feega` and the desktop app.
 
 - Type in **Search plugins** to filter by name or description.
 - Click a card for its details: a longer description, the permissions it asks for

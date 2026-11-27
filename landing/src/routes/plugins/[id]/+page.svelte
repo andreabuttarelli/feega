@@ -28,6 +28,7 @@
       <div>
         <h1>{lower(plugin.name)}</h1>
         <p class="meta">by {plugin.author} · v{plugin.version}</p>
+        {#if plugin.credit}<p class="meta">built on <a href={plugin.credit.url} rel="noopener">{lower(plugin.credit.name)}</a> · {lower(plugin.credit.license)}</p>{/if}
       </div>
       <TierBadge tier={plugin.tier} />
     </header>
@@ -93,6 +94,10 @@
     font-family: var(--sx-mono);
     font-size: 13px;
     opacity: 0.6;
+  }
+
+  .meta a {
+    color: inherit;
   }
 
   .lead {
