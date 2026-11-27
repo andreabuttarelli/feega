@@ -115,7 +115,7 @@
   import { modeOfKey } from './modes';
   import { browseHistory } from './history';
   import { DEFAULT_ANCHOR, anchorBox, isAnchor, nearestAnchor, nextAnchor, type Anchor } from './anchors';
-  import { PRESETS, SIZES, Size, Snap, fitOf, frameOf, savedSize, sizeForKey, snapped } from './sizes';
+  import { PRESETS, SIZES, Size, Snap, fitOf, frameOf, pageBoxOf, savedSize, sizeForKey, snapped } from './sizes';
   import { breakpointOfSize } from './usage-report';
   import { Where } from '@feega/plugin-api/manifest';
   import type { Place as PluginPlace } from '@feega/plugin-api/protocol';
@@ -339,6 +339,7 @@
   let savedPrefs = false;
   const fit = $derived(fitOf(size, custom, stage));
   const deviceFrame = $derived(frameOf(size));
+  const pageBox = $derived(pageBoxOf(deviceFrame, fit));
   const target = $derived(writeTarget(reach, size !== Size.Full, breakpoints, fit.width));
   const reachBadge = $derived(badgeText(breakpoints, target, fit.width));
   $effect(() => {
@@ -1732,9 +1733,9 @@
 
     <div class="backdrop" role="presentation" bind:clientWidth={stage.w} bind:clientHeight={stage.h} onpointermove={resizeFrame} onpointerup={endDrag}>
       <div class="frame" class:framed={size !== Size.Full} class:device={deviceFrame} style={`width:${fit.width * fit.scale}px;height:${fit.height * fit.scale}px${deviceFrame ? `;--bezel:${deviceFrame.bezel * fit.scale}px;--screen-radius:${deviceFrame.radius * fit.scale}px` : ''}`}>
-        {#if url}<iframe bind:this={frame} src={start} title="App" data-testid="app-frame" style={`width:${fit.width}px;height:${fit.height}px;transform:scale(${fit.scale})`}></iframe>{/if}
-        {#if deviceFrame}<DeviceChrome frame={deviceFrame} scale={fit.scale} landscape={fit.width > fit.height} />{/if}
-        {#if restarting}<div class="restarting" data-testid="restarting" role="status"><span class="server-dot-inline amber"></span>Restarting dev server…</div>{/if}
+        <div class="screen">
+        <div class="page" style={`left:${pageBox.left * fit.scale}px;top:${pageBox.top * fit.scale}px;width:${pageBox.width * fit.scale}px;height:${pageBox.height * fit.scale}px`}>
+        {#if url}<iframe bind:this={frame} src={start} title="App" data-testid="app-frame" style={`width:${pageBox.width}px;height:${pageBox.height}px;transform:scale(${fit.scale})`}></iframe>{/if}
         {#if mode === Mode.Design && bridged && !editing}
           <div class="overlay" role="presentation" onpointerdown={pressOverlay} onpointermove={(e) => (pointed(e), dragOverlay(e))} onpointerleave={() => ((hover = null), toHost({ kind: ToHost.Cursor, at: null }))} onclick={onPick} oncontextmenu={onMenu} ondragover={overAdd} ondragleave={() => (addSpot = null)} ondrop={dropAdd} ondblclick={onDouble} onwheel={wheelOnFocus}>
             {#if hover && !lostSlots[Slot.Hovered]}<div class="outline hover" style={box(hover)}></div>{/if}
@@ -1756,6 +1757,10 @@
           {/each}
           </div>
         {/if}
+        </div>
+        {#if deviceFrame}<DeviceChrome frame={deviceFrame} scale={fit.scale} landscape={fit.width > fit.height} />{/if}
+        </div>
+        {#if restarting}<div class="restarting" data-testid="restarting" role="status"><span class="server-dot-inline amber"></span>Restarting dev server…</div>{/if}
         {#if size !== Size.Full}
           <span class="handle left" role="separator" aria-label="Resize" title="Drag to resize, Shift for 10px, double-click for Full" onpointerdown={(e) => startDrag(e, -1)} ondblclick={() => pickSize(Size.Full)}></span>
           <span class="handle right" role="separator" aria-label="Resize" title="Drag to resize, Shift for 10px, double-click for Full" onpointerdown={(e) => startDrag(e, 1)} ondblclick={() => pickSize(Size.Full)}></span>
@@ -2077,6 +2082,7 @@
 
   .frame.device {
     border-radius: var(--screen-radius);
+    background: #111;
     box-shadow: 0 0 0 var(--bezel) #111, 0 0 0 calc(var(--bezel) + 1px) #3a3a3c, 0 12px 32px rgb(0 0 0 / 0.3);
   }
 
@@ -2084,6 +2090,19 @@
     display: block;
     border: 0;
     transform-origin: 0 0;
+  }
+
+  .screen {
+    position: absolute;
+    inset: 0;
+  }
+
+  .frame.device .screen {
+    clip-path: inset(0 round var(--screen-radius));
+  }
+
+  .page {
+    position: absolute;
   }
 
   .plugin-action {

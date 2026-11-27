@@ -58,6 +58,7 @@
         {#each open.badges as badge (badge)}<span class="badge">{badge}</span>{/each}
       </div>
       {#if open.description}<p>{open.description}</p>{:else if open.summary}<p>{open.summary}</p>{/if}
+      {#if open.credit}<p class="credit" data-testid="plugin-credit">{open.credit}</p>{/if}
 
       <div class="actions">
         <label class="toggle"><input type="checkbox" role="switch" checked={open.enabled} aria-label={`Enable ${open.name}`} data-testid="plugin-enable" onchange={(e) => onenable(open.id, e.currentTarget.checked)} /><span class="track"></span>{open.enabled ? 'Enabled' : 'Off'}</label>
@@ -83,6 +84,7 @@
               <span class="badge" data-testid="plugin-badge">{card.badge}</span>
             </span>
             <span class="summary">{card.summary}</span>
+            {#if card.credit}<span class="credit" data-testid="plugin-credit">{card.credit}</span>{/if}
           </button>
           <div class="foot">
             <label class="toggle"><input type="checkbox" role="switch" checked={card.enabled} aria-label={`Enable ${card.name}`} data-testid="plugin-enable" onchange={(e) => onenable(card.id, e.currentTarget.checked)} /><span class="track"></span>{card.enabled ? 'Enabled' : 'Off'}</label>
@@ -269,6 +271,7 @@
   }
 
   .version,
+  .credit,
   .hint,
   .problem {
     margin: 0;

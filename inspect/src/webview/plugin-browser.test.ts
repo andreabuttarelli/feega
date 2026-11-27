@@ -4,7 +4,7 @@ import { Badge, cardsOf, filterCards } from './plugin-browser';
 
 const row = (id: string, name: string, kind = Kind.BuiltIn, enabled = true): Row => ({ id, name, version: '1.0.0', kind, enabled, words: [], badges: [], removable: kind === Kind.Installed });
 
-const cards = cardsOf([row('feega.mesh-gradient', 'Mesh gradient'), row('feega.shadergradient', 'ShaderGradient (community)'), row('acme.a', 'Acme', Kind.Installed, false)]);
+const cards = cardsOf([row('feega.mesh-gradient', 'Mesh gradient'), row('feega.lucide-icons', 'Lucide icons'), row('feega.shadergradient', 'ShaderGradient (community)'), row('acme.a', 'Acme', Kind.Installed, false)]);
 const card = (id: string) => cards.find((one) => one.id === id)!;
 
 describe('cardsOf', () => {
@@ -12,10 +12,17 @@ describe('cardsOf', () => {
     expect(card('feega.mesh-gradient').summary).toBe('Drag colour points over an element and get a plain CSS mesh gradient.');
   });
 
-  it('calls registry plugins official and every other one community', () => {
-    expect(card('feega.mesh-gradient').badge).toBe(Badge.Official);
+  it('calls registry plugins by Feega and every other one community', () => {
+    expect(card('feega.mesh-gradient').badge).toBe(Badge.ByFeega);
+    expect(card('feega.mesh-gradient').badge).toBe('By Feega');
     expect(card('feega.shadergradient').badge).toBe(Badge.Community);
     expect(card('acme.a').badge).toBe(Badge.Community);
+  });
+
+  it('credits the library a plugin is built on', () => {
+    expect(card('feega.lucide-icons').credit).toBe('Built on Lucide · ISC');
+    expect(card('feega.mesh-gradient').credit).toBe('');
+    expect(card('acme.a').credit).toBe('');
   });
 
   it('gives plugins outside the registry no summary', () => {
@@ -36,6 +43,6 @@ describe('filterCards', () => {
   });
 
   it('returns everything for a blank query', () => {
-    expect(filterCards(cards, '  ')).toHaveLength(3);
+    expect(filterCards(cards, '  ')).toHaveLength(4);
   });
 });
