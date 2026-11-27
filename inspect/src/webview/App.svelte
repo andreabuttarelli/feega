@@ -62,6 +62,8 @@
   import { Tabs } from 'bits-ui';
   import { LeftTab, Tab } from './tabs';
   import PagesList from './PagesList.svelte';
+  import PagesCanvas from './PagesCanvas.svelte';
+  import LayoutGrid from '@lucide/svelte/icons/layout-grid';
   import { pageRows, seenRoutes } from './pages';
   import type { PageRoute } from '../host/page-route';
   import { fontCss } from './fonts';
@@ -216,6 +218,7 @@
 
   let tab = $state<string>(Tab.Properties);
   let leftTab = $state<string>(LeftTab.Layers);
+  let canvasOpen = $state(false);
   let projectRoutes = $state<PageRoute[]>([]);
   let seen = $state<string[]>([]);
   const pages = $derived(pageRows(projectRoutes, seen, route));
@@ -573,6 +576,17 @@
     }
     injected = { source: picked.source, css, inner: picked.inner, state: writtenState };
     bridge.preview(injected.source, css, injected.inner, injected.state);
+  }
+
+  function openCanvas() {
+    toHost({ kind: ToHost.Routes });
+    canvasOpen = true;
+  }
+
+  function openFromCanvas(target: { route: string; size: Size }) {
+    canvasOpen = false;
+    pickSize(target.size);
+    go(target.route);
   }
 
   function go(path: string | null) {
@@ -1523,6 +1537,9 @@
   const HISTORY_LETTERS = new Set(['z', 'y']);
 
   function onKey(e: KeyboardEvent) {
+    if (canvasOpen) {
+      return;
+    }
     const cmd = e.metaKey || e.ctrlKey;
     const focusKey = cmd || typing(e) || editing ? null : focusKeyOf(e.key, { open: focus !== null, available: Boolean(picked?.component) && mode === Mode.Design && !several });
     if (focusKey) {
@@ -1591,6 +1608,7 @@
     <Tabs.List class="tab-list left-head">
       <Tabs.Trigger value={LeftTab.Layers} class="tab" data-testid="layers-tab">Layers</Tabs.Trigger>
       <Tabs.Trigger value={LeftTab.Pages} class="tab" data-testid="pages-tab">Pages</Tabs.Trigger>
+      {#if leftTab === LeftTab.Pages}<button type="button" class="add" title="See every page at every size" data-testid="canvas-open-pages" onclick={openCanvas}>Open canvas</button>{/if}
       {#if leftTab === LeftTab.Layers}<button type="button" class="add" title="Add an element (/)" aria-label="Add" data-testid="add-button" disabled={!picked} onclick={(e) => openAddMenu(e.clientX, e.clientY)}>+ Add</button>{/if}
     </Tabs.List>
     <Tabs.Content value={LeftTab.Layers}>
@@ -1612,6 +1630,7 @@
       <button type="button" class="icon" title="Back (⌘[)" disabled={!canBack} onclick={() => go(history.back())}><ArrowLeft size={15} /></button>
       <button type="button" class="icon" title="Forward (⌘])" disabled={!canForward} onclick={() => go(history.forward())}><ArrowRight size={15} /></button>
       <button type="button" class="icon" title="Reload (⌘R)" onclick={() => go(route)}><RotateCw size={14} /></button>
+      <button type="button" class="icon" title="Pages canvas" aria-label="Pages canvas" data-testid="canvas-toggle" onclick={openCanvas}><LayoutGrid size={14} /></button>
       <NewPage items={libraryItems} onopen={() => toHost({ kind: ToHost.LibraryList })} oncreate={(route, item) => toHost({ kind: ToHost.NewPage, route, item })} />
       <form class="address" onsubmit={(e) => (e.preventDefault(), go(address))}>
         <ServerPopover state={server} reason={serverReason} info={serverInfo} onopen={(link) => toHost({ kind: ToHost.External, url: link })} onaction={(action) => (action === ServerAction.ReloadPage ? go(route) : toHost({ kind: ToHost.Server, action }))} />
@@ -1625,6 +1644,7 @@
       {#if share?.available}<SharePanel view={share} onstart={(name, canEdit) => toHost({ kind: ToHost.ShareStart, name, canEdit })} onstop={() => toHost({ kind: ToHost.ShareStop })} onkick={(userId) => toHost({ kind: ToHost.ShareKick, userId })} onrole={(userId, role) => toHost({ kind: ToHost.ShareRole, userId, role })} />{/if}
       <button type="button" class="icon" class:on={!barClosed} title="Properties (⌘\)" onclick={toggleBar} data-testid="bar-toggle"><PanelRight size={15} /></button>
     </header>
+    {#if canvasOpen && url}<PagesCanvas rows={pages} base={url} onopen={openFromCanvas} onclose={() => (canvasOpen = false)} />{/if}
     {#if focus}<FocusTabs name={focus.name} {route} active={viewing} notice={snapshotNotice} scheme={shownScheme} onscheme={switchScheme} transparent={transparentCanvas} ontransparent={toggleTransparent} zoom={zoomNow} onzoom={(request) => bridge.zoom(request)} onstep={(direction) => bridge.zoom({ mode: 'set', value: stepZoom(zoomNow, direction) })} onselect={showTab} onclose={exitFocus} bind:height={tabsH} />{/if}
 
     <div class="backdrop" role="presentation" bind:clientWidth={stage.w} bind:clientHeight={stage.h} onpointermove={resizeFrame} onpointerup={endDrag}>
@@ -1821,6 +1841,7 @@
   }
 
   .view {
+    position: relative;
     display: flex;
     flex-direction: column;
     min-width: 0;
