@@ -76,7 +76,7 @@
 .tab-bar .tab .name {
   display: block;
   line-height: 1;
-  padding-bottom: 1px;
+  padding-bottom: var(--name-lift, 1px);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

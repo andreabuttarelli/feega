@@ -27,5 +27,6 @@
     box-sizing: border-box;
     padding: 0 14px;
     background: #121212;
+    --name-lift: 3px;
   }
 </style>
