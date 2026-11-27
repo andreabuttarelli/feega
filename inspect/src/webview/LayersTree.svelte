@@ -12,6 +12,7 @@
   import { sourceText } from './page-bridge';
   import { actionsOf, roleOf } from './roles';
   import { hiddenHere } from './layer-state';
+  import { Shortcut, isMac, shortcutOf } from './selection-keys';
   import Self from './LayersTree.svelte';
 
   type Props = {
@@ -34,9 +35,10 @@
     locked: Set<string>;
     ontoggle: (flag: 'hidden' | 'locked', source: Source) => void;
     onfocus: (node: LayerNode) => void;
+    ondelete: (source: Source, instance: number) => void;
   };
 
-  let { nodes, picked, selected, badge = '', depth = 0, open, onselect, onhover, onopen, onmove, dragging, parentFile = null, onusage, hidden, locked, ontoggle, oncontext, onadd, onfocus }: Props = $props();
+  let { nodes, picked, selected, badge = '', depth = 0, open, onselect, onhover, onopen, onmove, dragging, parentFile = null, onusage, hidden, locked, ontoggle, oncontext, onadd, onfocus, ondelete }: Props = $props();
 
   const INDENT_PX = 12;
   const EDGE_BAND = 0.25;
@@ -47,6 +49,12 @@
   const choose = (n: LayerNode, e?: MouseEvent) => (n.source ? onselect(n.source, n.instance, e) : (open[key(n)] = !open[key(n)]));
 
   function onKey(e: KeyboardEvent, node: LayerNode) {
+    if (node.source && shortcutOf(e, isMac) === Shortcut.Delete) {
+      e.preventDefault();
+      e.stopPropagation();
+      ondelete(node.source, node.instance);
+      return;
+    }
     const actions: Record<string, () => void> = {
       Enter: () => (node.source ? onopen(node.source) : choose(node)),
       ' ': () => choose(node),
@@ -150,7 +158,7 @@
     </span>{/if}
   </div>
   {#if node.children.length && open[id]}
-    <Self nodes={node.children} {picked} {selected} {badge} depth={depth + 1} {open} {onselect} {onhover} {onopen} {onmove} {dragging} parentFile={node.source?.file ?? null} {onusage} {hidden} {locked} {ontoggle} {oncontext} {onadd} {onfocus} />
+    <Self nodes={node.children} {picked} {selected} {badge} depth={depth + 1} {open} {onselect} {onhover} {onopen} {onmove} {dragging} parentFile={node.source?.file ?? null} {onusage} {hidden} {locked} {ontoggle} {oncontext} {onadd} {onfocus} {ondelete} />
   {/if}
 {/each}
 

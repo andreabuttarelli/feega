@@ -38,12 +38,31 @@ export const MOVES: Partial<Record<Shortcut, Move>> = {
   [Shortcut.Previous]: Move.Previous
 };
 
-type Press = { key: string; shiftKey: boolean; metaKey: boolean; ctrlKey: boolean };
+type Press = { key: string; code?: string; shiftKey: boolean; metaKey: boolean; ctrlKey: boolean };
+
+const LATIN_LETTER = /^[a-z]$/i;
+const CYRILLIC = /\p{Script=Cyrillic}/u;
+const LETTER_CODE = /^Key([A-Z])$/;
+
+const PUNCTUATION_CODES: Record<string, string> = { BracketLeft: '[', BracketRight: ']', Backslash: '\\' };
+
+export function letterOf(e: { key: string; code?: string }): string {
+  if (LATIN_LETTER.test(e.key)) {
+    return e.key.toLowerCase();
+  }
+  const punctuation = PUNCTUATION_CODES[e.code ?? ''];
+  if (punctuation && CYRILLIC.test(e.key)) {
+    return punctuation;
+  }
+  const physical = LETTER_CODE.exec(e.code ?? '');
+
+  return physical ? physical[1].toLowerCase() : e.key.toLowerCase();
+}
 
 export function shortcutOf(e: Press, mac: boolean): Shortcut | null {
   const mod = mac ? e.metaKey : e.ctrlKey;
   const stray = mac ? e.ctrlKey : e.metaKey;
-  const key = e.key.toLowerCase();
+  const key = letterOf(e);
   if (stray) {
     return null;
   }
