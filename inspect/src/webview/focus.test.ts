@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Pick, Source } from '../messages';
-import { FocusKey, Scheme, focusKeyOf, focusOf, rowFocus, schemeApplyOf, schemeOf, snapshotNoticeOf, stepZoom, themeOfScheme, wheelFactor } from './focus';
+import { FocusKey, Scheme, backLabelOf, focusKeyOf, focusOf, rowFocus, schemeApplyOf, schemeOf, snapshotNoticeOf, stepZoom, themeOfScheme, wheelFactor } from './focus';
 
 const CARD: Source = { file: 'src/components/ProductCard.tsx', line: 4, col: 5 };
 
@@ -43,23 +43,31 @@ describe('rowFocus', () => {
 
 describe('focusKeyOf', () => {
   it('enters on F when something can be focused and nothing is', () => {
-    expect(focusKeyOf('f', { focused: false, available: true })).toBe(FocusKey.Enter);
+    expect(focusKeyOf('f', { open: false, available: true })).toBe(FocusKey.Enter);
   });
 
-  it('leaves on Escape while focused', () => {
-    expect(focusKeyOf('Escape', { focused: true, available: true })).toBe(FocusKey.Exit);
+  it('leaves on Escape while a component is open, on either tab', () => {
+    expect(focusKeyOf('Escape', { open: true, available: true })).toBe(FocusKey.Exit);
   });
 
   it('leaves F alone while focused, so the tab is not closed by a stray key', () => {
-    expect(focusKeyOf('F', { focused: true, available: true })).toBeNull();
+    expect(focusKeyOf('F', { open: true, available: true })).toBeNull();
   });
 
   it('leaves Escape alone when not focused', () => {
-    expect(focusKeyOf('Escape', { focused: false, available: true })).toBeNull();
+    expect(focusKeyOf('Escape', { open: false, available: true })).toBeNull();
   });
 
   it('ignores F when nothing can be focused', () => {
-    expect(focusKeyOf('f', { focused: false, available: false })).toBeNull();
+    expect(focusKeyOf('f', { open: false, available: false })).toBeNull();
+  });
+});
+
+describe('backLabelOf', () => {
+  it('names the page the back control returns to', () => {
+    expect(backLabelOf('/pricing')).toBe('/pricing');
+    expect(backLabelOf('/')).toBe('Home');
+    expect(backLabelOf('')).toBe('Home');
   });
 });
 
