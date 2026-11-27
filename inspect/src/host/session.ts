@@ -64,6 +64,7 @@ import { openAcpAgent } from './ai/acp-session';
 import { editorMcp } from './ai/editor-mcp';
 import { viewAsker } from './view-ask';
 import { machineEnv } from './agents';
+import { listRoutes } from './project-routes';
 
 const ADAPTER_DIR = 'feega-adapters';
 const START_WITH_FEEGA = 'Start with Feega';
@@ -311,6 +312,10 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     await edits.structure({ op: StructureOp.Add, at, add: { kind: AddKind.Image, src: copied.url, place } }).then((out) => edited(out, null));
   }
 
+  async function routesShown() {
+    await post({ kind: ToView.Routes, routes: await listRoutes(join(root, running?.plan.appDir ?? '')) });
+  }
+
   async function libraryShown() {
     const catalog = (await platform.library?.()) ?? null;
     await post({ kind: ToView.Library, items: catalog ? entriesOf(catalog) : [] });
@@ -358,6 +363,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     await edited(out, null);
     if (out.ok) {
       await post({ kind: ToView.PageCreated, route: made.route });
+      await routesShown();
     }
   }
 
@@ -891,6 +897,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.ShareKick]: (m) => sharing.kick(m.userId),
     [ToHost.ShareRole]: (m) => sharing.setRole(m.userId, m.role),
     [ToHost.LibraryList]: libraryShown,
+    [ToHost.Routes]: routesShown,
     [ToHost.LibraryInsert]: libraryInserted,
     [ToHost.NewPage]: pageCreated,
     [ToHost.Plugin]: async (m) => post({ kind: ToView.Plugin, id: m.id, result: await pluginRun(m.ask) }),

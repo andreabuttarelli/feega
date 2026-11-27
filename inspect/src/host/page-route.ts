@@ -1,5 +1,7 @@
 type Convention = { pattern: RegExp; index: RegExp | null };
 
+export type PageRoute = { route: string; dynamic: boolean };
+
 const CONVENTIONS: Convention[] = [
   { pattern: /^(?:src\/)?routes\/(.*?)\/?\+page\.svelte$/, index: null },
   { pattern: /^(?:src\/)?app\/(.*?)\/?page\.[jt]sx?$/, index: null },
@@ -8,16 +10,22 @@ const CONVENTIONS: Convention[] = [
 ];
 
 const GROUP = /\([^/]*\)\/?/g;
-const DYNAMIC = /\[|^_|\/_/;
+const PRIVATE = /^_|\/_/;
+const DYNAMIC = /\[/;
 
-export function routeOfFile(file: string): string | null {
+export function pageOfFile(file: string): PageRoute | null {
   for (const { pattern, index } of CONVENTIONS) {
     const found = file.match(pattern);
     if (!found) {
       continue;
     }
     const path = (index ? found[1].replace(index, '') : found[1]).replace(GROUP, '').replace(/\/$/, '');
-    return DYNAMIC.test(path) ? null : `/${path}`;
+    return PRIVATE.test(path) ? null : { route: `/${path}`, dynamic: DYNAMIC.test(path) };
   }
   return null;
+}
+
+export function routeOfFile(file: string): string | null {
+  const page = pageOfFile(file);
+  return page && !page.dynamic ? page.route : null;
 }

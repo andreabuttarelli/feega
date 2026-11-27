@@ -158,6 +158,12 @@ export function iconOf(node: IconNode): LayerIcon {
   return BY_TAG[tag] ?? layout ?? LayerIcon.Block;
 }
 
+export const FLOAT_HINT: Record<Floating, string> = {
+  [Floating.Absolute]: 'Absolute: placed relative to its nearest positioned parent',
+  [Floating.Fixed]: 'Fixed: stays in place on the screen while the page scrolls',
+  [Floating.Sticky]: 'Sticky: scrolls with the page, then sticks at its offset'
+};
+
 export const FLOAT_GLYPH: Record<Floating, string> = {
   [Floating.Absolute]: '<path d="M5 1v8M1 5h8"/><circle cx="5" cy="5" r="2"/>',
   [Floating.Fixed]: '<path d="M3.5 1h3l-.5 3 1.5 1.5h-6L3 4z M5 5.5V9"/>',
