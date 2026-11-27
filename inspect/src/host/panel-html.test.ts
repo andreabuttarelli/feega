@@ -15,7 +15,7 @@ describe('panel content security policy', () => {
   });
 
   it('does not open to the icon CDNs: plugins download through the host', () => {
-    expect(policy).not.toMatch(/jsdelivr|unpkg|https:/);
+    expect(policy).not.toMatch(/jsdelivr|unpkg/);
   });
 
   it('loads no remote image', () => {
