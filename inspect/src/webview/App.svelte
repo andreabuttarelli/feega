@@ -60,9 +60,13 @@
   import Redo2 from '@lucide/svelte/icons/redo-2';
   import { Scope } from '@feega/live-edit/scoped-rule';
   import { Tabs } from 'bits-ui';
-  import { LeftTab, Tab } from './tabs';
+  import { CanvasKind, LeftTab, Tab } from './tabs';
   import PagesList from './PagesList.svelte';
   import PagesCanvas from './PagesCanvas.svelte';
+  import ComponentsCanvas from './ComponentsCanvas.svelte';
+  import ComponentsList from './ComponentsList.svelte';
+  import { componentFocus } from './components';
+  import type { ComponentRow } from '../host/component-list';
   import LayoutGrid from '@lucide/svelte/icons/layout-grid';
   import { pageRows, seenRoutes } from './pages';
   import type { PageRoute } from '../host/page-route';
@@ -219,8 +223,9 @@
 
   let tab = $state<string>(Tab.Properties);
   let leftTab = $state<string>(LeftTab.Layers);
-  let canvasOpen = $state(false);
+  let canvasKind = $state<CanvasKind | null>(null);
   let projectRoutes = $state<PageRoute[]>([]);
+  let projectComponents = $state<ComponentRow[]>([]);
   let seen = $state<string[]>([]);
   const pages = $derived(pageRows(projectRoutes, seen, route));
   let share = $state<Extract<ViewMessage, { kind: ToView.Share }> | null>(null);
@@ -351,7 +356,7 @@
       server = ServerState.Running;
       restarting = false;
       visited(path);
-      untrack(() => focus && ((reopening = true), bridge.focus(focus.source, viewing === View.Focus, focus.index)));
+      untrack(() => focus && ((reopening = true), bridge.focus(focus.source, viewing === View.Focus, focus.index, focus.alone)));
       untrack(() => viewing === View.Page && syncView());
     },
     focusReady: () => untrack(() => viewing === View.Focus && syncView()),
@@ -579,15 +584,24 @@
     bridge.preview(injected.source, css, injected.inner, injected.state);
   }
 
-  function openCanvas() {
-    toHost({ kind: ToHost.Routes });
-    canvasOpen = true;
+  function openCanvas(kind: CanvasKind) {
+    toHost({ kind: kind === CanvasKind.Pages ? ToHost.Routes : ToHost.Components });
+    canvasKind = kind;
+  }
+
+  function openComponent(row: ComponentRow) {
+    enterFocus(componentFocus(row));
   }
 
   function openFromCanvas(target: { route: string; size: Size }) {
-    canvasOpen = false;
+    canvasKind = null;
     pickSize(target.size);
     go(target.route);
+  }
+
+  function openFromComponentsCanvas(row: ComponentRow) {
+    canvasKind = null;
+    openComponent(row);
   }
 
   function go(path: string | null) {
@@ -804,6 +818,7 @@
     [ToView.Peers]: (m) => (peers = share ? strangersOf(m.peers, HOST_PEER) : m.peers),
     [ToView.Library]: (m) => (libraryItems = m.items),
     [ToView.Routes]: (m) => (projectRoutes = m.routes),
+    [ToView.Components]: (m) => (projectComponents = m.components),
     [ToView.Comments]: (m) => (cloud = { enabled: m.enabled, comments: m.comments, review: m.review ?? cloud.review, error: m.error ?? '' }),
     [ToView.Onboarding]: (m) => (onboarding = m.state),
     [ToView.Support]: (m) => (support = m.done),
@@ -1300,7 +1315,7 @@
     }
     viewing = next;
     bridge.useFocus(next === View.Focus);
-    bridge.focus(focus.source, next === View.Focus, focus.index);
+    bridge.focus(focus.source, next === View.Focus, focus.index, focus.alone);
     syncView();
   }
 
@@ -1321,7 +1336,7 @@
     pageDark = false;
     transparentCanvas = false;
     bridge.useFocus(true);
-    bridge.focus(next.source, true, next.index);
+    bridge.focus(next.source, true, next.index, next.alone);
     bridge.zoom({ mode: 'set', value: REAL_SIZE });
   }
 
@@ -1540,7 +1555,7 @@
   const HISTORY_LETTERS = new Set(['z', 'y']);
 
   function onKey(e: KeyboardEvent) {
-    if (canvasOpen) {
+    if (canvasKind) {
       return;
     }
     const cmd = e.metaKey || e.ctrlKey;
@@ -1607,11 +1622,11 @@
     {#if libraryOpen}
       <LibraryPanel items={libraryItems} canInsert={!!picked} oninsert={(id) => picked && insertLibrary(id, picked.source, AddPlace.After)} onclose={() => (libraryOpen = false)} />
     {:else}
-    <Tabs.Root bind:value={leftTab} onValueChange={(value) => value === LeftTab.Pages && toHost({ kind: ToHost.Routes })}>
+    <Tabs.Root bind:value={leftTab} onValueChange={(value) => value === LeftTab.Pages ? toHost({ kind: ToHost.Routes }) : value === LeftTab.Components && toHost({ kind: ToHost.Components })}>
     <Tabs.List class="tab-list left-head">
       <Tabs.Trigger value={LeftTab.Layers} class="tab" data-testid="layers-tab">Layers</Tabs.Trigger>
       <Tabs.Trigger value={LeftTab.Pages} class="tab" data-testid="pages-tab">Pages</Tabs.Trigger>
-      {#if leftTab === LeftTab.Pages}<button type="button" class="add" title="See every page at every size" data-testid="canvas-open-pages" onclick={openCanvas}>Open canvas</button>{/if}
+      <Tabs.Trigger value={LeftTab.Components} class="tab" data-testid="components-tab">Components</Tabs.Trigger>
       {#if leftTab === LeftTab.Layers}<button type="button" class="add" title="Add an element (/)" aria-label="Add" data-testid="add-button" disabled={!picked} onclick={(e) => openAddMenu(e.clientX, e.clientY)}>+ Add</button>{/if}
     </Tabs.List>
     <Tabs.Content value={LeftTab.Layers}>
@@ -1620,7 +1635,10 @@
     </div>
     </Tabs.Content>
     <Tabs.Content value={LeftTab.Pages}>
-      <PagesList rows={pages} onopen={go} />
+      <PagesList rows={pages} onopen={go} oncanvas={() => openCanvas(CanvasKind.Pages)} />
+    </Tabs.Content>
+    <Tabs.Content value={LeftTab.Components}>
+      <ComponentsList rows={projectComponents} onopen={openComponent} oncanvas={() => openCanvas(CanvasKind.Components)} />
     </Tabs.Content>
     </Tabs.Root>
     {/if}
@@ -1633,7 +1651,7 @@
       <button type="button" class="icon" title="Back (⌘[)" disabled={!canBack} onclick={() => go(history.back())}><ArrowLeft size={15} /></button>
       <button type="button" class="icon" title="Forward (⌘])" disabled={!canForward} onclick={() => go(history.forward())}><ArrowRight size={15} /></button>
       <button type="button" class="icon" title="Reload (⌘R)" onclick={() => go(route)}><RotateCw size={14} /></button>
-      <button type="button" class="icon" title="Pages canvas" aria-label="Pages canvas" data-testid="canvas-toggle" onclick={openCanvas}><LayoutGrid size={14} /></button>
+      <button type="button" class="icon" title="Pages canvas" aria-label="Pages canvas" data-testid="canvas-toggle" onclick={() => openCanvas(CanvasKind.Pages)}><LayoutGrid size={14} /></button>
       <NewPage items={libraryItems} onopen={() => toHost({ kind: ToHost.LibraryList })} oncreate={(route, item) => toHost({ kind: ToHost.NewPage, route, item })} />
       <form class="address" onsubmit={(e) => (e.preventDefault(), go(address))}>
         <ServerPopover state={server} reason={serverReason} info={serverInfo} onopen={(link) => toHost({ kind: ToHost.External, url: link })} onaction={(action) => (action === ServerAction.ReloadPage ? go(route) : toHost({ kind: ToHost.Server, action }))} />
@@ -1647,7 +1665,8 @@
       {#if share?.available}<SharePanel view={share} onstart={(name, canEdit) => toHost({ kind: ToHost.ShareStart, name, canEdit })} onstop={() => toHost({ kind: ToHost.ShareStop })} onkick={(userId) => toHost({ kind: ToHost.ShareKick, userId })} onrole={(userId, role) => toHost({ kind: ToHost.ShareRole, userId, role })} />{/if}
       <button type="button" class="icon" class:on={!barClosed} title="Properties (⌘\)" onclick={toggleBar} data-testid="bar-toggle"><PanelRight size={15} /></button>
     </header>
-    {#if canvasOpen && url}<PagesCanvas rows={pages} base={url} onopen={openFromCanvas} onclose={() => (canvasOpen = false)} />{/if}
+    {#if canvasKind === CanvasKind.Pages && url}<PagesCanvas rows={pages} base={url} onopen={openFromCanvas} onclose={() => (canvasKind = null)} />{/if}
+    {#if canvasKind === CanvasKind.Components && url}<ComponentsCanvas rows={projectComponents} base={url} onopen={openFromComponentsCanvas} onclose={() => (canvasKind = null)} />{/if}
     {#if focus}<FocusTabs name={focus.name} {route} active={viewing} notice={snapshotNotice} scheme={shownScheme} onscheme={switchScheme} transparent={transparentCanvas} ontransparent={toggleTransparent} zoom={zoomNow} onzoom={(request) => bridge.zoom(request)} onstep={(direction) => bridge.zoom({ mode: 'set', value: stepZoom(zoomNow, direction) })} onselect={showTab} onclose={exitFocus} bind:height={tabsH} />{/if}
 
     <div class="backdrop" role="presentation" bind:clientWidth={stage.w} bind:clientHeight={stage.h} onpointermove={resizeFrame} onpointerup={endDrag}>

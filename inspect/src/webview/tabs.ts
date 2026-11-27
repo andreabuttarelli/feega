@@ -1,6 +1,7 @@
 export enum LeftTab {
   Layers = 'layers',
-  Pages = 'pages'
+  Pages = 'pages',
+  Components = 'components'
 }
 
 export enum Tab {
@@ -8,4 +9,9 @@ export enum Tab {
   Changes = 'changes',
   Comments = 'comments',
   Ai = 'ai'
+}
+
+export enum CanvasKind {
+  Pages = 'pages',
+  Components = 'components'
 }

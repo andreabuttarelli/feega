@@ -1,10 +1,13 @@
 <script lang="ts">
+  import CanvasBanner from './CanvasBanner.svelte';
   import type { PageRow } from './pages';
 
-  type Props = { rows: PageRow[]; onopen: (route: string) => void };
+  type Props = { rows: PageRow[]; onopen: (route: string) => void; oncanvas: () => void };
 
-  let { rows, onopen }: Props = $props();
+  let { rows, onopen, oncanvas }: Props = $props();
 </script>
+
+<CanvasBanner hint="See every page at every size" testid="canvas-open-pages" onopen={oncanvas} />
 
 <ul class="pages" data-testid="pages">
   {#each rows as row (row.route)}

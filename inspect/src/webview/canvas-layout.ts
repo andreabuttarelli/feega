@@ -39,3 +39,28 @@ export function layoutCanvas(pages: CanvasPage[], columns: Size[]) {
 
   return { frames, rows, bounds };
 }
+
+export const GRID_COLUMNS = 4;
+export const GRID_CELL_WIDTH = 480;
+export const GRID_CELL_HEIGHT = 320;
+export const GRID_GAP_X = 120;
+export const GRID_GAP_Y = 160;
+
+export type GridItem = { key: string; name: string };
+
+export type GridFrame = GridItem & { dynamic: false; x: number; y: number; width: number; height: number };
+
+export function layoutGrid(items: GridItem[], columns: number) {
+  const frames: GridFrame[] = items.map(({ key, name }, i) => ({
+    key,
+    name,
+    dynamic: false,
+    x: (i % columns) * (GRID_CELL_WIDTH + GRID_GAP_X),
+    y: Math.floor(i / columns) * (GRID_CELL_HEIGHT + GRID_GAP_Y),
+    width: GRID_CELL_WIDTH,
+    height: GRID_CELL_HEIGHT
+  }));
+  const bounds = frames.length === 0 ? { x: 0, y: 0, width: 0, height: 0 } : { x: 0, y: 0, width: Math.max(...frames.map((f) => f.x + f.width)), height: Math.max(...frames.map((f) => f.y + f.height)) };
+
+  return { frames, bounds };
+}

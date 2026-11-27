@@ -7,7 +7,7 @@ sidebar:
 
 The Pages canvas shows all the pages of your app together. Each page is one row, labelled with its route, with the Desktop, Tablet and Phone sizes side by side.
 
-Open it with **Open canvas** in the Pages tab, or with the grid button in the toolbar. Press `Esc` or choose **Editor** to go back.
+Open it with the **Open canvas** banner at the top of the Pages tab, or with the grid button in the toolbar. Press `Esc` or choose **Editor** to go back.
 
 ## Move around
 

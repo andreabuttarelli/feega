@@ -1,0 +1,372 @@
+<script lang="ts">
+  import ArrowLeft from '@lucide/svelte/icons/arrow-left';
+  import Maximize from '@lucide/svelte/icons/maximize';
+  import Minus from '@lucide/svelte/icons/minus';
+  import Plus from '@lucide/svelte/icons/plus';
+  import type { ComponentRow } from '../host/component-list';
+  import { GRID_COLUMNS, layoutGrid, type GridFrame } from './canvas-layout';
+  import { LIVE_CAP, VISIBLE_MARGIN, leaving, liveKeys } from './canvas-live';
+  import { keyOfComponent } from './components';
+  import { mountUrlOf } from './component-mount';
+  import { shotOf } from './canvas-shot';
+  import { CanvasKey, actualView, canvasKeyOf, fitView, panBy, percentOf, stepView, wheelOf, zoomAround, type CanvasView, type Point } from './canvas-view';
+
+  type Props = { rows: ComponentRow[]; base: string; onopen: (row: ComponentRow) => void; onclose: () => void };
+
+  let { rows, base, onopen, onclose }: Props = $props();
+
+  const MIDDLE_BUTTON = 1;
+  const SPACE_CODE = 'Space';
+  const FIRST_SHOT_DELAY_MS = 800;
+  const MOUNT_STATUS = 'feega:mount:status';
+  const MOUNT_FAILED = 'failed';
+
+  let root = $state<HTMLElement | null>(null);
+  let viewport = $state({ w: 0, h: 0 });
+  let view = $state<CanvasView>({ scale: 1, x: 0, y: 0 });
+  let touched = $state(false);
+  let held = $state(false);
+  let panning = $state(false);
+  let shots = $state<Record<string, string>>({});
+  let retiring = $state<string[]>([]);
+  let cannotRender = $state<string[]>([]);
+  const frameEls: Record<string, HTMLIFrameElement | undefined> = {};
+  let wasLive: string[] = [];
+  let queue: Promise<void> = Promise.resolve();
+
+  const byKey = $derived(new Map(rows.map((row) => [keyOfComponent(row), row])));
+  const layout = $derived(layoutGrid(rows.map((row) => ({ key: keyOfComponent(row), name: row.name })), GRID_COLUMNS));
+  const live = $derived(liveKeys(layout.frames, view, viewport, VISIBLE_MARGIN, LIVE_CAP));
+  const mounted = $derived(new Set([...live, ...retiring].filter((key) => !cannotRender.includes(key))));
+
+  const rowOf = (frame: GridFrame) => byKey.get(frame.key)!;
+
+  function onmessage(e: MessageEvent) {
+    if (e.data?.type !== MOUNT_STATUS || e.data.status !== MOUNT_FAILED) {
+      return;
+    }
+    const key = Object.keys(frameEls).find((k) => frameEls[k]?.contentWindow === e.source);
+    if (key && !cannotRender.includes(key)) {
+      cannotRender = [...cannotRender, key];
+    }
+  }
+
+  function fit() {
+    view = fitView(layout.bounds, viewport);
+    touched = false;
+  }
+
+  $effect(() => {
+    if (!touched && viewport.w > 0) {
+      view = fitView(layout.bounds, viewport);
+    }
+  });
+
+  function shoot(key: string): Promise<void> {
+    queue = queue.then(async () => {
+      const el = frameEls[key];
+      const png = el ? await shotOf(el) : null;
+      if (png) {
+        shots[key] = png;
+      }
+    });
+
+    return queue;
+  }
+
+  $effect(() => {
+    const gone = leaving(wasLive, live);
+    wasLive = live;
+    for (const key of gone) {
+      retiring = [...retiring, key];
+      void shoot(key).finally(() => (retiring = retiring.filter((k) => k !== key)));
+    }
+  });
+
+  function loaded(key: string) {
+    setTimeout(() => void shoot(key), FIRST_SHOT_DELAY_MS);
+  }
+
+  function register(node: HTMLIFrameElement, key: string) {
+    frameEls[key] = node;
+
+    return { destroy: () => delete frameEls[key] };
+  }
+
+  const pointOf = (e: { clientX: number; clientY: number }): Point => {
+    const box = root!.getBoundingClientRect();
+
+    return { x: e.clientX - box.left, y: e.clientY - box.top };
+  };
+
+  function onwheel(e: WheelEvent) {
+    e.preventDefault();
+    touched = true;
+    const action = wheelOf(e);
+    view = action.kind === 'zoom' ? zoomAround(view, action.factor, pointOf(e)) : panBy(view, action.dx, action.dy);
+  }
+
+  function attach(node: HTMLElement) {
+    node.addEventListener('wheel', onwheel, { passive: false });
+
+    return { destroy: () => node.removeEventListener('wheel', onwheel) };
+  }
+
+  function drag(start: PointerEvent) {
+    let last = { x: start.clientX, y: start.clientY };
+    const move = (e: PointerEvent) => {
+      view = panBy(view, e.clientX - last.x, e.clientY - last.y);
+      last = { x: e.clientX, y: e.clientY };
+    };
+    const end = () => {
+      panning = false;
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', end);
+    };
+    panning = true;
+    touched = true;
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', end);
+  }
+
+  function press(e: PointerEvent) {
+    if (e.button === MIDDLE_BUTTON || (held && e.button === 0)) {
+      e.preventDefault();
+      e.stopPropagation();
+      drag(e);
+    }
+  }
+
+  function step(direction: 1 | -1) {
+    touched = true;
+    view = stepView(view, direction, viewport);
+  }
+
+  function run(key: CanvasKey) {
+    const actions: Record<CanvasKey, () => void> = {
+      [CanvasKey.In]: () => step(1),
+      [CanvasKey.Out]: () => step(-1),
+      [CanvasKey.Fit]: fit,
+      [CanvasKey.Actual]: () => ((touched = true), (view = actualView(view, viewport))),
+      [CanvasKey.Close]: onclose
+    };
+    actions[key]();
+  }
+
+  function onkeydown(e: KeyboardEvent) {
+    if (e.code === SPACE_CODE) {
+      e.preventDefault();
+      held = true;
+      return;
+    }
+    const key = canvasKeyOf(e);
+    if (key) {
+      e.preventDefault();
+      run(key);
+    }
+  }
+
+  const onkeyup = (e: KeyboardEvent) => e.code === SPACE_CODE && (held = false);
+
+  const open = (frame: GridFrame) => onopen(rowOf(frame));
+</script>
+
+<svelte:window {onkeydown} {onkeyup} {onmessage} onblur={() => (held = false)} />
+
+<div
+  class="canvas"
+  role="application"
+  aria-label="Components canvas"
+  data-testid="components-canvas"
+  data-scale={view.scale}
+  bind:this={root}
+  bind:clientWidth={viewport.w}
+  bind:clientHeight={viewport.h}
+  use:attach
+  onpointerdowncapture={press}
+  style={`background-position:${view.x}px ${view.y}px`}
+>
+  <div class="world" style={`transform:translate(${view.x}px,${view.y}px) scale(${view.scale});--zoom:${view.scale}`}>
+    {#each layout.frames as frame (frame.key)}
+      <div class="frame" style={`left:${frame.x}px;top:${frame.y}px;width:${frame.width}px;height:${frame.height}px`} data-testid="canvas-frame" data-key={frame.key} data-live={live.includes(frame.key)} data-rendered={!cannotRender.includes(frame.key)}>
+        <span class="frame-label">{frame.name}</span>
+        {#if shots[frame.key]}<img class="shot" src={shots[frame.key]} alt="" draggable="false" />{:else}
+          <div class="card"><b>{frame.name}</b><span>{cannotRender.includes(frame.key) ? 'Needs props or context to render' : rowOf(frame).file}</span></div>
+        {/if}
+        {#if mounted.has(frame.key)}
+          <iframe use:register={frame.key} src={mountUrlOf(base, rowOf(frame))} title={frame.name} tabindex="-1" onload={() => loaded(frame.key)} style={`width:${frame.width}px;height:${frame.height}px`}></iframe>
+        {/if}
+        <button type="button" class="hit" title={`Open ${frame.name} on its own`} aria-label={`Open ${frame.name}`} data-testid="canvas-open" onclick={() => open(frame)}></button>
+      </div>
+    {/each}
+  </div>
+
+  {#if held}<div class="panner" class:grabbing={panning} data-testid="canvas-panner"></div>{/if}
+
+  <button type="button" class="back" data-testid="canvas-close" title="Back to the editor (Esc)" onclick={onclose}><ArrowLeft size={14} />Editor</button>
+
+  <div class="zoombar" data-testid="canvas-zoom">
+    <button type="button" aria-label="Zoom out" title="Zoom out (-)" onclick={() => step(-1)}><Minus size={14} /></button>
+    <span class="percent" data-testid="canvas-percent">{percentOf(view.scale)}</span>
+    <button type="button" aria-label="Zoom in" title="Zoom in (+)" onclick={() => step(1)}><Plus size={14} /></button>
+    <button type="button" aria-label="Zoom to fit" title="Zoom to fit (0)" data-testid="canvas-fit" onclick={fit}><Maximize size={14} /></button>
+  </div>
+</div>
+
+<style>
+  .canvas {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    overflow: hidden;
+    background-color: var(--ui-backdrop);
+    background-image: radial-gradient(circle, color-mix(in srgb, var(--ui-text) 14%, transparent) 1px, transparent 1px);
+    background-size: 24px 24px;
+    user-select: none;
+  }
+
+  .world {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 0;
+    height: 0;
+    transform-origin: 0 0;
+    --label: min(calc(12px / var(--zoom)), 80px);
+  }
+
+  .frame {
+    position: absolute;
+    background: var(--ui-panel);
+    box-shadow: 0 0 0 calc(1px / var(--zoom)) var(--ui-divider);
+  }
+
+  .frame-label {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    padding-bottom: calc(6px / var(--zoom));
+    color: var(--ui-text-2);
+    font-size: var(--label);
+    white-space: nowrap;
+  }
+
+  .shot,
+  iframe {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    pointer-events: none;
+  }
+
+  iframe {
+    background: white;
+  }
+
+  .card {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: calc(4px / var(--zoom));
+    color: var(--ui-text-2);
+    font-size: min(calc(13px / var(--zoom)), 120px);
+  }
+
+  .card b {
+    color: var(--ui-text);
+    font-weight: 500;
+  }
+
+  .hit {
+    position: absolute;
+    inset: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+  }
+
+  .hit:hover,
+  .hit:focus-visible {
+    outline: calc(2px / var(--zoom)) solid var(--ui-accent);
+    outline-offset: calc(2px / var(--zoom));
+  }
+
+  .frame:has(.hit:hover) .frame-label {
+    color: var(--ui-accent-text);
+  }
+
+  .panner {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    cursor: grab;
+  }
+
+  .panner.grabbing {
+    cursor: grabbing;
+  }
+
+  .back {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 28px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: var(--ui-radius-lg);
+    background: var(--ui-panel);
+    color: var(--ui-text);
+    font: inherit;
+    font-size: var(--ui-text-sm);
+    cursor: pointer;
+  }
+
+  .zoombar {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 3px;
+    border-radius: var(--ui-radius-lg);
+    background: var(--ui-panel);
+    transform: translateX(-50%);
+  }
+
+  .zoombar button {
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: none;
+    color: var(--ui-text-2);
+    cursor: pointer;
+  }
+
+  .zoombar button:hover,
+  .back:hover {
+    background: var(--ui-input);
+    color: var(--ui-text);
+  }
+
+  .percent {
+    min-width: 44px;
+    color: var(--ui-text-2);
+    font-size: var(--ui-text-xs);
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+  }
+</style>

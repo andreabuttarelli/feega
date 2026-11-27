@@ -254,6 +254,7 @@ export function focusTab(win, { install, prepare, report }) {
   let zoomNow = NO_ZOOM;
   let visible = true;
   let why = null;
+  let alone = false;
   const failed = new Map();
 
   const show = (on) => {
@@ -349,11 +350,38 @@ export function focusTab(win, { install, prepare, report }) {
     index = null;
     last = null;
     loaded = false;
+    alone = false;
+  }
+
+  const unknownPage = { htmlAttrs: {}, bodyAttrs: {}, head: '', body: '' };
+
+  function openAlone(request) {
+    if (frame && source === request.source && index === request.index) {
+      show(request.shown !== false);
+      return { count: 1, mode, dark: false, ...(mode === FocusMode.Snapshot && why) };
+    }
+    drop();
+    wanted = null;
+    const file = fileOf(request.source);
+    const canMount = !win.next?.version && !failed.has(request.source) && request.mount !== false;
+    const mountUrl = canMount ? mountUrlFor(win, { file, name: nameOfFile(file), props: {}, source: request.source, index: request.index }) : null;
+    why = failed.get(request.source) ?? (mountUrl ? null : UNSUPPORTED);
+    bg = null;
+    create(unknownPage, mountUrl);
+    source = request.source;
+    index = request.index;
+    last = unknownPage;
+    alone = true;
+    show(request.shown !== false);
+    return { count: 1, mode, dark: false, ...(mode === FocusMode.Snapshot && why) };
   }
 
   function open(request) {
     prepare();
     const parts = focusPage(win.document, request.source, request.index);
+    if (!parts.count && request.alone) {
+      return openAlone(request);
+    }
     if (!parts.count) {
       drop();
       wanted = request;
@@ -377,7 +405,7 @@ export function focusTab(win, { install, prepare, report }) {
   }
 
   function fallBack(reason) {
-    const request = { source, index, shown: visible };
+    const request = { source, index, shown: visible, alone };
     failed.set(source, reasonOf(reason));
     drop();
     const { count } = open(request);
