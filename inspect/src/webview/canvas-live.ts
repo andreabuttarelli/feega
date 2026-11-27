@@ -3,6 +3,8 @@ import type { CanvasView, Viewport } from './canvas-view';
 
 export const LIVE_CAP = 6;
 export const VISIBLE_MARGIN = 200;
+export const MIN_LIVE_WIDTH = 240;
+export const STICKY_MARGIN = 300;
 
 const touches = (f: CanvasFrame, view: CanvasView, viewport: Viewport, margin: number) => {
   const left = f.x * view.scale + view.x;
@@ -15,12 +17,15 @@ export const visibleKeys = (frames: CanvasFrame[], view: CanvasView, viewport: V
 
 const gapToCentre = (f: CanvasFrame, view: CanvasView, viewport: Viewport) => Math.hypot(view.x + (f.x + f.width / 2) * view.scale - viewport.w / 2, view.y + (f.y + f.height / 2) * view.scale - viewport.h / 2);
 
-export function liveKeys(frames: CanvasFrame[], view: CanvasView, viewport: Viewport, margin: number, cap: number): string[] {
+const STICKY_PULL = 400;
+
+export function liveSet(frames: CanvasFrame[], view: CanvasView, viewport: Viewport, current: string[]): string[] {
+  const held = (f: CanvasFrame) => current.includes(f.key);
+  const rank = (f: CanvasFrame) => gapToCentre(f, view, viewport) - (held(f) ? STICKY_PULL : 0);
+
   return frames
-    .filter((f) => f.target !== null && touches(f, view, viewport, margin))
-    .sort((a, b) => gapToCentre(a, view, viewport) - gapToCentre(b, view, viewport))
-    .slice(0, cap)
+    .filter((f) => f.target !== null && f.width * view.scale >= MIN_LIVE_WIDTH && touches(f, view, viewport, VISIBLE_MARGIN + (held(f) ? STICKY_MARGIN : 0)))
+    .sort((a, b) => rank(a) - rank(b))
+    .slice(0, LIVE_CAP)
     .map((f) => f.key);
 }
-
-export const leaving = (was: string[], now: string[]): string[] => was.filter((key) => !now.includes(key));

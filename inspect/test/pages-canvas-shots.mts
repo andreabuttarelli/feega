@@ -28,8 +28,9 @@ await page.waitForTimeout(4000);
 assert.ok((await live()) <= 6, 'live frames stay under the cap');
 assert.equal(await page.locator('[data-testid="canvas-frame"] iframe').count() <= 12, true);
 assert.equal(await page.locator('[data-testid="canvas-frame"][data-key^="/docs"] iframe').count(), 0);
-const srcPath = (selector: string) => page.locator(selector).first().getAttribute('src').then((src) => new URL(src!).pathname);
-assert.equal(await srcPath('[data-testid="canvas-frame"][data-key^="/blog"] iframe'), '/blog/primo-post');
+const blogOpen = page.locator('[data-testid="canvas-frame"][data-key="/blog/[slug]::desktop"] [data-testid="canvas-open"]');
+assert.equal(await blogOpen.getAttribute('aria-label'), 'Open /blog/primo-post at Desktop');
+assert.equal(await blogOpen.isDisabled(), false);
 
 const docsInput = page.locator('[data-testid="canvas-frame"][data-key="/docs/[...rest]::desktop"] [data-testid="example-input"]');
 assert.equal(await docsInput.count(), 1);

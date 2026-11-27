@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CANVAS_COLUMNS, layoutCanvas } from './canvas-layout';
-import { LIVE_CAP, VISIBLE_MARGIN, leaving, liveKeys, visibleKeys } from './canvas-live';
+import { VISIBLE_MARGIN, liveSet, visibleKeys } from './canvas-live';
 
 const pages = Array.from({ length: 10 }, (_, i) => ({ route: `/p${i}`, dynamic: i === 9 }));
 const { frames } = layoutCanvas(pages, CANVAS_COLUMNS);
@@ -31,42 +31,16 @@ describe('visibleKeys', () => {
   });
 });
 
-describe('liveKeys', () => {
-  const zoomedOut = { scale: 0.05, x: 0, y: 0 };
-
-  it('never runs more than the cap', () => {
-    expect(visibleKeys(frames, zoomedOut, viewport, 0).length).toBeGreaterThan(LIVE_CAP);
-    expect(liveKeys(frames, zoomedOut, viewport, 0, LIVE_CAP)).toHaveLength(LIVE_CAP);
-  });
-
-  it('prefers the frames nearest the centre of the viewport', () => {
-    const live = liveKeys(frames, zoomedOut, viewport, 0, 1);
-    const distance = (key: string) => {
-      const f = frames.find((x) => x.key === key)!;
-      return Math.hypot(f.x * 0.05 + (f.width * 0.05) / 2 - viewport.w / 2, f.y * 0.05 + (f.height * 0.05) / 2 - viewport.h / 2);
-    };
-    const best = Math.min(...visibleKeys(frames, zoomedOut, viewport, 0).map(distance));
-
-    expect(distance(live[0])).toBe(best);
-  });
-
-  it('skips dynamic routes without an example', () => {
-    const live = liveKeys(frames, { scale: 0.02, x: 0, y: 0 }, { w: 4000, h: 40000 }, 0, 99);
-
-    expect(live.some((key) => key.startsWith('/p9'))).toBe(false);
-    expect(live).toHaveLength(27);
-  });
+describe('liveSet and dynamic routes', () => {
+  const blog = (examples: { path: string; label: string }[]) => layoutCanvas([{ route: '/blog/[slug]', dynamic: true, examples }], CANVAS_COLUMNS).frames;
+  const wide = { scale: 0.7, x: 0, y: 0 };
+  const big = { w: 4000, h: 4000 };
 
   it('keeps a dynamic route that shows an example', () => {
-    const shown = layoutCanvas([{ route: '/blog/[slug]', dynamic: true, examples: [{ path: '/blog/a', label: 'a' }] }], CANVAS_COLUMNS).frames;
-
-    expect(liveKeys(shown, { scale: 0.02, x: 0, y: 0 }, { w: 4000, h: 40000 }, 0, 99)).toHaveLength(3);
+    expect(liveSet(blog([{ path: '/blog/a', label: 'a' }]), wide, big, [])).toHaveLength(3);
   });
-});
 
-describe('leaving', () => {
-  it('names the frames that were live and no longer are', () => {
-    expect(leaving(['a', 'b', 'c'], ['b', 'd'])).toEqual(['a', 'c']);
-    expect(leaving([], ['a'])).toEqual([]);
+  it('skips a dynamic route without an example', () => {
+    expect(liveSet(blog([]), wide, big, [])).toEqual([]);
   });
 });

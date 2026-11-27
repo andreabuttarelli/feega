@@ -4,10 +4,12 @@
   import Minus from '@lucide/svelte/icons/minus';
   import Plus from '@lucide/svelte/icons/plus';
   import { CANVAS_COLUMNS, layoutCanvas, type CanvasFrame } from './canvas-layout';
-  import { LIVE_CAP, VISIBLE_MARGIN, leaving, liveKeys } from './canvas-live';
+  import { liveSet } from './canvas-live';
+  import { LOAD_TIMEOUT_MS, MAX_LOADING, PAINT_DELAY_MS, POOL_CAP, SETTLE_MS, planPool, settler } from './canvas-pool';
   import { openOf, type CanvasOpen } from './canvas-open';
   import { shotOf } from './canvas-shot';
   import { CanvasKey, actualView, canvasKeyOf, fitView, panBy, percentOf, stepView, wheelOf, zoomAround, type CanvasView, type Point } from './canvas-view';
+  import { untrack } from 'svelte';
   import ExampleField from './ExampleField.svelte';
   import type { PageRow } from './pages';
   import { SIZES } from './sizes';
@@ -28,13 +30,17 @@
   let panning = $state(false);
   let shots = $state<Record<string, string>>({});
   let retiring = $state<string[]>([]);
+  let settledView = $state<CanvasView>({ scale: 1, x: 0, y: 0 });
+  let live = $state<string[]>([]);
+  let pool = $state<string[]>([]);
+  let loaded = $state(new Set<string>());
+  let ready = $state(new Set<string>());
   const frameEls: Record<string, HTMLIFrameElement | undefined> = {};
-  let wasLive: string[] = [];
   let queue: Promise<void> = Promise.resolve();
 
   const layout = $derived(layoutCanvas(rows, CANVAS_COLUMNS));
-  const live = $derived(liveKeys(layout.frames, view, viewport, VISIBLE_MARGIN, LIVE_CAP));
-  const mounted = $derived(new Set([...live, ...retiring]));
+  const mounted = $derived(new Set([...pool, ...retiring]));
+  const settle = settler(() => (settledView = view), SETTLE_MS);
   const currentRoute = $derived(rows.find((r) => r.current)?.route ?? null);
 
   const dimsOf = (f: CanvasFrame) => `${SIZES[f.size].label} · ${f.width} × ${f.height}`;
@@ -63,22 +69,55 @@
   }
 
   $effect(() => {
-    const gone = leaving(wasLive, live);
-    wasLive = live;
-    for (const key of gone) {
-      retiring = [...retiring, key];
-      void shoot(key).finally(() => (retiring = retiring.filter((k) => k !== key)));
+    void view;
+    settle();
+  });
+
+  $effect(() => {
+    const next = liveSet(layout.frames, settledView, viewport, untrack(() => live));
+    if (next.join() !== untrack(() => live).join()) {
+      live = next;
     }
   });
 
-  function loaded(key: string) {
+  function forget(key: string) {
+    loaded = new Set([...loaded].filter((k) => k !== key));
+    ready = new Set([...ready].filter((k) => k !== key));
+  }
+
+  function evict(key: string) {
+    retiring = [...retiring, key];
+    void shoot(key).finally(() => {
+      retiring = retiring.filter((k) => k !== key);
+      forget(key);
+    });
+  }
+
+  $effect(() => {
+    const plan = planPool({ pool: untrack(() => pool), wanted: live, settled: loaded, cap: POOL_CAP, maxLoading: MAX_LOADING });
+    if (plan.pool.join() !== untrack(() => pool).join()) {
+      pool = plan.pool;
+    }
+    plan.evicted.forEach(evict);
+  });
+
+  function settled(key: string) {
+    if (!loaded.has(key)) {
+      loaded = new Set([...loaded, key]);
+    }
+  }
+
+  function onload(key: string) {
+    settled(key);
+    setTimeout(() => (ready = new Set([...ready, key])), PAINT_DELAY_MS);
     setTimeout(() => void shoot(key), FIRST_SHOT_DELAY_MS);
   }
 
   function register(node: HTMLIFrameElement, key: string) {
     frameEls[key] = node;
+    const giveUp = setTimeout(() => settled(key), LOAD_TIMEOUT_MS);
 
-    return { destroy: () => delete frameEls[key] };
+    return { destroy: () => (clearTimeout(giveUp), delete frameEls[key]) };
   }
 
   const pointOf = (e: { clientX: number; clientY: number }): Point => {
@@ -194,7 +233,7 @@
           <div class="card"><b>{frame.route}</b><span>{frame.dynamic ? 'Dynamic route' : dimsOf(frame)}</span>{#if frame.target === null}<div class="manual"><ExampleField pattern={frame.route} onadd={(path) => onadd(frame.route, path)} /></div>{/if}</div>
         {/if}
         {#if mounted.has(frame.key) && frame.target !== null}
-          <iframe use:register={frame.key} src={new URL(frame.target, base).toString()} title={`${frame.target} ${SIZES[frame.size].label}`} tabindex="-1" onload={() => loaded(frame.key)} style={`width:${frame.width}px;height:${frame.height}px`}></iframe>
+          <iframe use:register={frame.key} src={new URL(frame.target, base).toString()} title={`${frame.target} ${SIZES[frame.size].label}`} tabindex="-1" data-ready={ready.has(frame.key)} class:shown={live.includes(frame.key) && ready.has(frame.key)} onload={() => onload(frame.key)} style={`width:${frame.width}px;height:${frame.height}px`}></iframe>
         {/if}
         <button type="button" class="hit" disabled={frame.target === null} title={frame.target === null ? 'Dynamic route: type a value to open it' : `Open ${frame.target} at ${SIZES[frame.size].label}`} aria-label={`Open ${frame.target ?? frame.route} at ${SIZES[frame.size].label}`} data-testid="canvas-open" onclick={() => open(frame)}></button>
       </div>
@@ -285,7 +324,15 @@
   }
 
   iframe {
+    visibility: hidden;
+    opacity: 0;
     background: white;
+  }
+
+  iframe.shown {
+    visibility: visible;
+    opacity: 1;
+    transition: opacity 160ms ease-out;
   }
 
   .card {
