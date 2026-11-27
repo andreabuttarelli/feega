@@ -5,7 +5,8 @@ import { diskTree } from './app-tree';
 import { startCli, type CliOptions } from './cli-process';
 import { type PidFile } from './pid-file';
 import { frameworkOf } from './project-info';
-import { TabStatus, type AppOption, type TabInfo } from './types';
+import { ViewKind } from '../../../inspect/src/webview/views';
+import { Channel, TabStatus, type AppOption, type TabInfo, type ViewInfo } from './types';
 
 export const CHROME_HEIGHT = 44;
 const MAX_LOG_LINES = 200;
@@ -84,7 +85,7 @@ export function tabHost(window: BrowserWindow, changed: () => void, pids: PidFil
     const id = `tab-${++next}`;
     const view = new WebContentsView({ webPreferences: { preload: VIEW_PRELOAD, contextIsolation: true, sandbox: true } });
     view.setBackgroundColor(OPAQUE_BACKGROUND);
-    const info: TabInfo = { id, dir, name: basename(dir), status: TabStatus.Starting, message: 'looking for the app', log: [], url: '', apps: [] };
+    const info: TabInfo = { id, dir, name: basename(dir), status: TabStatus.Starting, message: 'looking for the app', log: [], url: '', apps: [], views: [], view: ViewKind.Editor };
     tabs.set(id, { info, view, stop: async () => undefined, pick: null });
     remember();
     window.contentView.addChildView(view);
@@ -126,15 +127,30 @@ export function tabHost(window: BrowserWindow, changed: () => void, pids: PidFil
     await cli?.stop();
   };
 
+  const tabOf = (contents: WebContents) => [...tabs].find(([, tab]) => tab.view.webContents.id === contents.id)?.[0] ?? null;
+
+  const activate = (id: string | null) => {
+    active = id !== null && tabs.has(id) ? id : null;
+    layout();
+    changed();
+  };
+
   return {
     list: () => [...tabs.values()].map((t) => t.info),
     active: () => active,
-    activate: (id: string | null) => {
-      active = id !== null && tabs.has(id) ? id : null;
-      layout();
-      changed();
+    activate,
+    tabOf,
+    views: (contents: WebContents, state: { tabs: ViewInfo[]; active: string }) => {
+      const id = tabOf(contents);
+      if (id) {
+        patch(id, { views: state.tabs, view: state.active });
+      }
     },
-    tabOf: (contents: WebContents) => [...tabs].find(([, tab]) => tab.view.webContents.id === contents.id)?.[0] ?? null,
+    pickView: (id: string, view: string) => {
+      activate(id);
+      tabs.get(id)?.view.webContents.send(Channel.ShowView, view);
+    },
+    dropView: (id: string, view: string) => tabs.get(id)?.view.webContents.send(Channel.CloseView, view),
     send: (id: string, channel: string, ...args: unknown[]) => tabs.get(id)?.view.webContents.send(channel, ...args),
     open,
     close,

@@ -16,7 +16,7 @@ import { tabHost } from './tabs';
 import { CheckMode, updateController } from './updates/controller';
 import pkg from '../../package.json';
 import { platformRow } from './platform';
-import { Channel, NodeStatus, type Link, type NodeState, type Preferences, type ProjectState, type ShellState } from './types';
+import { Channel, NodeStatus, type Link, type NodeState, type Preferences, type ProjectState, type ShellState, type ViewInfo } from './types';
 import { readLoginPath, runShell } from './login-path';
 import { checkNode, runTool } from './node-check';
 import { bundledDir } from './cli-process';
@@ -180,6 +180,9 @@ app.whenReady().then(() => {
   ipcMain.handle(Channel.CloseTab, (_event, id: string) => tabs.close(id));
   ipcMain.handle(Channel.RetryTab, (_event, id: string) => void tabs.retry(id));
   ipcMain.handle(Channel.ChooseApp, (_event, id: string, app: string) => tabs.choose(id, app));
+  ipcMain.on(Channel.Views, (event, state: { tabs: ViewInfo[]; active: string }) => tabs.views(event.sender, state));
+  ipcMain.handle(Channel.PickView, (_event, id: string, view: string) => tabs.pickView(id, view));
+  ipcMain.handle(Channel.DropView, (_event, id: string, view: string) => tabs.dropView(id, view));
   ipcMain.handle(Channel.Activate, (_event, id: string | null) => tabs.activate(id));
   const menu = () => installMenu({ showSettings: () => window.webContents.send(Channel.ShowSettings), checkUpdates: () => void updates.check(CheckMode.Manual), cloud: settings.get().preferences.cloud, setCloud });
   const setCloud = (on: boolean) => {

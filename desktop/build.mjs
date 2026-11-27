@@ -25,3 +25,4 @@ const STATIC = ['index.html', 'style.css', 'tokens.css', 'fonts.css', 'pixel-ban
 for (const name of STATIC) {
   await cp(here(`src/renderer/${name}`), here(`dist/renderer/${name}`), { recursive: true });
 }
+await cp(here('../inspect/src/webview/tab-bar.css'), here('dist/renderer/tab-bar.css'));

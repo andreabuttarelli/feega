@@ -17,7 +17,7 @@
   import { Click, NONE, Surface, clickOf, contains, extend, keyOf, only, primary, refOf, siblingsOf, toggle, visibleRows, type Selection } from './selection';
   import type { SupportItem } from '../support';
   import { AccountState, type AgentId, Mode, Onboarding, OnboardingOutcome, OnboardingStep, Move, ServerAction, Slot, type ChangeRow, type FontChoice, type LayerNode, type LibraryEntry, type Palette, ServerState, type ServerInfo, Styling, ToHost, ToView, WebviewUsage, type AdapterRow, type Impact, type ImpactAsk, type Pick, type Prefs, type Source, type ViewMessage } from '../messages';
-  import { fromHost, inVscode, toHost } from './host';
+  import { desktopShell, fromHost, hostKind, inVscode, toHost } from './host';
   import { imageSaved } from './image-file.svelte';
   import { iconDrawn, iconsFound } from './icon-search.svelte';
   import { pageBridge, sourceText } from './page-bridge';
@@ -47,7 +47,9 @@
   import ServerPopover from './ServerPopover.svelte';
   import SharePanel from './SharePanel.svelte';
   import LayersTree from './LayersTree.svelte';
-  import FocusTabs from './FocusTabs.svelte';
+  import FocusControls from './FocusControls.svelte';
+  import TabBar from './TabBar.svelte';
+  import { Presentation, VIEWS, ViewKind, barControlsOf, presentationOf, rowTabsOf, shellTabsOf, tabsOf } from './views';
   import ComponentProps from './ComponentProps.svelte';
   import { propTally } from './focus-usage';
   import { applyAskOf } from './apply-plan';
@@ -114,7 +116,7 @@
   import { modeOfKey } from './modes';
   import { browseHistory } from './history';
   import { DEFAULT_ANCHOR, anchorBox, isAnchor, nearestAnchor, nextAnchor, type Anchor } from './anchors';
-  import { PRESETS, SIZES, Size, Snap, fitOf, frameOf, savedSize, sizeForKey, snapped } from './sizes';
+  import { PRESETS, SIZES, Size, Snap, fitOf, frameOf, pageBoxOf, savedSize, sizeForKey, snapped } from './sizes';
   import { breakpointOfSize } from './usage-report';
   import { Where } from '@feega/plugin-api/manifest';
   import type { Place as PluginPlace } from '@feega/plugin-api/protocol';
@@ -232,7 +234,10 @@
 
   let tab = $state<string>(Tab.Properties);
   let leftTab = $state<string>(LeftTab.Layers);
-  let canvasKind = $state<CanvasKind | null>(null);
+  let project = $state('');
+  let pagesOpen = $state(false);
+  let componentsOpen = $state(false);
+  let canvasShown = $state<CanvasKind | null>(null);
   let projectRoutes = $state<PageRoute[]>([]);
   let projectComponents = $state<ComponentRow[]>([]);
   let filesChanged = $state<FilesChange | null>(null);
@@ -321,6 +326,7 @@
   let docked = $state<Docked | null>(null);
   let bar = $state({ w: 0, h: 0 });
   let toolbarH = $state(0);
+  let rowH = $state(0);
   let moving = $state<{ dx: number; dy: number; x: number; y: number } | null>(null);
   let settings = $state<Settings | null>(null);
   let facts = $state<ReportFacts | null>(null);
@@ -347,6 +353,7 @@
   let savedPrefs = false;
   const fit = $derived(fitOf(size, custom, stage));
   const deviceFrame = $derived(frameOf(size));
+  const pageBox = $derived(pageBoxOf(deviceFrame, fit));
   const target = $derived(writeTarget(reach, size !== Size.Full, breakpoints, fit.width));
   const reachBadge = $derived(badgeText(breakpoints, target, fit.width));
   $effect(() => {
@@ -358,7 +365,7 @@
       }
     });
   });
-  const area = $derived({ x: leftPx, y: toolbarH + (focus ? tabsH : 0), w: stage.w, h: stage.h });
+  const area = $derived({ x: leftPx, y: rowH + toolbarH, w: stage.w, h: stage.h });
   const barAt = $derived(moving ? { x: moving.x, y: moving.y } : anchorBox(anchor, area, bar));
   const canBack = $derived((navTick, history.canBack()));
   const canForward = $derived((navTick, history.canForward()));
@@ -610,7 +617,15 @@
 
   function openCanvas(kind: CanvasKind) {
     toHost({ kind: kind === CanvasKind.Pages ? ToHost.Routes : ToHost.Components });
-    canvasKind = kind;
+    pagesOpen ||= kind === CanvasKind.Pages;
+    componentsOpen ||= kind === CanvasKind.Components;
+    canvasShown = kind;
+  }
+
+  function closeCanvas(kind: CanvasKind) {
+    pagesOpen &&= kind !== CanvasKind.Pages;
+    componentsOpen &&= kind !== CanvasKind.Components;
+    canvasShown = canvasShown === kind ? null : canvasShown;
   }
 
   function openComponent(row: ComponentRow) {
@@ -623,13 +638,12 @@
   }
 
   function openFromCanvas(target: { route: string; size: Size }) {
-    canvasKind = null;
+    showView(ViewKind.Editor);
     pickSize(target.size);
     go(target.route);
   }
 
   function openFromComponentsCanvas(row: ComponentRow) {
-    canvasKind = null;
     openComponent(row);
   }
 
@@ -778,7 +792,7 @@
   const pageAlerts = browserAlerts(showChat, desktopBridge());
 
   const handlers: { [K in ToView]: (m: Extract<ViewMessage, { kind: K }>) => void } = {
-    [ToView.App]: (m) => (restore(m.prefs), (route = m.route ?? route), (start = new URL(route, m.url).toString()), (url = m.url), (styling = m.styling), (breakpoints = m.breakpoints), (scales = m.scales), (themes = m.themes), (themeName = stillThere(m.themes.map((t) => t.name), themeName)), showTheme()),
+    [ToView.App]: (m) => (restore(m.prefs), (route = m.route ?? route), (start = new URL(route, m.url).toString()), (url = m.url), (project = m.project), (styling = m.styling), (breakpoints = m.breakpoints), (scales = m.scales), (themes = m.themes), (themeName = stillThere(m.themes.map((t) => t.name), themeName)), showTheme()),
     [ToView.History]: (m) => ((changes = m.changes), (canUndo = m.canUndo), (canRedo = m.canRedo)),
     [ToView.Settings]: (m) => {
       settings = m.values;
@@ -1325,7 +1339,6 @@
   }
   let viewing = $state(View.Page);
   let reopening = false;
-  let tabsH = $state(0);
 
   function syncView() {
     bridge.mode(mode);
@@ -1358,6 +1371,7 @@
     }
     reportPropsChanged();
     focusReported = false;
+    canvasShown = null;
     focus = next;
     viewing = View.Focus;
     reopening = false;
@@ -1394,6 +1408,39 @@
       syncView();
     }
   }
+
+  const CANVAS_VIEW: Record<CanvasKind, ViewKind> = { [CanvasKind.Pages]: ViewKind.PagesCanvas, [CanvasKind.Components]: ViewKind.ComponentsCanvas };
+  const shown = $derived(canvasShown ? CANVAS_VIEW[canvasShown] : focus && viewing === View.Focus ? ViewKind.Focus : ViewKind.Editor);
+  const viewTabs = $derived(tabsOf({ focus: focus?.name ?? null, pages: pagesOpen, components: componentsOpen }, shown));
+
+  const SHOW_VIEW: Record<ViewKind, () => void> = {
+    [ViewKind.Editor]: () => ((canvasShown = null), showTab(View.Page)),
+    [ViewKind.PagesCanvas]: () => (canvasShown = CanvasKind.Pages),
+    [ViewKind.ComponentsCanvas]: () => (canvasShown = CanvasKind.Components),
+    [ViewKind.Focus]: () => ((canvasShown = null), showTab(View.Focus))
+  };
+
+  const CLOSE_VIEW: Record<ViewKind, () => void> = {
+    [ViewKind.Editor]: () => undefined,
+    [ViewKind.PagesCanvas]: () => closeCanvas(CanvasKind.Pages),
+    [ViewKind.ComponentsCanvas]: () => closeCanvas(CanvasKind.Components),
+    [ViewKind.Focus]: exitFocus
+  };
+
+  const showView = (kind: ViewKind) => SHOW_VIEW[kind]();
+  const closeView = (kind: ViewKind) => CLOSE_VIEW[kind]();
+
+  const viewsAt = presentationOf(hostKind);
+
+  $effect(() => {
+    if (viewsAt !== Presentation.ShellTabs) {
+      return;
+    }
+    desktopShell?.views({ tabs: shellTabsOf(viewTabs).map(({ id, title, closable }) => ({ id, title, closable })), active: shown });
+  });
+
+  desktopShell?.onShow((id) => showView(id as ViewKind));
+  desktopShell?.onClose((id) => closeView(id as ViewKind));
 
   function detach() {
     if (picked?.component) {
@@ -1588,7 +1635,7 @@
   const HISTORY_LETTERS = new Set(['z', 'y']);
 
   function onKey(e: KeyboardEvent) {
-    if (canvasKind) {
+    if (canvasShown) {
       return;
     }
     const cmd = e.metaKey || e.ctrlKey;
@@ -1650,7 +1697,8 @@
 
 <svelte:window onkeydown={onKey} />
 
-<main bind:clientWidth={viewW} style={`grid-template-columns: ${leftPx}px minmax(0, 1fr) ${barPx}px; --bar: ${barPx}px; --left: ${leftPx}px`} class:sizing={sizing || leftSizing}>
+{#if viewsAt === Presentation.TopRow}<TabBar tabs={rowTabsOf(project || VIEWS[ViewKind.Editor].title(''), viewTabs)} onselect={showView} onclose={closeView} bind:height={rowH} />{/if}
+<main bind:clientWidth={viewW} style={`--row: ${rowH}px; grid-template-columns: ${leftPx}px minmax(0, 1fr) ${barPx}px; --bar: ${barPx}px; --left: ${leftPx}px`} class:sizing={sizing || leftSizing}>
   <aside class="left" class:closed={leftClosed}>
     {#if libraryOpen}
       <LibraryPanel items={libraryItems} canInsert={!!picked} oninsert={(id) => picked && insertLibrary(id, picked.source, AddPlace.After)} onclose={() => (libraryOpen = false)} />
@@ -1698,16 +1746,15 @@
       {#if share?.available}<SharePanel view={share} onstart={(name, canEdit) => toHost({ kind: ToHost.ShareStart, name, canEdit })} onstop={() => toHost({ kind: ToHost.ShareStop })} onkick={(userId) => toHost({ kind: ToHost.ShareKick, userId })} onrole={(userId, role) => toHost({ kind: ToHost.ShareRole, userId, role })} />{/if}
       <button type="button" class="icon" class:on={!barClosed} title="Properties (⌘\)" onclick={toggleBar} data-testid="bar-toggle"><PanelRight size={15} /></button>
     </header>
-    {#if canvasKind === CanvasKind.Pages && url}<PagesCanvas rows={pages} base={url} onopen={openFromCanvas} onadd={typedExample} onclose={() => (canvasKind = null)} changed={filesChanged} />{/if}
-    {#if canvasKind === CanvasKind.Components && url}<ComponentsCanvas rows={projectComponents} base={url} onopen={openFromComponentsCanvas} onclose={() => (canvasKind = null)} changed={filesChanged} />{/if}
-    {#if focus}<FocusTabs name={focus.name} {route} active={viewing} notice={snapshotNotice} scheme={shownScheme} onscheme={switchScheme} transparent={transparentCanvas} ontransparent={toggleTransparent} zoom={zoomNow} onzoom={(request) => bridge.zoom(request)} onstep={(direction) => bridge.zoom({ mode: 'set', value: stepZoom(zoomNow, direction) })} onselect={showTab} onclose={exitFocus} bind:height={tabsH} />{/if}
+    {#if shown === ViewKind.PagesCanvas && url}<PagesCanvas rows={pages} base={url} onopen={openFromCanvas} onadd={typedExample} onclose={() => showView(ViewKind.Editor)} changed={filesChanged} />{/if}
+    {#if shown === ViewKind.ComponentsCanvas && url}<ComponentsCanvas rows={projectComponents} base={url} onopen={openFromComponentsCanvas} onclose={() => showView(ViewKind.Editor)} changed={filesChanged} />{/if}
 
     <div class="backdrop" role="presentation" bind:clientWidth={stage.w} bind:clientHeight={stage.h} onpointermove={resizeFrame} onpointerup={endDrag}>
       <div class="frame" class:framed={size !== Size.Full} class:device={deviceFrame} style={`width:${fit.width * fit.scale}px;height:${fit.height * fit.scale}px${deviceFrame ? `;--bezel:${deviceFrame.bezel * fit.scale}px;--screen-radius:${deviceFrame.radius * fit.scale}px` : ''}`}>
-        {#if url}<iframe bind:this={frame} src={start} title="App" data-testid="app-frame" onload={() => ((pageLoaded = true), loadTick++)} style={`width:${fit.width}px;height:${fit.height}px;transform:scale(${fit.scale})`}></iframe>{/if}
-        {#if deviceFrame}<DeviceChrome frame={deviceFrame} scale={fit.scale} landscape={fit.width > fit.height} />{/if}
+        <div class="screen">
+        <div class="page" style={`left:${pageBox.left * fit.scale}px;top:${pageBox.top * fit.scale}px;width:${pageBox.width * fit.scale}px;height:${pageBox.height * fit.scale}px`}>
+        {#if url}<iframe bind:this={frame} src={start} title="App" data-testid="app-frame" onload={() => ((pageLoaded = true), loadTick++)} style={`width:${pageBox.width}px;height:${pageBox.height}px;transform:scale(${fit.scale})`}></iframe>{/if}
         {#if url && !everBridged && previewState === Preview.Loading}<div class="loading" data-testid="preview-loading" role="status"><span class="spinner"></span><span class="loading-text">{phase ?? 'Loading the page…'}</span></div>{/if}
-        {#if restarting}<div class="restarting" data-testid="restarting" role="status"><span class="server-dot-inline amber"></span>Restarting dev server…</div>{/if}
         {#if mode === Mode.Design && bridged && !editing}
           <div class="overlay" role="presentation" onpointerdown={pressOverlay} onpointermove={(e) => (pointed(e), dragOverlay(e))} onpointerleave={() => ((hover = null), toHost({ kind: ToHost.Cursor, at: null }))} onclick={onPick} oncontextmenu={onMenu} ondragover={overAdd} ondragleave={() => (addSpot = null)} ondrop={dropAdd} ondblclick={onDouble} onwheel={wheelOnFocus}>
             {#if hover && !lostSlots[Slot.Hovered]}<div class="outline hover" style={box(hover)}></div>{/if}
@@ -1729,6 +1776,10 @@
           {/each}
           </div>
         {/if}
+        </div>
+        {#if deviceFrame}<DeviceChrome frame={deviceFrame} scale={fit.scale} landscape={fit.width > fit.height} />{/if}
+        </div>
+        {#if restarting}<div class="restarting" data-testid="restarting" role="status"><span class="server-dot-inline amber"></span>Restarting dev server…</div>{/if}
         {#if size !== Size.Full}
           <span class="handle left" role="separator" aria-label="Resize" title="Drag to resize, Shift for 10px, double-click for Full" onpointerdown={(e) => startDrag(e, -1)} ondblclick={() => pickSize(Size.Full)}></span>
           <span class="handle right" role="separator" aria-label="Resize" title="Drag to resize, Shift for 10px, double-click for Full" onpointerdown={(e) => startDrag(e, 1)} ondblclick={() => pickSize(Size.Full)}></span>
@@ -1787,6 +1838,7 @@
         <ModeSwitch {mode} onmode={setMode} />
         <button type="button" class="icon" title="Undo (⌘Z)" disabled={!canUndo} onclick={() => toHost({ kind: ToHost.Undo })}><Undo2 size={14} /></button>
         <button type="button" class="icon" title="Redo (⇧⌘Z)" disabled={!canRedo} onclick={() => toHost({ kind: ToHost.Redo })}><Redo2 size={14} /></button>
+        {#if barControlsOf(shown).length}<FocusControls controls={barControlsOf(shown)} notice={snapshotNotice} scheme={shownScheme} onscheme={switchScheme} transparent={transparentCanvas} ontransparent={toggleTransparent} zoom={zoomNow} onzoom={(request) => bridge.zoom(request)} onstep={(direction) => bridge.zoom({ mode: 'set', value: stepZoom(zoomNow, direction) })} />{/if}
       </div>
 
       {#if docked}<DockTab edge={docked.edge} box={tabBox(docked, area)} onrestore={undock} />{/if}
@@ -1892,7 +1944,7 @@
     --float-gap: 16px;
     --top-row: 40px;
     display: grid;
-    height: 100vh;
+    height: calc(100vh - var(--row, 0px));
     overflow: hidden;
     transition: grid-template-columns 200ms cubic-bezier(0.16, 1, 0.3, 1);
   }
@@ -2033,6 +2085,7 @@
 
   .frame.device {
     border-radius: var(--screen-radius);
+    background: #111;
     box-shadow: 0 0 0 var(--bezel) #111, 0 0 0 calc(var(--bezel) + 1px) #3a3a3c, 0 12px 32px rgb(0 0 0 / 0.3);
   }
 
@@ -2040,6 +2093,19 @@
     display: block;
     border: 0;
     transform-origin: 0 0;
+  }
+
+  .screen {
+    position: absolute;
+    inset: 0;
+  }
+
+  .frame.device .screen {
+    clip-path: inset(0 round var(--screen-radius));
+  }
+
+  .page {
+    position: absolute;
   }
 
   .plugin-action {

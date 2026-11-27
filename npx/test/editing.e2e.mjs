@@ -612,7 +612,9 @@ try {
     const chips = frame.locator('#site-links > a');
     const labels = () => chips.allInnerTexts();
     const hrefs = () => chips.evaluateAll((els) => els.map((el) => el.getAttribute('href')));
+    const reveal = () => chips.first().evaluate((el) => el.scrollIntoView({ block: 'center' }));
     const selected = async (index) => {
+      await reveal();
       await chips.nth(index).click();
       await page.waitForTimeout(800);
     };
@@ -653,6 +655,7 @@ try {
     });
 
     await check('loop data: the context menu deletes the entry and one undo restores it', async () => {
+      await reveal();
       await chips.nth(0).click({ button: 'right' });
       await page.getByTestId('structure-menu').getByRole('menuitem', { name: /Delete/ }).click();
       await page.waitForTimeout(SETTLE_MS);

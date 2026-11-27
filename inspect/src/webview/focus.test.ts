@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Pick, Source } from '../messages';
-import { FocusKey, Scheme, backLabelOf, focusKeyOf, focusOf, rowFocus, schemeApplyOf, schemeOf, snapshotNoticeOf, stepZoom, themeOfScheme, wheelFactor } from './focus';
+import { FocusKey, Scheme, focusKeyOf, focusOf, rowFocus, schemeApplyOf, schemeOf, snapshotNoticeOf, stepZoom, themeOfScheme, wheelFactor } from './focus';
 
 const CARD: Source = { file: 'src/components/ProductCard.tsx', line: 4, col: 5 };
 
@@ -60,14 +60,6 @@ describe('focusKeyOf', () => {
 
   it('ignores F when nothing can be focused', () => {
     expect(focusKeyOf('f', { open: false, available: false })).toBeNull();
-  });
-});
-
-describe('backLabelOf', () => {
-  it('names the page the back control returns to', () => {
-    expect(backLabelOf('/pricing')).toBe('/pricing');
-    expect(backLabelOf('/')).toBe('Home');
-    expect(backLabelOf('')).toBe('Home');
   });
 });
 

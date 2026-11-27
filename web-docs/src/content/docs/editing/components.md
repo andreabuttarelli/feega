@@ -28,7 +28,7 @@ A component that cannot render alone, because it needs props or a provider, show
 
 **Open canvas** at the top of the list shows every component in a grid, each one rendered on its own with its name above it. It has the same zoom, pan and fit controls as the [Pages canvas](/editing/pages-canvas/), and the same limit of six live frames. Other frames show a snapshot. A component that cannot render alone is drawn as a card with its name.
 
-Click a frame to open that component in Focus.
+It opens as a view tab named Components canvas, next to the Pages canvas and Focus tabs (see [View tabs](/editing/focus/#view-tabs)). Click a frame to open that component in Focus.
 
 ## Live updates
 

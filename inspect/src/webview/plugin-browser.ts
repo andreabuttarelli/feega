@@ -1,22 +1,22 @@
-import { COPY, SOURCES } from '@feega/plugin-registry/registry';
+import { COPY, SOURCES, creditLine } from '@feega/plugin-registry/registry';
 import type { Row } from './plugin-manager';
 
 export enum Badge {
-  Official = 'Official',
+  ByFeega = 'By Feega',
   Community = 'Community'
 }
 
-export type Card = Row & { summary: string; description: string; badge: Badge };
+export type Card = Row & { summary: string; description: string; badge: Badge; credit: string };
 
 export function cardsOf(rows: Row[]): Card[] {
   return rows.map((row) => {
     const source = SOURCES.find((one) => one.manifestId === row.id);
     if (!source) {
-      return { ...row, summary: '', description: '', badge: Badge.Community };
+      return { ...row, summary: '', description: '', badge: Badge.Community, credit: '' };
     }
 
     const copy = COPY[source.id];
-    return { ...row, summary: source.summary, description: copy.description, badge: Badge.Official };
+    return { ...row, summary: source.summary, description: copy.description, badge: Badge.ByFeega, credit: creditLine(source.credit) };
   });
 }
 
