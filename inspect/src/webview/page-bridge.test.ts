@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { BRIDGE_READY, CAPTURED, FOCUSED, TRACKED, TREE_RESULT } from '../messages';
+import { BRIDGE_READY, CAPTURED, FOCUSED, TEXT_CANCEL, TRACKED, TREE_RESULT } from '../messages';
 import { CAPTURE_TIMEOUT_MS, pageBridge } from './page-bridge';
 
 const ORIGIN = 'http://localhost:5173';
@@ -184,5 +184,17 @@ describe('capturing the tab the user is looking at', () => {
 
     expect(await png).toBeNull();
     vi.useRealTimers();
+  });
+});
+
+describe('a text edit that ends without a change', () => {
+  it('reaches the view, so the click overlay comes back', () => {
+    const post = pageWindow();
+    const ended = vi.fn();
+    pageBridge(() => null, { textEnded: ended } as never);
+
+    post({ type: TEXT_CANCEL });
+
+    expect(ended).toHaveBeenCalledOnce();
   });
 });

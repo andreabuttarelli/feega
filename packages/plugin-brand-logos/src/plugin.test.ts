@@ -3,7 +3,10 @@ import { createApi, type Port } from '@feega/plugin-api/client';
 import { createPluginHost, type EditorPort } from '@feega/plugin-api/host';
 import { parseManifest } from '@feega/plugin-api/manifest';
 import { Control, OpKind, Place, type HostMessage, type PluginMessage, type ProjectInfo, type Proposal, type Selection, type UiNode } from '@feega/plugin-api/protocol';
+import { OFFLINE_NOTE } from '@feega/plugin-icon-kit/cdn';
+import { localCdn } from '@feega/plugin-icon-kit/cdn-fixture';
 import manifest from '../feega-plugin.json';
+import { VERSION } from './icons';
 import { BRAND, CHOSEN, INSERT, LABEL, QUERY, SECTION, SIZE, brandLogosPlugin } from './plugin';
 
 const at = (file: string): Selection => ({ source: { file, line: 4, col: 3 }, component: null, tag: 'section', name: 'section', classes: '', rect: { x: 0, y: 0, width: 1, height: 1 }, styles: {}, attributes: [] });
@@ -19,6 +22,8 @@ function load(initial: Selection | null) {
     throw new Error(parsed.reason);
   }
   const proposals: Proposal[] = [];
+  const notes: string[] = [];
+  const cdn = localCdn();
   let toHost: (m: PluginMessage) => void = () => undefined;
   let toPlugin: (m: HostMessage) => void = () => undefined;
   const editor: EditorPort = {
@@ -27,9 +32,9 @@ function load(initial: Selection | null) {
     sourceText: async () => null,
     propose: async (p) => (proposals.push(p), { ok: true }),
     preview: () => undefined,
-    fetch: async () => ({ status: 200, text: '' }),
+    fetch: cdn.fetch,
     pickFile: async () => null,
-    notify: () => undefined
+    notify: (text) => notes.push(text)
   };
   const host = createPluginHost({ editor, sandbox: () => ({ post: (m) => queueMicrotask(() => toPlugin(m)), listen: (h) => (toHost = h), close: () => undefined }) });
   host.load(parsed.manifest, '');
@@ -43,10 +48,14 @@ function load(initial: Selection | null) {
   };
   const ui = () => host.ui(parsed.manifest.id, SECTION);
   const control = async (id: string, value: string | number | boolean) => {
+    const before = proposals.length + notes.length;
     host.control(parsed.manifest.id, SECTION, id, value);
     await settle();
+    if (id === INSERT) {
+      await vi.waitFor(() => expect(proposals.length + notes.length).toBeGreaterThan(before), { timeout: ICONS_READY_MS });
+    }
   };
-  return { settle, ui, control, proposals, manifest: parsed.manifest };
+  return { settle, ui, control, cdn, proposals, notes, manifest: parsed.manifest };
 }
 
 const node = <T extends UiNode['type']>(tree: UiNode[], type: T, id?: string) => tree.find((n) => n.type === type && (id === undefined || ('id' in n && n.id === id)));
@@ -71,7 +80,7 @@ describe('manifest', () => {
 
     expect(m.contributions.rightBar).toEqual([{ id: SECTION, title: 'Brand logos', when: ['selection'] }]);
     expect([...m.grants].sort()).toEqual(['edit.insert', 'project', 'selection']);
-    expect(m.hosts).toEqual([]);
+    expect(m.hosts).toEqual(['cdn.jsdelivr.net', 'unpkg.com']);
   });
 });
 
@@ -98,6 +107,31 @@ describe('brand logos picker', () => {
     await plugin.settle();
 
     expect(JSON.stringify(plugin.ui())).toContain('trademarks');
+  });
+});
+
+describe('logo files', () => {
+  it('draws the logos on show from files pinned to the version of the bundled index', async () => {
+    const plugin = load(SVELTE);
+    await plugin.settle();
+    await vi.waitFor(() => {
+      const grid = node(plugin.ui(), Control.Grid, CHOSEN);
+      expect(grid?.type === Control.Grid && grid.items.length > 20 && grid.items.every((item) => item.image?.includes('<svg'))).toBe(true);
+    }, { timeout: ICONS_READY_MS });
+
+    expect(plugin.cdn.requests.every((url) => url.startsWith(`https://cdn.jsdelivr.net/npm/simple-icons@${VERSION}/icons/`))).toBe(true);
+  });
+
+  it('refuses to insert a logo it cannot get, with a note', async () => {
+    const plugin = load(SVELTE);
+    await plugin.settle();
+    plugin.cdn.offline = true;
+    await plugin.control(QUERY, 'gitea');
+    await plugin.control(CHOSEN, 'gitea');
+    await plugin.control(INSERT, true);
+
+    expect(plugin.proposals).toEqual([]);
+    expect(plugin.notes).toEqual([OFFLINE_NOTE]);
   });
 });
 

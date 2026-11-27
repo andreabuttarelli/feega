@@ -1,11 +1,12 @@
 import type { PluginApi } from '@feega/plugin-api/client';
 import { Control, type UiNode } from '@feega/plugin-api/protocol';
 import { envOf } from '@feega/plugin-icon-kit/env';
-import { CHOSEN, INSERT, QUERY, iconPicker, type PickerConfig, type Values } from '@feega/plugin-icon-kit/picker';
+import { CHOSEN, INSERT, QUERY, RETRY, iconPicker, type PickerConfig, type Values } from '@feega/plugin-icon-kit/picker';
+import { innerOf } from '@feega/plugin-icon-kit/cdn';
 import { attributesOf, componentName, svgComponent, type Prop, type SvgSpec } from '@feega/plugin-icon-kit/svg-component';
-import { CURRENT_COLOUR, DEFAULT_SIZE, POPULAR, VIEW_BOX, bodyOf, glyphOf, loadLogos, type Logo } from './icons';
+import { CURRENT_COLOUR, DEFAULT_SIZE, POPULAR, SOURCE, VIEW_BOX, fileOf, loadLogos, type Logo } from './icons';
 
-export { CHOSEN, INSERT, QUERY };
+export { CHOSEN, INSERT, QUERY, RETRY };
 export const SECTION = 'logos';
 export const SIZE = 'size';
 export const BRAND = 'brand';
@@ -25,10 +26,10 @@ const PROPS: Prop[] = [
   { name: 'color', fallback: CURRENT_COLOUR }
 ];
 
-const specOf = (logo: Logo): SvgSpec => ({
+const specOf = (logo: Logo, svg: string): SvgSpec => ({
   name: componentName(logo.name),
   viewBox: VIEW_BOX,
-  body: bodyOf(logo),
+  body: innerOf(svg),
   fixed: { role: 'img' },
   bound: { width: 'size', height: 'size', fill: 'color' },
   props: PROPS
@@ -54,11 +55,12 @@ const CONFIG: PickerConfig<Logo> = {
   label: LABEL,
   load: loadLogos,
   popular: POPULAR,
-  glyph: glyphOf,
+  source: SOURCE,
+  file: fileOf,
   initial: { [SIZE]: DEFAULT_SIZE, [BRAND]: Colour.Brand },
   options: optionsOf,
-  component: (logo, values, info, framework) => {
-    const file = svgComponent(specOf(logo), framework, envOf(info));
+  component: (logo, values, info, framework, svg) => {
+    const file = svgComponent(specOf(logo, svg), framework, envOf(info));
     const color = values[BRAND] === Colour.Brand ? `#${logo.hex}` : CURRENT_COLOUR;
 
     return { name: componentName(logo.name), file: file.file, source: file.source, attributes: attributesOf(framework, PROPS, { size: Number(values[SIZE]), color }) };
