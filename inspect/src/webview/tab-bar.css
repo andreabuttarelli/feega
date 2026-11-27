@@ -12,6 +12,7 @@
   font-family: 'BDO Grotesk', system-ui, sans-serif;
   font-weight: 500;
   font-size: 15px;
+  line-height: 1;
   letter-spacing: -0.01em;
   -webkit-font-smoothing: antialiased;
   user-select: none;
@@ -20,6 +21,7 @@
 
 .tab-bar button {
   font: inherit;
+  line-height: 1;
   letter-spacing: inherit;
   color: inherit;
   background: none;
@@ -72,6 +74,9 @@
 }
 
 .tab-bar .tab .name {
+  display: block;
+  line-height: 1;
+  padding-bottom: 1px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
