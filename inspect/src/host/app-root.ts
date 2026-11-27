@@ -1,4 +1,4 @@
-import { dirname, extname, join, relative, sep } from 'node:path';
+import { dirname, join, relative, sep } from 'node:path';
 
 export type Exists = (path: string) => Promise<boolean>;
 export type Dirs = (path: string) => Promise<string[]>;
@@ -11,7 +11,7 @@ const SKIPPED = new Set(['node_modules', '.git', '.claude', 'dist', 'build', '.s
 const DEPTH = 2;
 
 export async function appRootOf(clicked: string, workspace: string, has: Exists): Promise<string | null> {
-  for (let dir = extname(clicked) ? dirname(clicked) : clicked; dir.startsWith(workspace); dir = dirname(dir)) {
+  for (let dir = clicked; dir.startsWith(workspace); dir = dirname(dir)) {
     if (await has(join(dir, MANIFEST))) {
       return dir;
     }
