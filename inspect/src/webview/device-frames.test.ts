@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEVICE_SIZES, Notch, Size, SIZES, fitOf, frameOf, rotated } from './sizes';
+import { DEVICE_SIZES, Notch, Size, SIZES, fitOf, frameOf, rotated, savedSize } from './sizes';
 
 describe('device frames', () => {
   it('plain presets have no frame', () => {
@@ -46,5 +46,19 @@ describe('device frames', () => {
 
   it('devices have no shortcut key', () => {
     expect(DEVICE_SIZES.map((s) => SIZES[s].key)).toEqual(DEVICE_SIZES.map(() => null));
+  });
+});
+
+describe('saved size', () => {
+  it('a saved device frame is restored', () => {
+    expect(savedSize(Size.Iphone15Landscape)).toBe(Size.Iphone15Landscape);
+  });
+
+  it('presets and custom are restored', () => {
+    expect([Size.Phone, Size.Custom].map(savedSize)).toEqual([Size.Phone, Size.Custom]);
+  });
+
+  it('anything else falls back to full', () => {
+    expect([undefined, 'nope'].map(savedSize)).toEqual([Size.Full, Size.Full]);
   });
 });

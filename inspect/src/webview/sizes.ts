@@ -109,3 +109,7 @@ export function fitOf(size: Size, custom: number | null, stage: Stage): Fit {
   const { scale } = frameBox(ViewportMode.Fit, room, { w: width, h: height }, width);
   return { width, height, scale: Math.min(MAX_SCALE, scale) };
 }
+
+const RESTORABLE: Size[] = [...PRESETS, ...DEVICE_SIZES, Size.Custom];
+
+export const savedSize = (value: unknown): Size => RESTORABLE.find((s) => s === value) ?? Size.Full;

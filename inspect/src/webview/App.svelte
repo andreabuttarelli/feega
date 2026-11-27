@@ -100,7 +100,7 @@
   import { modeOfKey } from './modes';
   import { browseHistory } from './history';
   import { DEFAULT_ANCHOR, anchorBox, isAnchor, nearestAnchor, nextAnchor, type Anchor } from './anchors';
-  import { PRESETS, SIZES, Size, Snap, fitOf, frameOf, sizeForKey, snapped } from './sizes';
+  import { PRESETS, SIZES, Size, Snap, fitOf, frameOf, savedSize, sizeForKey, snapped } from './sizes';
   import { breakpointOfSize } from './usage-report';
   import { Where } from '@feega/plugin-api/manifest';
   import type { Place as PluginPlace } from '@feega/plugin-api/protocol';
@@ -685,7 +685,7 @@
       return;
     }
     savedPrefs = true;
-    size = PRESETS.includes(prefs.size as Size) || prefs.size === Size.Custom ? (prefs.size as Size) : Size.Full;
+    size = savedSize(prefs.size);
     custom = prefs.custom;
     barClosed = prefs.barClosed;
     route = prefs.route ?? route;
