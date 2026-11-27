@@ -22,7 +22,7 @@ The canvas is the only place with zoom and pan. The editor itself stays at its f
 
 ## Open a page
 
-Click a frame to switch to the Page tab on that route at that size. The canvas tab stays open. Frames highlight on hover. Dynamic routes such as `/blog/[slug]` are listed with a placeholder and cannot be opened.
+Click a frame to switch to the Page tab on that route at that size. The canvas tab stays open. Frames highlight on hover. A dynamic route such as `/blog/[slug]` renders its first example page, and its row is labelled with the pattern and the example. With no example yet, the frames show a field per parameter: type a value and press `Enter` to show that page. See [Layers](/editing/layers/) for where examples come from.
 
 ## Performance
 

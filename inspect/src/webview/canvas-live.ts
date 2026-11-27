@@ -24,7 +24,7 @@ export function liveSet(frames: CanvasFrame[], view: CanvasView, viewport: Viewp
   const rank = (f: CanvasFrame) => gapToCentre(f, view, viewport) - (held(f) ? STICKY_PULL : 0);
 
   return frames
-    .filter((f) => !f.dynamic && f.width * view.scale >= MIN_LIVE_WIDTH && touches(f, view, viewport, VISIBLE_MARGIN + (held(f) ? STICKY_MARGIN : 0)))
+    .filter((f) => f.target !== null && f.width * view.scale >= MIN_LIVE_WIDTH && touches(f, view, viewport, VISIBLE_MARGIN + (held(f) ? STICKY_MARGIN : 0)))
     .sort((a, b) => rank(a) - rank(b))
     .slice(0, LIVE_CAP)
     .map((f) => f.key);

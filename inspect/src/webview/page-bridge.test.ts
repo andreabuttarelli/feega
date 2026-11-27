@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { BRIDGE_READY, CAPTURED, FOCUSED, TEXT_CANCEL, TRACKED, TREE_RESULT } from '../messages';
+import { BRIDGE_READY, CAPTURED, FOCUSED, LINKS, TEXT_CANCEL, TRACKED, TREE_RESULT } from '../messages';
 import { CAPTURE_TIMEOUT_MS, pageBridge } from './page-bridge';
 
 const ORIGIN = 'http://localhost:5173';
@@ -26,6 +26,18 @@ describe('messages from other frames', () => {
     dispatchFrom(mine, { type: 'feega:location', path: '/mine' });
 
     expect(moved).toEqual(['/mine']);
+  });
+});
+
+describe('links of the page reach the view', () => {
+  it('as the paths the bridge found', () => {
+    const post = pageWindow();
+    const linked: string[][] = [];
+    pageBridge(() => null, { links: (paths: string[]) => linked.push(paths) } as never);
+
+    post({ type: LINKS, paths: ['/blog/a', '/blog/b'] });
+
+    expect(linked).toEqual([['/blog/a', '/blog/b']]);
   });
 });
 

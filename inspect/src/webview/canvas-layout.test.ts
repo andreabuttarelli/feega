@@ -53,6 +53,26 @@ describe('layoutCanvas', () => {
   });
 });
 
+describe('a dynamic route with examples', () => {
+  const withExample = layoutCanvas([{ route: '/blog/[slug]', dynamic: true, examples: [{ path: '/blog/primo-post', label: 'primo-post' }, { path: '/blog/b', label: 'b' }] }], CANVAS_COLUMNS);
+
+  it('shows its first example on every frame and on the row', () => {
+    expect(withExample.frames.map((f) => f.target)).toEqual(['/blog/primo-post', '/blog/primo-post', '/blog/primo-post']);
+    expect(withExample.rows[0].example).toEqual({ path: '/blog/primo-post', label: 'primo-post' });
+  });
+
+  it('without examples keeps a placeholder', () => {
+    const empty = layoutCanvas([{ route: '/blog/[slug]', dynamic: true, examples: [] }], CANVAS_COLUMNS);
+
+    expect(empty.frames.map((f) => f.target)).toEqual([null, null, null]);
+    expect(empty.rows[0].example).toBeNull();
+  });
+
+  it('a static page targets its own route', () => {
+    expect(layoutCanvas(pages, CANVAS_COLUMNS).frames[3].target).toBe('/about');
+  });
+});
+
 describe('bounds', () => {
   it('wrap every frame and row head', () => {
     const { frames, rows, bounds } = layoutCanvas(pages, CANVAS_COLUMNS);
