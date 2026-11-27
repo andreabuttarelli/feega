@@ -4,17 +4,14 @@
 
   import type { Component } from 'svelte';
 
-  type Props = { title?: string; hint: string; testid: string; icon?: Component; disabled?: boolean; onopen: (event: MouseEvent) => void };
+  type Props = { title?: string; testid: string; icon?: Component; disabled?: boolean; onopen: (event: MouseEvent) => void };
 
-  let { title = 'Open canvas', hint, testid, icon: Icon = LayoutGrid, disabled = false, onopen }: Props = $props();
+  let { title = 'Open canvas', testid, icon: Icon = LayoutGrid, disabled = false, onopen }: Props = $props();
 </script>
 
 <button type="button" class="banner" data-testid={testid} {disabled} onclick={onopen}>
   <span class="glyph"><Icon size={14} /></span>
-  <span class="text">
-    <b>{title}</b>
-    <span>{hint}</span>
-  </span>
+  <span class="text"><b>{title}</b></span>
   <ChevronRight size={14} />
 </button>
 
@@ -69,7 +66,4 @@
     font-weight: 500;
   }
 
-  .text span {
-    line-height: 1.3;
-  }
 </style>

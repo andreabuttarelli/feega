@@ -17,7 +17,7 @@
   const expand = (route: string) => (expanded = [...expanded, route]);
 </script>
 
-<ActionBanner hint="See every page at every size" testid="canvas-open-pages" onopen={oncanvas} />
+<ActionBanner testid="canvas-open-pages" onopen={oncanvas} />
 
 <ul class="pages" data-testid="pages">
   {#each rows as row (row.route)}
