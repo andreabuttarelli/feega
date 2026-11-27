@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { GitAfter, GitFix, GitScope, GitState, type GitView } from '../messages';
-import { copyOf, fixLabel, gitUi } from './git-view';
+import { copyOf, expandedOf, fixLabel, gitUi } from './git-view';
 
-const READY: GitView = { state: GitState.Ready, branch: 'main', upstream: 'origin/main', remote: 'origin', ahead: 0, behind: 0, feega: ['src/Hero.svelte'], others: ['src/Other.css'], message: 'Update padding in Hero' };
+const READY: GitView = { state: GitState.Ready, branch: 'main', upstream: 'origin/main', remote: 'origin', ahead: 0, behind: 0, feega: ['src/Hero.svelte'], others: ['src/Other.css'], message: 'Update padding in Hero', open: false };
 const ui = (patch: Partial<GitView> = {}, scope = GitScope.Feega, message = 'msg', changes = 2) => gitUi({ ...READY, ...patch }, scope, message, changes);
 
 describe('gitUi', () => {
@@ -93,5 +93,33 @@ describe('copyOf', () => {
     expect(copyOf(GitFix.CopyInit)).toBe('git init');
     expect(copyOf(GitFix.CopyRemote)).toBe('git remote add origin <url>');
     expect(copyOf(GitFix.Pull)).toBeNull();
+  });
+});
+
+describe('collapsed summary', () => {
+  it('names the commit in a short title', () => {
+    expect(ui().summary).toBe('Commit 2 changes');
+    expect(ui({}, GitScope.Feega, 'msg', 1).summary).toBe('Commit 1 change');
+    expect(ui({}, GitScope.All).summary).toBe('Commit all 2 changed files');
+  });
+});
+
+describe('what needs attention', () => {
+  it('flags a behind or diverged branch and a repository to create, not a plain state', () => {
+    expect(ui({ behind: 1 }).attention).toBe(true);
+    expect(ui({ behind: 1, ahead: 1 }).attention).toBe(true);
+    expect(ui({ state: GitState.NotRepo }).attention).toBe(true);
+    expect(ui().attention).toBe(false);
+    expect(ui({ feega: [] }).attention).toBe(false);
+    expect(ui({ remote: null, upstream: null }).attention).toBe(false);
+  });
+});
+
+describe('expandedOf', () => {
+  it('stays collapsed unless the user opened it or something needs action', () => {
+    expect(expandedOf(false, false, false)).toBe(false);
+    expect(expandedOf(true, false, false)).toBe(true);
+    expect(expandedOf(false, true, false)).toBe(true);
+    expect(expandedOf(false, false, true)).toBe(true);
   });
 });

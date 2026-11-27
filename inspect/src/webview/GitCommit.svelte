@@ -2,7 +2,7 @@
   import { GitAfter, GitFix, GitScope, GitState, ToHost, type ChangeRow } from '../messages';
   import { ai } from './ai-state.svelte';
   import { git } from './git-state.svelte';
-  import { copyOf, fixLabel, gitUi } from './git-view';
+  import { copyOf, expandedOf, fixLabel, gitUi } from './git-view';
   import { toHost } from './host';
   import Segmented from './Segmented.svelte';
 
@@ -20,6 +20,9 @@
   let email = $state('');
 
   const ui = $derived(git.view ? gitUi(git.view, scope, message, changes.length) : null);
+  const failed = $derived(git.result !== null && !git.result.ok);
+  const forced = $derived(ui !== null && (ui.attention || failed));
+  const expanded = $derived(git.view !== null && ui !== null && expandedOf(git.view.open, ui.attention, failed));
   const others = $derived(git.view?.others.length ?? 0);
   const agent = $derived(ai.agents.find((a) => a.installed && a.id === ai.agent) ?? ai.agents.find((a) => a.installed) ?? null);
 
@@ -37,6 +40,10 @@
       message = git.view.message;
     }
   });
+
+  function toggle() {
+    toHost({ kind: ToHost.GitOpen, open: !expanded });
+  }
 
   function begin() {
     git.pending = true;
@@ -92,10 +99,18 @@
 {/snippet}
 
 {#if ui && git.view}
-  <section class="git" data-testid="git-commit">
-    {#if ui.header}<h3 data-testid="git-header">{ui.header}</h3>{/if}
-    {#if ui.branchLine}<div class="branch" data-testid="git-branch">{ui.branchLine}</div>{/if}
-    {#if git.view.state === GitState.Ready}
+  <section class="git" class:collapsed={!expanded} data-testid="git-commit">
+    <div class="row">
+      <button type="button" class="chevron" aria-expanded={expanded} aria-label={expanded ? 'Collapse commit area' : 'Expand commit area'} data-testid="git-toggle" disabled={forced} onclick={toggle}>{expanded ? '▾' : '▸'}</button>
+      <div class="title">
+        <h3 data-testid="git-header">{expanded ? ui.header || ui.summary : ui.summary || ui.notice?.text}</h3>
+        {#if ui.branchLine}<div class="branch" data-testid="git-branch">{ui.branchLine}</div>{/if}
+      </div>
+      {#if !expanded && git.view.state === GitState.Ready}
+        <button type="button" class="primary" data-testid="git-quick" disabled={!ui.canCommit || git.pending} onclick={() => commit(ui.primary)}>{ui.primary === GitAfter.Push ? 'Commit & push' : 'Commit'}</button>
+      {/if}
+    </div>
+    {#if expanded && git.view.state === GitState.Ready}
       <textarea bind:value={message} oninput={() => (typed = true)} rows="2" placeholder="Commit message" aria-label="Commit message" data-testid="git-message"></textarea>
       <Segmented options={SCOPES} bind:value={scope} label="Files to commit" />
       {#if scope === GitScope.All && others}<p class="hint">Includes {others} {others === 1 ? 'file' : 'files'} you edited outside Feega.</p>{/if}
@@ -114,12 +129,12 @@
         {#if ui.showPush}<button type="button" data-testid="git-push" disabled={git.pending} onclick={() => toHost({ kind: ToHost.GitPush })}>Push</button>{/if}
       </div>
     {/if}
-    {#if git.result && !git.result.ok}
+    {#if expanded && git.result && !git.result.ok}
       {@render alert(git.result.text, git.result.fix, true)}
     {:else if git.result}
       <p class="ok" role="status" data-testid="git-result">{git.result.text}</p>
     {/if}
-    {#if ui.notice}{@render alert(ui.notice.text, ui.notice.fix, false)}{/if}
+    {#if expanded && ui.notice}{@render alert(ui.notice.text, ui.notice.fix, false)}{/if}
   </section>
 {/if}
 
@@ -133,10 +148,40 @@
     font-size: var(--ui-text-sm);
   }
 
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .title {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .collapsed {
+    padding-bottom: 8px;
+  }
+
+  .chevron {
+    width: 20px;
+    padding: 0;
+    background: none;
+    color: var(--ui-text-2);
+    font-size: 14px;
+  }
+
+  .chevron:disabled {
+    opacity: 0.25;
+  }
+
   h3 {
+    overflow: hidden;
     margin: 0;
     font-size: var(--ui-text-md);
     font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .branch,
@@ -200,7 +245,7 @@
   }
 
   button.primary {
-    flex: 1;
+    flex: 0 0 auto;
     background: var(--ui-accent);
     color: var(--ui-accent-ink);
   }

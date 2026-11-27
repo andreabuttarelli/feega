@@ -33,7 +33,7 @@ function panel(root: string, edited = ['src/Hero.svelte'], run: GitRun = nodeGit
   const sent: ViewMessage[] = [];
   const calls: string[][] = [];
   const logged: GitRun = (args) => (calls.push(args), run(args));
-  const p = gitPanel({ run: logged, post: (m) => void sent.push(m), rows: () => [{ at: `${edited[0]}:1:1`, prop: 'padding', files: edited }] });
+  const p = gitPanel({ opened: () => false, run: logged, post: (m) => void sent.push(m), rows: () => [{ at: `${edited[0]}:1:1`, prop: 'padding', files: edited }] });
   const view = () => (sent.filter((m) => m.kind === ToView.Git).at(-1) as { view: GitView }).view;
   const result = () => sent.filter((m) => m.kind === ToView.GitResult).at(-1) as Extract<ViewMessage, { kind: ToView.GitResult }>;
   return { p, view, result, calls };

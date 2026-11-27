@@ -9,6 +9,10 @@ The **Changes** tab has a commit area above the list of edits. It runs the `git`
 
 ## What you see
 
+The commit area starts collapsed as one row: **Commit 2 changes**, the branch, and a **Commit & push** button. The arrow opens the rest, and Feega remembers whether you left it open. A message that needs action, such as a rejected push, opens it by itself.
+
+Open, it shows:
+
 - A header such as **Commit 2 changes in 1 file**. One commit holds every edit listed under **Included in this commit**, together. Edits are not committed one at a time.
 - The current branch, and how many commits it is ahead of or behind its upstream.
 - A commit message, prefilled from your edits, for example `Update padding and font size in Hero`. Change it freely.

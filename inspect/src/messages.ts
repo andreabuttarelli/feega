@@ -254,7 +254,8 @@ export enum ToHost {
   GitPull = 'git-pull',
   GitPullPush = 'git-pull-push',
   GitIdentity = 'git-identity',
-  GitFix = 'git-fix'
+  GitFix = 'git-fix',
+  GitOpen = 'git-open'
 }
 
 export enum WebviewUsage {
@@ -303,11 +304,11 @@ export enum GitFix {
   CopyRemote = 'copy-remote'
 }
 
-export type GitView = { state: GitState; branch: string | null; upstream: string | null; remote: string | null; ahead: number; behind: number; feega: string[]; others: string[]; message: string };
+export type GitView = { state: GitState; branch: string | null; upstream: string | null; remote: string | null; ahead: number; behind: number; feega: string[]; others: string[]; message: string; open: boolean };
 
 export type ChangeRow = { id: number; at: string; prop: string; value: string; scope: string; files: string[]; time: number; by?: string };
 
-export type Prefs = { size: string; custom: number | null; barClosed: boolean; route?: string; anchor?: string; dock?: { edge: string; offset: number }; barWidth?: number; leftWidth?: number; leftClosed?: boolean; layers?: Record<string, { hidden: string[]; locked: string[] }> };
+export type Prefs = { size: string; custom: number | null; barClosed: boolean; route?: string; anchor?: string; dock?: { edge: string; offset: number }; barWidth?: number; leftWidth?: number; leftClosed?: boolean; gitOpen?: boolean; layers?: Record<string, { hidden: string[]; locked: string[] }> };
 
 export type ChatRow = { id: string; agent: AcpId; title: string; updatedAt: number; running: boolean };
 
@@ -507,6 +508,7 @@ export type HostMessage =
   | { kind: ToHost.GitPullPush }
   | { kind: ToHost.GitIdentity; name: string; email: string }
   | { kind: ToHost.GitFix; agent: AcpId }
+  | { kind: ToHost.GitOpen; open: boolean }
   | { kind: ToHost.AgentAnswer; id: number; png: string | null; text: string | null };
 
 export type Authored = HostMessage & { by?: Author };

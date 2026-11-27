@@ -7,7 +7,7 @@ export type GitOut = { code: number; out: string; err: string };
 
 export type GitRun = (args: string[]) => Promise<GitOut>;
 
-export type GitPanelHost = { run: GitRun; post: (message: ViewMessage) => unknown; rows: () => EditedRow[] };
+export type GitPanelHost = { opened: () => boolean; run: GitRun; post: (message: ViewMessage) => unknown; rows: () => EditedRow[] };
 
 type Snapshot = { view: GitView; status: GitStatus };
 
@@ -47,7 +47,7 @@ const explain = (err: string) => FAILURE_TEXT[failureOf(err)] ?? reasonOf(err);
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
-export function gitPanel({ run, post, rows }: GitPanelHost) {
+export function gitPanel({ opened, run, post, rows }: GitPanelHost) {
   let turn: Promise<unknown> = Promise.resolve();
   let last: GitFailed | null = null;
 
@@ -57,7 +57,7 @@ export function gitPanel({ run, post, rows }: GitPanelHost) {
     return next;
   };
 
-  const empty = (state: GitState): GitView => ({ state, branch: null, upstream: null, remote: null, ahead: 0, behind: 0, feega: [], others: [], message: '' });
+  const empty = (state: GitState): GitView => ({ state, branch: null, upstream: null, remote: null, ahead: 0, behind: 0, feega: [], others: [], message: '', open: opened() });
 
   async function snapshot(): Promise<Snapshot> {
     const none = { branch: null, upstream: null, ahead: 0, behind: 0, paths: [] };
@@ -76,7 +76,7 @@ export function gitPanel({ run, post, rows }: GitPanelHost) {
     const inRepo = new Set(edited.flatMap((r) => r.files.map((f) => prefix.out.trim() + f)));
     const { feega, others } = splitFiles(parsed.paths, inRepo);
     const message = commitMessage(edited);
-    return { view: { state: GitState.Ready, branch: parsed.branch, upstream: parsed.upstream, remote, ahead: parsed.ahead, behind: parsed.behind, feega, others, message }, status: parsed };
+    return { view: { state: GitState.Ready, branch: parsed.branch, upstream: parsed.upstream, remote, ahead: parsed.ahead, behind: parsed.behind, feega, others, message, open: opened() }, status: parsed };
   }
 
   const show = async () => {

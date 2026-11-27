@@ -2,7 +2,7 @@ import { GitAfter, GitFix, GitScope, GitState, type GitView } from '../messages'
 
 export type GitNotice = { text: string; fix: GitFix };
 
-export type GitUi = { header: string; notice: GitNotice | null; branchLine: string; files: string[]; primary: GitAfter; canCommit: boolean; canPush: boolean; showPush: boolean };
+export type GitUi = { header: string; summary: string; attention: boolean; notice: GitNotice | null; branchLine: string; files: string[]; primary: GitAfter; canCommit: boolean; canPush: boolean; showPush: boolean };
 
 const NO_GIT = 'Git is not installed or not on your PATH. Install it to commit from Feega.';
 const NOT_A_REPO = 'This folder is not a git repository.';
@@ -59,6 +59,14 @@ function headerOf(scope: GitScope, files: number, changes: number): string {
   return `Commit ${plural(changes, 'change')} in ${plural(files, 'file')}`;
 }
 
+const ATTENTION = new Set([GitFix.Pull, GitFix.Sync, GitFix.CopyInit]);
+
+export const expandedOf = (open: boolean, attention: boolean, failed: boolean) => open || attention || failed;
+
+function summaryOf(scope: GitScope, files: number, changes: number): string {
+  return scope === GitScope.All ? `Commit all ${plural(files, 'changed file')}` : `Commit ${plural(changes, 'change')}`;
+}
+
 function behindNotice(view: GitView): GitNotice | null {
   if (!view.upstream || !view.behind) {
     return null;
@@ -69,20 +77,22 @@ function behindNotice(view: GitView): GitNotice | null {
   return { text: `${view.branch} is ${plural(view.behind, 'commit')} behind ${view.upstream}.`, fix: GitFix.Pull };
 }
 
-const OFF: Omit<GitUi, 'notice'> = { header: '', branchLine: '', files: [], primary: GitAfter.Stay, canCommit: false, canPush: false, showPush: false };
+const OFF: Omit<GitUi, 'notice' | 'attention'> = { header: '', summary: '', branchLine: '', files: [], primary: GitAfter.Stay, canCommit: false, canPush: false, showPush: false };
 
 export function gitUi(view: GitView, scope: GitScope, message: string, changes: number): GitUi {
   if (view.state === GitState.NoGit) {
-    return { ...OFF, notice: { text: NO_GIT, fix: GitFix.None } };
+    return { ...OFF, notice: { text: NO_GIT, fix: GitFix.None }, attention: false };
   }
   if (view.state === GitState.NotRepo) {
-    return { ...OFF, notice: { text: NOT_A_REPO, fix: GitFix.CopyInit } };
+    return { ...OFF, notice: { text: NOT_A_REPO, fix: GitFix.CopyInit }, attention: true };
   }
   const files = scope === GitScope.All ? [...view.feega, ...view.others] : view.feega;
   const canPush = Boolean(view.branch && view.remote && (view.ahead > 0 || !view.upstream));
   const notice = behindNotice(view) ?? (!view.remote ? { text: NO_REMOTE, fix: GitFix.CopyRemote } : null) ?? (!files.length ? { text: NOTHING, fix: GitFix.None } : null);
   return {
     header: headerOf(scope, files.length, changes),
+    summary: summaryOf(scope, files.length, changes),
+    attention: notice !== null && ATTENTION.has(notice.fix),
     notice,
     branchLine: branchLineOf(view),
     files,

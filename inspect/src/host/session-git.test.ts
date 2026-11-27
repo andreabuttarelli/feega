@@ -46,7 +46,7 @@ function setup() {
     send: (m: ViewMessage) => sent.push(m),
     receive: (h: typeof handle) => void (handle = h),
     settings: () => ({}),
-    stored: () => undefined,
+    stored: (key: string) => stored.filter((s) => s.key === key).at(-1)?.value,
     store: async (key: string, value: unknown) => void stored.push({ key, value }),
     log: () => undefined,
     account: memoryAccountStore(),
@@ -88,6 +88,22 @@ describe('commit and push from the Changes tab', () => {
     await handle({ kind: ToHost.GitRefresh });
 
     expect(sent.filter((m) => m.kind === ToView.Git)).toEqual([expect.objectContaining({ view: expect.objectContaining({ state: GitState.NoGit }) })]);
+  });
+
+  it('starts collapsed and remembers the commit area opened, through later prefs saves', async () => {
+    const { send, view } = setup();
+    await send({ kind: ToHost.GitRefresh });
+
+    expect(view().open).toBe(false);
+
+    await send({ kind: ToHost.GitOpen, open: true });
+
+    expect(view().open).toBe(true);
+
+    await send({ kind: ToHost.Prefs, prefs: { size: 'full', custom: null, barClosed: false } });
+    await send({ kind: ToHost.GitRefresh });
+
+    expect(view().open).toBe(true);
   });
 
   it('pulls and pushes from one message', async () => {

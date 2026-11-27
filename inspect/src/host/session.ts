@@ -395,7 +395,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     ? pluginsSession({ host: { root: platform.plugins.root, dev: () => platform.plugins!.dev().map((folder) => resolve(root, folder)) }, post, notify: platform.notify, onInstalled: () => usage?.track(UsageKind.PluginInstalled) })
     : null;
 
-  const gitChanges = gitPanel({ run: async (args) => (platform.git ? platform.git(root)(args) : { code: GIT_MISSING, out: '', err: '' }), post, rows: () => edits.history() });
+  const gitChanges = gitPanel({ opened: () => platform.stored<Prefs>(Stored.Prefs)?.gitOpen ?? false, run: async (args) => (platform.git ? platform.git(root)(args) : { code: GIT_MISSING, out: '', err: '' }), post, rows: () => edits.history() });
   async function agentFixes(agent: AcpId) {
     const prompt = await gitChanges.fixPrompt();
     if (!prompt) {
@@ -830,7 +830,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.Picked]: (m) => (picks.get(m.id)?.(m.pick), picks.delete(m.id)),
     [ToHost.Restart]: () => startServer(),
     [ToHost.External]: (m) => platform.openExternal(m.url),
-    [ToHost.Prefs]: (m) => platform.store(Stored.Prefs, m.prefs),
+    [ToHost.Prefs]: (m) => platform.store(Stored.Prefs, { ...m.prefs, gitOpen: platform.stored<Prefs>(Stored.Prefs)?.gitOpen }),
     [ToHost.Server]: (m) => SERVER_ACTIONS[m.action](),
     [ToHost.SaveVariable]: (m) => edits.saveVariable(m.ask, m.name).then((out) => edited(out, m.ask)),
     [ToHost.Font]: (m) => edits.font(m.ask, m.google).then((out) => edited(out, m.ask)),
@@ -880,6 +880,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.GitPullPush]: () => gitChanges.pullAndPush(),
     [ToHost.GitIdentity]: (m) => gitChanges.identity(m.name, m.email),
     [ToHost.GitFix]: (m) => agentFixes(m.agent),
+    [ToHost.GitOpen]: (m) => platform.store(Stored.Prefs, { ...platform.stored<Prefs>(Stored.Prefs), gitOpen: m.open }).then(() => gitChanges.refresh()),
     [ToHost.Usage]: (m) => usage?.track(WEBVIEW_USAGE[m.event], webviewDimsOf(m.dims)),
     [ToHost.Comments]: comments.show,
     [ToHost.CommentAdd]: (m) => (usage?.track(UsageKind.CloudAction, { action: 'comment_add' }), comments.add(m.draft)),
