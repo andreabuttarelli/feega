@@ -1,12 +1,12 @@
 ---
 title: Plugins
-description: Plugins ship with Feega Inspect, Mesh gradient, 3D object, Lucide icons, Brand logos and Gradient presets. Plugins run sandboxed and change your code only through the same edit engine as manual edits.
+description: Plugins ship with Feega Inspect, Mesh gradient, 3D object, Lucide icons, Brand logos, Gradient presets and Phosphor icons. Plugins run sandboxed and change your code only through the same edit engine as manual edits.
 sidebar:
   order: 4
 ---
 
-Plugins add controls to Feega Inspect. Five are built in and on by default: **Mesh gradient**,
-**3D object**, **Lucide icons**, **Brand logos** and **Gradient presets**. You can also install third-party plugins or load one from a folder while you build
+Plugins add controls to Feega Inspect. Six are built in and on by default: **Mesh gradient**,
+**3D object**, **Lucide icons**, **Brand logos**, **Gradient presets** and **Phosphor icons**. You can also install third-party plugins or load one from a folder while you build
 it: see [Write a plugin](/integrations/write-a-plugin/).
 
 ## Browse plugins
@@ -129,6 +129,29 @@ The preset is written as the element's background image through the same edit en
 style change: a `background-image` declaration in the element's stylesheet rule (Svelte and Vue
 `<style>`, CSS modules for React) or its inline style when the file has no stylesheet. This is true
 in Tailwind projects too. Each click is one undoable step.
+
+## Phosphor icons
+
+Works like Lucide icons: search box, grid, **Insert**. Search matches names and Phosphor's tags
+("photography" finds the camera). Options:
+
+- **Weight**: thin, light, regular, bold, fill or duotone. The grid redraws in the weight you pick.
+- **Size** and **Text colour** or **Colour**.
+
+Insert writes `src/feega/icons/<Name>Icon`. With inline SVG, every weight is its own file
+(`CameraIcon`, `CameraBoldIcon`), so several weights of one icon can live together. If the project
+depends on `@phosphor-icons/react` or `@phosphor-icons/vue`, the file re-exports (React) or wraps
+(Vue) that library's component and the weight is written as a `weight` prop. `@phosphor-icons/web`
+and Svelte or Astro files use inline SVG. Nothing is added to `package.json`.
+
+Feega bundles only the list of icon names and tags. Each icon file, in the weight you pick, is
+downloaded when it first appears in the grid or is inserted, from jsDelivr (`cdn.jsdelivr.net`,
+with `unpkg.com` as a fallback), at the exact `@phosphor-icons/core` version the list was built
+from. **The first use needs internet**; icons already shown stay available for the session, the
+others show "Icons need internet the first time." with a **Retry** button. The downloads go through
+Feega, not the panel.
+
+Phosphor Icons are released under the MIT licence, Copyright Phosphor Icons.
 
 ## Safety
 
