@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createApi, type Port } from '@feega/plugin-api/client';
 import { createPluginHost, type EditorPort } from '@feega/plugin-api/host';
 import { parseManifest } from '@feega/plugin-api/manifest';
@@ -9,6 +9,8 @@ import { CHOSEN, COLOUR, INSERT, LABEL, QUERY, SECTION, SIZE, WEIGHT, phosphorPl
 const at = (file: string): Selection => ({ source: { file, line: 4, col: 3 }, component: null, tag: 'section', name: 'section', classes: '', rect: { x: 0, y: 0, width: 1, height: 1 }, styles: {}, attributes: [] });
 
 const SVELTE = at('src/Hero.svelte');
+const SETTLE_MS = 50;
+const ICONS_READY_MS = 10_000;
 const PLAIN: ProjectInfo = { typescript: true, publicDir: 'public', packages: {} };
 
 function load(initial: Selection | null, project: ProjectInfo = PLAIN) {
@@ -33,7 +35,12 @@ function load(initial: Selection | null, project: ProjectInfo = PLAIN) {
   host.load(parsed.manifest, '');
   const port: Port = { post: (m) => queueMicrotask(() => toHost(m)), listen: (h) => (toPlugin = h) };
   phosphorPlugin(createApi(port));
-  const settle = () => new Promise((resolve) => setTimeout(resolve, 300));
+  const settle = async () => {
+    await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
+    if (initial) {
+      await vi.waitFor(() => expect(host.ui(parsed.manifest.id, SECTION).length).toBeGreaterThan(0), { timeout: ICONS_READY_MS });
+    }
+  };
   const ui = () => host.ui(parsed.manifest.id, SECTION);
   const control = async (id: string, value: string | number | boolean) => {
     host.control(parsed.manifest.id, SECTION, id, value);
