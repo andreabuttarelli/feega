@@ -1,0 +1,21 @@
+{
+  "name": "trailer",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "clicks": "esbuild scripts/clicks.ts --bundle --platform=node --jsx=automatic --log-level=error --outfile=out/clicks.cjs && node out/clicks.cjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@remotion/cli": "^4.0.300",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "^4.0.300",
+    "simple-icons": "^16.38.1"
+  }
+}
