@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createApi, type Port } from '@feega/plugin-api/client';
 import { createPluginHost, type EditorPort } from '@feega/plugin-api/host';
 import { parseManifest } from '@feega/plugin-api/manifest';
@@ -11,6 +11,7 @@ import { CHOSEN, INSERT, QUERY, SECTION, lucidePlugin } from '@feega/plugin-luci
 import { fileEdits } from './file-edits';
 
 const SETTLE_MS = 60;
+const ICONS_READY_MS = 10_000;
 
 const selectionOf = (file: string, line: number, col: number): Selection => ({ source: { file, line, col }, component: null, tag: 'section', name: 'section', classes: '', rect: { x: 0, y: 0, width: 1, height: 1 }, styles: {}, attributes: [] });
 
@@ -44,7 +45,10 @@ async function insertCamera(file: string, page: string, packages: Record<string,
   host.load(parsed.manifest, '');
   const port: Port = { post: (m) => queueMicrotask(() => toHost(m)), listen: (h) => (toPlugin = h) };
   lucidePlugin(createApi(port));
-  const settle = () => new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
+  const settle = async () => {
+    await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
+    await vi.waitFor(() => expect(host.ui(parsed.manifest.id, SECTION).length).toBeGreaterThan(0), { timeout: ICONS_READY_MS });
+  };
   await settle();
   for (const [id, value] of [[QUERY, 'camera'], [CHOSEN, 'camera'], [INSERT, true]] as const) {
     host.control(parsed.manifest.id, SECTION, id, value);

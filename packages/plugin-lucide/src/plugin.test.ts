@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createApi, type Port } from '@feega/plugin-api/client';
 import { createPluginHost, type EditorPort } from '@feega/plugin-api/host';
 import { parseManifest } from '@feega/plugin-api/manifest';
@@ -10,6 +10,8 @@ const at = (file: string): Selection => ({ source: { file, line: 4, col: 3 }, co
 
 const SVELTE = at('src/Hero.svelte');
 const AT = 'src/Hero.svelte:4:3';
+const SETTLE_MS = 40;
+const ICONS_READY_MS = 10_000;
 const PLAIN: ProjectInfo = { typescript: true, publicDir: 'public', packages: {} };
 
 function load(initial: Selection | null, project: ProjectInfo = PLAIN) {
@@ -39,7 +41,12 @@ function load(initial: Selection | null, project: ProjectInfo = PLAIN) {
   host.load(parsed.manifest, '');
   const port: Port = { post: (m) => queueMicrotask(() => toHost(m)), listen: (h) => (toPlugin = h) };
   lucidePlugin(createApi(port));
-  const settle = () => new Promise((resolve) => setTimeout(resolve, 40));
+  const settle = async () => {
+    await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
+    if (selection) {
+      await vi.waitFor(() => expect(host.ui(parsed.manifest.id, SECTION).length).toBeGreaterThan(0), { timeout: ICONS_READY_MS });
+    }
+  };
   const ui = () => host.ui(parsed.manifest.id, SECTION);
   const control = async (id: string, value: string | number | boolean, live = false) => {
     host.control(parsed.manifest.id, SECTION, id, value, live);
