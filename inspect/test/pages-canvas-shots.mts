@@ -23,11 +23,8 @@ assert.deepEqual(
 );
 assert.equal(await page.locator('[data-testid="canvas-example"]').first().textContent(), 'primo-post');
 
-const live = () => page.locator('[data-testid="canvas-frame"][data-live="true"]').count();
-await page.waitForTimeout(4000);
-assert.ok((await live()) <= 6, 'live frames stay under the cap');
-assert.equal(await page.locator('[data-testid="canvas-frame"] iframe').count() <= 12, true);
-assert.equal(await page.locator('[data-testid="canvas-frame"][data-key^="/docs"] iframe').count(), 0);
+await page.waitForFunction(() => document.querySelectorAll('[data-testid="canvas-frame"][data-snap="true"]').length > 0, undefined, { timeout: 60000 });
+assert.equal(await page.locator('[data-testid="canvas-frame"] iframe').count(), 0, 'the canvas holds snapshots, not live frames');
 const blogOpen = page.locator('[data-testid="canvas-frame"][data-key="/blog/[slug]::desktop"] [data-testid="canvas-open"]');
 assert.equal(await blogOpen.getAttribute('aria-label'), 'Open /blog/primo-post at Desktop');
 assert.equal(await blogOpen.isDisabled(), false);

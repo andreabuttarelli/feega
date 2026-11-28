@@ -49,7 +49,7 @@
   import LayersTree from './LayersTree.svelte';
   import FocusControls from './FocusControls.svelte';
   import TabBar from './TabBar.svelte';
-  import { Presentation, VIEWS, ViewKind, barControlsOf, presentationOf, rowTabsOf, shellTabsOf, tabsOf } from './views';
+  import { Chrome, Presentation, VIEWS, ViewKind, barControlsOf, chromeOf, presentationOf, rowTabsOf, shellTabsOf, tabsOf } from './views';
   import ComponentProps from './ComponentProps.svelte';
   import { propTally } from './focus-usage';
   import { applyAskOf } from './apply-plan';
@@ -67,6 +67,8 @@
   import { CanvasKind, LeftTab, Tab } from './tabs';
   import PagesList from './PagesList.svelte';
   import PagesCanvas from './PagesCanvas.svelte';
+  import { sessionSnaps } from './canvas-session';
+  import { forgetPages } from './canvas-stale';
   import ComponentsCanvas from './ComponentsCanvas.svelte';
   import { ExampleProps } from './component-props.svelte';
   import ComponentsList from './ComponentsList.svelte';
@@ -100,6 +102,7 @@
   import CommentsList from './CommentsList.svelte';
   import AiPanel from './AiPanel.svelte';
   import { browserAlerts, desktopBridge } from './alerts';
+  import { BRIDGE_GRACE_MS, emptyText, Preview, previewOf } from './preview-load';
   import { answerAsk } from './agent-ask';
   import { ai, aiHeard } from './ai-state.svelte';
   import { gitHeard } from './git-state.svelte';
@@ -148,6 +151,11 @@
   let serverReason = $state('');
   let serverInfo = $state<ServerInfo | null>(null);
   let bridged = $state(false);
+  let everBridged = $state(false);
+  let pageLoaded = $state(false);
+  let loadTick = $state(0);
+  let graceOver = $state(false);
+  let phase = $state<string | null>(null);
   let mode = $state(Mode.Design);
   let editing = $state(false);
   let textPending: string | null = null;
@@ -268,6 +276,7 @@
   let scope = $state(Scope.Element);
   const classInfo = $derived(classOfKey(classesState.view, classesState.targetKey));
   const classTarget = $derived(classInfo ? editTarget(classInfo) : null);
+  let componentFolders = $state<string[]>([]);
   let layersOpen = $state<Record<string, boolean>>({ '(html):0:0': true, '(page):0:0': true });
   const layerDrag = $state<{ source: Source | null; name: string; component: boolean; parentFile: string | null; hint: { id: string; place: AddPlace } | null }>({ source: null, name: '', component: false, parentFile: null, hint: null });
 
@@ -336,6 +345,14 @@
     toHost({ kind: ToHost.OnboardingDone, outcome });
   }
 
+  const previewState = $derived(previewOf({ bridged, pageLoaded, graceOver }));
+  $effect(() => {
+    loadTick;
+    graceOver = false;
+    const timer = setTimeout(() => (graceOver = true), BRIDGE_GRACE_MS);
+    return () => clearTimeout(timer);
+  });
+
   const history = browseHistory();
   let savedPrefs = false;
   const fit = $derived(fitOf(size, custom, stage));
@@ -363,6 +380,8 @@
         showToast('Page reloaded · scroll and selection kept');
       }
       bridged = true;
+      everBridged = true;
+      phase = null;
       if (injected) {
         bridge.preview(injected.source, injected.css, injected.inner, injected.state);
       }
@@ -585,6 +604,7 @@
     if (!url || !frame) {
       return;
     }
+    pageLoaded = false;
     frame.src = new URL(route, url).toString();
   }
 
@@ -637,6 +657,7 @@
     }
     bridge.leave();
     bridged = false;
+    pageLoaded = false;
     server = ServerState.Reloading;
     frame!.src = new URL(path, url).toString();
   }
@@ -744,7 +765,7 @@
   const componentProps = new ExampleProps(() => savePrefs());
 
   function savePrefs() {
-    toHost({ kind: ToHost.Prefs, prefs: { size, custom, barClosed, route, anchor, dock: docked ?? undefined, barWidth, leftWidth, leftClosed, examples: $state.snapshot(manual), components: componentProps.saved(), layers: layerFlags.saved() } });
+    toHost({ kind: ToHost.Prefs, prefs: { size, custom, barClosed, route, anchor, dock: docked ?? undefined, barWidth, leftWidth, leftClosed, examples: $state.snapshot(manual), components: componentProps.saved(), layers: layerFlags.saved(), componentFolders } });
   }
 
   function restore(prefs: Prefs | null) {
@@ -763,6 +784,7 @@
     leftClosed = prefs.leftClosed ?? leftClosed;
     manual = prefs.examples ?? manual;
     componentProps.load(prefs.components);
+    componentFolders = prefs.componentFolders ?? componentFolders;
     for (const [r, flags] of Object.entries((prefs.layers ?? {}) as SavedLayers)) {
       flags.hidden.forEach((k) => layerFlags.toggle('hidden', r, k));
       flags.locked.forEach((k) => layerFlags.toggle('locked', r, k));
@@ -789,6 +811,7 @@
       }
     },
     [ToView.Server]: (m) => ((server = m.state), (restarting = restarting ? m.state !== ServerState.Stopped : m.state === ServerState.Restarting), (serverReason = m.reason ?? ''), (serverInfo = m.info ?? serverInfo)),
+    [ToView.Phase]: (m) => (phase = m.text),
     [ToView.Reload]: () => reloadAfterRestart(),
     [ToView.PageCreated]: (m) => go(m.route),
     [ToView.Impact]: (m) => (m.id === impactId ? (impact = m.impact) : impact),
@@ -850,7 +873,7 @@
     [ToView.Library]: (m) => (libraryItems = m.items),
     [ToView.Routes]: (m) => (projectRoutes = m.routes),
     [ToView.Components]: (m) => (projectComponents = m.components),
-    [ToView.FilesChanged]: (m) => (filesChanged = { files: m.files }),
+    [ToView.FilesChanged]: (m) => (canvasShown !== CanvasKind.Pages && forgetPages(sessionSnaps, m.files), (filesChanged = { files: m.files })),
     [ToView.Comments]: (m) => (cloud = { enabled: m.enabled, comments: m.comments, review: m.review ?? cloud.review, error: m.error ?? '' }),
     [ToView.Onboarding]: (m) => (onboarding = m.state),
     [ToView.Support]: (m) => (support = m.done),
@@ -1396,6 +1419,7 @@
 
   const CANVAS_VIEW: Record<CanvasKind, ViewKind> = { [CanvasKind.Pages]: ViewKind.PagesCanvas, [CanvasKind.Components]: ViewKind.ComponentsCanvas };
   const shown = $derived(canvasShown ? CANVAS_VIEW[canvasShown] : focus && viewing === View.Focus ? ViewKind.Focus : ViewKind.Editor);
+  const bare = $derived(chromeOf(shown) === Chrome.Bare);
   const viewTabs = $derived(tabsOf({ focus: focus?.name ?? null, pages: pagesOpen, components: componentsOpen }, shown));
 
   const SHOW_VIEW: Record<ViewKind, () => void> = {
@@ -1683,7 +1707,7 @@
 <svelte:window onkeydown={onKey} />
 
 {#if viewsAt === Presentation.TopRow}<TabBar tabs={rowTabsOf(project || VIEWS[ViewKind.Editor].title(''), viewTabs)} onselect={showView} onclose={closeView} bind:height={rowH} />{/if}
-<main bind:clientWidth={viewW} style={`--row: ${rowH}px; grid-template-columns: ${leftPx}px minmax(0, 1fr) ${barPx}px; --bar: ${barPx}px; --left: ${leftPx}px`} class:sizing={sizing || leftSizing}>
+<main bind:clientWidth={viewW} style={`--row: ${rowH}px; grid-template-columns: ${bare ? 0 : leftPx}px minmax(0, 1fr) ${bare ? 0 : barPx}px; --bar: ${barPx}px; --left: ${leftPx}px`} class:sizing={sizing || leftSizing} class:bare>
   <aside class="left" class:closed={leftClosed}>
     {#if libraryOpen}
       <LibraryPanel items={libraryItems} canInsert={!!picked} oninsert={(id) => picked && insertLibrary(id, picked.source, AddPlace.After)} onclose={() => (libraryOpen = false)} />
@@ -1695,7 +1719,7 @@
       <Tabs.Trigger value={LeftTab.Components} class="tab" data-testid="components-tab">Components</Tabs.Trigger>
     </Tabs.List>
     <Tabs.Content value={LeftTab.Layers}>
-    <ActionBanner title="Add element" hint={picked ? 'Insert after the selection (/)' : 'Select an element first'} testid="add-button" icon={Plus} disabled={!picked} onopen={(e) => openAddMenu(e.clientX, e.clientY)} />
+    <ActionBanner title="Add element" testid="add-button" icon={Plus} disabled={!picked} onopen={(e) => openAddMenu(e.clientX, e.clientY)} />
     <div class="layers" role="tree" aria-label="Layers" data-testid="layers">
       <LayersTree nodes={layers} {picked} selected={selectedKeys} badge={badgeOf(elementState)} open={layersOpen} onselect={selectRow} onhover={hoverLayer} onopen={(at) => toHost({ kind: ToHost.Open, at })} onmove={moveLayer} onusage={moveUsage} dragging={layerDrag} hidden={hiddenNow} locked={lockedNow} ontoggle={toggleFlag} oncontext={openLayerMenu} onadd={layerAdd} onfocus={(node) => viewing === View.Page && enterFocus(rowFocus(node))} ondelete={deleteRow} />
     </div>
@@ -1704,7 +1728,7 @@
       <PagesList rows={pages} onopen={go} onadd={typedExample} oncanvas={() => openCanvas(CanvasKind.Pages)} />
     </Tabs.Content>
     <Tabs.Content value={LeftTab.Components}>
-      <ComponentsList rows={projectComponents} props={componentProps} onopen={openComponent} oncanvas={() => openCanvas(CanvasKind.Components)} />
+      <ComponentsList rows={projectComponents} props={componentProps} open={componentFolders} onfolders={(open) => ((componentFolders = open), savePrefs())} onopen={openComponent} oncanvas={() => openCanvas(CanvasKind.Components)} />
     </Tabs.Content>
     </Tabs.Root>
     {/if}
@@ -1738,7 +1762,8 @@
       <div class="frame" class:framed={size !== Size.Full} class:device={deviceFrame} style={`width:${fit.width * fit.scale}px;height:${fit.height * fit.scale}px${deviceFrame ? `;--bezel:${deviceFrame.bezel * fit.scale}px;--screen-radius:${deviceFrame.radius * fit.scale}px` : ''}`}>
         <div class="screen">
         <div class="page" style={`left:${pageBox.left * fit.scale}px;top:${pageBox.top * fit.scale}px;width:${pageBox.width * fit.scale}px;height:${pageBox.height * fit.scale}px`}>
-        {#if url}<iframe bind:this={frame} src={start} title="App" data-testid="app-frame" style={`width:${pageBox.width}px;height:${pageBox.height}px;transform:scale(${fit.scale})`}></iframe>{/if}
+        {#if url}<iframe bind:this={frame} src={start} title="App" data-testid="app-frame" onload={() => ((pageLoaded = true), loadTick++)} style={`width:${pageBox.width}px;height:${pageBox.height}px;transform:scale(${fit.scale})`}></iframe>{/if}
+        {#if url && !everBridged && previewState === Preview.Loading}<div class="loading" data-testid="preview-loading" role="status"><span class="spinner"></span><span class="loading-text">{phase ?? 'Loading the page…'}</span></div>{/if}
         {#if mode === Mode.Design && bridged && !editing}
           <div class="overlay" role="presentation" onpointerdown={pressOverlay} onpointermove={(e) => (pointed(e), dragOverlay(e))} onpointerleave={() => ((hover = null), toHost({ kind: ToHost.Cursor, at: null }))} onclick={onPick} oncontextmenu={onMenu} ondragover={overAdd} ondragleave={() => (addSpot = null)} ondrop={dropAdd} ondblclick={onDouble} onwheel={wheelOnFocus}>
             {#if hover && !lostSlots[Slot.Hovered]}<div class="outline hover" style={box(hover)}></div>{/if}
@@ -1774,6 +1799,7 @@
       {#if !url}
         <div class="server-card" data-testid="server-card" data-state={server}>
           <p class="server-label"><span class="server-dot-inline {serverLook(server).dot}"></span>{serverLook(server).label}</p>
+          {#if phase}<p class="server-phase">{phase}</p>{/if}
           {#if serverReason}<pre class="server-reason">{serverReason}</pre>{/if}
           <div class="server-actions">
             {#each actionsOf(server, false) as action (action)}
@@ -1897,7 +1923,7 @@
           <PluginSections {plugins} {palette} />
           <Interactions pick={picked} {changes} />
         {:else}
-          <p class="empty">{bridged ? 'Click an element to edit it. Double-click text to rewrite it.' : 'The page has no Feega source map: element picking needs the feega-source-map plugin.'}</p>
+          <p class="empty">{emptyText(previewState)}</p>
         {/if}
       </Tabs.Content>
       <Tabs.Content value={Tab.Changes}>
@@ -1930,6 +1956,23 @@
     height: calc(100vh - var(--row, 0px));
     overflow: hidden;
     transition: grid-template-columns 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  main.bare {
+    --top-row: 0px;
+  }
+
+  main.bare .left,
+  main.bare .right {
+    visibility: hidden;
+  }
+
+  main.bare .toolbar {
+    display: none;
+  }
+
+  main.bare .backdrop {
+    visibility: hidden;
   }
 
   .view {
@@ -2570,6 +2613,37 @@
     word-break: break-word;
   }
 
+  .loading {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    background: var(--ui-panel);
+    color: var(--ui-text-2);
+    font-size: var(--ui-text-sm);
+    pointer-events: none;
+  }
+  .spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--ui-divider);
+    border-top-color: var(--ui-text-2);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  .server-phase {
+    margin: 0;
+    color: var(--ui-text-2);
+    font-size: var(--ui-text-sm);
+  }
   .restarting {
     position: absolute;
     inset: 0;

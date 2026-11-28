@@ -8,7 +8,7 @@ export const STICKY_MARGIN = 300;
 
 export type Placed = Pick<CanvasFrame, 'key' | 'target' | 'x' | 'y' | 'width' | 'height'>;
 
-const touches = (f: Placed, view: CanvasView, viewport: Viewport, margin: number) => {
+export const touches = (f: Placed, view: CanvasView, viewport: Viewport, margin: number) => {
   const left = f.x * view.scale + view.x;
   const top = f.y * view.scale + view.y;
 
@@ -17,7 +17,7 @@ const touches = (f: Placed, view: CanvasView, viewport: Viewport, margin: number
 
 export const visibleKeys = (frames: Placed[], view: CanvasView, viewport: Viewport, margin: number): string[] => frames.filter((f) => touches(f, view, viewport, margin)).map((f) => f.key);
 
-const gapToCentre = (f: Placed, view: CanvasView, viewport: Viewport) => Math.hypot(view.x + (f.x + f.width / 2) * view.scale - viewport.w / 2, view.y + (f.y + f.height / 2) * view.scale - viewport.h / 2);
+export const gapToCentre = (f: Placed, view: CanvasView, viewport: Viewport) => Math.hypot(view.x + (f.x + f.width / 2) * view.scale - viewport.w / 2, view.y + (f.y + f.height / 2) * view.scale - viewport.h / 2);
 
 const STICKY_PULL = 400;
 

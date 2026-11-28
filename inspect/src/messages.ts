@@ -318,7 +318,7 @@ export type GitView = { state: GitState; branch: string | null; upstream: string
 
 export type ChangeRow = { id: number; at: string; prop: string; value: string; scope: string; files: string[]; time: number; by?: string };
 
-export type Prefs = { size: string; custom: number | null; barClosed: boolean; route?: string; anchor?: string; dock?: { edge: string; offset: number }; barWidth?: number; leftWidth?: number; leftClosed?: boolean; gitOpen?: boolean; examples?: Record<string, string[]>; components?: SavedComponents; layers?: Record<string, { hidden: string[]; locked: string[] }> };
+export type Prefs = { size: string; custom: number | null; barClosed: boolean; route?: string; anchor?: string; dock?: { edge: string; offset: number }; barWidth?: number; leftWidth?: number; leftClosed?: boolean; gitOpen?: boolean; componentFolders?: string[]; examples?: Record<string, string[]>; components?: SavedComponents; layers?: Record<string, { hidden: string[]; locked: string[] }> };
 
 export type ChatRow = { id: string; agent: AcpId; title: string; updatedAt: number; running: boolean };
 
@@ -349,6 +349,7 @@ export enum ToView {
   Pick = 'pick',
   Change = 'change',
   Server = 'server',
+  Phase = 'phase',
   Settings = 'settings',
   History = 'history',
   IconResults = 'icon-results',
@@ -531,6 +532,7 @@ export type Authored = HostMessage & { by?: Author };
 export type ViewMessage =
   | { kind: ToView.App; url: string; project: string; styling: Styling; prefs: Prefs | null; route?: string; breakpoints: Breakpoints; themes: Theme[]; scales: Scales | null }
   | { kind: ToView.Server; state: ServerState; reason?: string; info?: ServerInfo }
+  | { kind: ToView.Phase; text: string | null }
   | { kind: ToView.Settings; values: Settings; facts: ReportFacts }
   | { kind: ToView.History; changes: ChangeRow[]; canUndo: boolean; canRedo: boolean }
   | { kind: ToView.Status; text: string }

@@ -5,22 +5,25 @@
   import type { Snippet } from 'svelte';
   import type { Bounds } from './canvas-layout';
   import { LIVE_CAP, liveSet } from './canvas-live';
+  import { labelMetrics } from './canvas-labels';
   import { LOAD_TIMEOUT_MS, MAX_LOADING, PAINT_DELAY_MS, POOL_CAP, SETTLE_MS, planPool, settler } from './canvas-pool';
   import { CardState, statusOf, type MountStatus } from './canvas-card';
   import { shotOf } from './canvas-shot';
   import type { Hit } from './canvas-open';
   import type { Placed } from './canvas-live';
-  import { CanvasKey, actualView, canvasKeyOf, fitView, panBy, percentOf, stepView, wheelOf, zoomAround, type CanvasView, type Point } from './canvas-view';
+  import { CanvasKey, actualView, canvasKeyOf, fitView, panBy, percentOf, stepView, wheelOf, zoomAround, type CanvasView, type Point, type Viewport } from './canvas-view';
   import { untrack } from 'svelte';
+
+  type Snapshot = { url: string; capped: boolean };
 
   type Props = {
     frames: F[];
     bounds: Bounds;
     label: string;
     testid: string;
-    minLiveWidth: number;
+    minLiveWidth?: number;
     frameLabel: (frame: F) => string;
-    srcOf: (frame: F) => string | null;
+    srcOf?: (frame: F) => string | null;
     hitOf: (frame: F) => Hit;
     onopen: (frame: F) => void;
     onclose: () => void;
@@ -30,11 +33,14 @@
     frameBadge?: (frame: F) => string | null;
     onstatus?: (key: string, status: MountStatus) => void;
     reload?: Record<string, number>;
+    snapshots?: Record<string, Snapshot>;
+    unrendered?: string[];
+    onview?: (view: CanvasView, viewport: Viewport) => void;
     world?: Snippet;
     card: Snippet<[F, CardState, string]>;
   };
 
-  let { frames, bounds, label, testid, minLiveWidth, frameLabel, srcOf, hitOf, onopen, onclose, stale = null, snug = false, liveCap = LIVE_CAP, frameBadge, onstatus, reload = {}, world, card }: Props = $props();
+  let { frames, bounds, label, testid, minLiveWidth = 0, frameLabel, srcOf = () => null, hitOf, onopen, onclose, stale = null, snug = false, liveCap = LIVE_CAP, frameBadge, onstatus, reload = {}, snapshots, unrendered = [], onview, world, card }: Props = $props();
 
   const MIDDLE_BUTTON = 1;
   const SPACE_CODE = 'Space';
@@ -60,6 +66,9 @@
   const frameEls: Record<string, HTMLIFrameElement | undefined> = {};
   let queue: Promise<void> = Promise.resolve();
 
+  const labels = $derived(labelMetrics(view.scale, 0));
+  const imageOf = (key: string) => (snapshots ? snapshots[key]?.url : shots[key]);
+  const cannotRender = (key: string) => failed.includes(key) || unrendered.includes(key);
   const mounted = $derived(new Set([...pool, ...retiring].filter((key) => !failed.includes(key))));
   const settle = settler(() => (settledView = view), SETTLE_MS);
 
@@ -69,7 +78,7 @@
   }
 
   $effect(() => {
-    if (!touched && !fitted && viewport.w > 0) {
+    if (!touched && (!fitted || snapshots) && viewport.w > 0) {
       view = fitView(bounds, viewport);
       fitted = true;
     }
@@ -124,7 +133,11 @@
   });
 
   $effect(() => {
-    const next = liveSet(frames, settledView, viewport, untrack(() => live), minLiveWidth, liveCap);
+    onview?.(view, viewport);
+  });
+
+  $effect(() => {
+    const next = snapshots ? [] : liveSet(frames, settledView, viewport, untrack(() => live), minLiveWidth, liveCap);
     if (next.join() !== untrack(() => live).join()) {
       live = next;
     }
@@ -277,16 +290,17 @@
   onpointerdowncapture={press}
   style={`background-position:${view.x}px ${view.y}px`}
 >
-  <div class="world" style={`transform:translate(${view.x}px,${view.y}px) scale(${view.scale});--zoom:${view.scale}`}>
+  <div class="world" style={`transform:translate(${view.x}px,${view.y}px) scale(${view.scale});--zoom:${view.scale};--label:${labels.font}px;--label-pad:${labels.pad}px`}>
     {@render world?.()}
 
     {#each frames as frame (frame.key)}
       {@const hit = hitOf(frame)}
-      <div class="frame" class:snug style={`left:${frame.x}px;top:${frame.y}px;width:${frame.width}px;height:${frame.height}px`} data-testid="canvas-frame" data-key={frame.key} data-live={live.includes(frame.key)} data-rendered={!failed.includes(frame.key)}>
+      <div class="frame" class:snug style={`left:${frame.x}px;top:${frame.y}px;width:${frame.width}px;height:${frame.height}px`} data-testid="canvas-frame" data-key={frame.key} data-live={live.includes(frame.key)} data-rendered={!cannotRender(frame.key)} data-snap={Boolean(imageOf(frame.key))}>
         <span class="frame-label">{frameLabel(frame)}{#if frameBadge?.(frame)}<em class="badge" data-testid="canvas-badge">{frameBadge(frame)}</em>{/if}</span>
-        {#if shots[frame.key]}<img class="shot" src={shots[frame.key]} alt="" draggable="false" />{:else}
-          <div class="card" data-covered={ready.has(frame.key) && !failed.includes(frame.key)} data-state={failed.includes(frame.key) ? CardState.Failed : CardState.Loading}>{@render card(frame, failed.includes(frame.key) ? CardState.Failed : CardState.Loading, reasons[frame.key] ?? '')}</div>
+        {#if imageOf(frame.key)}<img class="shot" src={imageOf(frame.key)} alt="" draggable="false" />{:else}
+          <div class="card" data-covered={ready.has(frame.key) && !cannotRender(frame.key)} data-state={cannotRender(frame.key) ? CardState.Failed : CardState.Loading}>{@render card(frame, cannotRender(frame.key) ? CardState.Failed : CardState.Loading, reasons[frame.key] ?? '')}</div>
         {/if}
+        {#if snapshots?.[frame.key]?.capped}<div class="more" data-testid="canvas-continues">continues…</div>{/if}
         {#if mounted.has(frame.key) && srcOf(frame) !== null}
           {#key reload[frame.key] ?? 0}<iframe use:register={frame.key} src={srcOf(frame)!} title={frameLabel(frame)} tabindex="-1" data-ready={ready.has(frame.key)} class:shown={live.includes(frame.key) && ready.has(frame.key)} onload={() => onload(frame.key)} style={`width:${frame.width}px;height:${frame.height}px`}></iframe>{/key}
         {/if}
@@ -325,11 +339,11 @@
     width: 0;
     height: 0;
     transform-origin: 0 0;
-    --label: min(calc(12px / var(--zoom)), 80px);
   }
 
   .frame {
     position: absolute;
+    container-type: inline-size;
     background: var(--ui-panel);
     box-shadow: 0 0 0 calc(1px / var(--zoom)) var(--ui-divider);
   }
@@ -393,11 +407,12 @@
     position: absolute;
     bottom: 100%;
     left: 0;
-    padding-bottom: calc(6px / var(--zoom));
+    padding-bottom: var(--label-pad);
     color: var(--ui-text-2);
     max-width: 100%;
     overflow: hidden;
     font-size: var(--label);
+    line-height: 1.25;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -408,6 +423,11 @@
     font-size: 0.85em;
     font-style: normal;
     opacity: 0.7;
+  }
+
+  .shot {
+    object-fit: cover;
+    object-position: top;
   }
 
   .shot,
@@ -442,7 +462,28 @@
     justify-content: center;
     gap: calc(4px / var(--zoom));
     color: var(--ui-text-2);
-    font-size: min(calc(13px / var(--zoom)), 120px);
+    font-size: min(calc(13px / var(--zoom)), 6cqw);
+  }
+
+  .card > :global(*) {
+    max-width: 90%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .more {
+    position: absolute;
+    inset: auto 0 0 0;
+    display: grid;
+    align-items: end;
+    justify-items: center;
+    height: min(20%, 600px);
+    padding-bottom: 1em;
+    background: linear-gradient(transparent, var(--ui-panel));
+    color: var(--ui-text-2);
+    font-size: min(calc(13px / var(--zoom)), 6cqw);
+    pointer-events: none;
   }
 
   .card :global(b) {
