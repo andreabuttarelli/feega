@@ -12,7 +12,7 @@
   import SearchField from './SearchField.svelte';
   import './tree-rows.css';
 
-  type Props = { rows: ComponentRow[]; props: ExampleProps; open: string[]; onopen: (row: ComponentRow) => void; onfolders: (open: string[]) => void; oncanvas: () => void };
+  type Props = { rows: ComponentRow[]; props: ExampleProps; open: string[]; onopen: (row: ComponentRow) => void; onfolders: (open: string[]) => void; oncanvas?: () => void };
 
   let { rows, props, open, onopen, onfolders, oncanvas }: Props = $props();
 
@@ -64,7 +64,7 @@
 {/snippet}
 
 <div class="components" data-testid="components">
-  <ActionBanner testid="canvas-open-components" onopen={oncanvas} />
+  {#if oncanvas}<ActionBanner testid="canvas-open-components" onopen={oncanvas} />{/if}
   <div class="search"><SearchField label="Search components" value={query} placeholder="Search components" onsearch={(text) => (query = text)} /></div>
 
   {#if shown.length}
