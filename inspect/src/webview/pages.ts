@@ -1,5 +1,5 @@
 import type { PageRoute } from '../host/page-route';
-import { assignExamples, labelOf, matchRoute } from './route-match';
+import { assignExamples, labelOf, matchRoute } from '../route-match';
 
 export type PageExample = { path: string; label: string; current: boolean };
 
@@ -27,7 +27,7 @@ export const addExample = (manual: Record<string, string[]>, pattern: string, pa
 });
 
 function examplesOf(page: PageRoute, assigned: string[], manual: string[], here: string): PageExample[] {
-  const paths = [...new Set([...assigned, ...manual.map(pathOf)])];
+  const paths = [...new Set([...assigned, ...(page.sourced ?? []), ...manual.map(pathOf)])];
 
   return paths.map((path) => ({ path, label: labelOf(page.route, path), current: path === here }));
 }

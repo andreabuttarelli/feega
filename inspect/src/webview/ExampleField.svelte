@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { fillRoute, paramsOf } from './route-match';
+  import { fillRoute, paramsOf } from '../route-match';
 
   type Props = { pattern: string; onadd: (path: string) => void };
 

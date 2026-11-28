@@ -1,6 +1,6 @@
 type Convention = { pattern: RegExp; index: RegExp | null };
 
-export type PageRoute = { route: string; dynamic: boolean };
+export type PageRoute = { route: string; dynamic: boolean; sourced?: string[] };
 
 const CONVENTIONS: Convention[] = [
   { pattern: /^(?:src\/)?routes\/(.*?)\/?\+page\.svelte$/, index: null },

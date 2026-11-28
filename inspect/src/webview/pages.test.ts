@@ -94,6 +94,12 @@ describe('examples of a dynamic route', () => {
     expect(rows[1].examples.map((e) => e.path)).toEqual(['/blog/b', '/blog/a', '/blog/c']);
   });
 
+  it('include the ones found in the project source, after visited and linked', () => {
+    const rows = pageRows([found('/'), { ...found('/blog/[slug]', true), sourced: ['/blog/s', '/blog/a'] }], knew({ linked: ['/blog/a'], manual: { '/blog/[slug]': ['/blog/c', '/blog/s'] } }), '/');
+
+    expect(rows[1].examples.map((e) => e.path)).toEqual(['/blog/a', '/blog/s', '/blog/c']);
+  });
+
   it('ignore a path that is a declared static route', () => {
     const rows = pageRows([found('/blog/new'), found('/blog/[slug]', true)], knew({ linked: ['/blog/new', '/blog/x'] }), '/');
 
