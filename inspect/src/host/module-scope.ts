@@ -70,10 +70,22 @@ export class Scopes {
   }
 
   private scopeOf(script: string, imported: Map<string, Resolved>): Lookup {
+    const resolving = new Set<string>();
     const declared = (name: string): Resolved => {
+      if (resolving.has(name)) {
+        return UNRESOLVED;
+      }
       const pattern = new RegExp(`(?:^|[\\s;])(?:export\\s+)?(?:const|let|var)\\s+${escaped(name)}\\b\\s*(?::[^=\\n]+)?=(?!=)\\s*`).exec(script);
 
-      return pattern ? valueAt(script, pattern.index + pattern[0].length, declared) : (imported.get(name) ?? UNRESOLVED);
+      if (!pattern) {
+        return imported.get(name) ?? UNRESOLVED;
+      }
+      resolving.add(name);
+      try {
+        return valueAt(script, pattern.index + pattern[0].length, declared);
+      } finally {
+        resolving.delete(name);
+      }
     };
 
     return declared;

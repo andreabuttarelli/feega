@@ -37,3 +37,28 @@ export async function scanProject(root: string, max = MAX_FILES): Promise<Scan> 
   await walk(root, 0, found, max);
   return found;
 }
+
+const FILE_DEPTH = 10;
+
+async function collect(dir: string, depth: number, accept: RegExp, found: string[], max: number): Promise<void> {
+  if (depth > FILE_DEPTH || found.length >= max) {
+    return;
+  }
+  const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
+  for (const entry of entries) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory() && !SKIPPED_DIRS.has(entry.name)) {
+      await collect(path, depth + 1, accept, found, max);
+    }
+    if (entry.isFile() && accept.test(entry.name) && found.length < max) {
+      found.push(path);
+    }
+  }
+}
+
+export async function listFiles(root: string, accept: RegExp, max: number): Promise<string[]> {
+  const found: string[] = [];
+  await collect(root, 0, accept, found, max);
+
+  return found;
+}

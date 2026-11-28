@@ -2,6 +2,7 @@ import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { pageOfFile, type PageRoute } from './page-route';
 import { SKIPPED_DIRS } from './project-scan';
+import { withSourced } from './route-examples';
 
 const ROUTE_DIRS = ['src/routes', 'routes', 'src/app', 'app', 'src/pages', 'pages'];
 const API_ROUTE = /^\/api(\/|$)/;
@@ -35,5 +36,7 @@ export async function listRoutes(appRoot: string): Promise<PageRoute[]> {
       return inside.filter((path) => !skipped(path)).map((path) => `${dir}/${path.split('\\').join('/')}`);
     })
   );
-  return routesOf(listed.flat());
+  const files = listed.flat();
+
+  return withSourced(appRoot, files, routesOf(files));
 }

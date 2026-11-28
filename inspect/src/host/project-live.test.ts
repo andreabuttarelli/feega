@@ -62,6 +62,16 @@ describe('projectLive', () => {
     expect(routesOf(posted).at(-1)).toEqual(['/']);
   });
 
+  it('pushes the routes when a link to a dynamic page is added to a file', async () => {
+    const { root, posted } = await live(['src/routes/+page.svelte', 'src/routes/blog/[slug]/+page.svelte']);
+
+    write(root, 'src/routes/+page.svelte', '<a href="/blog/hello">Hello</a>');
+    await pause(SETTLE_MS);
+
+    const last = posted.filter((m) => m.kind === ToView.Routes).at(-1);
+    expect(last?.kind === ToView.Routes && last.routes.find((r) => r.dynamic)?.sourced).toEqual(['/blog/hello']);
+  });
+
   it('pushes the components when one is created, deleted or renamed', async () => {
     const { root, posted } = await live(['src/lib/Card.svelte']);
 
