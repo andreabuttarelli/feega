@@ -7,7 +7,7 @@ import { COPY_FOR_AGENT, menuFor, type MenuItem } from './structure-menu';
 
 const BASE: MenuItem[] = [{ id: 'text', label: 'Text' }];
 
-const entry = (plugin: string, e: Contribution) => ({ plugin, entry: e });
+const entry = (plugin: string, e: Contribution) => ({ plugin, entry: e, owns: [] });
 
 describe('itemId', () => {
   it('round-trips plugin and item, even when the item has colons or slashes', () => {

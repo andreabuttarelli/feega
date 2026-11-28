@@ -57,7 +57,7 @@ export function createPlugins(deps: PluginDeps) {
   const at = (point: Point) => {
     const pick = deps.pick();
     const selection = pick ? selectionOf(pick) : null;
-    return (version, host.contributions(point).filter((one) => holds(one.entry.when, selection)));
+    return (version, host.contributions(point).filter((one) => holds(one.entry.when, selection, one.owns)));
   };
 
   return {

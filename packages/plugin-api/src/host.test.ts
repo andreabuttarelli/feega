@@ -65,7 +65,7 @@ describe('loading', () => {
 
   it('lists contributions by point with their plugin', () => {
     const { host } = setup([], { command: [{ id: 'go', title: 'Go' }], rightBar: [{ id: 'main', title: 'Main' }] });
-    expect(host.contributions(Point.Command)).toEqual([{ plugin: 'acme.test', entry: { id: 'go', title: 'Go' } }]);
+    expect(host.contributions(Point.Command)).toEqual([{ plugin: 'acme.test', entry: { id: 'go', title: 'Go' }, owns: [] }]);
     expect(host.contributions(Point.RightBar)).toHaveLength(1);
     expect(host.contributions(Point.AddMenu)).toEqual([]);
   });
@@ -180,6 +180,13 @@ describe('contributions state', () => {
     expect(await call(Call.Render, { contribution: 'main', tree })).toMatchObject({ ok: true });
     expect(host.ui('acme.test', 'main')).toEqual(tree);
     expect(seen).toHaveBeenCalled();
+  });
+
+  it('keeps the tree a plugin rendered for its popover', async () => {
+    const { host, call } = setup([], { popover: [{ id: 'pick', title: 'Pick' }] });
+
+    expect(await call(Call.Render, { contribution: 'pick', tree })).toMatchObject({ ok: true });
+    expect(host.ui('acme.test', 'pick')).toEqual(tree);
   });
 
   it('refuses to render into a contribution it did not declare', async () => {
