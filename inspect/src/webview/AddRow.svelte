@@ -31,7 +31,7 @@
 <div class="row" role="toolbar" aria-label="Add element" data-testid="add-row">
   {#each QUICK as item (item.id)}
     {@const Icon = ICONS[item.id]}
-    <button type="button" class="add" title={`Add ${item.label}`} aria-label={`Add ${item.label}`} data-testid={`add-${item.id}`} {disabled} draggable={!disabled} ondragstart={(e) => e.dataTransfer?.setData(ADD_DRAG_TYPE, item.id)} onclick={() => onadd(item.id as AddKind)}><Icon size={15} /></button>
+    <button type="button" class="add" title={`Add ${item.label}`} aria-label={`Add ${item.label}`} data-testid={`add-kind-${item.id}`} {disabled} draggable={!disabled} ondragstart={(e) => e.dataTransfer?.setData(ADD_DRAG_TYPE, item.id)} onclick={() => onadd(item.id as AddKind)}><Icon size={15} /></button>
   {/each}
   <button type="button" class="add" title="More elements" aria-label="More elements" data-testid="add-button" {disabled} onclick={onmore}><Ellipsis size={15} /></button>
 </div>
