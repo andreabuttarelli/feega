@@ -32,7 +32,7 @@ assert.equal(await page.locator('[data-testid="canvas-frame"]').count(), names.l
 assert.ok((await page.locator('[data-testid="canvas-frame"][data-live="true"]').count()) <= 6, 'live frames stay under the cap');
 await page.screenshot({ path: SHOT_CANVAS });
 
-await page.locator('[data-testid="canvas-frame"][data-key$="::Card"] [data-testid="canvas-open"]').click();
+await page.locator('[data-testid="canvas-frame"][data-key$="::Card"] [data-testid="canvas-open"]').dblclick();
 await page.locator('[data-testid="components-canvas"]').waitFor({ state: 'detached' });
 await page.waitForTimeout(3000);
 await page.screenshot({ path: SHOT_FOCUS });

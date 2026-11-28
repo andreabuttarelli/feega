@@ -1,3 +1,4 @@
+import type { FrameSize } from './canvas-select';
 import { SIZES, Size } from './sizes';
 
 export const CANVAS_COLUMNS = [Size.Desktop, Size.Tablet, Size.Phone];
@@ -55,26 +56,31 @@ export function columnsFor(groupHeights: number[], width: number, viewport: { w:
   return best;
 }
 
-function framesOf(page: CanvasPage, columns: Size[], heights: Heights, target: string | null) {
+export type Resized = Record<string, FrameSize>;
+
+function framesOf(page: CanvasPage, columns: Size[], heights: Heights, target: string | null, resized: Resized) {
   return columns.map((size) => {
     const key = keyOf(page.route, size);
     const device = dimsOf(size);
     const pageHeight = heights[key] ?? device.height;
     const shown = target === null ? COMPACT_HEIGHT : Math.min(pageHeight, HEIGHT_CAP_FACTOR * device.height);
+    const own = resized[key];
 
-    return { key, size, width: device.width, height: shown, pageHeight };
+    return { key, size, width: own?.width ?? device.width, height: own?.height ?? shown, pageHeight };
   });
 }
 
-export function layoutCanvas(pages: CanvasPage[], columns: Size[], heights: Heights = {}, viewport: { w: number; h: number } | null = null) {
+const widthOf = (frames: { width: number }[]) => frames.reduce((sum, f) => sum + f.width, 0) + COLUMN_GAP * (frames.length - 1);
+
+export function layoutCanvas(pages: CanvasPage[], columns: Size[], heights: Heights = {}, viewport: { w: number; h: number } | null = null, resized: Resized = {}) {
   const groups = pages.map((page) => {
     const example = page.dynamic ? (page.examples?.[0] ?? null) : null;
     const target = page.dynamic ? (example?.path ?? null) : page.route;
 
-    return { page, example, target, frames: framesOf(page, columns, heights, target) };
+    return { page, example, target, frames: framesOf(page, columns, heights, target, resized) };
   });
   const tallest = groups.map((g) => Math.max(...g.frames.map((f) => f.height)));
-  const perRow = columnsFor(tallest.map((h) => ROW_HEAD + h), groupWidth(columns), viewport);
+  const perRow = columnsFor(tallest.map((h) => ROW_HEAD + h), Math.max(...groups.map((g) => widthOf(g.frames))), viewport);
   const frames: CanvasFrame[] = [];
   const rows: CanvasRow[] = [];
   let y = 0;
@@ -82,14 +88,15 @@ export function layoutCanvas(pages: CanvasPage[], columns: Size[], heights: Heig
   for (let start = 0; start < groups.length; start += perRow) {
     const line = groups.slice(start, start + perRow);
     const height = ROW_HEAD + Math.max(...line.map((_, i) => tallest[start + i]));
-    line.forEach(({ page, example, target, frames: shown }, i) => {
-      const x = i * (groupWidth(columns) + GROUP_GAP);
+    let x = 0;
+    line.forEach(({ page, example, target, frames: shown }) => {
       let left = x;
       for (const frame of shown) {
         frames.push({ ...frame, route: page.route, dynamic: page.dynamic, target, x: left, y: y + ROW_HEAD });
         left += frame.width + COLUMN_GAP;
       }
       rows.push({ route: page.route, dynamic: page.dynamic, example, x, y, height });
+      x += widthOf(shown) + GROUP_GAP;
     });
     y += height + ROW_GAP;
   }
@@ -116,14 +123,14 @@ const clamp = (value: number, min: number, max: number) => Math.min(max, Math.ma
 
 const cellOf = (size: CellSize | undefined): CellSize => (size ? { width: clamp(size.width, MIN_CELL.width, MAX_CELL.width), height: clamp(size.height, MIN_CELL.height, MAX_CELL.height) } : DEFAULT_CELL);
 
-export function layoutFlow(items: FlowItem[], rowWidth: number) {
+export function layoutFlow(items: FlowItem[], rowWidth: number, resized: Resized = {}) {
   const frames: FlowFrame[] = [];
   let x = 0;
   let y = 0;
   let rowHeight = 0;
 
   for (const { key, name, size } of items) {
-    const cell = cellOf(size);
+    const cell = cellOf(resized[key] ?? size);
     if (x > 0 && x + cell.width > rowWidth) {
       y += rowHeight + FLOW_GAP_Y;
       x = 0;

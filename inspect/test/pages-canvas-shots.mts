@@ -60,7 +60,7 @@ const after = await page.locator('[data-testid="canvas-frame"]').first().boundin
 assert.ok(after!.y < before!.y, 'plain wheel pans');
 
 await page.locator('[data-testid="canvas-fit"]').click();
-await page.locator('[data-testid="canvas-frame"][data-key="/about::phone"] [data-testid="canvas-open"]').click();
+await page.locator('[data-testid="canvas-frame"][data-key="/about::phone"] [data-testid="canvas-open"]').dblclick();
 await page.locator('[data-testid="pages-canvas"]').waitFor({ state: 'detached' });
 await page.locator('[data-testid="page-row"][data-route="/about"][aria-current="page"]').waitFor();
 await page.waitForTimeout(1500);

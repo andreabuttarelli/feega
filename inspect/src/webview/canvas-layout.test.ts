@@ -270,3 +270,49 @@ describe('columnsFor', () => {
     }
   });
 });
+
+describe('layoutCanvas with resized frames', () => {
+  const pages = [{ route: '/a', dynamic: false }, { route: '/b', dynamic: false }];
+  const key = (route: string, size: Size) => `${route}::${size}`;
+
+  it('is unchanged without resized frames', () => {
+    expect(layoutCanvas(pages, CANVAS_COLUMNS, {}, null, {})).toEqual(layoutCanvas(pages, CANVAS_COLUMNS));
+  });
+
+  it('gives a resized frame its own width and height', () => {
+    const { frames } = layoutCanvas(pages, CANVAS_COLUMNS, {}, null, { [key('/a', Size.Phone)]: { width: 600, height: 700 } });
+
+    expect(frames.find((f) => f.key === key('/a', Size.Phone))).toMatchObject({ width: 600, height: 700 });
+  });
+
+  it('pushes the next frame in the group to the right', () => {
+    const wide = { [key('/a', Size.Desktop)]: { width: SIZES[Size.Desktop].width! + 300, height: 900 } };
+    const [first, second] = layoutCanvas(pages, CANVAS_COLUMNS, {}, null, wide).frames;
+
+    expect(second.x).toBe(first.x + first.width + COLUMN_GAP);
+  });
+
+  it('keeps groups from overlapping when one grows', () => {
+    const wide = { [key('/a', Size.Phone)]: { width: 900, height: 900 } };
+    const { frames } = layoutCanvas(pages, CANVAS_COLUMNS, {}, { w: 100000, h: 1000 }, wide);
+    const lastOfA = frames.filter((f) => f.route === '/a').at(-1)!;
+    const firstOfB = frames.find((f) => f.route === '/b')!;
+
+    expect(firstOfB.x).toBeGreaterThanOrEqual(lastOfA.x + lastOfA.width + GROUP_GAP);
+  });
+
+  it('makes the row as tall as the resized frame', () => {
+    const tall = { [key('/a', Size.Desktop)]: { width: 1440, height: 3000 } };
+    const { frames } = layoutCanvas(pages, CANVAS_COLUMNS, {}, { w: 100, h: 10000 }, tall);
+
+    expect(frames.find((f) => f.route === '/b')!.y).toBeGreaterThanOrEqual(ROW_HEAD + 3000 + ROW_GAP);
+  });
+});
+
+describe('layoutFlow with resized frames', () => {
+  it('lets a resized frame replace the measured size', () => {
+    const { frames } = layoutFlow([{ key: 'a', name: 'A', size: { width: 300, height: 100 } }], ROW_WIDTH, { a: { width: 500, height: 250 } });
+
+    expect(frames[0]).toMatchObject({ width: 500, height: 250 });
+  });
+});
