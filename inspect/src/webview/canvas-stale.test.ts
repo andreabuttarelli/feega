@@ -47,8 +47,8 @@ describe('forgetPages', () => {
 
 describe('componentKeysOf', () => {
   const rows: ComponentRow[] = [
-    { name: 'Card', file: 'src/lib/Card.svelte', folder: 'lib', uses: 0 },
-    { name: 'Button', file: 'src/lib/Button.svelte', folder: 'lib', uses: 0 }
+    { name: 'Card', file: 'src/lib/Card.svelte', folder: 'lib', uses: 0, examples: [] },
+    { name: 'Button', file: 'src/lib/Button.svelte', folder: 'lib', uses: 0, examples: [] }
   ];
 
   it('takes the component whose file changed', () => {

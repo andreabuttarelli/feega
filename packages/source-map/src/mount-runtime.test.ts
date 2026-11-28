@@ -150,6 +150,23 @@ describe('startMount', () => {
     expect(posted).toContainEqual({ type: 'feega:mount:status', status: 'failed', reason: 'Cannot read properties of undefined' });
   });
 
+  it('tells the page which props the component declares once it fails, so they can be filled in', async () => {
+    const { start, win, posted, wait } = setup();
+    start();
+    win.dispatchEvent(new (win as unknown as { ErrorEvent: typeof ErrorEvent }).ErrorEvent('error', { message: 'Cannot read properties of undefined' }));
+    await wait(30);
+
+    expect(posted).toContainEqual({ type: 'feega:mount:controls', controls: [{ name: 'size' }] });
+  });
+
+  it('does not ask for the props of a component that rendered', async () => {
+    const { start, posted, wait } = setup({ draw: (el) => (el.innerHTML = '<b>hi</b>') });
+    start();
+    await wait(450);
+
+    expect(posted.map((message) => message.type)).toEqual(['feega:mount:status']);
+  });
+
   it('draws again with the props and the variants it is sent', () => {
     const { start, win, rendered } = setup();
     start();

@@ -2,7 +2,6 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { PropsSource } from '../props-source';
 import { componentsOf, folderOf, listComponents } from './component-list';
 
 const file = (path: string, text = '') => ({ path, text });
@@ -86,12 +85,12 @@ describe('listComponents', () => {
     const rows = await listComponents(root, async (path) => (path.endsWith('Card.svelte') ? ['src/routes/+page.svelte', 'src/routes/+page.svelte', 'src/routes/+page.svelte'] : []));
 
     expect(rows).toEqual([
-      { name: 'Card', file: 'src/lib/Card.svelte', folder: 'lib', uses: 3 },
-      { name: 'Button', file: 'src/lib/ui/Button.svelte', folder: 'lib/ui', uses: 0 }
+      { name: 'Card', file: 'src/lib/Card.svelte', folder: 'lib', uses: 3, examples: [{ id: 'src/routes/+page.svelte:1', file: 'src/routes/+page.svelte', line: 1, props: {}, unresolved: [] }] },
+      { name: 'Button', file: 'src/lib/ui/Button.svelte', folder: 'lib/ui', uses: 0, examples: [] }
     ]);
   });
 
-  it('takes the props of the first use that writes them as literals', async () => {
+  it('gives each component an example for every place that uses it', async () => {
     const root = project({
       'src/lib/Card.svelte': '<div />',
       'src/routes/a/+page.svelte': '<Card {item} />',
@@ -100,14 +99,9 @@ describe('listComponents', () => {
 
     const [card] = await listComponents(root, async () => ['src/routes/a/+page.svelte', 'src/routes/b/+page.svelte']);
 
-    expect(card.sample).toEqual({ props: { title: 'Domanda 1', n: 3 }, source: PropsSource.Code });
-  });
-
-  it('has no sample when no use writes literal props', async () => {
-    const root = project({ 'src/lib/Card.svelte': '<div />', 'src/routes/+page.svelte': '<Card {item} />' });
-
-    const [card] = await listComponents(root, async () => ['src/routes/+page.svelte']);
-
-    expect(card.sample).toBeUndefined();
+    expect(card.examples.map((e) => [e.file, e.props, e.unresolved])).toEqual([
+      ['src/routes/a/+page.svelte', {}, ['item']],
+      ['src/routes/b/+page.svelte', { title: 'Domanda 1', n: 3 }, []]
+    ]);
   });
 });

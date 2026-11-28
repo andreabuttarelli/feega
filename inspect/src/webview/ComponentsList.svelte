@@ -2,21 +2,25 @@
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import type { ComponentRow } from '../host/component-list';
   import ActionBanner from './ActionBanner.svelte';
-  import { keyOfComponent } from './components';
+  import { bestExample } from './component-props';
+  import type { ExampleProps } from './component-props.svelte';
+  import { exampleLabel, keyOfComponent } from './components';
   import { NodeKind, buildTree, highlight, visibleNodes } from './components-tree';
   import { freshKeys } from './fresh-keys.svelte';
   import { ICON_SVG, LayerIcon } from './layer-icons';
+  import PropFields from './PropFields.svelte';
   import SearchField from './SearchField.svelte';
   import './tree-rows.css';
 
-  type Props = { rows: ComponentRow[]; open: string[]; onopen: (row: ComponentRow) => void; onfolders: (open: string[]) => void; oncanvas: () => void };
+  type Props = { rows: ComponentRow[]; props: ExampleProps; open: string[]; onopen: (row: ComponentRow) => void; onfolders: (open: string[]) => void; oncanvas: () => void };
 
-  let { rows, open, onopen, onfolders, oncanvas }: Props = $props();
+  let { rows, props, open, onopen, onfolders, oncanvas }: Props = $props();
 
   const INDENT_PX = 12;
 
   let query = $state('');
   let tree = $state<HTMLElement>();
+  let expanded = $state<string[]>([]);
 
   const searching = $derived(query.trim() !== '');
   const opened = $derived(new Set(open));
@@ -25,6 +29,8 @@
 
   const treeRows = () => [...(tree?.querySelectorAll<HTMLElement>('[role="treeitem"]') ?? [])];
   const focusId = (id: string | null) => treeRows().find((el) => el.dataset.node === id)?.focus();
+  const expandable = (row: ComponentRow) => row.examples.length > 0 || props.fieldsOf(row).length > 0;
+  const toggleDetail = (id: string) => (expanded = expanded.includes(id) ? expanded.filter((k) => k !== id) : [...expanded, id]);
   const isOpen = (id: string) => searching || opened.has(id);
   const setOpen = (id: string, on: boolean) => onfolders(on ? [...new Set([...open, id])] : open.filter((o) => o !== id));
 
@@ -98,11 +104,23 @@
             onclick={() => onopen(node.row)}
             onkeydown={(e) => onKey(e, at)}
           >
-            <span class="tree-twist"></span>
+            {#if expandable(node.row)}
+              <button type="button" class="tree-twist" class:open={expanded.includes(node.id)} tabindex="-1" aria-label={expanded.includes(node.id) ? 'Hide examples' : 'Show examples'} data-testid="component-expand" onclick={(e) => (e.stopPropagation(), toggleDetail(node.id))}><ChevronRight size={12} /></button>
+            {:else}
+              <span class="tree-twist"></span>
+            {/if}
             {@render glyph(LayerIcon.Component)}
             <span class="tree-name">{@render marked(node.row.name)}</span>
             {#if node.row.uses > 0}<span class="uses" data-testid="component-uses" title={`Used in ${node.row.uses} ${node.row.uses === 1 ? 'file' : 'files'}`}>{node.row.uses}</span>{/if}
           </div>
+          {#if expanded.includes(node.id)}
+            <div class="detail" role="group" style={`padding-left:${8 + (at.depth + 1) * INDENT_PX}px`} data-testid="component-detail">
+              {#each node.row.examples as example (example.id)}
+                <button type="button" class="example" class:on={bestExample(node.row, props.chosenOf(node.row))?.id === example.id} title={`${example.file}:${example.line}`} data-testid="component-example" data-id={example.id} onclick={() => props.choose(node.row, example.id)}>{exampleLabel(example)}{#if example.unresolved.length > 0}<span class="rest">{example.unresolved.length} open</span>{/if}</button>
+              {/each}
+              <PropFields fields={props.fieldsOf(node.row)} onedit={(name, text, kind) => props.edit(node.row, name, text, kind)} />
+            </div>
+          {/if}
         {/if}
       {/each}
     </div>
@@ -133,6 +151,45 @@
     from {
       background: color-mix(in srgb, var(--ui-accent) 35%, transparent);
     }
+  }
+
+  .detail {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding-top: 2px;
+    padding-right: 12px;
+    padding-bottom: 6px;
+  }
+
+  .example {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 22px;
+    padding: 0 6px;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: none;
+    color: var(--ui-text-2);
+    font: inherit;
+    font-size: var(--ui-text-xs);
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .example:hover {
+    background: var(--ui-input);
+  }
+
+  .example.on {
+    color: var(--ui-text);
+    background: var(--ui-input);
+  }
+
+  .rest {
+    margin-left: auto;
+    opacity: 0.7;
   }
 
   mark {
