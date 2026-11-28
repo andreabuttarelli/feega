@@ -41,7 +41,7 @@ export const inVscode = typeof acquireVsCodeApi === 'function';
 
 export type ShellViews = { tabs: { id: string; title: string; closable: boolean }[]; active: string };
 
-export type DesktopShell = { views: (state: ShellViews) => void; onShow: (handle: (id: string) => void) => void; onClose: (handle: (id: string) => void) => void };
+export type DesktopShell = { openSettings: () => void; views: (state: ShellViews) => void; onShow: (handle: (id: string) => void) => void; onClose: (handle: (id: string) => void) => void };
 
 export const desktopShell = (window as unknown as { feegaDesktop?: Partial<DesktopShell> }).feegaDesktop as DesktopShell | undefined;
 
