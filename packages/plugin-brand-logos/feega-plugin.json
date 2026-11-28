@@ -3,20 +3,23 @@
   "name": "Brand logos",
   "version": "1.0.0",
   "permissions": [
-    "selection",
     "project",
     "edit.insert",
     "network:cdn.jsdelivr.net",
     "network:unpkg.com"
   ],
   "contributions": {
-    "rightBar": [
+    "addMenu": [
+      {
+        "id": "icon",
+        "title": "Brand logo",
+        "popover": "logos"
+      }
+    ],
+    "popover": [
       {
         "id": "logos",
-        "title": "Brand logos",
-        "when": [
-          "selection"
-        ]
+        "title": "Brand logos"
       }
     ]
   }

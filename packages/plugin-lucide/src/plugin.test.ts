@@ -2,34 +2,35 @@ import { describe, expect, it, vi } from 'vitest';
 import { createApi, type Port } from '@feega/plugin-api/client';
 import { createPluginHost, type EditorPort } from '@feega/plugin-api/host';
 import { parseManifest } from '@feega/plugin-api/manifest';
-import { Control, OpKind, Place, type HostMessage, type PluginMessage, type ProjectInfo, type Proposal, type Selection, type UiNode } from '@feega/plugin-api/protocol';
+import { Control, OpKind, Place, type HostMessage, type PluginMessage, type ProjectInfo, type Proposal, type Source, type UiNode } from '@feega/plugin-api/protocol';
 import { OFFLINE_NOTE } from '@feega/plugin-icon-kit/cdn';
 import { localCdn } from '@feega/plugin-icon-kit/cdn-fixture';
 import manifest from '../feega-plugin.json';
 import { VERSION } from './icons';
-import { CHOSEN, COLOUR, INHERIT, INSERT, LABEL, PAGE_SIZE, QUERY, RETRY, SECTION, SIZE, STROKE, lucidePlugin } from './plugin';
+import { CHOSEN, COLOUR, INHERIT, LABEL, PAGE_SIZE, QUERY, RETRY, SECTION, SIZE, STROKE, lucidePlugin } from './plugin';
 
-const at = (file: string): Selection => ({ source: { file, line: 4, col: 3 }, component: null, tag: 'section', name: 'section', classes: 'hero', rect: { x: 0, y: 0, width: 400, height: 200 }, styles: {}, attributes: [] });
+const at = (file: string): Source => ({ file, line: 4, col: 3 });
 
 const SVELTE = at('src/Hero.svelte');
 const AT = 'src/Hero.svelte:4:3';
+const ITEM = 'icon';
 const SETTLE_MS = 40;
 const ICONS_READY_MS = 10_000;
 const PLAIN: ProjectInfo = { typescript: true, publicDir: 'public', packages: {} };
 
-function load(initial: Selection | null, project: ProjectInfo = PLAIN) {
+function load(target: Source | null, project: ProjectInfo = PLAIN) {
   const parsed = parseManifest({ ...manifest, permissions: manifest.permissions });
   if (!parsed.ok) {
     throw new Error(parsed.reason);
   }
-  let selection = initial;
+  let open = target !== null;
   const proposals: Proposal[] = [];
   const notes: string[] = [];
   const cdn = localCdn();
   let toHost: (m: PluginMessage) => void = () => undefined;
   let toPlugin: (m: HostMessage) => void = () => undefined;
   const editor: EditorPort = {
-    selection: () => selection,
+    selection: () => null,
     project: async () => project,
     sourceText: async () => null,
     propose: async (p) => (proposals.push(p), { ok: true }),
@@ -47,7 +48,7 @@ function load(initial: Selection | null, project: ProjectInfo = PLAIN) {
   lucidePlugin(createApi(port));
   const settle = async () => {
     await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
-    if (selection) {
+    if (open) {
       await vi.waitFor(() => expect(host.ui(parsed.manifest.id, SECTION).length).toBeGreaterThan(0), { timeout: ICONS_READY_MS });
     }
   };
@@ -55,18 +56,21 @@ function load(initial: Selection | null, project: ProjectInfo = PLAIN) {
   const control = async (id: string, value: string | number | boolean, live = false) => {
     const before = proposals.length + notes.length;
     host.control(parsed.manifest.id, SECTION, id, value, live);
+    open = open && id !== CHOSEN;
     await settle();
-    if (id === INSERT) {
+    if (id === CHOSEN) {
       await vi.waitFor(() => expect(proposals.length + notes.length).toBeGreaterThan(before), { timeout: ICONS_READY_MS });
     }
   };
   const drawn = () => vi.waitFor(() => expect(grid(ui())?.items.length && grid(ui())?.items.every((item) => item.image)).toBeTruthy(), { timeout: ICONS_READY_MS });
-  const select = async (next: Selection | null) => {
-    selection = next;
-    host.selectionChanged(next);
-    await settle();
+  if (target) {
+    host.menu(parsed.manifest.id, ITEM, target);
+  }
+  const pick = (at: Source, place: Place) => {
+    open = true;
+    host.menu(parsed.manifest.id, ITEM, at, place);
   };
-  return { settle, ui, control, select, drawn, cdn, proposals, notes, manifest: parsed.manifest };
+  return { settle, ui, control, pick, drawn, cdn, proposals, notes, manifest: parsed.manifest };
 }
 
 const node = <T extends UiNode['type']>(tree: UiNode[], type: T, id?: string) => tree.find((n) => n.type === type && (id === undefined || ('id' in n && n.id === id)));
@@ -76,24 +80,25 @@ const grid = (tree: UiNode[]) => {
   return found?.type === Control.Grid ? found : null;
 };
 
-async function choose(plugin: ReturnType<typeof load>, query: string, name: string) {
+async function search(plugin: ReturnType<typeof load>, query: string) {
   await plugin.settle();
   await plugin.control(QUERY, query, true);
-  await plugin.control(CHOSEN, name);
 }
 
 describe('manifest', () => {
-  it('declares one Properties section shown on a selection and asks only for what it uses', () => {
+  it('adds one Add menu entry that opens its picker and no Properties section, and asks only for what it uses', () => {
     const { manifest: m } = load(null);
 
-    expect(m.contributions.rightBar).toEqual([{ id: SECTION, title: 'Lucide icons', when: ['selection'] }]);
-    expect([...m.grants].sort()).toEqual(['edit.insert', 'project', 'selection']);
+    expect(m.contributions.addMenu).toEqual([{ id: ITEM, title: 'Lucide icon', popover: SECTION }]);
+    expect(m.contributions.popover).toEqual([{ id: SECTION, title: 'Lucide icons' }]);
+    expect(m.contributions.rightBar).toBeUndefined();
+    expect([...m.grants].sort()).toEqual(['edit.insert', 'project']);
     expect(m.hosts).toEqual(['cdn.jsdelivr.net', 'unpkg.com']);
   });
 });
 
 describe('picker', () => {
-  it('shows nothing without a selection', async () => {
+  it('shows nothing until the menu entry is picked', async () => {
     const plugin = load(null);
     await plugin.settle();
 
@@ -131,16 +136,26 @@ describe('picker', () => {
     expect(node(plugin.ui(), Control.Note)).toMatchObject({ text: 'No icon matches "zzzzzz".' });
   });
 
-  it('offers to insert only once an icon is chosen', async () => {
+  it('inserts the icon the moment it is picked and closes', async () => {
     const plugin = load(SVELTE);
-    await plugin.settle();
+    await search(plugin, 'camera');
 
-    expect(node(plugin.ui(), Control.Button, INSERT)).toBeUndefined();
-
-    await choose(plugin, 'camera', 'camera');
-
-    expect(node(plugin.ui(), Control.Button, INSERT)).toMatchObject({ label: 'Insert camera' });
     expect(plugin.proposals).toEqual([]);
+
+    await plugin.control(CHOSEN, 'camera');
+
+    expect(plugin.proposals).toHaveLength(1);
+    expect(plugin.ui()).toEqual([]);
+  });
+
+  it('inserts where the menu was opened, after the element when asked', async () => {
+    const plugin = load(null);
+    plugin.pick(SVELTE, Place.After);
+    await plugin.settle();
+    await plugin.control(CHOSEN, 'camera');
+    const [op] = plugin.proposals[0].ops;
+
+    expect(op).toMatchObject({ kind: OpKind.Insert, at: AT, place: Place.After });
   });
 
   it('shows the colour only when the icon does not follow the text colour', async () => {
@@ -212,7 +227,6 @@ describe('icon files', () => {
     plugin.cdn.offline = true;
     await plugin.control(QUERY, 'sun', true);
     await plugin.control(CHOSEN, 'sun-dim');
-    await plugin.control(INSERT, true);
 
     expect(plugin.proposals).toEqual([]);
     expect(plugin.notes).toEqual([OFFLINE_NOTE]);
@@ -222,8 +236,8 @@ describe('icon files', () => {
 describe('inserting without an icon package', () => {
   it('inserts a self-contained svg component next to the selected element and adds no dependency', async () => {
     const plugin = load(SVELTE);
-    await choose(plugin, 'camera', 'camera');
-    await plugin.control(INSERT, true);
+    await search(plugin, 'camera');
+    await plugin.control(CHOSEN, 'camera');
 
     expect(plugin.proposals).toHaveLength(1);
     expect(plugin.proposals[0].label).toBe(LABEL);
@@ -240,12 +254,12 @@ describe('inserting without an icon package', () => {
 
   it('writes size, stroke and colour on the tag when they differ from the defaults', async () => {
     const plugin = load(SVELTE);
-    await choose(plugin, 'camera', 'camera');
+    await search(plugin, 'camera');
     await plugin.control(SIZE, 32);
     await plugin.control(STROKE, 1.5);
     await plugin.control(INHERIT, false);
     await plugin.control(COLOUR, '#ff0000');
-    await plugin.control(INSERT, true);
+    await plugin.control(CHOSEN, 'camera');
     const [op] = plugin.proposals[0].ops;
 
     expect(op.kind === OpKind.Insert && op.component.attributes).toBe('size={32} strokeWidth={1.5} color="#ff0000"');
@@ -253,7 +267,7 @@ describe('inserting without an icon package', () => {
 
   it('keeps the options after an insert so the next icon matches', async () => {
     const plugin = load(SVELTE);
-    await choose(plugin, 'camera', 'camera');
+    await search(plugin, 'camera');
     await plugin.control(SIZE, 40);
 
     expect(node(plugin.ui(), Control.Slider, SIZE)).toMatchObject({ value: 40 });
@@ -261,8 +275,8 @@ describe('inserting without an icon package', () => {
 
   it('writes a Svelte 4 component in a Svelte 4 project', async () => {
     const plugin = load(SVELTE, { ...PLAIN, packages: { svelte: '^4.2.0' } });
-    await choose(plugin, 'camera', 'camera');
-    await plugin.control(INSERT, true);
+    await search(plugin, 'camera');
+    await plugin.control(CHOSEN, 'camera');
     const [op] = plugin.proposals[0].ops;
 
     expect(op.kind === OpKind.Insert && op.component.source).toContain('export let size = 24;');
@@ -270,8 +284,8 @@ describe('inserting without an icon package', () => {
 
   it('writes a React component for a tsx file', async () => {
     const plugin = load(at('src/App.tsx'));
-    await choose(plugin, 'sun', 'sun');
-    await plugin.control(INSERT, true);
+    await search(plugin, 'sun');
+    await plugin.control(CHOSEN, 'sun');
     const [op] = plugin.proposals[0].ops;
 
     expect(op.kind === OpKind.Insert && op.component.file).toBe('src/feega/icons/SunIcon.tsx');
@@ -279,8 +293,8 @@ describe('inserting without an icon package', () => {
 
   it('refuses a file that is not a component, with a note', async () => {
     const plugin = load(at('src/index.html'));
-    await choose(plugin, 'camera', 'camera');
-    await plugin.control(INSERT, true);
+    await search(plugin, 'camera');
+    await plugin.control(CHOSEN, 'camera');
 
     expect(plugin.proposals).toEqual([]);
     expect(plugin.notes).toEqual(['Add an icon to a Svelte, React, Vue or Astro file.']);
@@ -290,9 +304,9 @@ describe('inserting without an icon package', () => {
 describe('inserting with the icon package the project already has', () => {
   it('re-exports lucide-react', async () => {
     const plugin = load(at('src/App.tsx'), { ...PLAIN, packages: { 'lucide-react': '^0.460.0' } });
-    await choose(plugin, 'arrow-right', 'arrow-right');
+    await search(plugin, 'arrow-right');
     await plugin.control(SIZE, 32);
-    await plugin.control(INSERT, true);
+    await plugin.control(CHOSEN, 'arrow-right');
     const [op] = plugin.proposals[0].ops;
 
     expect(plugin.proposals[0].ops).toHaveLength(1);
@@ -301,8 +315,8 @@ describe('inserting with the icon package the project already has', () => {
 
   it('wraps the lucide-svelte icon', async () => {
     const plugin = load(SVELTE, { ...PLAIN, packages: { 'lucide-svelte': '^0.460.0', svelte: '^5.0.0' } });
-    await choose(plugin, 'arrow-right', 'arrow-right');
-    await plugin.control(INSERT, true);
+    await search(plugin, 'arrow-right');
+    await plugin.control(CHOSEN, 'arrow-right');
     const [op] = plugin.proposals[0].ops;
 
     expect(op.kind === OpKind.Insert && op.component.file).toBe('src/feega/icons/ArrowRightIcon.svelte');
@@ -312,8 +326,8 @@ describe('inserting with the icon package the project already has', () => {
 
   it('wraps the @lucide/svelte icon', async () => {
     const plugin = load(SVELTE, { ...PLAIN, packages: { '@lucide/svelte': '^0.500.0', svelte: '^5.0.0' } });
-    await choose(plugin, 'arrow-right', 'arrow-right');
-    await plugin.control(INSERT, true);
+    await search(plugin, 'arrow-right');
+    await plugin.control(CHOSEN, 'arrow-right');
     const [op] = plugin.proposals[0].ops;
 
     expect(op.kind === OpKind.Insert && op.component.source).toContain("from '@lucide/svelte/icons/arrow-right'");
@@ -321,8 +335,8 @@ describe('inserting with the icon package the project already has', () => {
 
   it('wraps the lucide-vue-next icon', async () => {
     const plugin = load(at('src/App.vue'), { ...PLAIN, packages: { 'lucide-vue-next': '^0.460.0' } });
-    await choose(plugin, 'arrow-right', 'arrow-right');
-    await plugin.control(INSERT, true);
+    await search(plugin, 'arrow-right');
+    await plugin.control(CHOSEN, 'arrow-right');
     const [op] = plugin.proposals[0].ops;
 
     expect(op.kind === OpKind.Insert && op.component.source).toContain("import { ArrowRight } from 'lucide-vue-next';");
@@ -331,8 +345,8 @@ describe('inserting with the icon package the project already has', () => {
 
   it('ignores a lucide package that belongs to another framework', async () => {
     const plugin = load(SVELTE, { ...PLAIN, packages: { 'lucide-react': '^0.460.0' } });
-    await choose(plugin, 'camera', 'camera');
-    await plugin.control(INSERT, true);
+    await search(plugin, 'camera');
+    await plugin.control(CHOSEN, 'camera');
     const [op] = plugin.proposals[0].ops;
 
     expect(op.kind === OpKind.Insert && op.component.source).toContain('<svg');
@@ -340,8 +354,8 @@ describe('inserting with the icon package the project already has', () => {
 
   it('uses inline svg in Astro even with a lucide package installed', async () => {
     const plugin = load(at('src/pages/index.astro'), { ...PLAIN, packages: { 'lucide-react': '^0.460.0' } });
-    await choose(plugin, 'camera', 'camera');
-    await plugin.control(INSERT, true);
+    await search(plugin, 'camera');
+    await plugin.control(CHOSEN, 'camera');
     const [op] = plugin.proposals[0].ops;
 
     expect(op.kind === OpKind.Insert && op.component.file).toBe('src/feega/icons/CameraIcon.astro');
