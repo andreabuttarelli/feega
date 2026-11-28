@@ -1,5 +1,5 @@
 import type { PageRoute } from '../host/page-route';
-import { assignExamples, labelOf, matchRoute } from './route-match';
+import { assignExamples, labelOf, matchRoute } from '../route-match';
 
 export type PageExample = { path: string; label: string; current: boolean };
 
