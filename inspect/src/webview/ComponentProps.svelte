@@ -1,10 +1,14 @@
 <script lang="ts">
+  import SectionHead from './SectionHead.svelte';
+  import { builtInKey, isOpen } from './section-folds';
   import { EDITORS, INVALID, editorFor, Input, type PropControl, type PropValue, type Variants } from './prop-controls';
 
   type Apply = { ready: boolean; usage: boolean; skipped: string[] };
-  type Props = { controls: PropControl[]; values: Record<string, unknown>; grid: boolean; variants: Variants; dynamic: string[]; apply: Apply; onchange: (name: string, value: PropValue | undefined) => void; ongrid: (on: boolean) => void; onapply: () => void };
+  type Props = { controls: PropControl[]; values: Record<string, unknown>; grid: boolean; variants: Variants; dynamic: string[]; apply: Apply; onchange: (name: string, value: PropValue | undefined) => void; ongrid: (on: boolean) => void; onapply: () => void; closed: string[]; ontoggle: (key: string) => void };
 
-  let { controls, values, grid, variants, dynamic, apply, onchange, ongrid, onapply }: Props = $props();
+  let { controls, values, grid, variants, dynamic, apply, onchange, ongrid, onapply, closed, ontoggle }: Props = $props();
+
+  const key = builtInKey('Props');
 
   let invalid = $state<Record<string, boolean>>({});
 
@@ -24,12 +28,11 @@
 </script>
 
 <section data-section="Props" data-testid="component-props">
-  <div class="head">
-    <span class="title">Props</span>
-    {#if variants.variants}
-      <button type="button" class="grid" class:on={grid} aria-pressed={grid} data-testid="variants-toggle" onclick={() => ongrid(!grid)}>Variants</button>
-    {/if}
-  </div>
+  {#snippet variantsToggle()}
+    <button type="button" class="grid" class:on={grid} aria-pressed={grid} data-testid="variants-toggle" onclick={() => ongrid(!grid)}>Variants</button>
+  {/snippet}
+  <SectionHead title="Props" open={isOpen(closed, key)} ontoggle={() => ontoggle(key)} actions={variants.variants ? variantsToggle : undefined} />
+  {#if isOpen(closed, key)}
   <div class="apply">
     <button type="button" class="grid" data-testid="apply-props" disabled={!apply.ready} title={applyTitle} onclick={onapply}>Apply to page</button>
     {#if skippedNote}<span class="note" data-testid="apply-skipped">{skippedNote}</span>{/if}
@@ -61,6 +64,7 @@
       </div>
     </div>
   {/each}
+  {/if}
 </section>
 
 <style>
@@ -71,18 +75,8 @@
     font-size: var(--ui-text-sm);
   }
 
-  .head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    height: 32px;
-    padding: 0 12px;
-  }
-
-  .title {
-    color: var(--ui-text);
-    font-size: var(--ui-text-xs);
-    font-weight: 600;
+  section:has(:global(> .head [aria-expanded='false'])) {
+    padding: 4px 0;
   }
 
   .grid {

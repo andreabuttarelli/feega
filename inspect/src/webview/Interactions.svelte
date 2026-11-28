@@ -4,10 +4,15 @@
   import { ToHost, type ChangeRow, type Pick } from '../messages';
   import { toHost } from './host';
   import { sourceText } from './page-bridge';
+  import SectionHead from './SectionHead.svelte';
+  import { builtInKey, isOpen } from './section-folds';
   import { canAddGo, clickHandler, GO_CHOICES, handlerLabel, routeChoices } from './wiring-view';
   import { wiringState } from './wiring-state.svelte';
 
-  let { pick, changes }: { pick: Pick; changes: ChangeRow[] } = $props();
+  let { pick, changes, closed, ontoggle }: { pick: Pick; changes: ChangeRow[]; closed: string[]; ontoggle: (key: string) => void } = $props();
+
+  const linkKey = builtInKey('Link');
+  const eventsKey = builtInKey('Events');
 
   let go = $state<Go>(Go.Page);
   let target = $state('');
@@ -34,7 +39,8 @@
   <div class="wiring" data-testid="wiring">
     {#if link}
       <section data-section="Link">
-        <div class="head"><span class="title">Link</span></div>
+        <SectionHead title="Link" open={isOpen(closed, linkKey)} ontoggle={() => ontoggle(linkKey)} />
+        {#if isOpen(closed, linkKey)}
         <div class="row" data-row="link-address">
           <span class="label">{link.attr === 'to' ? 'To' : 'Address'}</span>
           <div class="control">
@@ -54,11 +60,13 @@
             {#if link.newTab}<span class="note-inline">adds rel="noopener noreferrer"</span>{/if}
           </div>
         </div>
+        {/if}
       </section>
     {/if}
 
     <section data-section="Events">
-      <div class="head"><span class="title">Events</span></div>
+      <SectionHead title="Events" open={isOpen(closed, eventsKey)} ontoggle={() => ontoggle(eventsKey)} />
+      {#if isOpen(closed, eventsKey)}
       {#each wiring.events as event (event.attribute)}
         <button type="button" class="event" data-event={event.event} title="Open in the editor" onclick={() => toHost({ kind: ToHost.Open, at: event.at })}>
           <span class="name">{event.attribute}</span>
@@ -87,6 +95,7 @@
       {:else if handled && !link}
         <p class="note">Click is handled in code: edit it there to change what it does.</p>
       {/if}
+      {/if}
     </section>
   </div>
 {/if}
@@ -102,17 +111,8 @@
     border-bottom: 1px solid var(--ui-divider);
   }
 
-  .head {
-    display: flex;
-    align-items: center;
-    height: 32px;
-    padding: 0 12px;
-  }
-
-  .title {
-    color: var(--ui-text);
-    font-size: var(--ui-text-xs);
-    font-weight: 600;
+  section:has(:global(> .head [aria-expanded='false'])) {
+    padding: 4px 0;
   }
 
   .row {
