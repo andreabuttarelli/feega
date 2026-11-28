@@ -8,6 +8,7 @@ type Deps = {
   routes: () => Promise<PageRoute[]>;
   components: () => Promise<ComponentRow[]>;
   post: (message: ViewMessage) => void;
+  touched?: (files: string[]) => void;
   debounceMs?: number;
 };
 
@@ -18,7 +19,7 @@ enum Rescan {
 
 const signatureOf = (list: unknown[]) => JSON.stringify(list);
 
-export function projectLive({ appRoot, routes, components, post, debounceMs }: Deps) {
+export function projectLive({ appRoot, routes, components, post, touched, debounceMs }: Deps) {
   let watching: { root: string; dispose: () => void } | null = null;
   let routesSeen: string | null = null;
   let componentsSeen: string | null = null;
@@ -44,6 +45,7 @@ export function projectLive({ appRoot, routes, components, post, debounceMs }: D
     if (structure.length || content.length) {
       await rescan(structure.length ? Rescan.All : Rescan.Routes).catch(() => undefined);
     }
+    touched?.([...structure, ...content]);
     if (content.length) {
       post({ kind: ToView.FilesChanged, files: content });
     }

@@ -65,7 +65,8 @@ import { openAcpAgent } from './ai/acp-session';
 import { editorMcp } from './ai/editor-mcp';
 import { viewAsker } from './view-ask';
 import { machineEnv } from './agents';
-import { listRoutes } from './project-routes';
+import { listRoutes, listedFiles } from './project-routes';
+import { generatorPages, routeRuntime } from './route-runtime';
 import { listComponents } from './component-list';
 import { projectLive } from './project-live';
 
@@ -317,18 +318,28 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   }
 
   const appRootNow = () => join(root, running?.plan.appDir ?? '');
-  const routesNow = () => listRoutes(appRootNow());
+  const runtime = routeRuntime({
+    base: () => running?.upstream ?? null,
+    enabled: () => platform.settings()[SettingKey.RouteGenerators] !== false,
+    files: async () => generatorPages(await listedFiles(appRootNow())),
+    shown: async (routes) => {
+      live.routesSent(routes);
+      await post({ kind: ToView.Routes, routes });
+    }
+  });
+  const routesNow = async () => runtime.overlay(await listRoutes(appRootNow()));
   const componentsNow = () => {
     const appDir = running?.plan.appDir ?? '';
     return listComponents(appRootNow(), async (file) => (await usages.usersOf(posix.join(appDir, file))).map((site) => posix.relative(appDir, site.file)));
   };
-  const live = projectLive({ appRoot: appRootNow, routes: routesNow, components: componentsNow, post });
+  const live = projectLive({ appRoot: appRootNow, routes: routesNow, components: componentsNow, post, touched: (files) => void runtime.touched(files).catch(() => undefined) });
 
   async function routesShown() {
     const routes = await routesNow();
     live.routesSent(routes);
     live.watch();
     await post({ kind: ToView.Routes, routes });
+    void runtime.run(routes).catch(() => undefined);
   }
 
   async function componentsShown() {
