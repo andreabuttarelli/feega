@@ -97,7 +97,7 @@
     font-size: var(--ui-text-sm);
   }
 
-  section.plugin:has(> :global(.head) [aria-expanded='false']) {
+  section.plugin:has(:global(> .head [aria-expanded='false'])) {
     padding: 4px 0;
   }
 

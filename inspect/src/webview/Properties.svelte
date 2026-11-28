@@ -529,7 +529,7 @@
     border-bottom: 1px solid var(--ui-divider);
   }
 
-  section:has(> :global(.head) [aria-expanded='false']) {
+  section:has(:global(> .head [aria-expanded='false'])) {
     padding: 4px 0;
   }
 

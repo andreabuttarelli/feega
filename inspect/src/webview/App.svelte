@@ -762,13 +762,13 @@
     }
   }
 
-  let pluginClosed = $state<string[]>([]);
-  const togglePlugin = (key: string) => ((pluginClosed = toggled(pluginClosed, key)), savePrefs());
+  let sectionsClosed = $state<string[]>([]);
+  const toggleSection = (key: string) => ((sectionsClosed = toggled(sectionsClosed, key)), savePrefs());
 
   const componentProps = new ExampleProps(() => savePrefs());
 
   function savePrefs() {
-    toHost({ kind: ToHost.Prefs, prefs: { size, custom, barClosed, route, anchor, dock: docked ?? undefined, barWidth, leftWidth, leftClosed, examples: $state.snapshot(manual), components: componentProps.saved(), pluginClosed, layers: layerFlags.saved(), componentFolders } });
+    toHost({ kind: ToHost.Prefs, prefs: { size, custom, barClosed, route, anchor, dock: docked ?? undefined, barWidth, leftWidth, leftClosed, examples: $state.snapshot(manual), components: componentProps.saved(), sectionsClosed, layers: layerFlags.saved(), componentFolders } });
   }
 
   function restore(prefs: Prefs | null) {
@@ -786,7 +786,7 @@
     leftWidth = prefs.leftWidth ?? leftWidth;
     leftClosed = prefs.leftClosed ?? leftClosed;
     manual = prefs.examples ?? manual;
-    pluginClosed = prefs.pluginClosed ?? pluginClosed;
+    sectionsClosed = prefs.sectionsClosed ?? sectionsClosed;
     componentProps.load(prefs.components);
     componentFolders = prefs.componentFolders ?? componentFolders;
     for (const [r, flags] of Object.entries((prefs.layers ?? {}) as SavedLayers)) {
@@ -1889,7 +1889,7 @@
       </Tabs.List>
       <Tabs.Content value={Tab.Properties}>
         {#if mount && viewing === View.Focus && mount.controls.length}
-          <ComponentProps controls={mount.controls} values={mount.values} grid={showGrid} {variants} dynamic={mount.dynamic} apply={{ ready: Boolean(applyPlan), usage: Boolean(focus?.usage), skipped: applyPlan?.skipped ?? [] }} onchange={setProp} ongrid={setGrid} onapply={applyToPage} />
+          <ComponentProps controls={mount.controls} values={mount.values} grid={showGrid} {variants} dynamic={mount.dynamic} apply={{ ready: Boolean(applyPlan), usage: Boolean(focus?.usage), skipped: applyPlan?.skipped ?? [] }} onchange={setProp} ongrid={setGrid} onapply={applyToPage} closed={sectionsClosed} ontoggle={toggleSection} />
         {/if}
         {#if several}
           <div class="what" data-testid="multi-selection">
@@ -1924,10 +1924,10 @@
           {/if}
           {#if held}<PreviewBar {held} onapply={applyHeld} oncancel={cancelHeld} onmute={muteHeld} />{/if}
           <Properties pick={picked} {breakpoints} {scales} {palette} {elementState} {baseline} onstate={chooseState} onpreview={preview} onchange={change} onsavevar={saveVar} onhint={(h) => (hint = h)} onfont={pickFont} onfontreplace={replaceFont} onfontload={loadFont} onnotice={showToast} />
-          <ClassesSection pick={picked} {changes} onselect={select} />
-          <Attributes pick={picked} {palette} />
-          <PluginSections {plugins} {palette} closed={pluginClosed} ontoggle={togglePlugin} />
-          <Interactions pick={picked} {changes} />
+          <ClassesSection pick={picked} {changes} onselect={select} closed={sectionsClosed} ontoggle={toggleSection} />
+          <Attributes pick={picked} {palette} closed={sectionsClosed} ontoggle={toggleSection} />
+          <PluginSections {plugins} {palette} closed={sectionsClosed} ontoggle={toggleSection} />
+          <Interactions pick={picked} {changes} closed={sectionsClosed} ontoggle={toggleSection} />
         {:else}
           <p class="empty">{emptyText(previewState)}</p>
         {/if}

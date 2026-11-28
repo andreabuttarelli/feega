@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { foldKey, isOpen, toggled } from './section-folds';
+import { builtInKey, foldKey, isOpen, toggled } from './section-folds';
 
 describe('section folds', () => {
   it('una sezione è aperta di default', () => {
@@ -21,5 +21,14 @@ describe('section folds', () => {
 
   it('la chiave non collide tra plugin e sezione con separatori nel nome', () => {
     expect(foldKey('a/b', 'c')).not.toBe(foldKey('a', 'b/c'));
+  });
+});
+
+describe('built-in sections', () => {
+  it('una sezione built-in non collide con una di un plugin dallo stesso nome', () => {
+    const shut = toggled([], builtInKey('Classes'));
+
+    expect(isOpen(shut, foldKey('mesh', 'Classes'))).toBe(true);
+    expect(isOpen(shut, builtInKey('Classes'))).toBe(false);
   });
 });
