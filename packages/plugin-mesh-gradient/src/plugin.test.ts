@@ -48,6 +48,10 @@ function load(initial: Selection | null) {
   };
   const ui = () => host.ui(parsed.manifest.id, SECTION);
   const handles = () => host.handles(parsed.manifest.id, OVERLAY);
+  const menu = async (at: Selection | null) => {
+    host.menu(parsed.manifest.id, START, at?.source ?? null);
+    await settle();
+  };
   const control = async (id: string, value: string | number | boolean, live = false) => {
     host.control(parsed.manifest.id, SECTION, id, value, live);
     await settle();
@@ -56,26 +60,28 @@ function load(initial: Selection | null) {
     host.handle(parsed.manifest.id, OVERLAY, id, phase, x, y);
     await settle();
   };
-  return { settle, select, ui, handles, control, handle, proposals, previews, manifest: parsed.manifest };
+  return { settle, select, ui, handles, control, menu, handle, proposals, previews, manifest: parsed.manifest };
 }
 
 const node = <T extends UiNode['type']>(tree: UiNode[], type: T, id?: string) => tree.find((n) => n.type === type && (id === undefined || ('id' in n && n.id === id)));
 
 describe('manifest', () => {
-  it('declares one right-bar section and one overlay, and asks only for what it uses', () => {
+  it('adds the mesh from the Add menu, shows its controls only on an element that has one, and asks only for what it uses', () => {
     const { manifest: m } = load(null);
-    expect(m.contributions.rightBar).toEqual([{ id: SECTION, title: 'Mesh gradient', when: ['!attribute:data-feega-scene'] }]);
-    expect(m.contributions.overlay).toEqual([{ id: OVERLAY, when: ['!attribute:data-feega-scene'] }]);
+    expect(m.contributions.addMenu).toEqual([{ id: START, title: 'Mesh gradient' }]);
+    expect(m.contributions.rightBar).toEqual([{ id: SECTION, title: 'Mesh gradient', when: ['owned', '!attribute:data-feega-scene'] }]);
+    expect(m.contributions.overlay).toEqual([{ id: OVERLAY, when: ['owned', '!attribute:data-feega-scene'] }]);
+    expect(m.owns).toEqual(['style:background-image*=radial-gradient']);
     expect([...m.grants].sort()).toEqual(['edit.style', 'selection']);
     expect(m.hosts).toEqual([]);
   });
 });
 
 describe('mesh gradient plugin', () => {
-  it('offers to start a mesh on an element that has none, and shows no handles', async () => {
+  it('shows no controls and no handles on an element that has no mesh', async () => {
     const plugin = load(PLAIN);
     await plugin.settle();
-    expect(node(plugin.ui(), Control.Button, START)).toBeTruthy();
+    expect(plugin.ui()).toEqual([]);
     expect(plugin.handles()).toEqual([]);
   });
 
@@ -86,13 +92,19 @@ describe('mesh gradient plugin', () => {
     expect(plugin.handles()).toEqual([]);
   });
 
-  it('writes pure CSS to the element source when the mesh is started', async () => {
+  it('writes pure CSS to the element picked in the Add menu', async () => {
     const plugin = load(PLAIN);
     await plugin.settle();
-    await plugin.control(START, true);
+    await plugin.menu(PLAIN);
     expect(plugin.proposals).toHaveLength(1);
     expect(plugin.proposals[0].label).toBe('Mesh gradient');
     expect(plugin.proposals[0].ops).toEqual([{ kind: OpKind.Style, at: AT, css: cssOf(DEFAULT_MESH) }]);
+  });
+
+  it('shows the controls once the element has the mesh', async () => {
+    const plugin = load(PLAIN);
+    await plugin.menu(PLAIN);
+    await plugin.select(MESHED);
     expect(plugin.handles()).toHaveLength(DEFAULT_MESH.points.length);
     expect(node(plugin.ui(), Control.List, POINTS_LIST)).toBeTruthy();
   });
@@ -186,6 +198,6 @@ describe('mesh gradient plugin', () => {
     await plugin.settle();
     await plugin.select(PLAIN);
     expect(plugin.handles()).toEqual([]);
-    expect(node(plugin.ui(), Control.Button, START)).toBeTruthy();
+    expect(plugin.ui()).toEqual([]);
   });
 });

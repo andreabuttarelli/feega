@@ -1,5 +1,5 @@
 import type { PluginApi } from '@feega/plugin-api/client';
-import { Control, HandlePhase, OpKind, type Selection, type UiNode } from '@feega/plugin-api/protocol';
+import { HandlePhase, OpKind, type Selection, type Source } from '@feega/plugin-api/protocol';
 import { ADD, BASE, COLOUR, DEFAULT_MESH, POINTS_LIST, RANDOMIZE, REMOVE, SOFTNESS, addPoint, cssOf, handlesOf, movePoint, parseMesh, randomize, removePoint, setBase, setColor, setSoftness, treeOf, type Mesh } from './mesh';
 
 export const SECTION = 'mesh';
@@ -7,12 +7,10 @@ export const OVERLAY = 'points';
 export const START = 'start';
 
 const LABEL = 'Mesh gradient';
-const INTRO: UiNode[] = [
-  { type: Control.Note, text: 'Blend colour points into a smooth gradient. Writes plain CSS.' },
-  { type: Control.Button, id: START, label: 'Add mesh gradient' }
-];
 
-const sourceOf = (selection: Selection) => `${selection.source.file}:${selection.source.line}:${selection.source.col}`;
+const textOf = (at: Source) => `${at.file}:${at.line}:${at.col}`;
+
+const sourceOf = (selection: Selection) => textOf(selection.source);
 
 export function meshPlugin(api: PluginApi, rng: () => number = Math.random) {
   const section = api.section(SECTION);
@@ -22,7 +20,7 @@ export function meshPlugin(api: PluginApi, rng: () => number = Math.random) {
   let chosen = '';
 
   async function show() {
-    await section.render(selection ? (mesh ? treeOf(mesh, chosen) : INTRO) : []);
+    await section.render(mesh ? treeOf(mesh, chosen) : []);
     await overlay.render(mesh ? handlesOf(mesh, chosen) : []);
   }
 
@@ -57,10 +55,6 @@ export function meshPlugin(api: PluginApi, rng: () => number = Math.random) {
   const current = () => mesh as Mesh;
 
   const ACTIONS: Record<string, (value: string | number | boolean, live: boolean) => Promise<void>> = {
-    [START]: () => {
-      chosen = DEFAULT_MESH.points[0].id;
-      return write(DEFAULT_MESH);
-    },
     [POINTS_LIST]: (id) => ((chosen = String(id)), show()),
     [COLOUR]: (value, live) => change(setColor(current(), chosen, String(value)), live),
     [SOFTNESS]: (value, live) => change(setSoftness(current(), Number(value)), live),
@@ -74,7 +68,13 @@ export function meshPlugin(api: PluginApi, rng: () => number = Math.random) {
     [RANDOMIZE]: () => write(randomize(current(), rng))
   };
 
-  section.on((id, value, live) => (mesh || id === START ? ACTIONS[id]?.(value, live) : undefined));
+  section.on((id, value, live) => (mesh ? ACTIONS[id]?.(value, live) : undefined));
+
+  api.menu.on((item, target) => {
+    if (item === START && target) {
+      void api.propose(LABEL, [{ kind: OpKind.Style, at: textOf(target), css: cssOf(DEFAULT_MESH) }]);
+    }
+  });
 
   overlay.on(async (id, phase, x, y) => {
     if (!mesh) {
