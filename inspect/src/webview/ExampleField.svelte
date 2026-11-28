@@ -21,47 +21,38 @@
   }
 </script>
 
-<div class="fields" data-testid="example-field" data-route={pattern}>
+<div class="example" data-testid="example-field" data-route={pattern}>
   {#each params as param (param.name)}
-    <label class="field">
-      <span class="name">{param.name} =</span>
-      <input type="text" spellcheck="false" autocomplete="off" placeholder={param.required ? 'value' : 'optional'} aria-label={`Value for ${param.name}`} data-testid="example-input" data-param={param.name} bind:value={values[param.name]} onkeydown={submit} />
-    </label>
+    <input type="text" spellcheck="false" autocomplete="off" placeholder={`Open with a ${param.name}${param.required ? '' : ' (optional)'}…`} title={`Type a ${param.name} and press Enter to open the page`} aria-label={`Value for ${param.name}`} data-testid="example-input" data-param={param.name} bind:value={values[param.name]} onkeydown={submit} />
   {/each}
 </div>
 
 <style>
-  .fields {
+  .example {
     display: flex;
     flex-direction: column;
     gap: 4px;
   }
 
-  .field {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    color: var(--ui-text-2);
-    font-size: var(--ui-text-xs);
-  }
-
-  .name {
-    flex: none;
-  }
-
   input {
-    flex: 1;
-    min-width: 0;
-    height: 22px;
-    padding: 0 6px;
-    border: 0;
+    box-sizing: border-box;
+    width: 100%;
+    height: 24px;
+    padding: 0 8px;
+    border: 1px solid transparent;
     border-radius: var(--ui-radius-sm);
     background: var(--ui-input);
     color: var(--ui-text);
     font: inherit;
+    font-size: var(--ui-text-xs);
+    outline: none;
   }
 
-  input:focus-visible {
-    outline: 1px solid var(--ui-accent);
+  input::placeholder {
+    color: var(--ui-text-3);
+  }
+
+  input:focus {
+    border-color: var(--ui-accent);
   }
 </style>
