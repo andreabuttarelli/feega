@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ComponentRow } from '../host/component-list';
-import { componentFocus, exampleLabel } from './components';
+import { componentFocus, exampleLabel, keyOfComponent, keyOfFocus } from './components';
 
 const row = (name: string, folder: string, uses = 0): ComponentRow => ({ name, folder, file: `src/${folder}/${name}.svelte`, uses, examples: [] });
 
@@ -19,5 +19,11 @@ describe('exampleLabel', () => {
 
   it('keeps a file at the top as it is', () => {
     expect(exampleLabel({ file: 'App.vue', line: 3 })).toBe('App.vue:3');
+  });
+});
+
+describe('keyOfFocus', () => {
+  it('is the key of the component row the focus was opened from', () => {
+    expect(keyOfFocus(componentFocus(rows[0]))).toBe(keyOfComponent(rows[0]));
   });
 });

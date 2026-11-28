@@ -5,4 +5,6 @@ export const componentFocus = (row: ComponentRow): Focus => ({ name: row.name, s
 
 export const keyOfComponent = (row: ComponentRow) => `${row.file}::${row.name}`;
 
+export const keyOfFocus = (focus: Focus) => `${focus.source.file}::${focus.name}`;
+
 export const exampleLabel = (example: { file: string; line: number }) => `${example.file.split('/').slice(-2).join('/')}:${example.line}`;

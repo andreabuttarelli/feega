@@ -8,6 +8,7 @@ export enum CardState {
 export enum Badge {
   Code = 'from code',
   Edited = 'edited',
+  Edge = 'edge',
   Sample = 'sample'
 }
 
