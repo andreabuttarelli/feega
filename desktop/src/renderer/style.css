@@ -671,6 +671,42 @@ html[data-platform='linux'] #bar {
   user-select: text;
 }
 
+.group + .group {
+  margin-top: 32px;
+}
+
+.group-title {
+  margin: 0 0 12px 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--sx-ink-3);
+}
+
+.choice,
+.text-field {
+  flex: none;
+  width: 200px;
+  height: 38px;
+  padding: 0 14px;
+  border: 1px solid rgb(255 255 255 / 0.3);
+  border-radius: 999px;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  user-select: text;
+}
+
+.choice option {
+  color: #000;
+}
+
+.choice:focus-visible,
+.text-field:focus-visible {
+  outline: 2px solid var(--sx-accent);
+  outline-offset: 2px;
+}
+
 .port.hidden {
   display: none;
 }

@@ -48,7 +48,7 @@
   import LayersTree from './LayersTree.svelte';
   import FocusControls from './FocusControls.svelte';
   import TabBar from './TabBar.svelte';
-  import { Chrome, Presentation, VIEWS, ViewKind, barControlsOf, chromeOf, presentationOf, rowTabsOf, shellTabsOf, tabsOf } from './views';
+  import { Chrome, Presentation, VIEWS, ViewKind, barControlsOf, chromeOf, presentationOf, SettingsRoute, settingsRouteOf, rowTabsOf, shellTabsOf, tabsOf } from './views';
   import ComponentProps from './ComponentProps.svelte';
   import { propTally } from './focus-usage';
   import { applyAskOf } from './apply-plan';
@@ -1754,7 +1754,7 @@
   </aside>
   <section class="view">
     <header class="toolbar" bind:clientHeight={toolbarH}>
-      <FeegaMenu commands={plugins.commands} oncommand={(plugin, command) => plugins.host.command(plugin, command)} onplugins={() => (pluginsOpen = true)} values={settings} {facts} {account} {support} onaccount={(kind) => toHost({ kind })} onsupport={(item) => toHost({ kind: ToHost.Support, item })} onsetting={(key, value) => toHost({ kind: ToHost.Setting, key, value })} onlink={(link) => toHost({ kind: ToHost.External, url: link })} />
+      <FeegaMenu onsettings={settingsRouteOf(hostKind) === SettingsRoute.DesktopPage ? () => desktopShell?.openSettings() : undefined} commands={plugins.commands} oncommand={(plugin, command) => plugins.host.command(plugin, command)} onplugins={() => (pluginsOpen = true)} values={settings} {facts} {account} {support} onaccount={(kind) => toHost({ kind })} onsupport={(item) => toHost({ kind: ToHost.Support, item })} onsetting={(key, value) => toHost({ kind: ToHost.Setting, key, value })} onlink={(link) => toHost({ kind: ToHost.External, url: link })} />
       <button type="button" class="icon" class:on={!leftClosed} title="Layers (⇧⌘\)" aria-label="Toggle Layers" data-testid="left-toggle" onclick={() => ((leftClosed = !leftClosed), savePrefs())}><PanelLeft size={15} /></button>
       <button type="button" class="icon" title="Back (⌘[)" disabled={!canBack} onclick={() => go(history.back())}><ArrowLeft size={15} /></button>
       <button type="button" class="icon" title="Forward (⌘])" disabled={!canForward} onclick={() => go(history.forward())}><ArrowRight size={15} /></button>

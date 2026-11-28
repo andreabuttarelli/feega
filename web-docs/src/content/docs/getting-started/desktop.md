@@ -50,7 +50,7 @@ chmod +x Feega-linux-x64.AppImage && ./Feega-linux-x64.AppImage
 - **Monorepos.** If a folder holds several apps, the tab asks which one to open.
 - **Sign in.** Sign in from the account chip to use your Feega account, or continue without one.
 - **Updates.** When a new version is downloaded, a panel says "Feega <version> is ready". Press **restart now**, or **later** to hide it until the next launch. The "update ready · restart" button stays in the tab bar. With automatic updates off, the panel offers **update** instead. If an update fails, a small row offers **retry**.
-- **Settings.** Open them with Cmd+, :
+- **Settings.** Open them with Cmd+, or from **Settings** in the Feega menu:
 
 | Setting | Meaning |
 |---|---|
@@ -58,4 +58,5 @@ chmod +x Feega-linux-x64.AppImage && ./Feega-linux-x64.AppImage
 | Open last projects on launch | Reopen the folders that were open when you quit. |
 | Feega Cloud (beta) | Off by default. Also in the Feega menu. Applies to editors opened after you change it. |
 | Onboarding | **Show again** replays the welcome tour. |
-| Anonymous usage data | Counts only, never your code. Off starts the editor with `FEEGA_TELEMETRY=0`. See [Privacy](/more/privacy/). |
+
+The same page lists the editor settings under General, Dev server, AI agents and Notifications. They are the settings of the Feega menu, stored once for every project opened in the desktop app, so a change here or in the editor is the same value. **Anonymous usage counts** is one of them. See [Privacy](/more/privacy/).

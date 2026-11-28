@@ -19,6 +19,16 @@ describe('settings store', () => {
   });
 });
 
+describe('the old telemetry preference', () => {
+  it('is reported when the user had turned it off', () => {
+    const dir = fresh();
+    writeFileSync(join(dir, 'settings.json'), JSON.stringify({ preferences: { telemetry: false } }));
+
+    expect(settingsStore(dir).legacyTelemetryOff()).toBe(true);
+    expect(settingsStore(fresh()).legacyTelemetryOff()).toBe(false);
+  });
+});
+
 describe('account invite', () => {
   it('waits for a first created project', () => {
     expect(inviteWanted(settingsStore(fresh()).get(), null)).toBe(false);

@@ -159,7 +159,7 @@ npx feega            # or: npx feega <dir> --port 4100 --no-open
 It finds the app (and asks which one when the folder holds several), starts its dev server and
 opens the editor in the browser. Edits, undo/redo and the Changes tab behave as in the extension.
 Open in editor uses `code -g` when VS Code is on the PATH, else `$VISUAL`/`$EDITOR`, else prints
-`file:line:col`. Settings live in `.feega/settings.json` in the app folder. Ctrl+C stops the
+`file:line:col`. Settings live in `.feega/settings.json` in the app folder (one shared file in the desktop app). Ctrl+C stops the
 editor and the dev server.
 
 `npx feega plugin add|remove|list|dev` manages third-party plugins; see

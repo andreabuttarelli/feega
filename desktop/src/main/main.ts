@@ -11,7 +11,9 @@ import { onboardingUrlAllowed } from './onboarding-links';
 import { installMenu } from './menu';
 import { pidFile } from './pid-file';
 import { frameworkOf } from './project-info';
+import { editorSettings, editorSettingsPath } from './editor-settings';
 import { inviteWanted, settingsStore } from './store';
+import type { SettingKey, SettingValue } from '../../../inspect/src/settings';
 import { tabHost } from './tabs';
 import { CheckMode, updateController } from './updates/controller';
 import pkg from '../../package.json';
@@ -66,6 +68,10 @@ app.whenReady().then(() => {
   }
   const userData = app.getPath('userData');
   const settings = settingsStore(userData);
+  const editor = editorSettings(editorSettingsPath(userData));
+  if (settings.legacyTelemetryOff()) {
+    editor.adoptTelemetryOff();
+  }
   const account = accountStore(userData);
   const pids = pidFile(userData);
   pids.sweep();
@@ -95,7 +101,8 @@ app.whenReady().then(() => {
     project,
     invite: inviteWanted(settings.get(), account.email()),
     documents: app.getPath('documents'),
-    onboarded: settings.get().onboarded
+    onboarded: settings.get().onboarded,
+    editor: editor.get()
   });
 
   const publish = () => window.webContents.send(Channel.State, state());
@@ -113,7 +120,7 @@ app.whenReady().then(() => {
     quit: () => app.quit()
   });
   const tabs = tabHost(window, publish, pids, {
-    options: () => ({ editorPort: settings.get().preferences.editorPort, telemetry: settings.get().preferences.telemetry, cloud: settings.get().preferences.cloud }),
+    options: () => ({ editorPort: settings.get().preferences.editorPort, cloud: settings.get().preferences.cloud }),
     opened: (dirs) => settings.remember(dirs),
     closed: (id) => alerts.closed(id)
   });
@@ -190,6 +197,11 @@ app.whenReady().then(() => {
     menu();
     publish();
   };
+  ipcMain.on(Channel.OpenSettings, () => window.webContents.send(Channel.ShowSettings));
+  ipcMain.handle(Channel.SetEditorSetting, (_event, key: SettingKey, value: SettingValue) => {
+    editor.set(key, value);
+    publish();
+  });
   ipcMain.handle(Channel.SetPreferences, (_event, change: Partial<Preferences>) => {
     settings.prefer(change);
     menu();

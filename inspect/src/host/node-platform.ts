@@ -1,12 +1,12 @@
 import { publishLocal } from './local-bridge/publish';
 import { spawn } from 'node:child_process';
-import { mkdirSync, readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, statSync } from 'node:fs';
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { homedir, tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { ToView } from '../messages';
-import { settingsWith, type SettingValue } from '../settings';
+import { SETTINGS_FILE_ENV, settingsWith, type SettingValue } from '../settings';
 import { pluginsRoot } from '@feega/plugin-store/registry';
 import { fileAccountStore, type AccountStore } from './account';
 import { machineAgents } from './agents';
@@ -50,6 +50,14 @@ const readJson = (path: string): Record<string, unknown> => {
   }
 };
 
+const modifiedAt = (path: string): number => {
+  try {
+    return statSync(path).mtimeMs;
+  } catch {
+    return 0;
+  }
+};
+
 const freshLaunch = (state: Record<string, unknown>): Record<string, unknown> => {
   const prefs = state[Stored.Prefs];
   return prefs && typeof prefs === 'object' ? { ...state, [Stored.Prefs]: { ...prefs, size: FULL_WIDTH, custom: null } } : state;
@@ -64,10 +72,19 @@ const stateDirFor = (root: string, env: NodeJS.ProcessEnv) => {
 
 export function nodePlatform({ root, launcher, version, transport, print, launch = launchDetached, env = process.env, account = fileAccountStore(), onboarding = fileOnboardingStore(), support = fileSupportStore(), install = fileInstallStore(), firstEdit = fileFirstEdit(), cloud, share, plugins = { root: pluginsRoot(), dev: () => [] } }: NodeHost): Platform {
   const dir = join(root, FEEGA_DIR);
-  const settingsPath = join(dir, SETTINGS_FILE);
+  const settingsPath = env[SETTINGS_FILE_ENV] || join(dir, SETTINGS_FILE);
   const stateDir = stateDirFor(root, env);
   const statePath = join(stateDir, STATE_FILE);
-  const settings = readJson(settingsPath) as Record<string, SettingValue>;
+  let settings = readJson(settingsPath) as Record<string, SettingValue>;
+  let settingsSeen = modifiedAt(settingsPath);
+  const currentSettings = () => {
+    const modified = modifiedAt(settingsPath);
+    if (modified !== settingsSeen) {
+      settings = readJson(settingsPath) as Record<string, SettingValue>;
+      settingsSeen = modified;
+    }
+    return settings;
+  };
   const state = freshLaunch(readJson(statePath));
   const session = new Map<string, unknown>();
 
@@ -105,8 +122,12 @@ export function nodePlatform({ root, launcher, version, transport, print, launch
     version,
     launcher,
     ...transport,
-    settings: () => settingsWith((row) => settings[row.key]),
-    setSetting: (key, value) => ((settings[key] = value), save(settingsPath, settings)),
+    settings: () => settingsWith((row) => currentSettings()[row.key]),
+    setSetting: async (key, value) => {
+      currentSettings()[key] = value;
+      await save(settingsPath, settings);
+      settingsSeen = modifiedAt(settingsPath);
+    },
     stored: <T>(key: Stored) => (SESSION_ONLY.has(key) ? session.get(key) : state[key]) as T | undefined,
     store: async (key, value) => {
       if (SESSION_ONLY.has(key)) {
@@ -127,7 +148,7 @@ export function nodePlatform({ root, launcher, version, transport, print, launch
     chooseApp: async (apps, workspace) => (print(`feega: ${workspace} holds several apps, run feega on one of:\n${apps.map((app) => `  ${join(workspace, app)}`).join('\n')}`), null),
     openExternal,
     openSettings: async () => {
-      await save(settingsPath, settings);
+      await save(settingsPath, currentSettings());
       return edit(settingsPath);
     },
     sourceControl: () => print(`feega: review the changes with \`git -C ${root} diff\``),
@@ -148,7 +169,7 @@ export function nodePlatform({ root, launcher, version, transport, print, launch
     agents: () => machineAgents(),
     usage: {
       identity: () => ({ ...installOf(install), version, editor: Editor.Npx, os: process.platform, arch: process.arch, device: Device.Cli }),
-      enabled: () => nodeUsageEnabled(env, settingsWith((row) => settings[row.key])),
+      enabled: () => nodeUsageEnabled(env, settingsWith((row) => currentSettings()[row.key])),
       firstEdit
     }
   };
