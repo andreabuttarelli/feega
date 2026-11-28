@@ -16,6 +16,7 @@ describe('editKindOf', () => {
     [{ kind: ToHost.ImageUpload }, EditKind.Image],
     [{ kind: ToHost.IconSwap }, EditKind.Image],
     [{ kind: ToHost.Attribute }, EditKind.Attribute],
+    [{ kind: ToHost.Retag }, EditKind.Attribute],
     [{ kind: ToHost.LibraryInsert }, EditKind.Template],
     [{ kind: ToHost.Undo }, EditKind.Other]
   ])('%o is %s', (m, kind) => {

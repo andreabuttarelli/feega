@@ -15,6 +15,8 @@
   import Check from '@lucide/svelte/icons/check';
   import Icon from './Icon.svelte';
   import FontPicker from './FontPicker.svelte';
+  import TagPicker from './TagPicker.svelte';
+  import { isTextTag } from '@feega/live-edit/retag';
   import MissingFont from './MissingFont.svelte';
   import { missingIn } from './missing-font';
   import { UI_ICON_SVG, UiIcon } from './ui-icons';
@@ -387,6 +389,10 @@
         {@render row('Letter spacing', ls, 'letter-spacing')}
         {#snippet ta()}{@render segmented(byName('text-align'), TEXT_ALIGN)}{/snippet}
         {@render row('Align', ta, 'text-align')}
+        {#if isTextTag(pick.tag)}
+          {#snippet tagRow()}<TagPicker at={sourceText(pick.source)} tag={pick.tag} />{/snippet}
+          {@render row('Tag', tagRow, 'tag')}
+        {/if}
         <FillList scope="text-fill" inline parse={() => textFillsOf(pick.styles)} css={textFillCss} guard={(next) => textFillRefusal(pick.styles, next)} onrefuse={onnotice} {palette} {header} {row} onchange={writeText} onpreview={previewText} />
       {/if}
     </section>

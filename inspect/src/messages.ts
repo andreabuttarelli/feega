@@ -214,6 +214,7 @@ export enum ToHost {
   Classes = 'classes',
   Link = 'link',
   Attribute = 'attribute',
+  Retag = 'retag',
   ApplyProps = 'apply-props',
   ReadProps = 'read-props',
   Go = 'go',
@@ -479,6 +480,7 @@ export type HostMessage =
   | { kind: ToHost.Classes; at: string }
   | { kind: ToHost.Link; at: string; edit: LinkEdit; instance?: number }
   | { kind: ToHost.Attribute; at: string; name: string; value: string }
+  | { kind: ToHost.Retag; at: string; to: string }
   | { kind: ToHost.ApplyProps; ask: ApplyAsk; gate?: Gate }
   | { kind: ToHost.ReadProps; ask: ReadAsk }
   | { kind: ToHost.Go; at: string; ask: GoAsk }
