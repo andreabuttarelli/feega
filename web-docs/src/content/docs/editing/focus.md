@@ -9,11 +9,11 @@ Select an element inside a component and press `F`, or use the focus action on i
 
 ## View tabs
 
-The Pages canvas and each focused component are view tabs. Page is always there and cannot be closed.
+Each focused component is a view tab. Page is always there and cannot be closed.
 
 | Where you run Feega | Where the view tabs are |
 |---|---|
-| Feega desktop | In the window's top bar, next to the project tab, as `project · Pages canvas` and `project · Card`. They close and switch like project tabs and share the project's dev server |
+| Feega desktop | In the window's top bar, next to the project tab, as `project · Card`. They close and switch like project tabs and share the project's dev server |
 | `npx feega` in the browser | A tab row above the editor, styled like the desktop window bar, with the project as the first tab |
 | VS Code | The same tab row above the editor |
 
