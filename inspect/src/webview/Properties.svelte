@@ -15,6 +15,9 @@
   import Check from '@lucide/svelte/icons/check';
   import Icon from './Icon.svelte';
   import FontPicker from './FontPicker.svelte';
+  import TagPicker from './TagPicker.svelte';
+  import { tagNote } from './tag-note';
+  import { isTextTag } from '@feega/live-edit/retag';
   import MissingFont from './MissingFont.svelte';
   import { missingIn } from './missing-font';
   import { UI_ICON_SVG, UiIcon } from './ui-icons';
@@ -370,6 +373,17 @@
     </section>
   {/if}
 
+  {#if has(Section.Typography) && isTextTag(pick.tag)}
+    <section data-section={Section.Tag}>
+      {@render header(Section.Tag)}
+      {#if !closed[Section.Tag]}
+        {#snippet tagRow()}<TagPicker at={sourceText(pick.source)} tag={pick.tag} />{/snippet}
+        {@render row('Tag', tagRow, 'tag')}
+        {#if tagNote(pick)}<p class="tag-note">{tagNote(pick)}</p>{/if}
+      {/if}
+    </section>
+  {/if}
+
   {#if has(Section.Typography)}
     <section data-section={Section.Typography}>
       {@render header(Section.Typography)}
@@ -519,6 +533,13 @@
 
   section:has(> .head [aria-expanded='false']) {
     padding: 4px 0;
+  }
+
+  .tag-note {
+    margin: 0;
+    padding: 0 12px 8px;
+    color: var(--ui-text-2);
+    font-size: var(--ui-text-xs);
   }
 
   .properties :global(.head) {

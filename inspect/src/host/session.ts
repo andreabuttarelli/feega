@@ -899,6 +899,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
     [ToHost.Classes]: (m) => classesShown(m.at),
     [ToHost.Link]: (m) => edits.link(m.at, m.edit, m.instance).then((out) => edited(out, null)),
     [ToHost.Attribute]: (m) => edits.attribute(m.at, m.name, m.value).then((out) => edited(out, null)),
+    [ToHost.Retag]: (m) => edits.retag(m.at, m.to).then((out) => edited(out, null)),
     [ToHost.ApplyProps]: (m) => applyProps(m.ask, m.gate),
     [ToHost.ReadProps]: (m) => usagePropsShown(m.ask),
     [ToHost.Go]: (m) => edits.go(m.at, m.ask).then((out) => edited(out, null)),

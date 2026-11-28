@@ -33,6 +33,7 @@ import { svgMarkup } from '@feega/live-edit/svg-markup';
 import { addGo, type GoAsk } from '@feega/live-edit/go-action';
 import { linkWrite, type LinkEdit } from '@feega/live-edit/link-edit';
 import { attributeWrite } from '@feega/live-edit/attribute-edit';
+import { retag } from '@feega/live-edit/retag';
 import { applyProps, type Applied } from '@feega/live-edit/apply-props';
 import type { Proposal } from '@feega/plugin-api/protocol';
 import { Styling, type ApplyAsk, type EditAsk, type ImpactAsk } from '../messages';
@@ -333,6 +334,20 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     return out.ok ? writtenAll([out.change], '') : out;
   }
 
+  async function retagWritten(rawAt: string, to: string): Promise<Written> {
+    meta = { at: rawAt, prop: 'tag', value: to, scope: '' };
+    const at = placed(rawAt);
+    if (!at) {
+      return { ok: false, reason: `${rawAt} is not a file:line:col inside the workspace` };
+    }
+    const out = await retag(reader(root), at, to);
+    if (!out.ok) {
+      return out;
+    }
+    const written = await writtenAll([out.change], '');
+    return written.ok ? { ...written, selected: at } : written;
+  }
+
   async function propsPlanned(ask: ApplyAsk): Promise<Applied> {
     const usage = placed(ask.usage);
     if (!usage) {
@@ -549,6 +564,7 @@ export function fileEdits(root: string, choice: () => StylingChoice = () => Styl
     loadFont: (family: string) => inTurn(() => fontLoaded(family)),
     link: (at: string, edit: LinkEdit, instance?: number) => inTurn(() => linkWritten(at, edit, instance)),
     attribute: (at: string, name: string, value: string) => inTurn(() => attributeWritten(at, name, value)),
+    retag: (at: string, to: string) => inTurn(() => retagWritten(at, to)),
     propsPlan: (ask: ApplyAsk) => inTurn(() => propsPlanned(ask)),
     applyProps: (ask: ApplyAsk) => inTurn(() => propsWritten(ask)),
     go: (at: string, ask: GoAsk) => inTurn(() => goWritten(at, ask)),

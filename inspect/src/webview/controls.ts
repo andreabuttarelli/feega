@@ -9,6 +9,7 @@ export enum Section {
   Layout = 'Auto layout',
   Size = 'Size',
   Spacing = 'Spacing',
+  Tag = 'Tag',
   Typography = 'Typography',
   Fill = 'Fill',
   Radius = 'Radius',
