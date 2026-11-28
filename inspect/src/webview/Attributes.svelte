@@ -4,8 +4,12 @@
   import ColourSwatch from './ColourSwatch.svelte';
   import { toHost } from './host';
   import { sourceText } from './page-bridge';
+  import SectionHead from './SectionHead.svelte';
+  import { builtInKey, isOpen } from './section-folds';
 
-  let { pick, palette }: { pick: Pick; palette: Palette } = $props();
+  let { pick, palette, closed, ontoggle }: { pick: Pick; palette: Palette; closed: string[]; ontoggle: (key: string) => void } = $props();
+
+  const key = builtInKey('Attributes');
 
   const at = $derived(sourceText(pick.source));
   const fields = $derived(editableAttributes(pick.attributes));
@@ -16,7 +20,8 @@
 
 {#if fields.length || variables.length}
   <section data-section="Attributes" data-testid="attributes">
-    <div class="head"><span class="title">Attributes</span></div>
+    <SectionHead title="Attributes" open={isOpen(closed, key)} ontoggle={() => ontoggle(key)} />
+    {#if isOpen(closed, key)}
     {#each fields as field (field.name)}
       <div class="row" data-row={field.name}>
         <span class="label" title={field.name}>{attributeLabel(field.name)}</span>
@@ -41,6 +46,7 @@
         </div>
       </div>
     {/each}
+    {/if}
   </section>
 {/if}
 
@@ -52,17 +58,8 @@
     font-size: var(--ui-text-sm);
   }
 
-  .head {
-    display: flex;
-    align-items: center;
-    height: 32px;
-    padding: 0 12px;
-  }
-
-  .title {
-    color: var(--ui-text);
-    font-size: var(--ui-text-xs);
-    font-weight: 600;
+  section:has(:global(> .head [aria-expanded='false'])) {
+    padding: 4px 0;
   }
 
   .row {

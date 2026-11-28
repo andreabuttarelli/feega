@@ -4,10 +4,14 @@
   import { declarationsLabel, editTarget, ruleContext, usageLabel } from './class-view';
   import { toHost } from './host';
   import { sourceText } from './page-bridge';
+  import SectionHead from './SectionHead.svelte';
+  import { builtInKey, isOpen } from './section-folds';
 
-  type Props = { pick: Pick; changes: unknown; onselect: (source: Source) => void };
+  type Props = { pick: Pick; changes: unknown; onselect: (source: Source) => void; closed: string[]; ontoggle: (key: string) => void };
 
-  let { pick, changes, onselect }: Props = $props();
+  let { pick, changes, onselect, closed, ontoggle }: Props = $props();
+
+  const key = builtInKey('Classes');
 
   const at = $derived(sourceText(pick.source));
   const view = $derived(classesState.view?.at === at ? classesState.view : null);
@@ -35,7 +39,8 @@
 
 {#if own.length || view?.dynamic}
   <section data-section="Classes" data-testid="classes">
-    <div class="head"><span class="title">Classes</span></div>
+    <SectionHead title="Classes" open={isOpen(closed, key)} ontoggle={() => ontoggle(key)} />
+    {#if isOpen(closed, key)}
     {#each own as info (info.key)}
       <div class="item" class:on={classesState.targetKey === info.key} data-class={info.name}>
         <button type="button" class="name" data-action="class-open" aria-expanded={viewingKey === info.key} onclick={() => (viewingKey = viewingKey === info.key ? null : info.key)}>
@@ -68,6 +73,7 @@
           {/if}
         {/each}
       {/if}
+    {/if}
     {/if}
   </section>
 {/if}
@@ -103,17 +109,8 @@
     font-size: var(--ui-text-sm);
   }
 
-  .head {
-    display: flex;
-    align-items: center;
-    height: 32px;
-    padding: 0 12px;
-  }
-
-  .title {
-    color: var(--ui-text);
-    font-size: var(--ui-text-xs);
-    font-weight: 600;
+  section:has(:global(> .head [aria-expanded='false'])) {
+    padding: 4px 0;
   }
 
   .item {

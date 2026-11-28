@@ -2,7 +2,7 @@
   import ActionBanner from './ActionBanner.svelte';
   import ExampleField from './ExampleField.svelte';
   import { freshKeys } from './fresh-keys.svelte';
-  import { EXAMPLE_LIMIT, type PageRow } from './pages';
+  import { EXAMPLE_LIMIT, ExampleKind, type PageRow } from './pages';
 
   type Props = { rows: PageRow[]; onopen: (route: string) => void; onadd: (pattern: string, path: string) => void; oncanvas?: () => void };
 
@@ -14,10 +14,15 @@
 
   const shownOf = (row: PageRow) => (expanded.includes(row.route) ? row.examples : row.examples.slice(0, EXAMPLE_LIMIT));
   const hiddenOf = (row: PageRow) => row.examples.length - shownOf(row).length;
+  const labelOf = (row: PageRow) => (row.kind === ExampleKind.NotFound ? 'Error page' : row.route);
   const expand = (route: string) => (expanded = [...expanded, route]);
 </script>
 
 {#if oncanvas}<ActionBanner testid="canvas-open-pages" onopen={oncanvas} />{/if}
+
+{#snippet badge(kind: ExampleKind)}
+  {#if kind === ExampleKind.NotFound}<span class="badge" data-testid="not-found-badge">404</span>{/if}
+{/snippet}
 
 <ul class="pages" data-testid="pages">
   {#each rows as row (row.route)}
@@ -35,6 +40,14 @@
           {#if hiddenOf(row) > 0}
             <li><button type="button" class="page more" data-testid="page-more" onclick={() => expand(row.route)}>{hiddenOf(row)} more</button></li>
           {/if}
+          {#if row.notFound}
+            {@const example = row.notFound}
+            <li>
+              <button type="button" class="page example" class:on={example.current} aria-current={example.current ? 'page' : undefined} title={`Open ${example.path}`} data-testid="page-not-found" data-path={example.path} onclick={() => onopen(example.path)}>
+                <span class="route">{example.label}</span>{@render badge(example.kind)}
+              </button>
+            </li>
+          {/if}
           {#if row.examples.length === 0}
             <li class="manual"><ExampleField pattern={row.route} onadd={(path) => onadd(row.route, path)} /></li>
           {/if}
@@ -43,7 +56,7 @@
     {:else}
       <li>
         <button type="button" class="page" class:on={row.current} class:fresh={fresh.has(row.route)} aria-current={row.current ? 'page' : undefined} title={`Open ${row.route}`} data-testid="page-row" data-route={row.route} onclick={() => onopen(row.route)}>
-          <span class="route">{row.route}</span>
+          <span class="route">{labelOf(row)}</span>{@render badge(row.kind)}
         </button>
       </li>
     {/if}
@@ -124,6 +137,13 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .badge {
+    flex: none;
+    color: var(--ui-text-2);
+    font-size: var(--ui-text-xs);
+    opacity: 0.7;
   }
 
   .empty {

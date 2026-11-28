@@ -3,6 +3,7 @@
   import type { ComponentRow } from '../host/component-list';
   import ActionBanner from './ActionBanner.svelte';
   import { bestExample } from './component-props';
+  import { isPreset } from './edge-presets';
   import type { ExampleProps } from './component-props.svelte';
   import { exampleLabel, keyOfComponent } from './components';
   import { NodeKind, buildTree, highlight, visibleNodes } from './components-tree';
@@ -116,7 +117,10 @@
           {#if expanded.includes(node.id)}
             <div class="detail" role="group" style={`padding-left:${8 + (at.depth + 1) * INDENT_PX}px`} data-testid="component-detail">
               {#each node.row.examples as example (example.id)}
-                <button type="button" class="example" class:on={bestExample(node.row, props.chosenOf(node.row))?.id === example.id} title={`${example.file}:${example.line}`} data-testid="component-example" data-id={example.id} onclick={() => props.choose(node.row, example.id)}>{exampleLabel(example)}{#if example.unresolved.length > 0}<span class="rest">{example.unresolved.length} open</span>{/if}</button>
+                <button type="button" class="example" class:on={!isPreset(props.chosenOf(node.row)) && bestExample(node.row, props.chosenOf(node.row))?.id === example.id} title={`${example.file}:${example.line}`} data-testid="component-example" data-id={example.id} onclick={() => props.choose(node.row, example.id)}>{exampleLabel(example)}{#if example.unresolved.length > 0}<span class="rest">{example.unresolved.length} open</span>{/if}</button>
+              {/each}
+              {#each props.presetsOf(node.row) as preset (preset.id)}
+                <button type="button" class="example" class:on={props.chosenOf(node.row) === preset.id} data-testid="component-preset" data-id={preset.id} onclick={() => props.choose(node.row, preset.id)}>{preset.label}<span class="rest">edge</span></button>
               {/each}
               <PropFields fields={props.fieldsOf(node.row)} onedit={(name, text, kind) => props.edit(node.row, name, text, kind)} />
             </div>

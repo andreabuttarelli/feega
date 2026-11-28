@@ -1,6 +1,7 @@
 import type { ComponentExample } from '../host/component-examples';
 import type { ComponentRow } from '../host/component-list';
 import { Badge, type Control, type Controls } from './canvas-card';
+import { edgePresets, isPreset, presetPropsOf, type EdgeExample } from './edge-presets';
 
 export type Edits = Record<string, Record<string, unknown>>;
 
@@ -34,7 +35,15 @@ export function bestExample(row: ComponentRow, chosen: string | undefined): Comp
   return picked ?? row.examples.reduce<ComponentExample | null>((best, next) => (best === null || next.unresolved.length < best.unresolved.length ? next : best), null);
 }
 
-export const propsFor = (row: ComponentRow, chosen: string | undefined, edits: Record<string, unknown>): Record<string, unknown> => ({ ...bestExample(row, chosen)?.props, ...edits });
+const codeProps = (row: ComponentRow, chosen: string | undefined): Record<string, unknown> => bestExample(row, chosen)?.props ?? {};
+
+export const propsFor = (row: ComponentRow, chosen: string | undefined, edits: Record<string, unknown>, controls: Controls = null): Record<string, unknown> => ({
+  ...codeProps(row, chosen),
+  ...presetPropsOf(chosen, controls, codeProps(row, chosen)),
+  ...edits
+});
+
+export const presetsOf = (row: ComponentRow, chosen: string | undefined, controls: Controls): EdgeExample[] => edgePresets(controls, codeProps(row, chosen));
 
 export function displayOf(value: unknown): string {
   return typeof value === 'string' ? value : JSON.stringify(value);
@@ -73,12 +82,13 @@ export function fieldsOf(row: ComponentRow, chosen: string | undefined, edits: R
   const example = bestExample(row, chosen);
   const declared = (controls ?? []).filter((control) => !NOT_A_FIELD.has(control.kind)).map((control) => control.name);
   const open = example ? example.unresolved : declared;
+  const preset = presetPropsOf(chosen, controls, codeProps(row, chosen));
   const names = [...new Set([...open, ...Object.keys(edits)])];
 
   return names.map((name) => {
     const control = controls?.find((c) => c.name === name);
     const edited = name in edits;
-    const value = edited ? edits[name] : (example?.props[name] ?? placeholderOf(control, name));
+    const value = edited ? edits[name] : (preset[name] ?? example?.props[name] ?? placeholderOf(control, name));
 
     return { name, kind: kindOf(control), value: displayOf(value), edited };
   });
@@ -87,6 +97,9 @@ export function fieldsOf(row: ComponentRow, chosen: string | undefined, edits: R
 export function badgeOf(row: ComponentRow, chosen: string | undefined, edits: Record<string, unknown>, shown: Record<string, unknown> | undefined): Badge | null {
   if (Object.keys(edits).length > 0) {
     return Badge.Edited;
+  }
+  if (isPreset(chosen)) {
+    return Badge.Edge;
   }
   if (Object.keys(bestExample(row, chosen)?.props ?? {}).length > 0) {
     return Badge.Code;
