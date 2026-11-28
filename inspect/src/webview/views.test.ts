@@ -25,12 +25,12 @@ describe('tabsOf', () => {
     expect(tabsOf(NONE, ViewKind.Editor).map((t) => t.kind)).toEqual([ViewKind.Editor]);
   });
 
-  it('adds the canvas and the focus after the editor, in that order', () => {
-    expect(tabsOf({ focus: 'Card', pages: true, components: false }, ViewKind.Editor).map((t) => t.kind)).toEqual([ViewKind.Editor, ViewKind.PagesCanvas, ViewKind.Focus]);
+  it('opens a focused component in the editor tab, not a tab of its own', () => {
+    expect(tabsOf({ focus: 'Card', pages: true, components: false }, ViewKind.Focus).map((t) => t.kind)).toEqual([ViewKind.Editor, ViewKind.PagesCanvas]);
   });
 
-  it('lists the components canvas between the pages canvas and the focus', () => {
-    expect(tabsOf({ focus: 'Card', pages: true, components: true }, ViewKind.Editor).map((t) => t.kind)).toEqual([ViewKind.Editor, ViewKind.PagesCanvas, ViewKind.ComponentsCanvas, ViewKind.Focus]);
+  it('lists the components canvas after the pages canvas', () => {
+    expect(tabsOf({ focus: 'Card', pages: true, components: true }, ViewKind.Editor).map((t) => t.kind)).toEqual([ViewKind.Editor, ViewKind.PagesCanvas, ViewKind.ComponentsCanvas]);
   });
 
   it('titles the components canvas', () => {
@@ -39,13 +39,14 @@ describe('tabsOf', () => {
   });
 
   it('marks exactly the shown view as active', () => {
-    const tabs = tabsOf({ focus: 'Card', pages: true, components: false }, ViewKind.Focus);
-    expect(tabs.filter((t) => t.active).map((t) => t.kind)).toEqual([ViewKind.Focus]);
+    const tabs = tabsOf({ focus: 'Card', pages: true, components: false }, ViewKind.PagesCanvas);
+    expect(tabs.filter((t) => t.active).map((t) => t.kind)).toEqual([ViewKind.PagesCanvas]);
   });
 
-  it('carries the title and closable flag of the registry', () => {
-    const focus = tabsOf({ focus: 'Card', pages: false, components: false }, ViewKind.Focus).find((t) => t.kind === ViewKind.Focus);
-    expect(focus).toMatchObject({ title: 'Card', closable: true });
+  it('keeps the editor tab active while a component is focused in it', () => {
+    const tabs = tabsOf({ focus: 'Card', pages: false, components: false }, ViewKind.Focus);
+    expect(tabs).toHaveLength(1);
+    expect(tabs[0]).toMatchObject({ kind: ViewKind.Editor, active: true });
   });
 });
 
@@ -66,7 +67,7 @@ describe('presentationOf', () => {
 describe('rowTabsOf', () => {
   it('names the first tab after the project, like the desktop window', () => {
     const tabs = tabsOf({ focus: 'Card', pages: true, components: false }, ViewKind.Editor);
-    expect(rowTabsOf('react-css', tabs).map((t) => t.title)).toEqual(['react-css', 'Pages canvas', 'Card']);
+    expect(rowTabsOf('react-css', tabs).map((t) => t.title)).toEqual(['react-css', 'Pages canvas']);
   });
 
   it('is one tab for a project with nothing else open', () => {
@@ -74,7 +75,7 @@ describe('rowTabsOf', () => {
   });
 
   it('keeps the active flag and the closable flag', () => {
-    const tabs = rowTabsOf('react-css', tabsOf({ focus: 'Card', pages: false, components: false }, ViewKind.Focus));
+    const tabs = rowTabsOf('react-css', tabsOf({ focus: null, pages: true, components: false }, ViewKind.PagesCanvas));
     expect(tabs.map((t) => [t.active, t.closable])).toEqual([[false, false], [true, true]]);
   });
 });
@@ -82,7 +83,7 @@ describe('rowTabsOf', () => {
 describe('shell tabs', () => {
   it('leaves the editor to the project tab', () => {
     const tabs = tabsOf({ focus: 'Card', pages: true, components: false }, ViewKind.Editor);
-    expect(shellTabsOf(tabs).map((t) => t.id)).toEqual([ViewKind.PagesCanvas, ViewKind.Focus]);
+    expect(shellTabsOf(tabs).map((t) => t.id)).toEqual([ViewKind.PagesCanvas]);
   });
 
   it('names a view after its project', () => {

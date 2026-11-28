@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EXAMPLE_LIMIT, LINKED_CAP, addExample, linkedRoutes, pageRows, seenRoutes, type Found } from './pages';
+import { EXAMPLE_LIMIT, ExampleKind, LINKED_CAP, NOT_FOUND_PATH, addExample, linkedRoutes, pageRows, seenRoutes, withErrorPage, type Found } from './pages';
 
 const found = (route: string, dynamic = false) => ({ route, dynamic });
 const none: Found = { seen: [], linked: [], manual: {} };
@@ -73,7 +73,7 @@ describe('examples of a dynamic route', () => {
     const rows = pageRows(blog, knew({ seen: ['/', '/blog/primo-post'] }), '/blog/primo-post');
 
     expect(rows.map((r) => r.route)).toEqual(['/', '/blog/[slug]']);
-    expect(rows[1].examples).toEqual([{ path: '/blog/primo-post', label: 'primo-post', current: true }]);
+    expect(rows[1].examples).toEqual([{ path: '/blog/primo-post', label: 'primo-post', current: true, kind: ExampleKind.Found }]);
   });
 
   it('include links found in the page', () => {
@@ -116,5 +116,53 @@ describe('examples of a dynamic route', () => {
     const linked = Array.from({ length: EXAMPLE_LIMIT + 5 }, (_, i) => `/blog/p${i}`);
 
     expect(pageRows(blog, knew({ linked }), '/')[1].examples).toHaveLength(EXAMPLE_LIMIT + 5);
+  });
+});
+
+describe('not found example', () => {
+  it('ends every dynamic route with a value that cannot exist, outside the examples', () => {
+    const row = pageRows([found('/blog/[slug]', true)], knew({ linked: ['/blog/a'] }), '/')[0];
+
+    expect(row.notFound).toEqual({ path: '/blog/feega-not-found', label: 'feega-not-found', current: false, kind: ExampleKind.NotFound });
+    expect(row.examples.map((e) => e.path)).toEqual(['/blog/a']);
+  });
+
+  it('fills every parameter, catch-all and optional ones too', () => {
+    const rows = pageRows([found('/[lang]/docs/[...rest]', true), found('/shop/[[page]]', true)], none, '/');
+
+    expect(rows.map((r) => r.notFound?.path)).toEqual(['/feega-not-found/docs/feega-not-found', '/shop/feega-not-found']);
+  });
+
+  it('is current when previewed', () => {
+    expect(pageRows([found('/blog/[slug]', true)], none, '/blog/feega-not-found?x=1')[0].notFound?.current).toBe(true);
+  });
+
+  it('is absent from static routes', () => {
+    expect(pageRows([found('/about')], none, '/')[0].notFound).toBeNull();
+  });
+
+  it('is not counted by the example limit', () => {
+    const linked = Array.from({ length: EXAMPLE_LIMIT }, (_, i) => `/blog/p${i}`);
+
+    expect(pageRows([found('/blog/[slug]', true)], knew({ linked }), '/')[0].examples).toHaveLength(EXAMPLE_LIMIT);
+  });
+
+  it('is not remembered as a visited page', () => {
+    expect(seenRoutes(seenRoutes([], '/blog/feega-not-found'), NOT_FOUND_PATH)).toEqual([]);
+  });
+});
+
+describe('withErrorPage', () => {
+  it('puts the error page first, current when previewed', () => {
+    const rows = withErrorPage(pageRows([found('/')], none, NOT_FOUND_PATH), NOT_FOUND_PATH);
+
+    expect(rows.map((r) => [r.route, r.kind, r.current])).toEqual([
+      [NOT_FOUND_PATH, ExampleKind.NotFound, true],
+      ['/', ExampleKind.Found, false]
+    ]);
+  });
+
+  it('stays out of an empty list', () => {
+    expect(withErrorPage([], '/')).toEqual([]);
   });
 });

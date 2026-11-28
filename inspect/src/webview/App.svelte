@@ -72,10 +72,10 @@
   import { ExampleProps } from './component-props.svelte';
   import ComponentsList from './ComponentsList.svelte';
   import type { FilesChange } from './files-change';
-  import { componentFocus } from './components';
+  import { componentFocus, keyOfFocus } from './components';
   import type { ComponentRow } from '../host/component-list';
   import LayoutGrid from '@lucide/svelte/icons/layout-grid';
-  import { addExample, linkedRoutes, pageRows, seenRoutes } from './pages';
+  import { addExample, linkedRoutes, pageRows, seenRoutes, withErrorPage } from './pages';
   import type { PageRoute } from '../host/page-route';
   import { fontCss } from './fonts';
   import MissingFont from './MissingFont.svelte';
@@ -123,6 +123,7 @@
   import { Where } from '@feega/plugin-api/manifest';
   import type { Place as PluginPlace } from '@feega/plugin-api/protocol';
   import PluginSections from './PluginSections.svelte';
+  import { toggled } from './section-folds';
   import PluginOverlay from './PluginOverlay.svelte';
   import { createPlugins } from './plugins.svelte';
   import { selectionOf, sourceOfText } from './plugin-editor';
@@ -246,7 +247,7 @@
   let seen = $state<string[]>([]);
   let linked = $state<string[]>([]);
   let manual = $state<Record<string, string[]>>({});
-  const pages = $derived(pageRows(projectRoutes, { seen, linked, manual }, route));
+  const pages = $derived(withErrorPage(pageRows(projectRoutes, { seen, linked, manual }, route), route));
   let share = $state<Extract<ViewMessage, { kind: ToView.Share }> | null>(null);
   let cloud = $state<{ enabled: boolean; comments: CloudComment[]; review: CloudRevisions; error: string }>({ enabled: false, comments: [], review: { status: 'open', revisions: [] }, error: '' });
   let composing = $state(false);
@@ -397,6 +398,7 @@
     tree: (tree) => ((layers = tree), askPalette()),
     mounted: (status) => {
       mount = { controls: controlsOf(status.controls, status.props), values: status.props, touched: mount?.touched ?? [], dynamic: mount?.dynamic ?? [] };
+      untrack(() => focus && (componentProps.controls[keyOfFocus(focus)] = status.controls));
       sendProps();
       askUsageProps();
     },
@@ -761,10 +763,13 @@
     }
   }
 
+  let sectionsClosed = $state<string[]>([]);
+  const toggleSection = (key: string) => ((sectionsClosed = toggled(sectionsClosed, key)), savePrefs());
+
   const componentProps = new ExampleProps(() => savePrefs());
 
   function savePrefs() {
-    toHost({ kind: ToHost.Prefs, prefs: { size, custom, barClosed, route, anchor, dock: docked ?? undefined, barWidth, leftWidth, leftClosed, examples: $state.snapshot(manual), components: componentProps.saved(), layers: layerFlags.saved(), componentFolders } });
+    toHost({ kind: ToHost.Prefs, prefs: { size, custom, barClosed, route, anchor, dock: docked ?? undefined, barWidth, leftWidth, leftClosed, examples: $state.snapshot(manual), components: componentProps.saved(), sectionsClosed, layers: layerFlags.saved(), componentFolders } });
   }
 
   function restore(prefs: Prefs | null) {
@@ -782,6 +787,7 @@
     leftWidth = prefs.leftWidth ?? leftWidth;
     leftClosed = prefs.leftClosed ?? leftClosed;
     manual = prefs.examples ?? manual;
+    sectionsClosed = prefs.sectionsClosed ?? sectionsClosed;
     componentProps.load(prefs.components);
     componentFolders = prefs.componentFolders ?? componentFolders;
     for (const [r, flags] of Object.entries((prefs.layers ?? {}) as SavedLayers)) {
@@ -1884,7 +1890,7 @@
       </Tabs.List>
       <Tabs.Content value={Tab.Properties}>
         {#if mount && viewing === View.Focus && mount.controls.length}
-          <ComponentProps controls={mount.controls} values={mount.values} grid={showGrid} {variants} dynamic={mount.dynamic} apply={{ ready: Boolean(applyPlan), usage: Boolean(focus?.usage), skipped: applyPlan?.skipped ?? [] }} onchange={setProp} ongrid={setGrid} onapply={applyToPage} />
+          <ComponentProps controls={mount.controls} values={mount.values} grid={showGrid} {variants} dynamic={mount.dynamic} apply={{ ready: Boolean(applyPlan), usage: Boolean(focus?.usage), skipped: applyPlan?.skipped ?? [] }} onchange={setProp} ongrid={setGrid} onapply={applyToPage} closed={sectionsClosed} ontoggle={toggleSection} />
         {/if}
         {#if several}
           <div class="what" data-testid="multi-selection">
@@ -1919,10 +1925,10 @@
           {/if}
           {#if held}<PreviewBar {held} onapply={applyHeld} oncancel={cancelHeld} onmute={muteHeld} />{/if}
           <Properties pick={picked} {breakpoints} {scales} {palette} {elementState} {baseline} onstate={chooseState} onpreview={preview} onchange={change} onsavevar={saveVar} onhint={(h) => (hint = h)} onfont={pickFont} onfontreplace={replaceFont} onfontload={loadFont} onnotice={showToast} />
-          <ClassesSection pick={picked} {changes} onselect={select} />
-          <Attributes pick={picked} {palette} />
-          <PluginSections {plugins} {palette} />
-          <Interactions pick={picked} {changes} />
+          <ClassesSection pick={picked} {changes} onselect={select} closed={sectionsClosed} ontoggle={toggleSection} />
+          <Attributes pick={picked} {palette} closed={sectionsClosed} ontoggle={toggleSection} />
+          <PluginSections {plugins} {palette} closed={sectionsClosed} ontoggle={toggleSection} />
+          <Interactions pick={picked} {changes} closed={sectionsClosed} ontoggle={toggleSection} />
         {:else}
           <p class="empty">{emptyText(previewState)}</p>
         {/if}

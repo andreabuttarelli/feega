@@ -70,16 +70,16 @@ export type OpenViews = { focus: string | null; pages: boolean; components: bool
 
 const tabOf = (kind: ViewKind, name: string, active: ViewKind): ViewTab => ({ id: kind, kind, title: VIEWS[kind].title(name), icon: VIEWS[kind].icon, closable: VIEWS[kind].closable, active: kind === active });
 
+const IN_EDITOR_TAB: ViewKind[] = [ViewKind.Editor, ViewKind.Focus];
+
 export function tabsOf(open: OpenViews, active: ViewKind): ViewTab[] {
-  const tabs = [tabOf(ViewKind.Editor, '', active)];
+  const editor = { ...tabOf(ViewKind.Editor, '', active), active: IN_EDITOR_TAB.includes(active) };
+  const tabs = [editor];
   if (open.pages) {
     tabs.push(tabOf(ViewKind.PagesCanvas, '', active));
   }
   if (open.components) {
     tabs.push(tabOf(ViewKind.ComponentsCanvas, '', active));
-  }
-  if (open.focus !== null) {
-    tabs.push(tabOf(ViewKind.Focus, open.focus, active));
   }
   return tabs;
 }

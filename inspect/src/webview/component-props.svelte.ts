@@ -1,7 +1,7 @@
 import type { ComponentRow } from '../host/component-list';
 import type { Controls } from './canvas-card';
 import { keyOfComponent } from './components';
-import { badgeOf, fieldsOf, loadedFrom, parseField, propsFor, savedOf, withEdit, type Chosen, type Edits, type FieldKind, type SavedComponents } from './component-props';
+import { badgeOf, fieldsOf, loadedFrom, parseField, presetsOf, propsFor, savedOf, withEdit, type Chosen, type Edits, type FieldKind, type SavedComponents } from './component-props';
 
 export class ExampleProps {
   chosen = $state<Chosen>({});
@@ -12,7 +12,9 @@ export class ExampleProps {
 
   constructor(private readonly changed: () => void) {}
 
-  propsOf = (row: ComponentRow) => propsFor(row, this.chosen[keyOfComponent(row)], this.edits[keyOfComponent(row)] ?? {});
+  propsOf = (row: ComponentRow) => propsFor(row, this.chosen[keyOfComponent(row)], this.edits[keyOfComponent(row)] ?? {}, this.controls[keyOfComponent(row)] ?? null);
+
+  presetsOf = (row: ComponentRow) => presetsOf(row, this.chosen[keyOfComponent(row)], this.controls[keyOfComponent(row)] ?? null);
 
   fieldsOf = (row: ComponentRow) => fieldsOf(row, this.chosen[keyOfComponent(row)], this.edits[keyOfComponent(row)] ?? {}, this.controls[keyOfComponent(row)] ?? null);
 

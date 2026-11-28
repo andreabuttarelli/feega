@@ -3,16 +3,18 @@
   import type { Palette } from '../messages';
   import ColourSwatch from './ColourSwatch.svelte';
   import Field from './Field.svelte';
+  import SectionHead from './SectionHead.svelte';
   import SearchField from './SearchField.svelte';
   import type { Plugins } from './plugins.svelte';
+  import { foldKey, isOpen } from './section-folds';
 
-  type Props = { plugins: Plugins; palette: Palette };
+  type Props = { plugins: Plugins; palette: Palette; closed: string[]; ontoggle: (key: string) => void };
 
-  let { plugins, palette }: Props = $props();
+  let { plugins, palette, closed, ontoggle }: Props = $props();
 
   const sections = $derived(
     plugins.rightBar
-      .map((one) => ({ plugin: one.plugin, id: one.entry.id, title: one.entry.title ?? one.entry.id, tree: plugins.ui(one.plugin, one.entry.id) }))
+      .map((one) => ({ key: foldKey(one.plugin, one.entry.id), plugin: one.plugin, id: one.entry.id, title: one.entry.title ?? one.entry.id, tree: plugins.ui(one.plugin, one.entry.id) }))
       .filter((section) => section.tree.length)
   );
 
@@ -23,7 +25,8 @@
 
 {#each sections as section (section.plugin + section.id)}
   <section class="plugin" data-plugin={section.plugin} data-section={section.id}>
-    <div class="head"><span class="title">{section.title}</span></div>
+    <SectionHead title={section.title} open={isOpen(closed, section.key)} ontoggle={() => ontoggle(section.key)} />
+    {#if isOpen(closed, section.key)}
     {#each section.tree as node, index (index)}
       {#if node.type === Control.Slider}
         <div class="row" data-control={node.id}>
@@ -83,6 +86,7 @@
         <p class="note">{node.text}</p>
       {/if}
     {/each}
+    {/if}
   </section>
 {/each}
 
@@ -93,16 +97,8 @@
     font-size: var(--ui-text-sm);
   }
 
-  .head {
-    display: flex;
-    align-items: center;
-    height: 32px;
-    padding: 0 12px;
-  }
-
-  .title {
-    color: var(--ui-text);
-    font-weight: 600;
+  section.plugin:has(:global(> .head [aria-expanded='false'])) {
+    padding: 4px 0;
   }
 
   .row {

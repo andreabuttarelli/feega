@@ -3,6 +3,7 @@
   import { eventAttrs } from '../analytics/attrs';
   import { lower } from '../lower';
   import { creditLine, pluginPath, type PluginView } from './plugins';
+  import LabelBadges from './LabelBadges.svelte';
   import TierBadge from './TierBadge.svelte';
 
   let { plugin }: { plugin: PluginView } = $props();
@@ -14,6 +15,8 @@
     <h2>{lower(plugin.name)}</h2>
     <TierBadge tier={plugin.tier} />
   </div>
+
+  <div class="labels"><LabelBadges labels={plugin.labels} /></div>
 
   <p class="summary">{lower(plugin.summary)}</p>
   {#if plugin.credit}<p class="credit">{lower(creditLine(plugin.credit))}</p>{/if}
@@ -52,6 +55,12 @@
     height: 48px;
     border-radius: 10px;
     background: var(--sx-grey-1);
+  }
+
+  .labels {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
   }
 
   h2 {

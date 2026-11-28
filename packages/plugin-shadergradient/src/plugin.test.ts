@@ -59,7 +59,7 @@ function load(options: { packages?: Record<string, string>; text?: string | null
 describe('manifest', () => {
   it('is named as a community plugin and asks for no network', () => {
     const parsed = parseManifest(manifest);
-    expect(parsed.ok && parsed.manifest.name).toBe('ShaderGradient (community)');
+    expect(parsed.ok && parsed.manifest.name).toBe('ShaderGradient');
     expect(parsed.ok && parsed.manifest.hosts).toEqual([]);
   });
 });
