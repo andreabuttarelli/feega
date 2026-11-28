@@ -75,7 +75,7 @@
   import { componentFocus } from './components';
   import type { ComponentRow } from '../host/component-list';
   import LayoutGrid from '@lucide/svelte/icons/layout-grid';
-  import { addExample, linkedRoutes, pageRows, seenRoutes } from './pages';
+  import { addExample, linkedRoutes, pageRows, seenRoutes, withErrorPage } from './pages';
   import type { PageRoute } from '../host/page-route';
   import { fontCss } from './fonts';
   import MissingFont from './MissingFont.svelte';
@@ -246,7 +246,7 @@
   let seen = $state<string[]>([]);
   let linked = $state<string[]>([]);
   let manual = $state<Record<string, string[]>>({});
-  const pages = $derived(pageRows(projectRoutes, { seen, linked, manual }, route));
+  const pages = $derived(withErrorPage(pageRows(projectRoutes, { seen, linked, manual }, route), route));
   let share = $state<Extract<ViewMessage, { kind: ToView.Share }> | null>(null);
   let cloud = $state<{ enabled: boolean; comments: CloudComment[]; review: CloudRevisions; error: string }>({ enabled: false, comments: [], review: { status: 'open', revisions: [] }, error: '' });
   let composing = $state(false);
