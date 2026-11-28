@@ -49,7 +49,7 @@
   import LayersTree from './LayersTree.svelte';
   import FocusControls from './FocusControls.svelte';
   import TabBar from './TabBar.svelte';
-  import { Presentation, VIEWS, ViewKind, barControlsOf, presentationOf, rowTabsOf, shellTabsOf, tabsOf } from './views';
+  import { Chrome, Presentation, VIEWS, ViewKind, barControlsOf, chromeOf, presentationOf, rowTabsOf, shellTabsOf, tabsOf } from './views';
   import ComponentProps from './ComponentProps.svelte';
   import { propTally } from './focus-usage';
   import { applyAskOf } from './apply-plan';
@@ -1413,6 +1413,7 @@
 
   const CANVAS_VIEW: Record<CanvasKind, ViewKind> = { [CanvasKind.Pages]: ViewKind.PagesCanvas, [CanvasKind.Components]: ViewKind.ComponentsCanvas };
   const shown = $derived(canvasShown ? CANVAS_VIEW[canvasShown] : focus && viewing === View.Focus ? ViewKind.Focus : ViewKind.Editor);
+  const bare = $derived(chromeOf(shown) === Chrome.Bare);
   const viewTabs = $derived(tabsOf({ focus: focus?.name ?? null, pages: pagesOpen, components: componentsOpen }, shown));
 
   const SHOW_VIEW: Record<ViewKind, () => void> = {
@@ -1700,7 +1701,7 @@
 <svelte:window onkeydown={onKey} />
 
 {#if viewsAt === Presentation.TopRow}<TabBar tabs={rowTabsOf(project || VIEWS[ViewKind.Editor].title(''), viewTabs)} onselect={showView} onclose={closeView} bind:height={rowH} />{/if}
-<main bind:clientWidth={viewW} style={`--row: ${rowH}px; grid-template-columns: ${leftPx}px minmax(0, 1fr) ${barPx}px; --bar: ${barPx}px; --left: ${leftPx}px`} class:sizing={sizing || leftSizing}>
+<main bind:clientWidth={viewW} style={`--row: ${rowH}px; grid-template-columns: ${bare ? 0 : leftPx}px minmax(0, 1fr) ${bare ? 0 : barPx}px; --bar: ${barPx}px; --left: ${leftPx}px`} class:sizing={sizing || leftSizing} class:bare>
   <aside class="left" class:closed={leftClosed}>
     {#if libraryOpen}
       <LibraryPanel items={libraryItems} canInsert={!!picked} oninsert={(id) => picked && insertLibrary(id, picked.source, AddPlace.After)} onclose={() => (libraryOpen = false)} />
@@ -1949,6 +1950,23 @@
     height: calc(100vh - var(--row, 0px));
     overflow: hidden;
     transition: grid-template-columns 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  main.bare {
+    --top-row: 0px;
+  }
+
+  main.bare .left,
+  main.bare .right {
+    visibility: hidden;
+  }
+
+  main.bare .toolbar {
+    display: none;
+  }
+
+  main.bare .backdrop {
+    visibility: hidden;
   }
 
   .view {
