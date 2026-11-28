@@ -33,6 +33,7 @@
   import { OFFSET_SIDES, OffsetSide, flipOffset, initialOffsets, offsetsFromHost, type Offsets } from './position-box';
   import { sourceText } from './page-bridge';
   import { wiringState } from './wiring-state.svelte';
+  import SectionHead from './SectionHead.svelte';
   import ShadowList from './ShadowList.svelte';
   import FillList from './FillList.svelte';
   import IconActions from './IconActions.svelte';
@@ -166,17 +167,14 @@
 </script>
 
 {#snippet header(section: Section, actions?: Snippet, inline = false)}
-  <div class="head" class:inline class:differs={inline && changed(section)} data-row={inline ? section : undefined}>
-    {#if inline}
+  {#if inline}
+    <div class="head inline" class:differs={changed(section)} data-row={section}>
       <span class="label title-inline">{section}</span>
       <div class="control">{@render actions?.()}</div>
-    {:else}
-      <button type="button" class="title" aria-expanded={!closed[section]} onclick={() => (closed[section] = !closed[section])}>
-        <span class="chevron" class:shut={closed[section]}><ChevronDown size={12} /></span>{section}
-      </button>
-      {#if actions}<div class="actions">{@render actions()}</div>{/if}
-    {/if}
-  </div>
+    </div>
+  {:else}
+    <SectionHead title={section} open={!closed[section]} ontoggle={() => (closed[section] = !closed[section])} {actions} />
+  {/if}
 {/snippet}
 
 {#snippet row(label: string, content: Snippet, name = '')}
@@ -531,7 +529,7 @@
     border-bottom: 1px solid var(--ui-divider);
   }
 
-  section:has(> .head [aria-expanded='false']) {
+  section:has(> :global(.head) [aria-expanded='false']) {
     padding: 4px 0;
   }
 
@@ -542,15 +540,9 @@
     font-size: var(--ui-text-xs);
   }
 
-  .properties :global(.head) {
-    display: flex;
-    align-items: center;
-    height: 32px;
-    padding: 0 8px 0 4px;
-  }
-
   .properties :global(.head.inline) {
     display: grid;
+    align-items: center;
     grid-template-columns: var(--label-w) minmax(0, 1fr);
     gap: 8px;
     height: auto;
@@ -679,41 +671,6 @@
   .posbox .bar.bottom { bottom: 4px; }
   .posbox .bar.left { left: 4px; }
   .posbox .bar.right { right: 4px; }
-
-  .properties :global(.title) {
-    display: flex;
-    flex: 1;
-    align-items: center;
-    gap: 4px;
-    height: 100%;
-    padding: 0;
-    border: 0;
-    background: none;
-    box-shadow: none;
-    color: var(--ui-text);
-    font: inherit;
-    font-size: var(--ui-text-xs);
-    font-weight: 600;
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .properties :global(.chevron) {
-    display: grid;
-    place-items: center;
-    width: 16px;
-    color: var(--ui-text-3);
-    transition: transform 120ms ease;
-  }
-
-  .properties :global(.chevron.shut) {
-    transform: rotate(-90deg);
-  }
-
-  .properties :global(.actions) {
-    display: flex;
-    gap: 2px;
-  }
 
   .properties :global(.row) {
     display: grid;

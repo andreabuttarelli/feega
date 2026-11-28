@@ -123,6 +123,7 @@
   import { Where } from '@feega/plugin-api/manifest';
   import type { Place as PluginPlace } from '@feega/plugin-api/protocol';
   import PluginSections from './PluginSections.svelte';
+  import { toggled } from './section-folds';
   import PluginOverlay from './PluginOverlay.svelte';
   import { createPlugins } from './plugins.svelte';
   import { selectionOf, sourceOfText } from './plugin-editor';
@@ -761,10 +762,13 @@
     }
   }
 
+  let pluginClosed = $state<string[]>([]);
+  const togglePlugin = (key: string) => ((pluginClosed = toggled(pluginClosed, key)), savePrefs());
+
   const componentProps = new ExampleProps(() => savePrefs());
 
   function savePrefs() {
-    toHost({ kind: ToHost.Prefs, prefs: { size, custom, barClosed, route, anchor, dock: docked ?? undefined, barWidth, leftWidth, leftClosed, examples: $state.snapshot(manual), components: componentProps.saved(), layers: layerFlags.saved(), componentFolders } });
+    toHost({ kind: ToHost.Prefs, prefs: { size, custom, barClosed, route, anchor, dock: docked ?? undefined, barWidth, leftWidth, leftClosed, examples: $state.snapshot(manual), components: componentProps.saved(), pluginClosed, layers: layerFlags.saved(), componentFolders } });
   }
 
   function restore(prefs: Prefs | null) {
@@ -782,6 +786,7 @@
     leftWidth = prefs.leftWidth ?? leftWidth;
     leftClosed = prefs.leftClosed ?? leftClosed;
     manual = prefs.examples ?? manual;
+    pluginClosed = prefs.pluginClosed ?? pluginClosed;
     componentProps.load(prefs.components);
     componentFolders = prefs.componentFolders ?? componentFolders;
     for (const [r, flags] of Object.entries((prefs.layers ?? {}) as SavedLayers)) {
@@ -1921,7 +1926,7 @@
           <Properties pick={picked} {breakpoints} {scales} {palette} {elementState} {baseline} onstate={chooseState} onpreview={preview} onchange={change} onsavevar={saveVar} onhint={(h) => (hint = h)} onfont={pickFont} onfontreplace={replaceFont} onfontload={loadFont} onnotice={showToast} />
           <ClassesSection pick={picked} {changes} onselect={select} />
           <Attributes pick={picked} {palette} />
-          <PluginSections {plugins} {palette} />
+          <PluginSections {plugins} {palette} closed={pluginClosed} ontoggle={togglePlugin} />
           <Interactions pick={picked} {changes} />
         {:else}
           <p class="empty">{emptyText(previewState)}</p>
