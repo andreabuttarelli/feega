@@ -17,10 +17,12 @@ await page.locator('[data-testid="canvas-open-pages"]').waitFor();
 await page.screenshot({ path: SHOT_PAGES });
 
 await page.locator('[data-testid="components-tab"]').click();
+await page.locator('[data-testid="component-folder"]').first().waitFor();
+await page.locator('[data-testid="components"] [aria-expanded="false"]').evaluateAll((folders) => folders.forEach((f) => (f as HTMLElement).click()));
 await page.locator('[data-testid="component-row"]').first().waitFor();
 const names = await page.locator('[data-testid="component-row"]').evaluateAll((rows) => rows.map((r) => (r as HTMLElement).dataset.name));
 assert.ok(names.includes('Button') && names.includes('Card') && names.includes('Avatar'), 'lists the components');
-assert.equal(await page.locator('[data-testid="component-group"][data-folder="lib/ui"]').count(), 1, 'grouped by folder');
+assert.ok((await page.locator('[data-testid="component-folder"]').count()) > 0, 'nested in folders');
 await page.screenshot({ path: SHOT });
 
 await page.locator('[data-testid="canvas-open-components"]').click();
