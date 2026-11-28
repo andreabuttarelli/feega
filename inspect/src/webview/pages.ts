@@ -6,6 +6,11 @@ export enum ExampleKind {
   NotFound = 'not-found'
 }
 
+export enum FieldMode {
+  Closed = 'closed',
+  Open = 'open'
+}
+
 export type PageExample = { path: string; label: string; current: boolean; kind: ExampleKind };
 
 export type PageRow = PageRoute & { current: boolean; kind: ExampleKind; examples: PageExample[]; notFound: PageExample | null };
@@ -74,4 +79,12 @@ export function withErrorPage(rows: PageRow[], current: string): PageRow[] {
   const errorPage: PageRow = { route: NOT_FOUND_PATH, dynamic: false, current: pathOf(current) === NOT_FOUND_PATH, kind: ExampleKind.NotFound, examples: [], notFound: null };
 
   return [errorPage, ...rows];
+}
+
+export const fieldState = (exampleCount: number, asked: FieldMode): FieldMode => (exampleCount === 0 ? FieldMode.Open : asked);
+
+export function customLabel(pattern: string): string {
+  const params = paramsOf(pattern);
+
+  return params.length === 1 ? `Custom ${params[0].name}` : 'Custom value';
 }

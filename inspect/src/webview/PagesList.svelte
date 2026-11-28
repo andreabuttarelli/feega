@@ -2,20 +2,30 @@
   import ActionBanner from './ActionBanner.svelte';
   import ExampleField from './ExampleField.svelte';
   import { freshKeys } from './fresh-keys.svelte';
-  import { EXAMPLE_LIMIT, ExampleKind, type PageRow } from './pages';
+  import Plus from '@lucide/svelte/icons/plus';
+  import { EXAMPLE_LIMIT, ExampleKind, FieldMode, customLabel, fieldState, type PageRow } from './pages';
 
   type Props = { rows: PageRow[]; onopen: (route: string) => void; onadd: (pattern: string, path: string) => void; oncanvas?: () => void };
 
   let { rows, onopen, onadd, oncanvas }: Props = $props();
 
   let expanded = $state<string[]>([]);
+  let asked = $state<string[]>([]);
 
-  const fresh = freshKeys(() => rows.map((row) => row.route));
+  const fresh = freshKeys(() => rows.flatMap((row) => [row.route, ...row.examples.map((example) => example.path)]));
+  const modeOf = (row: PageRow) => fieldState(row.examples.length, asked.includes(row.route) ? FieldMode.Open : FieldMode.Closed);
+  const ask = (route: string) => (asked = [...asked, route]);
+  const dismiss = (route: string) => (asked = asked.filter((r) => r !== route));
+  const add = (row: PageRow, path: string) => {
+    onadd(row.route, path);
+    dismiss(row.route);
+    expand(row.route);
+  };
 
   const shownOf = (row: PageRow) => (expanded.includes(row.route) ? row.examples : row.examples.slice(0, EXAMPLE_LIMIT));
   const hiddenOf = (row: PageRow) => row.examples.length - shownOf(row).length;
   const labelOf = (row: PageRow) => (row.kind === ExampleKind.NotFound ? 'Error page' : row.route);
-  const expand = (route: string) => (expanded = [...expanded, route]);
+  const expand = (route: string) => (expanded = expanded.includes(route) ? expanded : [...expanded, route]);
 </script>
 
 {#if oncanvas}<ActionBanner testid="canvas-open-pages" onopen={oncanvas} />{/if}
@@ -32,7 +42,7 @@
         <ul class="examples">
           {#each shownOf(row) as example (example.path)}
             <li>
-              <button type="button" class="page example" class:on={example.current} aria-current={example.current ? 'page' : undefined} title={`Open ${example.path}`} data-testid="page-example" data-path={example.path} onclick={() => onopen(example.path)}>
+              <button type="button" class="page example" class:on={example.current} class:fresh={fresh.has(example.path)} aria-current={example.current ? 'page' : undefined} title={`Open ${example.path}`} data-testid="page-example" data-path={example.path} onclick={() => onopen(example.path)}>
                 <span class="route">{example.label}</span>
               </button>
             </li>
@@ -48,8 +58,10 @@
               </button>
             </li>
           {/if}
-          {#if row.examples.length === 0}
-            <li class="manual"><ExampleField pattern={row.route} onadd={(path) => onadd(row.route, path)} /></li>
+          {#if modeOf(row) === FieldMode.Open}
+            <li class="manual"><ExampleField pattern={row.route} focus={asked.includes(row.route)} onadd={(path) => add(row, path)} oncollapse={() => dismiss(row.route)} /></li>
+          {:else}
+            <li><button type="button" class="page example custom" title="Open a page with a value you type" data-testid="custom-row" onclick={() => ask(row.route)}><Plus size={12} /><span class="route">{customLabel(row.route)}</span></button></li>
           {/if}
         </ul>
       </li>
@@ -107,6 +119,10 @@
   .more {
     color: var(--ui-text-2);
     font-size: var(--ui-text-xs);
+  }
+
+  .custom {
+    color: var(--ui-text-3);
   }
 
   .manual {
