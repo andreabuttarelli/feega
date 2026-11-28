@@ -1,11 +1,10 @@
 import type { PluginApi } from '@feega/plugin-api/client';
-import { Control, OpKind, Place, frameworkOf, type ComponentFile, type Framework, type ProjectInfo, type Selection, type UiNode } from '@feega/plugin-api/protocol';
+import { Control, OpKind, Place, frameworkOf, type ComponentFile, type Framework, type ProjectInfo, type Source, type UiNode } from '@feega/plugin-api/protocol';
 import { OFFLINE_NOTE, iconFetcher, type Source } from './cdn';
 import { search, type Searchable } from './search';
 
 export const QUERY = 'query';
 export const CHOSEN = 'icon';
-export const INSERT = 'insert';
 export const RETRY = 'retry';
 export const PAGE_SIZE = 60;
 
@@ -31,7 +30,9 @@ export type PickerConfig<I extends PickerIcon> = {
 
 const NOT_A_COMPONENT = 'Add an icon to a Svelte, React, Vue or Astro file.';
 
-const sourceOf = (selection: Selection) => `${selection.source.file}:${selection.source.line}:${selection.source.col}`;
+type Opened = { target: Source; place: Place | null };
+
+const sourceOf = (at: Source) => `${at.file}:${at.line}:${at.col}`;
 
 export function iconPicker<I extends PickerIcon>(api: PluginApi, config: PickerConfig<I>) {
   const section = api.section(config.section);
@@ -39,9 +40,8 @@ export function iconPicker<I extends PickerIcon>(api: PluginApi, config: PickerC
   const fetcher = iconFetcher(api.fetch, config.source);
   const pending = new Set<string>();
   const failed = new Set<string>();
-  let selection: Selection | null = null;
+  let opened: Opened | null = null;
   let query = '';
-  let chosen: string | null = null;
   let values: Values = config.initial;
 
   async function matches(): Promise<I[]> {
@@ -60,18 +60,16 @@ export function iconPicker<I extends PickerIcon>(api: PluginApi, config: PickerC
     const offline = shown.some((icon) => missing(icon) && failed.has(config.file(icon, values)));
     const note = offline ? OFFLINE_NOTE : !found.length ? `No icon matches "${query.trim()}".` : found.length > PAGE_SIZE ? `Showing ${PAGE_SIZE} of ${found.length}. Type to narrow.` : null;
     const retry: UiNode[] = offline ? [{ type: Control.Button, id: RETRY, label: 'Retry' }] : [];
-    const insert: UiNode[] = chosen ? [{ type: Control.Button, id: INSERT, label: `Insert ${chosen}` }] : [];
     const items = shown.map((icon) => ({ id: icon.name, label: icon.name, image: fetcher.cached(config.file(icon, values)) }));
 
     return {
       shown,
       tree: [
         { type: Control.Search, id: QUERY, label: 'Search icons', value: query, placeholder: 'Search icons' },
-        { type: Control.Grid, id: CHOSEN, label: 'Icons', selected: chosen, items },
+        { type: Control.Grid, id: CHOSEN, label: 'Icons', selected: null, items },
         ...(note ? [{ type: Control.Note as const, text: note }] : []),
         ...retry,
-        ...config.options(values),
-        ...insert
+        ...config.options(values)
       ]
     };
   }
@@ -97,7 +95,7 @@ export function iconPicker<I extends PickerIcon>(api: PluginApi, config: PickerC
   }
 
   async function show(fetching = true) {
-    if (!selection) {
+    if (!opened) {
       await section.render([]);
       return;
     }
@@ -113,16 +111,19 @@ export function iconPicker<I extends PickerIcon>(api: PluginApi, config: PickerC
     }
   }
 
-  async function insert() {
-    const framework = selection ? frameworkOf(selection.source.file) : null;
-    if (!selection || !chosen) {
+  async function insert(name: string) {
+    const at = opened;
+    opened = null;
+    await show();
+    const framework = at ? frameworkOf(at.target.file) : null;
+    if (!at) {
       return;
     }
     if (!framework) {
       await api.notify(NOT_A_COMPONENT);
       return;
     }
-    const icon = (await icons).find((one) => one.name === chosen) as I;
+    const icon = (await icons).find((one) => one.name === name) as I;
     const svg = await fetcher.get(config.file(icon, values));
     if (svg === null) {
       await api.notify(OFFLINE_NOTE);
@@ -130,7 +131,7 @@ export function iconPicker<I extends PickerIcon>(api: PluginApi, config: PickerC
     }
     const component = config.component(icon, values, await api.project.info(), framework, svg);
 
-    await api.propose(config.label, [{ kind: OpKind.Insert, at: sourceOf(selection), place: Place.Auto, component }]);
+    await api.propose(config.label, [{ kind: OpKind.Insert, at: sourceOf(at.target), place: at.place ?? Place.Auto, component }]);
   }
 
   const retry = () => (failed.clear(), show());
@@ -143,15 +144,16 @@ export function iconPicker<I extends PickerIcon>(api: PluginApi, config: PickerC
 
   const ACTIONS: Record<string, (value: string | number | boolean) => Promise<void>> = {
     [QUERY]: (value) => change(() => (query = String(value))),
-    [CHOSEN]: (value) => ((chosen = String(value)), show()),
-    [INSERT]: insert,
+    [CHOSEN]: (value) => insert(String(value)),
     [RETRY]: retry
   };
 
   section.on((id, value) => void (ACTIONS[id] ?? ((next) => change(() => (values = { ...values, [id]: next }))))(value));
 
-  api.selection.watch((next) => {
-    selection = next;
-    void show();
+  api.menu.on((_, target, place) => {
+    if (target) {
+      opened = { target, place };
+      void show();
+    }
   });
 }

@@ -59,7 +59,8 @@ describe('manifest', () => {
     const parsed = parseManifest(manifest);
     expect(parsed.ok && parsed.manifest.contributions.addMenu?.map((e) => e.category)).toEqual(Array(5).fill('3D object'));
     expect(parsed.ok && parsed.manifest.hosts).toEqual([]);
-    expect(parsed.ok && parsed.manifest.contributions.rightBar?.[0].when).toEqual(['attribute:data-feega-scene']);
+    expect(parsed.ok && parsed.manifest.contributions.rightBar?.[0].when).toEqual(['owned']);
+    expect(parsed.ok && parsed.manifest.owns).toEqual(['attribute:data-feega-scene']);
   });
 });
 

@@ -1,13 +1,13 @@
 import type { PluginApi } from '@feega/plugin-api/client';
 import { Control, type UiNode } from '@feega/plugin-api/protocol';
 import { envOf } from '@feega/plugin-icon-kit/env';
-import { CHOSEN, INSERT, PAGE_SIZE, QUERY, RETRY, iconPicker, type PickerConfig, type Values } from '@feega/plugin-icon-kit/picker';
+import { CHOSEN, PAGE_SIZE, QUERY, RETRY, iconPicker, type PickerConfig, type Values } from '@feega/plugin-icon-kit/picker';
 import { innerOf } from '@feega/plugin-icon-kit/cdn';
 import { attributesOf, componentName, svgComponent, type Prop, type SvgSpec } from '@feega/plugin-icon-kit/svg-component';
 import { CURRENT_COLOUR, DEFAULT_SIZE, DEFAULT_STROKE, POPULAR, SOURCE, VIEW_BOX, fileOf, loadIcons, type LucideIcon } from './icons';
 import { libraryFor } from './library';
 
-export { CHOSEN, INSERT, PAGE_SIZE, QUERY, RETRY };
+export { CHOSEN, PAGE_SIZE, QUERY, RETRY };
 export const SECTION = 'icons';
 export const SIZE = 'size';
 export const STROKE = 'stroke';

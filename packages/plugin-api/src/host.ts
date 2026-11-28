@@ -37,7 +37,7 @@ export type EditorPort = {
   notify: (text: string) => void;
 };
 
-export type Contributed = { plugin: string; entry: Contribution };
+export type Contributed = { plugin: string; entry: Contribution; owns: string[] };
 
 type Loaded = { manifest: Manifest; channel: Channel; ui: Map<string, UiNode[]>; handles: Map<string, Handle[]> };
 
@@ -48,7 +48,7 @@ type Handler<K extends Call> = (context: Context, args: CallArgs[K]) => Promise<
 const CALLS = new Set<string>(Object.values(Call));
 const OP_KINDS = new Set<string>(Object.values(OpKind));
 
-const declares = (manifest: Manifest, point: Point, id: string) => (manifest.contributions[point] ?? []).some((entry) => entry.id === id);
+const declares = (manifest: Manifest, points: Point[], id: string) => points.some((point) => (manifest.contributions[point] ?? []).some((entry) => entry.id === id));
 
 const isProposal = (value: unknown): value is Proposal => {
   const proposal = value as Proposal | null;
@@ -63,9 +63,9 @@ async function propose({ plugin, editor }: Context, proposal: unknown): Promise<
   return denied ? { ok: false, reason: denied } : editor.propose(proposal);
 }
 
-function remember<T>(store: Map<string, T>, manifest: Manifest, point: Point, contribution: string, value: T, changed: () => void): null {
-  if (!declares(manifest, point, contribution)) {
-    throw new Error(`${manifest.id} declares no ${point} contribution ${contribution}`);
+function remember<T>(store: Map<string, T>, manifest: Manifest, points: Point[], contribution: string, value: T, changed: () => void): null {
+  if (!declares(manifest, points, contribution)) {
+    throw new Error(`${manifest.id} declares no ${points.join(' or ')} contribution ${contribution}`);
   }
   store.set(contribution, value);
   changed();
@@ -89,8 +89,8 @@ const HANDLERS: { [K in Call]: Handler<K> } = {
   [Call.Fetch]: fetched,
   [Call.PickFile]: ({ editor }, args) => editor.pickFile(args.accept),
   [Call.Notify]: ({ editor }, args) => (editor.notify(args.text), null),
-  [Call.Render]: ({ plugin, changed }, args) => remember(plugin.ui, plugin.manifest, Point.RightBar, args.contribution, args.tree, changed),
-  [Call.Overlay]: ({ plugin, changed }, args) => remember(plugin.handles, plugin.manifest, Point.Overlay, args.contribution, args.handles, changed)
+  [Call.Render]: ({ plugin, changed }, args) => remember(plugin.ui, plugin.manifest, [Point.RightBar, Point.Popover], args.contribution, args.tree, changed),
+  [Call.Overlay]: ({ plugin, changed }, args) => remember(plugin.handles, plugin.manifest, [Point.Overlay], args.contribution, args.handles, changed)
 };
 
 const isCall = (message: unknown): message is PluginMessage => {
@@ -145,7 +145,7 @@ export function createPluginHost(deps: { sandbox: Sandbox; editor: EditorPort })
     load,
     unload,
     manifests: () => [...plugins.values()].map((p) => p.manifest),
-    contributions: (point: Point): Contributed[] => [...plugins.values()].flatMap((p) => (p.manifest.contributions[point] ?? []).map((entry) => ({ plugin: p.manifest.id, entry }))),
+    contributions: (point: Point): Contributed[] => [...plugins.values()].flatMap((p) => (p.manifest.contributions[point] ?? []).map((entry) => ({ plugin: p.manifest.id, entry, owns: p.manifest.owns }))),
     ui: (plugin: string, contribution: string): UiNode[] => plugins.get(plugin)?.ui.get(contribution) ?? [],
     handles: (plugin: string, contribution: string): Handle[] => plugins.get(plugin)?.handles.get(contribution) ?? [],
     subscribe: (watch: () => void) => (watchers.add(watch), () => watchers.delete(watch)),

@@ -3,20 +3,23 @@
   "name": "Heroicons",
   "version": "1.0.0",
   "permissions": [
-    "selection",
     "project",
     "edit.insert",
     "network:cdn.jsdelivr.net",
     "network:unpkg.com"
   ],
   "contributions": {
-    "rightBar": [
+    "addMenu": [
+      {
+        "id": "icon",
+        "title": "Heroicon",
+        "popover": "heroicons"
+      }
+    ],
+    "popover": [
       {
         "id": "heroicons",
-        "title": "Heroicons",
-        "when": [
-          "selection"
-        ]
+        "title": "Heroicons"
       }
     ]
   }
