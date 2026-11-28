@@ -17,4 +17,4 @@ The Typography section covers font family (with a font picker), weight, size, li
 
 ### Changing the tag
 
-On a plain HTML text element (`h1`–`h6`, `p`, `span`, `label`, `blockquote`, `strong`, `em`, `small`), the Tag row switches it to another tag of that list. Feega renames the opening and closing tag in your source and keeps the attributes and children. Undo and redo work like any other edit, and the element stays selected. Components and self-closing tags have no Tag row.
+In its own Tag section above Typography, on a plain HTML text element (`h1`–`h6`, `p`, `span`, `label`, `blockquote`, `strong`, `em`, `small`), the picker switches it to another tag of that list. Feega renames the opening and closing tag in your source and keeps the attributes and children. Undo and redo work like any other edit, and the element stays selected. If the element is written inside a component used more than once, a note under the picker says how many uses change. Components and self-closing tags have no Tag section.

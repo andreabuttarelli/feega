@@ -16,6 +16,7 @@
   import Icon from './Icon.svelte';
   import FontPicker from './FontPicker.svelte';
   import TagPicker from './TagPicker.svelte';
+  import { tagNote } from './tag-note';
   import { isTextTag } from '@feega/live-edit/retag';
   import MissingFont from './MissingFont.svelte';
   import { missingIn } from './missing-font';
@@ -372,6 +373,17 @@
     </section>
   {/if}
 
+  {#if has(Section.Typography) && isTextTag(pick.tag)}
+    <section data-section={Section.Tag}>
+      {@render header(Section.Tag)}
+      {#if !closed[Section.Tag]}
+        {#snippet tagRow()}<TagPicker at={sourceText(pick.source)} tag={pick.tag} />{/snippet}
+        {@render row('Tag', tagRow, 'tag')}
+        {#if tagNote(pick)}<p class="tag-note">{tagNote(pick)}</p>{/if}
+      {/if}
+    </section>
+  {/if}
+
   {#if has(Section.Typography)}
     <section data-section={Section.Typography}>
       {@render header(Section.Typography)}
@@ -389,10 +401,6 @@
         {@render row('Letter spacing', ls, 'letter-spacing')}
         {#snippet ta()}{@render segmented(byName('text-align'), TEXT_ALIGN)}{/snippet}
         {@render row('Align', ta, 'text-align')}
-        {#if isTextTag(pick.tag)}
-          {#snippet tagRow()}<TagPicker at={sourceText(pick.source)} tag={pick.tag} />{/snippet}
-          {@render row('Tag', tagRow, 'tag')}
-        {/if}
         <FillList scope="text-fill" inline parse={() => textFillsOf(pick.styles)} css={textFillCss} guard={(next) => textFillRefusal(pick.styles, next)} onrefuse={onnotice} {palette} {header} {row} onchange={writeText} onpreview={previewText} />
       {/if}
     </section>
@@ -525,6 +533,13 @@
 
   section:has(> .head [aria-expanded='false']) {
     padding: 4px 0;
+  }
+
+  .tag-note {
+    margin: 0;
+    padding: 0 12px 8px;
+    color: var(--ui-text-2);
+    font-size: var(--ui-text-xs);
   }
 
   .properties :global(.head) {
