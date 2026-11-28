@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { CLOUD_SETTING } from './cloud-flag';
-import { SETTINGS, helpLinks, issueUrl } from './settings';
+import { SETTINGS, SettingGroup, groupedSettings, helpLinks, issueUrl } from './settings';
 
 const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 const SETTINGS_JSON_ONLY = ['feegaInspect.plugins.dev'];
@@ -29,6 +29,18 @@ describe('settings', () => {
 
     expect(url.searchParams.get('body')).toContain('0.1.0');
     expect(url.searchParams.get('body')).toContain('sveltekit');
+  });
+});
+
+describe('grouped settings', () => {
+  it('keeps every row, once, under a group', () => {
+    const rows = groupedSettings().flatMap((g) => g.rows);
+
+    expect(rows.map((r) => r.key).sort()).toEqual(SETTINGS.map((r) => r.key).sort());
+  });
+
+  it('lists groups in menu order, none empty', () => {
+    expect(groupedSettings().map((g) => g.group)).toEqual([SettingGroup.General, SettingGroup.DevServer, SettingGroup.Agents, SettingGroup.Notifications]);
   });
 });
 

@@ -21,10 +21,18 @@ export enum StylingChoice {
   Css = 'css'
 }
 
+export enum SettingGroup {
+  General = 'General',
+  DevServer = 'Dev server',
+  Agents = 'AI agents',
+  Notifications = 'Notifications'
+}
+
 export type SettingValue = string | boolean;
 
 export type SettingRow = {
   key: SettingKey;
+  group: SettingGroup;
   label: string;
   hint: string;
   fallback: SettingValue;
@@ -32,9 +40,9 @@ export type SettingRow = {
 };
 
 export const SETTINGS: SettingRow[] = [
-  { key: SettingKey.Telemetry, label: 'Anonymous usage counts', hint: 'Sessions, edits, session length, editor, OS and device kind. No code, no paths.', fallback: true },
+  { key: SettingKey.Telemetry, group: SettingGroup.General, label: 'Anonymous usage counts', hint: 'Sessions, edits, session length, editor, OS and device kind. No code, no paths.', fallback: true },
   {
-    key: SettingKey.Styling,
+    key: SettingKey.Styling, group: SettingGroup.General,
     label: 'Write styles as',
     hint: 'Auto: Tailwind classes when the project has Tailwind; otherwise a rule in the component style block (Svelte, Vue), or an inline style in files without a stylesheet.',
     fallback: StylingChoice.Auto,
@@ -44,9 +52,9 @@ export const SETTINGS: SettingRow[] = [
       { value: StylingChoice.Css, label: 'CSS' }
     ]
   },
-  { key: SettingKey.DevCommand, label: 'Dev server command', hint: 'Empty: detected from package.json.', fallback: '' },
+  { key: SettingKey.DevCommand, group: SettingGroup.DevServer, label: 'Dev server command', hint: 'Empty: detected from package.json.', fallback: '' },
   {
-    key: SettingKey.DefaultSize,
+    key: SettingKey.DefaultSize, group: SettingGroup.General,
     label: 'Default device',
     hint: 'Size the preview opens at.',
     fallback: 'full',
@@ -58,7 +66,7 @@ export const SETTINGS: SettingRow[] = [
     ]
   },
   {
-    key: SettingKey.KeepServerAlive,
+    key: SettingKey.KeepServerAlive, group: SettingGroup.DevServer,
     label: 'Keep the dev server after closing',
     hint: 'Minutes the dev server Feega started stays warm after the panel closes, so reopening is instant. Closing the window always stops it.',
     fallback: '10',
@@ -70,34 +78,37 @@ export const SETTINGS: SettingRow[] = [
     ]
   },
   {
-    key: SettingKey.SyncSelection,
+    key: SettingKey.SyncSelection, group: SettingGroup.General,
     label: 'Show the selection in the editor',
     hint: 'Selecting an element reveals its source beside Feega with the line selected, so coding agents that read the editor selection see it.',
     fallback: true
   },
   {
-    key: SettingKey.PreviewUnknown,
+    key: SettingKey.PreviewUnknown, group: SettingGroup.General,
     label: 'Preview edits with unknown impact',
     hint: 'When Feega cannot tell where an edit will land (global CSS, a class built from props or a function, a CSS variable), it shows the diff and waits for Apply.',
     fallback: true
   },
   {
-    key: SettingKey.AiPermissions,
+    key: SettingKey.AiPermissions, group: SettingGroup.Agents,
     label: 'AI agent permissions',
     hint: 'Default for new projects: when the AI tab asks before an agent edits a file or runs a command. Each project remembers its own choice.',
     fallback: Policy.Ask,
     choices: POLICY_ROWS.map((row) => ({ value: row.id, label: row.name }))
   },
-  { key: SettingKey.Notifications, label: 'Notifications', hint: 'Tell me when an AI agent needs me while I am in another window or tab. Messages name the agent and the project, never code or prompts.', fallback: true },
-  { key: SettingKey.NotifyFinished, label: 'Notify when an agent finishes', hint: 'Needs Notifications on.', fallback: true },
-  { key: SettingKey.NotifyPermission, label: 'Notify when an agent needs permission', hint: 'Needs Notifications on.', fallback: true },
+  { key: SettingKey.Notifications, group: SettingGroup.Notifications, label: 'Notifications', hint: 'Tell me when an AI agent needs me while I am in another window or tab. Messages name the agent and the project, never code or prompts.', fallback: true },
+  { key: SettingKey.NotifyFinished, group: SettingGroup.Notifications, label: 'Notify when an agent finishes', hint: 'Needs Notifications on.', fallback: true },
+  { key: SettingKey.NotifyPermission, group: SettingGroup.Notifications, label: 'Notify when an agent needs permission', hint: 'Needs Notifications on.', fallback: true },
   {
-    key: SettingKey.RouteGenerators,
+    key: SettingKey.RouteGenerators, group: SettingGroup.DevServer,
     label: 'Run route generators to find examples',
     hint: 'Pages calls entries and getStaticPaths through your dev server to list example pages of dynamic routes. SvelteKit and Astro. This runs your project code.',
     fallback: true
   }
 ];
+
+export const groupedSettings = (): { group: SettingGroup; rows: SettingRow[] }[] =>
+  Object.values(SettingGroup).map((group) => ({ group, rows: SETTINGS.filter((row) => row.group === group) }));
 
 export type Settings = Record<SettingKey, SettingValue>;
 
