@@ -36,7 +36,7 @@ opens in the diff, and **Undo** reverts it in one step.
 
 ## Mesh gradient
 
-Select an element. In **Properties**, the **Mesh gradient** section offers **Add mesh gradient**.
+Select an element, then press **More elements** (**…**) at the end of the Add row and pick **Mesh gradient**. The **Mesh gradient** section in **Properties** appears only on an element that already has a mesh gradient.
 
 - Four colour points appear over the preview. Drag them to move them.
 - Pick a point in the list, then change its **Colour**.
@@ -73,14 +73,16 @@ component uses runes, so it needs Svelte 5.
 
 ## Lucide icons
 
-Select an element. In **Properties**, the **Lucide icons** section has a search box and a grid of
-icons. With nothing typed it shows common icons. Type a name or a word ("arrow", "cart", "weather")
-to search the whole set. Click an icon, set the options, then press **Insert**.
+Select an element, press **More elements** (**…**) at the end of the Add row and pick **Lucide
+icon**. A popover opens with a search box and a grid of icons. With nothing typed it shows common
+icons. Type a name or a word ("arrow", "cart", "weather") to search the whole set. Click an icon to
+insert it; the popover closes.
 
 - **Size** and **Stroke** set the icon's width, height and line weight.
 - **Text colour** makes the icon follow the surrounding text colour. Turn it off to pick a **Colour**.
 
-Insert is one undoable step. It places the icon next to the selected element, or inside it when it
+Set the options before you click the icon. Properties has no icon section: change the props on the
+tag in your code afterwards. Insert is one undoable step. It places the icon next to the selected element, or inside it when it
 is a container, and writes `src/feega/icons/<Name>Icon` (`.svelte`, `.vue`, `.astro`, `.tsx` or
 `.jsx`, matching the file you add it to). Size, stroke and colour are written as props on the tag,
 only when they differ from the defaults (24, 2, current colour).
@@ -102,8 +104,9 @@ the panel.
 
 ## Brand logos
 
-Select an element. In **Properties**, the **Brand logos** section works like Lucide icons: a search
-box, a grid (common brands when nothing is typed), then **Insert**.
+Select an element, press **More elements** (**…**) and pick **Brand logo**. It works like Lucide
+icons: a popover with a search box and a grid (common brands when nothing is typed). Click a logo
+to insert it.
 
 - **Size** sets the width and height.
 - **Colour** is **Brand colour**, the brand's official hex, or **Text colour**, which follows the
@@ -125,9 +128,10 @@ LinkedIn, Slack and Microsoft, are not in the set.
 
 ## Gradient presets
 
-Select an element. In **Properties**, **Gradient presets** shows a gallery of 36 subtle gradients.
-**Kind** filters the gallery to linear, radial or conic. Click a preset to apply it; **Remove
-gradient** sets the background image back to `none`.
+Select an element, press **More elements** (**…**) and pick **Gradient preset**. A popover shows a
+gallery of 36 subtle gradients. **Kind** filters it to linear, radial or conic. Click a preset to
+apply it; the popover closes. On an element that has a gradient, **Properties** shows a **Gradient**
+section with **Remove gradient**, which sets the background image back to `none`.
 
 The preset is written as the element's background image through the same edit engine as a manual
 style change: a `background-image` declaration in the element's stylesheet rule (Svelte and Vue
@@ -136,7 +140,7 @@ in Tailwind projects too. Each click is one undoable step.
 
 ## Phosphor icons
 
-Works like Lucide icons: search box, grid, **Insert**. Search matches names and Phosphor's tags
+Works like Lucide icons: pick **Phosphor icon** in the **More elements** menu, search, click an icon. Search matches names and Phosphor's tags
 ("photography" finds the camera). Options:
 
 - **Weight**: thin, light, regular, bold, fill or duotone. The grid redraws in the weight you pick.
@@ -159,7 +163,7 @@ Phosphor Icons are released under the MIT licence, Copyright Phosphor Icons.
 
 ## Heroicons
 
-Works like Lucide icons: search box (by name), grid, **Insert**. Options:
+Works like Lucide icons: pick **Heroicon** in the **More elements** menu, search by name, click an icon. Options:
 
 - **Style**: Outline 24, Solid 24, Mini 20 or Micro 16. A few icons do not exist in Micro; they
   drop out of the grid when that style is chosen.
@@ -198,5 +202,5 @@ after you approve the permissions they ask for.
 ## Where plugins appear
 
 A plugin declares contributions in `feega-plugin.json`: a **Properties** section, a preview
-overlay, **Add** menu items (with a category), context menu items for Layers and the preview, a
+overlay, **Add** menu items (with a category, and optionally a popover they open), context menu items for Layers and the preview, a
 top-bar button, a command (listed in the Feega menu) and a side panel (a tab beside Properties).

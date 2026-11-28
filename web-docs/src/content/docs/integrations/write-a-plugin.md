@@ -35,7 +35,13 @@ A working example is in the repository at
 - `contributions`: where the plugin shows up. Points are `rightBar` (a **Properties** section),
   `overlay` (handles over the preview), `addMenu`, `contextMenu` (with `where`: `layers`,
   `preview` or `both`), `topBar`, `command` (listed in the Feega menu) and `sidePanel` (with
-  `html`). Entries need an `id`; most need a `title`. `when` limits an entry to some selections.
+  `html`) and `popover` (a panel an `addMenu` entry opens, named by its `popover` field; the
+  plugin renders into it like a `rightBar` section). Entries need an `id`; most need a `title`.
+  `when` limits an entry to some selections: `selection`, `attribute:<name>`,
+  `!attribute:<name>` and `owned`.
+- `owns`: what the plugin's own output looks like on an element, as the same kind of rules:
+  `attribute:<name>` or `style:<property>*=<text>`. A section with `"when": ["owned"]` shows only
+  on an element that matches, so controls for a plugin's output stay out of the way elsewhere.
 
 ## Permissions
 
