@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EXAMPLE_LIMIT, ExampleKind, LINKED_CAP, NOT_FOUND_PATH, addExample, linkedRoutes, pageRows, seenRoutes, withErrorPage, type Found } from './pages';
+import { EXAMPLE_LIMIT, ExampleKind, FieldMode, customLabel, fieldState, LINKED_CAP, NOT_FOUND_PATH, addExample, linkedRoutes, pageRows, seenRoutes, withErrorPage, type Found } from './pages';
 
 const found = (route: string, dynamic = false) => ({ route, dynamic });
 const none: Found = { seen: [], linked: [], manual: {} };
@@ -164,5 +164,26 @@ describe('withErrorPage', () => {
 
   it('stays out of an empty list', () => {
     expect(withErrorPage([], '/')).toEqual([]);
+  });
+});
+
+describe('fieldState', () => {
+  it('opens the field when the route has no examples', () => {
+    expect(fieldState(0, FieldMode.Closed)).toBe(FieldMode.Open);
+  });
+
+  it('collapses the field under examples until asked', () => {
+    expect(fieldState(3, FieldMode.Closed)).toBe(FieldMode.Closed);
+    expect(fieldState(3, FieldMode.Open)).toBe(FieldMode.Open);
+  });
+});
+
+describe('customLabel', () => {
+  it('names the single param', () => {
+    expect(customLabel('/alternatives/[slug]')).toBe('Custom slug');
+  });
+
+  it('is generic for several params', () => {
+    expect(customLabel('/[lang]/blog/[slug]')).toBe('Custom value');
   });
 });
