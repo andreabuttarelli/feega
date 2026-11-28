@@ -723,7 +723,9 @@ try {
     const layers = page.locator('[data-testid="layers"] [data-layer]');
     const benefits = layers.filter({ hasText: /^\s*Benefits/ }).first();
     const faq = layers.filter({ hasText: /^\s*Faq/ }).first();
-    await benefits.dragTo(faq, { targetPosition: { x: 60, y: 20 } });
+    await faq.scrollIntoViewIfNeeded();
+    await benefits.scrollIntoViewIfNeeded();
+    await benefits.dragTo(faq,{ targetPosition: { x: 60, y: 20 } });
     await page.waitForTimeout(SETTLE_MS);
     const order = await frame.locator('main').first().evaluate((main) => [...main.children].map((c) => c.id).filter((id) => id === 'faq' || id === 'benefits'));
     assert.deepEqual(order, ['faq', 'benefits'], 'the page shows the new order');
