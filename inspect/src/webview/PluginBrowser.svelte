@@ -38,7 +38,8 @@
 
 <svelte:window onkeydown={onKey} />
 
-<div class="browser" role="dialog" aria-label="Plugins" data-testid="plugin-browser">
+<div class="scrim" role="presentation" onclick={(e) => e.target === e.currentTarget && onclose()}>
+<div class="browser" role="dialog" aria-modal="true" aria-label="Plugins" data-testid="plugin-browser">
   <header>
     {#if open}
       <button type="button" class="icon" aria-label="Back to plugins" data-testid="plugin-back" onclick={() => (openId = null)}><ArrowLeft size={15} /></button>
@@ -108,12 +109,25 @@
     {/if}
   {/if}
 </div>
+</div>
 
 <style>
-  .browser {
+  .scrim {
     position: fixed;
     inset: 0;
     z-index: 20;
+    display: grid;
+    place-items: center;
+    padding: 32px 24px;
+    background: rgb(0 0 0 / 0.45);
+  }
+
+  .browser {
+    width: min(880px, 100%);
+    max-height: 100%;
+    border: 1px solid var(--ui-border, rgb(255 255 255 / 0.08));
+    border-radius: var(--ui-radius-lg, 12px);
+    box-shadow: 0 24px 64px rgb(0 0 0 / 0.4);
     display: flex;
     flex-direction: column;
     gap: var(--ui-space-3, 12px);
