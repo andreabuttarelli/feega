@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Kind, type Row } from './plugin-manager';
 import { Badge, cardsOf, filterCards } from './plugin-browser';
-import { pixelRowsOf } from '@feega/plugin-registry/pixel';
 
 const row = (id: string, name: string, kind = Kind.BuiltIn, enabled = true): Row => ({ id, name, version: '1.0.0', kind, enabled, words: [], badges: [], removable: kind === Kind.Installed });
 
@@ -28,10 +27,10 @@ describe('cardsOf', () => {
   });
 
   it('gives each registry plugin its pixel icon and the others none', () => {
-    expect(card('feega.mesh-gradient').pixels).toBe(pixelRowsOf('mesh-gradient'));
-    expect(card('feega.lucide-icons').pixels).toBe(pixelRowsOf('lucide'));
-    expect(card('feega.shadergradient').pixels).toBe(pixelRowsOf('shadergradient'));
-    expect(card('acme.a').pixels).toBeUndefined();
+    expect(card('feega.mesh-gradient').icon).toBe('mesh-gradient');
+    expect(card('feega.lucide-icons').icon).toBe('lucide');
+    expect(card('feega.shadergradient').icon).toBe('shadergradient');
+    expect(card('acme.a').icon).toBeUndefined();
   });
 
   it('credits the library a plugin is built on', () => {

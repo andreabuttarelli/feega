@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { COPY, PluginLabel, SOURCES, creditLine, labelsOf } from './registry';
-import { pixelRowsOf } from './pixel';
+import { COPY, PluginLabel, SOURCES, creditLine, labelsOf, pixelIconOf } from './registry';
 
 describe('creditLine', () => {
   it('names the library and its license', () => {
@@ -40,16 +39,16 @@ describe('labelsOf', () => {
   });
 });
 
-describe('pixelRowsOf', () => {
+describe('pixelIconOf', () => {
   it('has pixel art for the icon of every registry plugin', () => {
     for (const source of SOURCES) {
-      expect(pixelRowsOf(COPY[source.id].icon), source.id).toBeDefined();
+      expect(pixelIconOf(COPY[source.id].icon), source.id).toBe(COPY[source.id].icon);
     }
   });
 
-  it('gives a plugin without a known icon no rows so the caller falls back', () => {
-    expect(pixelRowsOf(undefined)).toBeUndefined();
-    expect(pixelRowsOf('nope')).toBeUndefined();
+  it('gives a plugin without a known icon none so the caller falls back', () => {
+    expect(pixelIconOf(undefined)).toBeUndefined();
+    expect(pixelIconOf('nope')).toBeUndefined();
   });
 
   it('gives each built-in a different icon', () => {

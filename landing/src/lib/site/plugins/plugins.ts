@@ -5,7 +5,7 @@ import { permissionWords } from './permissions';
 export const PLUGINS_PATH = '/plugins';
 
 export { creditLine };
-export type { PluginCredit, PluginTier };
+export type { PluginCredit, PluginLabel, PluginTier };
 
 export type PluginView = {
   id: string;

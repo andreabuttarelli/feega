@@ -54,7 +54,7 @@
   {#if open}
     <article class="detail" data-testid="plugin-detail" data-plugin={open.id}>
       <div class="meta">
-        <PluginGlyph pixels={open.pixels} />
+        <PluginGlyph icon={open.icon} />
         {#each open.labels as label (label)}<span class="badge" data-testid="plugin-badge" data-label={label}>{label}</span>{/each}
         <span class="version">v{open.version}</span>
         {#each open.badges as badge (badge)}<span class="badge">{badge}</span>{/each}
@@ -81,7 +81,7 @@
         <div class="card" data-testid="plugin-card" data-plugin={card.id}>
           <button type="button" class="open" aria-label={`Open ${card.name}`} data-testid="plugin-open" onclick={() => (openId = card.id)}>
             <span class="head">
-              <PluginGlyph pixels={card.pixels} />
+              <PluginGlyph icon={card.icon} />
               <span class="name">{card.name}</span>
             </span>
             <span class="labels">{#each card.labels as label (label)}<span class="badge" data-testid="plugin-badge" data-label={label}>{label}</span>{/each}</span>
