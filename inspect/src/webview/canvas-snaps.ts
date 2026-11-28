@@ -9,7 +9,7 @@ export type SnapJob = Placed & { target: string; device: Viewport };
 
 export type Snap = { url: string; height: number; capped: boolean };
 
-export type StoredSnap = Snap & { target: string };
+export type StoredSnap = Snap & { target: string; width: number };
 
 type Props = {
   max: number;
@@ -29,7 +29,7 @@ export function snapQueue({ max, capture, changed, store = new Map() }: Props) {
   let viewport: Viewport = { w: 0, h: 0 };
 
   const generationOf = (key: string) => generation.get(key) ?? 0;
-  const fresh = (job: SnapJob) => snaps.get(job.key)?.target === job.target && !outdated.has(job.key);
+  const fresh = (job: SnapJob) => snaps.get(job.key)?.target === job.target && snaps.get(job.key)?.width === job.device.w && !outdated.has(job.key);
   const waiting = (job: SnapJob) => !fresh(job) && !failed.has(job.key) && !running.has(job.key);
   const rank = (job: SnapJob) => gapToCentre(job, view, viewport) + (touches(job, view, viewport, NO_MARGIN) ? 0 : OFF_SCREEN_PENALTY);
 
@@ -59,7 +59,7 @@ export function snapQueue({ max, capture, changed, store = new Map() }: Props) {
     }
     outdated.delete(job.key);
     if (snap) {
-      snaps.set(job.key, { ...snap, target: job.target });
+      snaps.set(job.key, { ...snap, target: job.target, width: job.device.w });
     } else {
       failed.add(job.key);
     }

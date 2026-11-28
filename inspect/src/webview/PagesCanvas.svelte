@@ -4,7 +4,8 @@
   import { capturer } from './canvas-capture';
   import { CANVAS_COLUMNS, layoutCanvas, type CanvasFrame } from './canvas-layout';
   import { openOf, type CanvasOpen } from './canvas-open';
-  import { sessionSnaps } from './canvas-session';
+  import { sessionSizes, sessionSnaps } from './canvas-session';
+  import type { FrameSize } from './canvas-select';
   import { SNAP_CONCURRENCY, snapQueue, type SnapJob } from './canvas-snaps';
   import { pageKeysOf } from './canvas-stale';
   import type { CanvasView, Viewport } from './canvas-view';
@@ -21,6 +22,8 @@
   let unrendered = $state<string[]>([]);
   let view = $state<CanvasView>({ scale: 1, x: 0, y: 0 });
   let viewport = $state<Viewport>({ w: 0, h: 0 });
+  let selected = $state<string | null>(null);
+  let resized = $state<Record<string, FrameSize>>(Object.fromEntries(sessionSizes));
 
   const queue = snapQueue({ max: SNAP_CONCURRENCY, store: sessionSnaps, capture: (job) => capturer(base)(job), changed: publish });
 
@@ -32,14 +35,31 @@
   publish();
 
   const heights = $derived(Object.fromEntries(Object.entries(snaps).filter(([, snap]) => snap.height > 0).map(([key, snap]) => [key, snap.height])));
-  const layout = $derived(layoutCanvas(rows, CANVAS_COLUMNS, heights, viewport));
+  const layout = $derived(layoutCanvas(rows, CANVAS_COLUMNS, heights, viewport, resized));
   const shown = $derived(Object.fromEntries(layout.frames.filter((f) => snaps[f.key]).map((f) => [f.key, { url: snaps[f.key].url, capped: snaps[f.key].capped || snaps[f.key].height > f.height }])));
 
-  const jobOf = (f: CanvasFrame): SnapJob => ({ key: f.key, target: f.target!, x: f.x, y: f.y, width: f.width, height: f.height, device: { w: SIZES[f.size].width ?? f.width, h: SIZES[f.size].height ?? f.height } });
+  const jobOf = (f: CanvasFrame): SnapJob => ({ key: f.key, target: f.target!, x: f.x, y: f.y, width: f.width, height: f.height, device: { w: f.width, h: resized[f.key]?.height ?? SIZES[f.size].height ?? f.height } });
 
   $effect(() => {
-    queue.want(layout.frames.filter((f) => f.target !== null).map(jobOf), view, viewport);
+    queue.want(layout.frames.filter((f) => f.target !== null && f.key !== selected).map(jobOf), view, viewport);
   });
+
+  let was: string | null = null;
+
+  $effect(() => {
+    const now = selected;
+    untrack(() => {
+      if (was !== null && was !== now) {
+        queue.invalidate([was]);
+      }
+      was = now;
+    });
+  });
+
+  function resize(key: string, size: FrameSize) {
+    resized[key] = size;
+    sessionSizes.set(key, size);
+  }
 
   let seen = untrack(() => changed);
 
@@ -55,11 +75,11 @@
   const watch = (next: CanvasView, size: Viewport) => ((view = next), (viewport = size));
   const currentRoute = $derived(rows.find((r) => r.current)?.route ?? null);
 
-  const dimsOf = (f: CanvasFrame) => `${SIZES[f.size].label} · ${f.width} × ${f.pageHeight}`;
+  const dimsOf = (f: CanvasFrame) => (resized[f.key] ? `Custom · ${f.width} × ${f.height}` : `${SIZES[f.size].label} · ${f.width} × ${f.pageHeight}`);
 
   const hitOf = (f: CanvasFrame) => ({
-    label: `Open ${f.target ?? f.route} at ${SIZES[f.size].label}`,
-    title: f.target === null ? 'Dynamic route: type a value to open it' : `Open ${f.target} at ${SIZES[f.size].label}`,
+    label: `Select ${f.target ?? f.route} at ${SIZES[f.size].label}`,
+    title: f.target === null ? 'Dynamic route: type a value to open it' : `Select ${f.target} at ${SIZES[f.size].label}. Double-click to open`,
     enabled: f.target !== null
   });
 
@@ -78,6 +98,9 @@
   testid="pages-canvas"
   frameLabel={dimsOf}
   snapshots={shown}
+  bind:selected
+  onresize={resize}
+  liveSrcOf={(f) => (f.target === null ? null : new URL(f.target, base).toString())}
   {unrendered}
   onview={watch}
   {hitOf}

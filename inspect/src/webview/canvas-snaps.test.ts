@@ -96,7 +96,7 @@ describe('snapQueue results', () => {
     await finish('a', 3100);
     queue.want([job('a', 0)], VIEW, VIEWPORT);
 
-    expect(queue.snaps.get('a')).toEqual({ url: 'png:a', height: 3100, capped: false, target: '/a' });
+    expect(queue.snaps.get('a')).toEqual({ url: 'png:a', height: 3100, capped: false, target: '/a', width: 100 });
     expect(started).toEqual(['a']);
     expect(changed).toHaveBeenCalled();
   });
@@ -108,6 +108,28 @@ describe('snapQueue results', () => {
     queue.want([job('a', 0, '/blog/two')], VIEW, VIEWPORT);
 
     expect(started).toEqual(['a', 'a']);
+  });
+
+  it('recaptures when the frame was resized', async () => {
+    const { queue, started, finish } = setup();
+    queue.want([job('a', 0)], VIEW, VIEWPORT);
+    await finish('a');
+    queue.want([{ ...job('a', 0), device: { w: 600, h: 100 } }], VIEW, VIEWPORT);
+
+    expect(started).toEqual(['a', 'a']);
+  });
+
+  it('does not capture a frame while it is left out of the wanted jobs', async () => {
+    const { queue, started, finish } = setup();
+    queue.want([job('a', 0), job('b', 100)], VIEW, VIEWPORT);
+    await finish('a');
+    queue.want([job('b', 100)], VIEW, VIEWPORT);
+    queue.invalidate(['a']);
+    const whileLeftOut = [...started];
+    queue.want([job('a', 0), job('b', 100)], VIEW, VIEWPORT);
+
+    expect(whileLeftOut).toEqual(['b', 'a']);
+    expect(started).toEqual(['b', 'a', 'a']);
   });
 
   it('records a failure, keeps it out of the cache and does not retry in a loop', async () => {
@@ -125,7 +147,7 @@ describe('snapQueue results', () => {
 
 describe('snapQueue store', () => {
   it('starts from the snapshots a previous queue left in the store', () => {
-    const store = new Map([['a', { url: 'png:a', height: 900, capped: false, target: '/a' }]]);
+    const store = new Map([['a', { url: 'png:a', height: 900, capped: false, target: '/a', width: 100 }]]);
     const started: string[] = [];
     const queue = snapQueue({ max: 2, store, capture: async (j) => (started.push(j.key), null), changed: () => undefined });
 

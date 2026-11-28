@@ -32,7 +32,7 @@ assert.equal(box!.y, (await page.locator('main').boundingBox())!.y, 'the pages c
 assert.equal(box!.width, 1440, 'the pages canvas fills the width');
 await page.screenshot({ path: SHOT.replace(/\.png$/, '-pages.png') });
 
-await page.locator('[data-testid="canvas-frame"] [data-testid="canvas-open"]:not([disabled])').first().click();
+await page.locator('[data-testid="canvas-frame"] [data-testid="canvas-open"]:not([disabled])').first().dblclick();
 await pages.waitFor({ state: 'detached' });
 await shown();
 
@@ -44,7 +44,7 @@ await page.waitForTimeout(1500);
 await hidden();
 await page.screenshot({ path: SHOT.replace(/\.png$/, '-components.png') });
 
-await page.locator('[data-testid="canvas-frame"] [data-testid="canvas-open"]').first().click();
+await page.locator('[data-testid="canvas-frame"] [data-testid="canvas-open"]').first().dblclick();
 await components.waitFor({ state: 'detached' });
 await shown();
 

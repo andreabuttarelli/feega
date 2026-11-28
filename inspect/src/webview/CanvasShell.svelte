@@ -13,6 +13,8 @@
   import type { Placed } from './canvas-live';
   import { CanvasKey, actualView, canvasKeyOf, fitView, panBy, percentOf, stepView, wheelOf, zoomAround, type CanvasView, type Point, type Viewport } from './canvas-view';
   import { untrack } from 'svelte';
+  import CanvasSizeBar from './CanvasSizeBar.svelte';
+  import { FRAME_LIMITS, HANDLES, Handle, afterEscape, resizeBy, type FrameSize, type Limits } from './canvas-select';
 
   type Snapshot = { url: string; capped: boolean };
 
@@ -24,6 +26,10 @@
     minLiveWidth?: number;
     frameLabel: (frame: F) => string;
     srcOf?: (frame: F) => string | null;
+    liveSrcOf?: (frame: F) => string | null;
+    selected?: string | null;
+    onresize?: (key: string, size: FrameSize) => void;
+    limits?: Limits;
     hitOf: (frame: F) => Hit;
     onopen: (frame: F) => void;
     onclose: () => void;
@@ -40,10 +46,12 @@
     card: Snippet<[F, CardState, string]>;
   };
 
-  let { frames, bounds, label, testid, minLiveWidth = 0, frameLabel, srcOf = () => null, hitOf, onopen, onclose, stale = null, snug = false, liveCap = LIVE_CAP, frameBadge, onstatus, reload = {}, snapshots, unrendered = [], onview, world, card }: Props = $props();
+  let { frames, bounds, label, testid, minLiveWidth = 0, frameLabel, srcOf = () => null, liveSrcOf = () => null, selected = $bindable(null), onresize, limits = FRAME_LIMITS, hitOf, onopen, onclose, stale = null, snug = false, liveCap = LIVE_CAP, frameBadge, onstatus, reload = {}, snapshots, unrendered = [], onview, world, card }: Props = $props();
 
+  const PRIMARY_BUTTON = 0;
   const MIDDLE_BUTTON = 1;
   const SPACE_CODE = 'Space';
+  const ENTER_KEY = 'Enter';
   const FIRST_SHOT_DELAY_MS = 800;
   const RECAPTURE_DELAY_MS = 1200;
 
@@ -63,9 +71,13 @@
   let pool = $state<string[]>([]);
   let loaded = $state(new Set<string>());
   let ready = $state(new Set<string>());
+  let liveReady = $state(false);
+  let resizing = $state(false);
+  let dragged = false;
   const frameEls: Record<string, HTMLIFrameElement | undefined> = {};
   let queue: Promise<void> = Promise.resolve();
 
+  const selectedFrame = $derived(frames.find((f) => f.key === selected) ?? null);
   const labels = $derived(labelMetrics(view.scale, 0));
   const imageOf = (key: string) => (snapshots ? snapshots[key]?.url : shots[key]);
   const cannotRender = (key: string) => failed.includes(key) || unrendered.includes(key);
@@ -125,6 +137,11 @@
       }
       reloaded = now;
     });
+  });
+
+  $effect(() => {
+    void selected;
+    liveReady = false;
   });
 
   $effect(() => {
@@ -205,6 +222,7 @@
   function drag(start: PointerEvent) {
     let last = { x: start.clientX, y: start.clientY };
     const move = (e: PointerEvent) => {
+      dragged = true;
       view = panBy(view, e.clientX - last.x, e.clientY - last.y);
       last = { x: e.clientX, y: e.clientY };
     };
@@ -215,6 +233,7 @@
     };
     panning = true;
     touched = true;
+    dragged = false;
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', end);
   }
@@ -224,6 +243,40 @@
       e.preventDefault();
       e.stopPropagation();
       drag(e);
+    }
+  }
+
+  function grow(e: PointerEvent, frame: F, handle: Handle) {
+    e.preventDefault();
+    e.stopPropagation();
+    const origin = { x: e.clientX, y: e.clientY };
+    const start = { width: frame.width, height: frame.height };
+    const move = (m: PointerEvent) => onresize?.(frame.key, resizeBy(start, handle, { x: m.clientX - origin.x, y: m.clientY - origin.y }, view.scale, limits));
+    const end = () => {
+      resizing = false;
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', end);
+    };
+    resizing = true;
+    touched = true;
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', end);
+  }
+
+  function background(e: PointerEvent) {
+    const wasDrag = dragged;
+    dragged = false;
+    if (e.button !== PRIMARY_BUTTON || wasDrag || (e.target as Element).closest('.frame, .zoombar, .sizebar')) {
+      return;
+    }
+    selected = null;
+  }
+
+  function escape() {
+    const next = afterEscape(selected);
+    selected = next.selected;
+    if (next.close) {
+      onclose();
     }
   }
 
@@ -238,13 +291,18 @@
       [CanvasKey.Out]: () => step(-1),
       [CanvasKey.Fit]: fit,
       [CanvasKey.Actual]: () => ((touched = true), (view = actualView(view, viewport))),
-      [CanvasKey.Close]: onclose
+      [CanvasKey.Close]: escape
     };
     actions[key]();
   }
 
   function onkeydown(e: KeyboardEvent) {
-    if (e.target instanceof HTMLInputElement) {
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) {
+      return;
+    }
+    if (e.key === ENTER_KEY && selectedFrame && !(e.target instanceof HTMLButtonElement)) {
+      e.preventDefault();
+      openSelected();
       return;
     }
     if (e.code === SPACE_CODE) {
@@ -260,6 +318,12 @@
   }
 
   const onkeyup = (e: KeyboardEvent) => e.code === SPACE_CODE && (held = false);
+
+  function openSelected() {
+    if (selectedFrame && hitOf(selectedFrame).enabled) {
+      onopen(selectedFrame);
+    }
+  }
 
   function onmessage(e: MessageEvent) {
     const status = statusOf(e.data);
@@ -279,6 +343,7 @@
 
 <div
   class="canvas"
+  class:resizing
   role="application"
   aria-label={label}
   data-testid={testid}
@@ -288,6 +353,7 @@
   bind:clientHeight={viewport.h}
   use:attach
   onpointerdowncapture={press}
+  onpointerup={background}
   style={`background-position:${view.x}px ${view.y}px`}
 >
   <div class="world" style={`transform:translate(${view.x}px,${view.y}px) scale(${view.scale});--zoom:${view.scale};--label:${labels.font}px;--label-pad:${labels.pad}px`}>
@@ -295,7 +361,7 @@
 
     {#each frames as frame (frame.key)}
       {@const hit = hitOf(frame)}
-      <div class="frame" class:snug style={`left:${frame.x}px;top:${frame.y}px;width:${frame.width}px;height:${frame.height}px`} data-testid="canvas-frame" data-key={frame.key} data-live={live.includes(frame.key)} data-rendered={!cannotRender(frame.key)} data-snap={Boolean(imageOf(frame.key))}>
+      <div class="frame" class:snug class:selected={selected === frame.key} style={`left:${frame.x}px;top:${frame.y}px;width:${frame.width}px;height:${frame.height}px`} data-testid="canvas-frame" data-key={frame.key} data-live={live.includes(frame.key)} data-rendered={!cannotRender(frame.key)} data-snap={Boolean(imageOf(frame.key))}>
         <span class="frame-label">{frameLabel(frame)}{#if frameBadge?.(frame)}<em class="badge" data-testid="canvas-badge">{frameBadge(frame)}</em>{/if}</span>
         {#if imageOf(frame.key)}<img class="shot" src={imageOf(frame.key)} alt="" draggable="false" />{:else}
           <div class="card" data-covered={ready.has(frame.key) && !cannotRender(frame.key)} data-state={cannotRender(frame.key) ? CardState.Failed : CardState.Loading}>{@render card(frame, cannotRender(frame.key) ? CardState.Failed : CardState.Loading, reasons[frame.key] ?? '')}</div>
@@ -304,13 +370,22 @@
         {#if mounted.has(frame.key) && srcOf(frame) !== null}
           {#key reload[frame.key] ?? 0}<iframe use:register={frame.key} src={srcOf(frame)!} title={frameLabel(frame)} tabindex="-1" data-ready={ready.has(frame.key)} class:shown={live.includes(frame.key) && ready.has(frame.key)} onload={() => onload(frame.key)} style={`width:${frame.width}px;height:${frame.height}px`}></iframe>{/key}
         {/if}
-        <button type="button" class="hit" disabled={!hit.enabled} title={hit.title} aria-label={hit.label} data-testid="canvas-open" onclick={() => onopen(frame)}></button>
+        {#if selected === frame.key && liveSrcOf(frame) !== null}
+          {#key reload[frame.key] ?? 0}<iframe class="live" class:ready={liveReady} src={liveSrcOf(frame)!} title={frameLabel(frame)} data-testid="canvas-live" onload={() => (liveReady = true)} style={`width:${frame.width}px;height:${frame.height}px`}></iframe>{/key}
+        {/if}
+        <button type="button" class="hit" class:through={selected === frame.key && liveReady} disabled={!hit.enabled} title={hit.title} aria-label={hit.label} data-testid="canvas-open" onclick={() => (selected = frame.key)} ondblclick={() => onopen(frame)}></button>
+        {#if selected === frame.key && onresize}
+          {#each HANDLES as handle (handle)}<div class="handle" role="presentation" data-handle={handle} data-testid="canvas-handle" onpointerdown={(e) => grow(e, frame, handle)}></div>{/each}
+        {/if}
       </div>
     {/each}
   </div>
 
   {#if held}<div class="panner" class:grabbing={panning} data-testid="canvas-panner"></div>{/if}
 
+  {#if selectedFrame && onresize}
+    <CanvasSizeBar name={frameLabel(selectedFrame)} size={{ width: selectedFrame.width, height: selectedFrame.height }} {limits} onsize={(size) => onresize(selectedFrame.key, size)} onopen={openSelected} />
+  {/if}
 
   <div class="zoombar" data-testid="canvas-zoom">
     <button type="button" aria-label="Zoom out" title="Zoom out (-)" onclick={() => step(-1)}><Minus size={14} /></button>
@@ -499,6 +574,78 @@
     background: none;
     cursor: pointer;
   }
+
+  .hit.through {
+    pointer-events: none;
+  }
+
+  iframe.live {
+    z-index: 1;
+    visibility: visible;
+    background: white;
+    opacity: 0;
+    pointer-events: auto;
+  }
+
+  iframe.live.ready {
+    opacity: 1;
+  }
+
+  .resizing iframe {
+    pointer-events: none;
+  }
+
+  .frame.selected {
+    outline: calc(2px / var(--zoom)) solid var(--ui-accent);
+  }
+
+  .frame.selected .frame-label {
+    color: var(--ui-accent-text);
+  }
+
+  .handle {
+    position: absolute;
+    z-index: 3;
+    --edge: calc(10px / var(--zoom));
+    --grip: calc(-5px / var(--zoom));
+  }
+
+  .handle[data-handle='n'],
+  .handle[data-handle='s'] {
+    left: 0;
+    width: 100%;
+    height: var(--edge);
+    cursor: ns-resize;
+  }
+
+  .handle[data-handle='e'],
+  .handle[data-handle='w'] {
+    top: 0;
+    width: var(--edge);
+    height: 100%;
+    cursor: ew-resize;
+  }
+
+  .handle[data-handle='n'] { top: var(--grip); }
+  .handle[data-handle='s'] { bottom: var(--grip); }
+  .handle[data-handle='e'] { right: var(--grip); }
+  .handle[data-handle='w'] { left: var(--grip); }
+
+  .handle[data-handle='ne'],
+  .handle[data-handle='nw'],
+  .handle[data-handle='se'],
+  .handle[data-handle='sw'] {
+    width: var(--edge);
+    height: var(--edge);
+    z-index: 4;
+    border: calc(1.5px / var(--zoom)) solid var(--ui-accent);
+    background: var(--ui-panel);
+  }
+
+  .handle[data-handle='ne'] { top: var(--grip); right: var(--grip); cursor: nesw-resize; }
+  .handle[data-handle='nw'] { top: var(--grip); left: var(--grip); cursor: nwse-resize; }
+  .handle[data-handle='se'] { bottom: var(--grip); right: var(--grip); cursor: nwse-resize; }
+  .handle[data-handle='sw'] { bottom: var(--grip); left: var(--grip); cursor: nesw-resize; }
 
   .hit:hover:not(:disabled),
   .hit:focus-visible {
