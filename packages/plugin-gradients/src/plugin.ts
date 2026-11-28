@@ -1,8 +1,10 @@
 import type { PluginApi } from '@feega/plugin-api/client';
-import { Control, OpKind, type Selection, type UiNode } from '@feega/plugin-api/protocol';
+import { Control, OpKind, type Selection, type Source, type UiNode } from '@feega/plugin-api/protocol';
 import { Kind, PRESETS, kindOf } from './presets';
 
-export const SECTION = 'gradients';
+export const SECTION = 'presets';
+export const BAR = 'gradient';
+export const ITEM = 'presets';
 export const PICK = 'preset';
 export const KIND = 'kind';
 export const CLEAR = 'clear';
@@ -18,13 +20,14 @@ const KIND_OPTIONS = [
   { value: Kind.Conic, label: 'Conic' }
 ];
 
-const sourceOf = (selection: Selection) => `${selection.source.file}:${selection.source.line}:${selection.source.col}`;
+const sourceOf = (at: Source) => `${at.file}:${at.line}:${at.col}`;
 
 export function gradientsPlugin(api: PluginApi) {
-  const section = api.section(SECTION);
+  const popover = api.section(SECTION);
+  const bar = api.section(BAR);
   let selection: Selection | null = null;
+  let opened: Source | null = null;
   let kind = ALL;
-  let chosen: string | null = null;
 
   const tree = (): UiNode[] => [
     { type: Control.Select, id: KIND, label: 'Kind', value: kind, options: KIND_OPTIONS },
@@ -32,39 +35,45 @@ export function gradientsPlugin(api: PluginApi) {
       type: Control.Grid,
       id: PICK,
       label: 'Gradients',
-      selected: chosen,
+      selected: null,
       items: PRESETS.filter((preset) => kind === ALL || kindOf(preset) === kind).map((preset) => ({ id: preset.id, label: preset.name, swatch: preset.css }))
-    },
-    { type: Control.Button, id: CLEAR, label: 'Remove gradient' }
+    }
   ];
 
-  const show = () => section.render(selection ? tree() : []);
-
-  async function apply(css: string) {
-    if (selection) {
-      await api.propose(LABEL, [{ kind: OpKind.Style, at: sourceOf(selection), css: { 'background-image': css } }]);
-    }
+  async function show() {
+    await popover.render(opened ? tree() : []);
+    await bar.render(selection ? [{ type: Control.Button, id: CLEAR, label: 'Remove gradient' }] : []);
   }
+
+  const apply = (at: Source, css: string) => api.propose(LABEL, [{ kind: OpKind.Style, at: sourceOf(at), css: { 'background-image': css } }]);
 
   const ACTIONS: Record<string, (value: string | number | boolean) => Promise<void>> = {
     [KIND]: (value) => ((kind = String(value)), show()),
     [PICK]: async (value) => {
       const preset = PRESETS.find((one) => one.id === value);
-      if (!preset) {
-        return;
+      const at = opened;
+      opened = null;
+      await show();
+      if (preset && at) {
+        await apply(at, preset.css);
       }
-      chosen = preset.id;
-      await apply(preset.css);
-      await show();
-    },
-    [CLEAR]: async () => {
-      chosen = null;
-      await apply(NO_GRADIENT);
-      await show();
     }
   };
 
-  section.on((id, value) => void ACTIONS[id]?.(value));
+  popover.on((id, value) => void ACTIONS[id]?.(value));
+
+  bar.on((id) => {
+    if (id === CLEAR && selection) {
+      void apply(selection.source, NO_GRADIENT);
+    }
+  });
+
+  api.menu.on((_, target) => {
+    if (target) {
+      opened = target;
+      void show();
+    }
+  });
 
   api.selection.watch((next) => {
     selection = next;

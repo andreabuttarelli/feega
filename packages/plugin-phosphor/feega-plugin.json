@@ -3,20 +3,23 @@
   "name": "Phosphor icons",
   "version": "1.0.0",
   "permissions": [
-    "selection",
     "project",
     "edit.insert",
     "network:cdn.jsdelivr.net",
     "network:unpkg.com"
   ],
   "contributions": {
-    "rightBar": [
+    "addMenu": [
+      {
+        "id": "icon",
+        "title": "Phosphor icon",
+        "popover": "phosphor"
+      }
+    ],
+    "popover": [
       {
         "id": "phosphor",
-        "title": "Phosphor icons",
-        "when": [
-          "selection"
-        ]
+        "title": "Phosphor icons"
       }
     ]
   }

@@ -17,6 +17,22 @@ const valid = {
   }
 };
 
+describe('popover', () => {
+  const base = { id: 'a', name: 'A', version: '1.0.0' };
+
+  it('lets a menu entry open a popover the manifest declares', () => {
+    const out = parseManifest({ ...base, contributions: { addMenu: [{ id: 'x', title: 'X', popover: 'p' }], popover: [{ id: 'p', title: 'P' }] } });
+
+    expect(out.ok && out.manifest.contributions.addMenu?.[0].popover).toBe('p');
+  });
+
+  it('refuses a menu entry that opens a popover nobody declares', () => {
+    const out = parseManifest({ ...base, contributions: { addMenu: [{ id: 'x', title: 'X', popover: 'ghost' }] } });
+
+    expect(!out.ok && out.reason).toMatch(/popover/);
+  });
+});
+
 describe('parseManifest', () => {
   it('reads a complete manifest', () => {
     const out = parseManifest(valid);

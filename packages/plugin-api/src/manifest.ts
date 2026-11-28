@@ -1,4 +1,4 @@
-import { isCondition } from './when';
+import { isCondition, isOwnership } from './when';
 
 export enum Point {
   RightBar = 'rightBar',
@@ -7,7 +7,8 @@ export enum Point {
   ContextMenu = 'contextMenu',
   SidePanel = 'sidePanel',
   Command = 'command',
-  Overlay = 'overlay'
+  Overlay = 'overlay',
+  Popover = 'popover'
 }
 
 export enum Permission {
@@ -28,18 +29,19 @@ export enum Where {
   Both = 'both'
 }
 
-export type Contribution = { id: string; title?: string; category?: string; where?: Where; html?: string; when?: string[] };
+export type Contribution = { id: string; title?: string; category?: string; where?: Where; html?: string; popover?: string; when?: string[] };
 
-type Field = 'title' | 'category' | 'where' | 'html';
+type Field = 'title' | 'category' | 'where' | 'html' | 'popover';
 
 export const POINTS: Record<Point, { required: Field[]; optional: Field[] }> = {
   [Point.RightBar]: { required: ['title'], optional: [] },
   [Point.TopBar]: { required: ['title'], optional: [] },
-  [Point.AddMenu]: { required: ['title'], optional: ['category'] },
+  [Point.AddMenu]: { required: ['title'], optional: ['category', 'popover'] },
   [Point.ContextMenu]: { required: ['title', 'where'], optional: [] },
   [Point.SidePanel]: { required: ['title', 'html'], optional: [] },
   [Point.Command]: { required: ['title'], optional: [] },
-  [Point.Overlay]: { required: [], optional: [] }
+  [Point.Overlay]: { required: [], optional: [] },
+  [Point.Popover]: { required: ['title'], optional: [] }
 };
 
 export type Manifest = {
@@ -48,6 +50,7 @@ export type Manifest = {
   version: string;
   grants: Permission[];
   hosts: string[];
+  owns: string[];
   contributions: Partial<Record<Point, Contribution[]>>;
 };
 
@@ -122,6 +125,12 @@ function contributionsOf(raw: unknown): Manifest['contributions'] | string {
   return out;
 }
 
+const missingPopover = (contributions: Manifest['contributions']) => {
+  const declared = new Set((contributions[Point.Popover] ?? []).map((entry) => entry.id));
+  const ghost = (contributions[Point.AddMenu] ?? []).find((entry) => entry.popover !== undefined && !declared.has(entry.popover));
+  return ghost ? `addMenu/${ghost.id}: popover ${ghost.popover} is not declared` : null;
+};
+
 export function parseManifest(input: unknown): Parsed {
   if (!isObject(input)) {
     return refuse('the manifest must be an object');
@@ -139,9 +148,17 @@ export function parseManifest(input: unknown): Parsed {
   if (typeof permissions === 'string') {
     return refuse(permissions);
   }
+  const owns = Array.isArray(input.owns) ? input.owns : [];
+  if (!owns.every((rule) => typeof rule === 'string' && isOwnership(rule))) {
+    return refuse('owns holds unknown rules');
+  }
   const contributions = contributionsOf(input.contributions);
   if (typeof contributions === 'string') {
     return refuse(contributions);
   }
-  return { ok: true, manifest: { id: input.id, name: input.name, version: input.version, ...permissions, contributions } };
+  const ghost = missingPopover(contributions);
+  if (ghost) {
+    return refuse(ghost);
+  }
+  return { ok: true, manifest: { id: input.id, name: input.name, version: input.version, ...permissions, owns, contributions } };
 }

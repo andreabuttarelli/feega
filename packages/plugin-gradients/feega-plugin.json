@@ -2,8 +2,35 @@
   "id": "feega.gradient-presets",
   "name": "Gradient presets",
   "version": "1.0.0",
-  "permissions": ["selection", "edit.style"],
+  "permissions": [
+    "selection",
+    "edit.style"
+  ],
   "contributions": {
-    "rightBar": [{ "id": "gradients", "title": "Gradient presets", "when": ["selection"] }]
-  }
+    "addMenu": [
+      {
+        "id": "presets",
+        "title": "Gradient preset",
+        "popover": "presets"
+      }
+    ],
+    "popover": [
+      {
+        "id": "presets",
+        "title": "Gradient presets"
+      }
+    ],
+    "rightBar": [
+      {
+        "id": "gradient",
+        "title": "Gradient",
+        "when": [
+          "owned"
+        ]
+      }
+    ]
+  },
+  "owns": [
+    "style:background-image*=gradient("
+  ]
 }

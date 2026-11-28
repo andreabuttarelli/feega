@@ -32,6 +32,12 @@ export function addMenuItems(base: MenuItem[], contributed: Contributed[]): Menu
   return [...base, ...submenus, ...loose];
 }
 
+export function popoverOf(contributed: Contributed[], id: string): { plugin: string; popover: string; title: string } | null {
+  const item = parseItemId(id);
+  const entry = contributed.find((one) => one.plugin === item?.plugin && one.entry.id === item.item)?.entry;
+  return item && entry?.popover ? { plugin: item.plugin, popover: entry.popover, title: entry.title ?? entry.id } : null;
+}
+
 export const contextMenuItems = (base: MenuItem[], contributed: Contributed[], where: Where.Layers | Where.Preview): MenuItem[] => [
   ...base,
   ...contributed.filter(({ entry }) => entry.where === where || entry.where === Where.Both).map(itemOf)

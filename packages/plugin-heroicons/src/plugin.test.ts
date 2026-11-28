@@ -2,32 +2,34 @@ import { describe, expect, it, vi } from 'vitest';
 import { createApi, type Port } from '@feega/plugin-api/client';
 import { createPluginHost, type EditorPort } from '@feega/plugin-api/host';
 import { parseManifest } from '@feega/plugin-api/manifest';
-import { Control, OpKind, type HostMessage, type PluginMessage, type ProjectInfo, type Proposal, type Selection, type UiNode } from '@feega/plugin-api/protocol';
+import { Control, OpKind, type HostMessage, type PluginMessage, type ProjectInfo, type Proposal, type Source, type UiNode } from '@feega/plugin-api/protocol';
 import { OFFLINE_NOTE } from '@feega/plugin-icon-kit/cdn';
 import { localCdn } from '@feega/plugin-icon-kit/cdn-fixture';
 import manifest from '../feega-plugin.json';
 import { VERSION } from './icons';
-import { CHOSEN, COLOUR, INHERIT, INSERT, LABEL, QUERY, SECTION, SIZE, STYLE, heroiconsPlugin } from './plugin';
+import { CHOSEN, COLOUR, INHERIT, LABEL, QUERY, SECTION, SIZE, STYLE, heroiconsPlugin } from './plugin';
 
-const at = (file: string): Selection => ({ source: { file, line: 4, col: 3 }, component: null, tag: 'section', name: 'section', classes: '', rect: { x: 0, y: 0, width: 1, height: 1 }, styles: {}, attributes: [] });
+const at = (file: string): Source => ({ file, line: 4, col: 3 });
 
 const SVELTE = at('src/Hero.svelte');
+const ITEM = 'icon';
 const SETTLE_MS = 50;
 const ICONS_READY_MS = 10_000;
 const PLAIN: ProjectInfo = { typescript: true, publicDir: 'public', packages: {} };
 
-function load(initial: Selection | null, project: ProjectInfo = PLAIN) {
+function load(target: Source | null, project: ProjectInfo = PLAIN) {
   const parsed = parseManifest({ ...manifest, permissions: manifest.permissions });
   if (!parsed.ok) {
     throw new Error(parsed.reason);
   }
+  let open = target !== null;
   const proposals: Proposal[] = [];
   const notes: string[] = [];
   const cdn = localCdn();
   let toHost: (m: PluginMessage) => void = () => undefined;
   let toPlugin: (m: HostMessage) => void = () => undefined;
   const editor: EditorPort = {
-    selection: () => initial,
+    selection: () => null,
     project: async () => project,
     sourceText: async () => null,
     propose: async (p) => (proposals.push(p), { ok: true }),
@@ -42,7 +44,7 @@ function load(initial: Selection | null, project: ProjectInfo = PLAIN) {
   heroiconsPlugin(createApi(port));
   const settle = async () => {
     await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
-    if (initial) {
+    if (open) {
       await vi.waitFor(() => expect(host.ui(parsed.manifest.id, SECTION).length).toBeGreaterThan(0), { timeout: ICONS_READY_MS });
     }
   };
@@ -50,11 +52,15 @@ function load(initial: Selection | null, project: ProjectInfo = PLAIN) {
   const control = async (id: string, value: string | number | boolean) => {
     const before = proposals.length + notes.length;
     host.control(parsed.manifest.id, SECTION, id, value);
+    open = open && id !== CHOSEN;
     await settle();
-    if (id === INSERT) {
+    if (id === CHOSEN) {
       await vi.waitFor(() => expect(proposals.length + notes.length).toBeGreaterThan(before), { timeout: ICONS_READY_MS });
     }
   };
+  if (target) {
+    host.menu(parsed.manifest.id, ITEM, target);
+  }
   return { settle, ui, control, cdn, proposals, notes, manifest: parsed.manifest };
 }
 
@@ -65,10 +71,9 @@ const grid = (tree: UiNode[]) => {
   return found?.type === Control.Grid ? found : null;
 };
 
-async function choose(plugin: ReturnType<typeof load>, query: string, name: string) {
+async function search(plugin: ReturnType<typeof load>, query: string) {
   await plugin.settle();
   await plugin.control(QUERY, query);
-  await plugin.control(CHOSEN, name);
 }
 
 const insertOp = (plugin: ReturnType<typeof load>) => {
@@ -80,11 +85,13 @@ const insertOp = (plugin: ReturnType<typeof load>) => {
 };
 
 describe('manifest', () => {
-  it('declares one Properties section and asks only for what it uses', () => {
+  it('adds one Add menu entry that opens its picker and no Properties section, and asks only for what it uses', () => {
     const { manifest: m } = load(null);
 
-    expect(m.contributions.rightBar).toEqual([{ id: SECTION, title: 'Heroicons', when: ['selection'] }]);
-    expect([...m.grants].sort()).toEqual(['edit.insert', 'project', 'selection']);
+    expect(m.contributions.addMenu).toEqual([{ id: ITEM, title: 'Heroicon', popover: SECTION }]);
+    expect(m.contributions.popover).toEqual([{ id: SECTION, title: 'Heroicons' }]);
+    expect(m.contributions.rightBar).toBeUndefined();
+    expect([...m.grants].sort()).toEqual(['edit.insert', 'project']);
     expect(m.hosts).toEqual(['cdn.jsdelivr.net', 'unpkg.com']);
   });
 });
@@ -126,7 +133,6 @@ describe('icon files', () => {
     plugin.cdn.offline = true;
     await plugin.control(QUERY, 'anchor');
     await plugin.control(CHOSEN, 'beaker');
-    await plugin.control(INSERT, true);
 
     expect(plugin.proposals).toEqual([]);
     expect(plugin.notes).toEqual([OFFLINE_NOTE]);
@@ -136,8 +142,8 @@ describe('icon files', () => {
 describe('inserting without an icon package', () => {
   it('inserts the outline style as an inline svg component with the stroke on the svg', async () => {
     const plugin = load(SVELTE);
-    await choose(plugin, 'camera', 'camera');
-    await plugin.control(INSERT, true);
+    await search(plugin, 'camera');
+    await plugin.control(CHOSEN, 'camera');
     const op = insertOp(plugin);
 
     expect(plugin.proposals[0].label).toBe(LABEL);
@@ -149,9 +155,9 @@ describe('inserting without an icon package', () => {
 
   it('gives each style its own file and fills the solid style', async () => {
     const plugin = load(SVELTE);
-    await choose(plugin, 'camera', 'camera');
+    await search(plugin, 'camera');
     await plugin.control(STYLE, 'solid');
-    await plugin.control(INSERT, true);
+    await plugin.control(CHOSEN, 'camera');
     const op = insertOp(plugin);
 
     expect(op.component).toMatchObject({ name: 'CameraSolidIcon', file: 'src/feega/icons/CameraSolidIcon.svelte' });
@@ -160,13 +166,13 @@ describe('inserting without an icon package', () => {
 
   it('draws the mini style on a 20 grid and the micro style on a 16 grid', async () => {
     const mini = load(SVELTE);
-    await choose(mini, 'camera', 'camera');
+    await search(mini, 'camera');
     await mini.control(STYLE, 'mini');
-    await mini.control(INSERT, true);
+    await mini.control(CHOSEN, 'camera');
     const micro = load(SVELTE);
-    await choose(micro, 'camera', 'camera');
+    await search(micro, 'camera');
     await micro.control(STYLE, 'micro');
-    await micro.control(INSERT, true);
+    await micro.control(CHOSEN, 'camera');
 
     expect(insertOp(mini).component.source).toContain('viewBox="0 0 20 20"');
     expect(insertOp(micro).component.source).toContain('viewBox="0 0 16 16"');
@@ -174,11 +180,11 @@ describe('inserting without an icon package', () => {
 
   it('writes size and colour on the tag when they differ', async () => {
     const plugin = load(SVELTE);
-    await choose(plugin, 'camera', 'camera');
+    await search(plugin, 'camera');
     await plugin.control(SIZE, 32);
     await plugin.control(INHERIT, false);
     await plugin.control(COLOUR, '#ff0000');
-    await plugin.control(INSERT, true);
+    await plugin.control(CHOSEN, 'camera');
 
     expect(insertOp(plugin).component.attributes).toBe('size={32} color="#ff0000"');
   });
@@ -187,9 +193,9 @@ describe('inserting without an icon package', () => {
 describe('inserting with the icon package the project already has', () => {
   it('re-exports the heroicons react component of the chosen style and sizes it with width and height', async () => {
     const plugin = load(at('src/App.tsx'), { ...PLAIN, packages: { '@heroicons/react': '^2.2.0' } });
-    await choose(plugin, 'camera', 'camera');
+    await search(plugin, 'camera');
     await plugin.control(STYLE, 'mini');
-    await plugin.control(INSERT, true);
+    await plugin.control(CHOSEN, 'camera');
 
     expect(insertOp(plugin).component).toMatchObject({
       name: 'CameraMiniIcon',
@@ -201,8 +207,8 @@ describe('inserting with the icon package the project already has', () => {
 
   it('wraps the heroicons vue component', async () => {
     const plugin = load(at('src/App.vue'), { ...PLAIN, packages: { '@heroicons/vue': '^2.2.0' } });
-    await choose(plugin, 'arrow-right', 'arrow-right');
-    await plugin.control(INSERT, true);
+    await search(plugin, 'arrow-right');
+    await plugin.control(CHOSEN, 'arrow-right');
     const op = insertOp(plugin);
 
     expect(op.component.source).toContain("import { ArrowRightIcon } from '@heroicons/vue/24/outline';");
@@ -212,8 +218,8 @@ describe('inserting with the icon package the project already has', () => {
 
   it('uses inline svg in a framework the installed package does not serve', async () => {
     const plugin = load(SVELTE, { ...PLAIN, packages: { '@heroicons/react': '^2.2.0' } });
-    await choose(plugin, 'camera', 'camera');
-    await plugin.control(INSERT, true);
+    await search(plugin, 'camera');
+    await plugin.control(CHOSEN, 'camera');
 
     expect(insertOp(plugin).component.source).toContain('<svg');
   });

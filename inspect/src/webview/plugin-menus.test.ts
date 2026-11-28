@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { Where, type Contribution } from '@feega/plugin-api/manifest';
 import { AddPlace } from '@feega/live-edit/add-node';
 import { Place } from '@feega/plugin-api/protocol';
-import { addMenuItems, contextMenuItems, itemId, parseItemId, pluginDrop } from './plugin-menus';
+import { addMenuItems, contextMenuItems, itemId, parseItemId, pluginDrop, popoverOf } from './plugin-menus';
 import { COPY_FOR_AGENT, menuFor, type MenuItem } from './structure-menu';
 
 const BASE: MenuItem[] = [{ id: 'text', label: 'Text' }];
 
-const entry = (plugin: string, e: Contribution) => ({ plugin, entry: e });
+const entry = (plugin: string, e: Contribution) => ({ plugin, entry: e, owns: [] });
 
 describe('itemId', () => {
   it('round-trips plugin and item, even when the item has colons or slashes', () => {
@@ -76,5 +76,19 @@ describe('pluginDrop', () => {
 describe('the Copy for agent entry', () => {
   it.each([Where.Layers, Where.Preview])('is in the %s context menu', (where) => {
     expect(contextMenuItems(menuFor(1), [], where).map((item) => item.id)).toContain(COPY_FOR_AGENT);
+  });
+});
+
+describe('popoverOf', () => {
+  const contributed = [entry('p', { id: 'icons', title: 'Icon', popover: 'picker' }), entry('p', { id: 'plain', title: 'Plain' })];
+
+  it('names the popover a menu item opens', () => {
+    expect(popoverOf(contributed, itemId('p', 'icons'))).toEqual({ plugin: 'p', popover: 'picker', title: 'Icon' });
+  });
+
+  it('is empty for an item without one, a missing item and a built-in id', () => {
+    expect(popoverOf(contributed, itemId('p', 'plain'))).toBeNull();
+    expect(popoverOf(contributed, itemId('p', 'ghost'))).toBeNull();
+    expect(popoverOf(contributed, 'text')).toBeNull();
   });
 });

@@ -2,9 +2,38 @@
   "id": "feega.mesh-gradient",
   "name": "Mesh gradient",
   "version": "1.0.0",
-  "permissions": ["selection", "edit.style"],
+  "permissions": [
+    "selection",
+    "edit.style"
+  ],
   "contributions": {
-    "rightBar": [{ "id": "mesh", "title": "Mesh gradient", "when": ["!attribute:data-feega-scene"] }],
-    "overlay": [{ "id": "points", "when": ["!attribute:data-feega-scene"] }]
-  }
+    "addMenu": [
+      {
+        "id": "start",
+        "title": "Mesh gradient"
+      }
+    ],
+    "rightBar": [
+      {
+        "id": "mesh",
+        "title": "Mesh gradient",
+        "when": [
+          "owned",
+          "!attribute:data-feega-scene"
+        ]
+      }
+    ],
+    "overlay": [
+      {
+        "id": "points",
+        "when": [
+          "owned",
+          "!attribute:data-feega-scene"
+        ]
+      }
+    ]
+  },
+  "owns": [
+    "style:background-image*=radial-gradient"
+  ]
 }

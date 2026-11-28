@@ -8,11 +8,12 @@ import { parseManifest } from '@feega/plugin-api/manifest';
 import type { HostMessage, PluginMessage, Selection } from '@feega/plugin-api/protocol';
 import { localCdn } from '@feega/plugin-icon-kit/cdn-fixture';
 import manifest from '@feega/plugin-lucide/manifest';
-import { CHOSEN, INSERT, QUERY, SECTION, lucidePlugin } from '@feega/plugin-lucide/plugin';
+import { CHOSEN, QUERY, SECTION, lucidePlugin } from '@feega/plugin-lucide/plugin';
 import { fileEdits } from './file-edits';
 
 const SETTLE_MS = 60;
 const ICONS_READY_MS = 10_000;
+const MENU_ITEM = 'icon';
 
 const selectionOf = (file: string, line: number, col: number): Selection => ({ source: { file, line, col }, component: null, tag: 'section', name: 'section', classes: '', rect: { x: 0, y: 0, width: 1, height: 1 }, styles: {}, attributes: [] });
 
@@ -50,16 +51,16 @@ async function insertCamera(file: string, page: string, packages: Record<string,
     await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
     await vi.waitFor(() => expect(host.ui(parsed.manifest.id, SECTION).length).toBeGreaterThan(0), { timeout: ICONS_READY_MS });
   };
+  host.menu(parsed.manifest.id, MENU_ITEM, selection.source);
   await settle();
-  for (const [id, value] of [[QUERY, 'camera'], [CHOSEN, 'camera'], [INSERT, true]] as const) {
-    host.control(parsed.manifest.id, SECTION, id, value);
-    await settle();
-  }
+  host.control(parsed.manifest.id, SECTION, QUERY, 'camera');
+  await settle();
+  host.control(parsed.manifest.id, SECTION, CHOSEN, 'camera');
   await vi.waitFor(() => expect(edits.history()).toHaveLength(1), { timeout: ICONS_READY_MS });
   return { read: (path: string) => readFileSync(join(root, path), 'utf8'), edits };
 }
 
-describe('Lucide icons, from the Properties section to the files', () => {
+describe('Lucide icons, from the Add menu to the files', () => {
   it('writes an inline svg component, the import and the tag, and undoes it in one step', async () => {
     const page = '<section class="hero">\n  <h1>Hi</h1>\n</section>\n';
     const { read, edits } = await insertCamera('src/Page.svelte', page, { svelte: '^5.0.0' });

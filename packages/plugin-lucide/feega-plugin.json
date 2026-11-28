@@ -3,20 +3,23 @@
   "name": "Lucide icons",
   "version": "1.0.0",
   "permissions": [
-    "selection",
     "project",
     "edit.insert",
     "network:cdn.jsdelivr.net",
     "network:unpkg.com"
   ],
   "contributions": {
-    "rightBar": [
+    "addMenu": [
+      {
+        "id": "icon",
+        "title": "Lucide icon",
+        "popover": "icons"
+      }
+    ],
+    "popover": [
       {
         "id": "icons",
-        "title": "Lucide icons",
-        "when": [
-          "selection"
-        ]
+        "title": "Lucide icons"
       }
     ]
   }
