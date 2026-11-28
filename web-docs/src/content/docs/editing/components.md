@@ -30,7 +30,7 @@ A component that cannot render alone, because it needs props or a provider, show
 
 ## Usage examples
 
-Expand a component in the list to see every place that uses it. Props that cannot be known, such as page load data, get inline fields: type a value (JSON for objects and arrays). The choices are remembered per project.
+Expand a component in the list to see every place that uses it. Props that cannot be known, such as page load data, get inline fields: type a value (JSON for objects and arrays), or click the dice button at the right end of a text field to pick a ready value: UUID, short id, slug, number, lorem text, name, email, date, URL, image URL or an empty string. The list follows the prop type, so a number prop offers numbers and a prop named like `src` or `url` offers links and images. The choices are remembered per project.
 
 Below the examples, Feega offers edge-case presets built from the declared prop types, each marked "edge": Long text (200 characters in every string), Empty (empty strings and arrays), Missing image (a URL that does not exist for props named like an image, `src` or `url`) and Extreme numbers (0, -1 and 999999). A preset lays over the chosen example, your own edits stay on top, and one that would change no prop is not shown.
 

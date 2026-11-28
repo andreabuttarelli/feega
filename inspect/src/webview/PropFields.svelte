@@ -1,5 +1,7 @@
 <script lang="ts">
   import { FieldKind, type Field } from './component-props';
+  import SampleMenu from './SampleMenu.svelte';
+  import { TargetKind } from './sample-values';
 
   type Props = { fields: Field[]; onedit: (name: string, text: string, kind: FieldKind) => void };
 
@@ -15,7 +17,10 @@
       {#if field.kind === FieldKind.Toggle}
         <input type="checkbox" checked={field.value === 'true'} data-testid="prop-field" data-name={field.name} onchange={(e) => onedit(field.name, String((e.currentTarget as HTMLInputElement).checked), field.kind)} />
       {:else}
-        <input type="text" value={field.value} placeholder={field.name} spellcheck="false" data-testid="prop-field" data-name={field.name} onchange={(e) => onedit(field.name, valueOf(e), field.kind)} />
+        <span class="box">
+          <input type="text" value={field.value} placeholder={field.name} spellcheck="false" data-testid="prop-field" data-name={field.name} onchange={(e) => onedit(field.name, valueOf(e), field.kind)} />
+          <SampleMenu target={{ kind: TargetKind.Prop, fieldKind: field.kind, name: field.name }} onpick={(value) => onedit(field.name, value, field.kind)} />
+        </span>
       {/if}
     </label>
   {/each}
@@ -46,11 +51,16 @@
     white-space: nowrap;
   }
 
-  input[type='text'] {
+  .box {
+    position: relative;
     flex: 1;
     min-width: 0;
+  }
+
+  input[type='text'] {
+    width: 100%;
     box-sizing: border-box;
-    padding: 2px 6px;
+    padding: 2px 24px 2px 6px;
     border: 1px solid var(--ui-divider);
     border-radius: var(--ui-radius-sm);
     background: var(--ui-input);
