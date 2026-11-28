@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ComponentRow } from '../host/component-list';
 import { Badge, type Controls } from './canvas-card';
 import { FieldKind, badgeOf, bestExample, displayOf, fieldsOf, loadedFrom, parseField, propsFor, savedOf, withEdit } from './component-props';
+import { EdgePreset } from './edge-presets';
 
 const example = (line: number, props: Record<string, unknown>, unresolved: string[] = []) => ({ id: `src/p.svelte:${line}`, file: 'src/p.svelte', line, props, unresolved }) as ComponentRow['examples'][number];
 
@@ -156,5 +157,29 @@ describe('what is remembered', () => {
 
   it('starts empty when nothing was saved', () => {
     expect(loadedFrom(undefined)).toEqual({ chosen: {}, edits: {} });
+  });
+});
+
+describe('edge presets', () => {
+  const rows = row([example(1, { title: 'A', n: 5 })]);
+
+  it('lay over the code example, under the edits', () => {
+    expect(propsFor(rows, EdgePreset.Empty, {}, controls)).toEqual({ title: '', n: 5, items: [] });
+    expect(propsFor(rows, EdgePreset.Empty, { title: 'Mine' }, controls)).toEqual({ title: 'Mine', n: 5, items: [] });
+  });
+
+  it('keep the code example in charge of the rest', () => {
+    expect(bestExample(rows, EdgePreset.Empty)?.line).toBe(1);
+  });
+
+  it('show their value in the fields of the props the code left open', () => {
+    const open = row([example(1, {}, ['title'])]);
+
+    expect(fieldsOf(open, EdgePreset.Empty, {}, controls)[0]).toMatchObject({ name: 'title', value: '', edited: false });
+  });
+
+  it('badge as edge until edited', () => {
+    expect(badgeOf(rows, EdgePreset.Empty, {}, { title: '' })).toBe(Badge.Edge);
+    expect(badgeOf(rows, EdgePreset.Empty, { n: 1 }, { title: '' })).toBe(Badge.Edited);
   });
 });
