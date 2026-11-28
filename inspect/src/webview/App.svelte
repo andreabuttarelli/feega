@@ -1416,6 +1416,8 @@
     }
   }
 
+  const CANVAS_RELEASED = false;
+
   const CANVAS_VIEW: Record<CanvasKind, ViewKind> = { [CanvasKind.Pages]: ViewKind.PagesCanvas, [CanvasKind.Components]: ViewKind.ComponentsCanvas };
   const shown = $derived(canvasShown ? CANVAS_VIEW[canvasShown] : focus && viewing === View.Focus ? ViewKind.Focus : ViewKind.Editor);
   const bare = $derived(chromeOf(shown) === Chrome.Bare);
@@ -1724,10 +1726,10 @@
     </div>
     </Tabs.Content>
     <Tabs.Content value={LeftTab.Pages}>
-      <PagesList rows={pages} onopen={go} onadd={typedExample} oncanvas={() => openCanvas(CanvasKind.Pages)} />
+      <PagesList rows={pages} onopen={go} onadd={typedExample} oncanvas={CANVAS_RELEASED ? () => openCanvas(CanvasKind.Pages) : undefined} />
     </Tabs.Content>
     <Tabs.Content value={LeftTab.Components}>
-      <ComponentsList rows={projectComponents} props={componentProps} open={componentFolders} onfolders={(open) => ((componentFolders = open), savePrefs())} onopen={openComponent} oncanvas={() => openCanvas(CanvasKind.Components)} />
+      <ComponentsList rows={projectComponents} props={componentProps} open={componentFolders} onfolders={(open) => ((componentFolders = open), savePrefs())} onopen={openComponent} oncanvas={CANVAS_RELEASED ? () => openCanvas(CanvasKind.Components) : undefined} />
     </Tabs.Content>
     </Tabs.Root>
     {/if}
@@ -1740,7 +1742,7 @@
       <button type="button" class="icon" title="Back (⌘[)" disabled={!canBack} onclick={() => go(history.back())}><ArrowLeft size={15} /></button>
       <button type="button" class="icon" title="Forward (⌘])" disabled={!canForward} onclick={() => go(history.forward())}><ArrowRight size={15} /></button>
       <button type="button" class="icon" title="Reload (⌘R)" onclick={() => go(route)}><RotateCw size={14} /></button>
-      <button type="button" class="icon" title="Pages canvas" aria-label="Pages canvas" data-testid="canvas-toggle" onclick={() => openCanvas(CanvasKind.Pages)}><LayoutGrid size={14} /></button>
+      {#if CANVAS_RELEASED}<button type="button" class="icon" title="Pages canvas" aria-label="Pages canvas" data-testid="canvas-toggle" onclick={() => openCanvas(CanvasKind.Pages)}><LayoutGrid size={14} /></button>{/if}
       <NewPage items={libraryItems} onopen={() => toHost({ kind: ToHost.LibraryList })} oncreate={(route, item) => toHost({ kind: ToHost.NewPage, route, item })} />
       <form class="address" onsubmit={(e) => (e.preventDefault(), go(address))}>
         <ServerPopover state={server} reason={serverReason} info={serverInfo} onopen={(link) => toHost({ kind: ToHost.External, url: link })} onaction={(action) => (action === ServerAction.ReloadPage ? go(route) : toHost({ kind: ToHost.Server, action }))} />

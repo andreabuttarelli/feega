@@ -4,7 +4,7 @@
   import { freshKeys } from './fresh-keys.svelte';
   import { EXAMPLE_LIMIT, type PageRow } from './pages';
 
-  type Props = { rows: PageRow[]; onopen: (route: string) => void; onadd: (pattern: string, path: string) => void; oncanvas: () => void };
+  type Props = { rows: PageRow[]; onopen: (route: string) => void; onadd: (pattern: string, path: string) => void; oncanvas?: () => void };
 
   let { rows, onopen, onadd, oncanvas }: Props = $props();
 
@@ -17,7 +17,7 @@
   const expand = (route: string) => (expanded = [...expanded, route]);
 </script>
 
-<ActionBanner testid="canvas-open-pages" onopen={oncanvas} />
+{#if oncanvas}<ActionBanner testid="canvas-open-pages" onopen={oncanvas} />{/if}
 
 <ul class="pages" data-testid="pages">
   {#each rows as row (row.route)}
