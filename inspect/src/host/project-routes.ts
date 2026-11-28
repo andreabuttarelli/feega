@@ -29,14 +29,19 @@ export function routesOf(files: string[]): PageRoute[] {
 
 const skipped = (path: string) => path.split('/').some((part) => SKIPPED_DIRS.has(part));
 
-export async function listRoutes(appRoot: string): Promise<PageRoute[]> {
+export async function listedFiles(appRoot: string): Promise<string[]> {
   const listed = await Promise.all(
     ROUTE_DIRS.map(async (dir) => {
       const inside = await readdir(join(appRoot, dir), { recursive: true }).catch(() => []);
       return inside.filter((path) => !skipped(path)).map((path) => `${dir}/${path.split('\\').join('/')}`);
     })
   );
-  const files = listed.flat();
+
+  return listed.flat();
+}
+
+export async function listRoutes(appRoot: string): Promise<PageRoute[]> {
+  const files = await listedFiles(appRoot);
 
   return withSourced(appRoot, files, routesOf(files));
 }

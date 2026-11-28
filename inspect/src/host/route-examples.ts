@@ -1,11 +1,12 @@
 import { readFile, stat } from 'node:fs/promises';
-import { basename, dirname, join } from 'node:path';
+import { basename, dirname, join, relative } from 'node:path';
 import { assignExamples, fillRoute } from '../route-match';
 import { Scopes, scriptOf } from './module-scope';
 import { linksOf } from './route-links';
 import { entriesOf, hasGenerator } from './route-entries';
 import { pageOfFile, type PageRoute } from './page-route';
 import { listFiles } from './project-scan';
+import { NOISY_FILE, isPlaceholder } from './route-noise';
 
 const LINK_FILE = /\.(svelte|tsx|jsx|vue|astro|md|mdx|ts|js|html)$/;
 const MAX_FILES = 2000;
@@ -35,7 +36,7 @@ async function linksIn(file: string): Promise<string[]> {
 }
 
 async function linkedPaths(appRoot: string): Promise<string[]> {
-  const files = await listFiles(appRoot, LINK_FILE, MAX_FILES);
+  const files = (await listFiles(appRoot, LINK_FILE, MAX_FILES)).filter((file) => !NOISY_FILE.test(relative(appRoot, file)));
   const found = await Promise.all(files.map(linksIn));
 
   return [...new Set(found.flat())];
@@ -76,7 +77,7 @@ export async function withSourced(appRoot: string, files: string[], routes: Page
 
   for (const page of dynamic) {
     const own = files.filter((file) => pageOfFile(file)?.route === page.route);
-    const paths = [...new Set([...(await entryPaths(appRoot, page.route, own)), ...linked[page.route]])].slice(0, EXAMPLES_PER_ROUTE);
+    const paths = [...new Set([...(await entryPaths(appRoot, page.route, own)), ...linked[page.route].filter((path) => !isPlaceholder(page.route, path))])].slice(0, EXAMPLES_PER_ROUTE);
     if (paths.length > 0) {
       withExamples.set(page.route, paths);
     }

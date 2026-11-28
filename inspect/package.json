@@ -139,6 +139,11 @@
           "default": true,
           "description": "Notify when an AI agent needs permission. Needs Notifications on."
         },
+        "feegaInspect.routeGenerators": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run route generators (entries, getStaticPaths) through the dev server to find example pages of dynamic routes. SvelteKit and Astro. This runs your project code."
+        },
         "feegaInspect.cloud.enabled": {
           "type": "boolean",
           "default": false,

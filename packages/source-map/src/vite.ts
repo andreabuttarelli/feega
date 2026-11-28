@@ -7,6 +7,7 @@ import { fsUrl, sourceId } from './source-id.ts';
 import { PROVIDERS_QUERY } from './mount-page.ts';
 import { isMountModule, mountRoutes } from './mount-routes.ts';
 import { providersOf } from './providers-module.ts';
+import { routeEntries } from './route-entries-endpoint.ts';
 
 const BRIDGE_PATH = fileURLToPath(new URL('./bridge.js', import.meta.url));
 const VITE_CLIENT = /\/vite\/dist\/client\/client\.mjs$/;
@@ -43,6 +44,7 @@ export function feegaSource({ bridge = Bridge.ViteClient, root: projectRoot }: S
 
     configureServer(server) {
       mount = mountRoutes(server, { root: () => root, runtimeDir: MOUNT_RUNTIME_DIR });
+      routeEntries(server, () => root);
     },
 
     resolveId(source) {

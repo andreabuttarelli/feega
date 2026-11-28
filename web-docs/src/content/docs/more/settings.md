@@ -16,6 +16,7 @@ In VS Code, settings are under `feegaInspect.*`. With `npx feega`, they live in 
 | `feegaInspect.notifications` | `true` | boolean | Notify you when an AI agent needs you while Feega is out of view. See [Notifications](/more/chat-with-your-agent/#notifications). |
 | `feegaInspect.notifyFinished` | `true` | boolean | Notify when an agent finishes. Needs `feegaInspect.notifications`. |
 | `feegaInspect.notifyPermission` | `true` | boolean | Notify when an agent needs permission. Needs `feegaInspect.notifications`. |
+| `feegaInspect.routeGenerators` | `true` | boolean | Run route generators (`entries`, `getStaticPaths`) through the dev server to find example pages of dynamic routes in Pages. SvelteKit and Astro. This runs your project code. See [Pages](/editing/layers/#pages). |
 | `feegaInspect.telemetry` | `true` | boolean | Anonymous usage counts. See [Privacy](/more/privacy/). |
 
 ## Commands

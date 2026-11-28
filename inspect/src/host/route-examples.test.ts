@@ -102,3 +102,32 @@ describe('examples from source', () => {
     expect((await sourcedOf(root, '/blog/[slug]'))?.length).toBe(50);
   });
 });
+
+describe('noise in linked examples', () => {
+  const BLOG = 'src/routes/blog/[slug]/+page.svelte';
+  const linkIn = (file: string, text: string) => sourcedOf(project({ [BLOG]: '', [file]: text }), '/blog/[slug]');
+
+  it.each([
+    ['a value equal to its param name', '<a href="/blog/slug">x</a>'],
+    ['a single character value', '<a href="/blog/a">x</a>'],
+    ['a link inside an html comment', '<!-- <a href="/blog/hello">x</a> -->'],
+    ['a link inside a block comment', "/* goto('/blog/hello') */"],
+    ['a link inside a line comment', "// goto('/blog/hello')"]
+  ])('drops %s', async (_name, text) => {
+    expect(await linkIn('src/routes/+page.svelte', text)).toBeUndefined();
+  });
+
+  it.each(['src/lib/nav.test.ts', 'src/lib/nav.spec.ts', 'src/lib/Nav.stories.svelte', 'src/__tests__/nav.ts', 'tests/fixtures/nav.ts'])('drops a link found only in %s', async (file) => {
+    expect(await linkIn(file, "goto('/blog/hello')")).toBeUndefined();
+  });
+
+  it('keeps a link that a real file also has', async () => {
+    const root = project({ [BLOG]: '', 'src/a.test.ts': "goto('/blog/hello')", 'src/routes/+page.svelte': '<a href="/blog/hello">x</a>' });
+
+    expect(await sourcedOf(root, '/blog/[slug]')).toEqual(['/blog/hello']);
+  });
+
+  it('keeps a url with two slashes after a protocol on the same line', async () => {
+    expect(await linkIn('src/routes/+page.svelte', '<a href="https://x.com">x</a> <a href="/blog/hello">x</a>')).toEqual(['/blog/hello']);
+  });
+});

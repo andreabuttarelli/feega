@@ -11,7 +11,8 @@ export enum SettingKey {
   AiPermissions = 'feegaInspect.aiPermissions',
   Notifications = 'feegaInspect.notifications',
   NotifyFinished = 'feegaInspect.notifyFinished',
-  NotifyPermission = 'feegaInspect.notifyPermission'
+  NotifyPermission = 'feegaInspect.notifyPermission',
+  RouteGenerators = 'feegaInspect.routeGenerators'
 }
 
 export enum StylingChoice {
@@ -89,7 +90,13 @@ export const SETTINGS: SettingRow[] = [
   },
   { key: SettingKey.Notifications, label: 'Notifications', hint: 'Tell me when an AI agent needs me while I am in another window or tab. Messages name the agent and the project, never code or prompts.', fallback: true },
   { key: SettingKey.NotifyFinished, label: 'Notify when an agent finishes', hint: 'Needs Notifications on.', fallback: true },
-  { key: SettingKey.NotifyPermission, label: 'Notify when an agent needs permission', hint: 'Needs Notifications on.', fallback: true }
+  { key: SettingKey.NotifyPermission, label: 'Notify when an agent needs permission', hint: 'Needs Notifications on.', fallback: true },
+  {
+    key: SettingKey.RouteGenerators,
+    label: 'Run route generators to find examples',
+    hint: 'Pages calls entries and getStaticPaths through your dev server to list example pages of dynamic routes. SvelteKit and Astro. This runs your project code.',
+    fallback: true
+  }
 ];
 
 export type Settings = Record<SettingKey, SettingValue>;
