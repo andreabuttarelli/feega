@@ -3,8 +3,6 @@
   import ArrowLeft from '@lucide/svelte/icons/arrow-left';
   import ArrowRight from '@lucide/svelte/icons/arrow-right';
   import RotateCw from '@lucide/svelte/icons/rotate-cw';
-  import Plus from '@lucide/svelte/icons/plus';
-  import ActionBanner from './ActionBanner.svelte';
   import ExternalLink from '@lucide/svelte/icons/external-link';
   import PanelRight from '@lucide/svelte/icons/panel-right';
   import PanelLeft from '@lucide/svelte/icons/panel-left';
@@ -42,6 +40,7 @@
   import { dockedEdge, isDocked, slideAway, tabBox, type Docked } from './dock';
   import FeegaMenu from './FeegaMenu.svelte';
   import PluginBrowser from './PluginBrowser.svelte';
+  import AddRow from './AddRow.svelte';
   import { cardsOf } from './plugin-browser';
   import OnboardingDialog from './Onboarding.svelte';
   import ServerPopover from './ServerPopover.svelte';
@@ -1417,6 +1416,8 @@
     }
   }
 
+  const CANVAS_RELEASED = false;
+
   const CANVAS_VIEW: Record<CanvasKind, ViewKind> = { [CanvasKind.Pages]: ViewKind.PagesCanvas, [CanvasKind.Components]: ViewKind.ComponentsCanvas };
   const shown = $derived(canvasShown ? CANVAS_VIEW[canvasShown] : focus && viewing === View.Focus ? ViewKind.Focus : ViewKind.Editor);
   const bare = $derived(chromeOf(shown) === Chrome.Bare);
@@ -1719,16 +1720,16 @@
       <Tabs.Trigger value={LeftTab.Components} class="tab" data-testid="components-tab">Components</Tabs.Trigger>
     </Tabs.List>
     <Tabs.Content value={LeftTab.Layers}>
-    <ActionBanner title="Add element" testid="add-button" icon={Plus} disabled={!picked} onopen={(e) => openAddMenu(e.clientX, e.clientY)} />
+    <AddRow disabled={!picked} onadd={(kind) => addElement(kind)} onmore={(e) => openAddMenu(e.clientX, e.clientY)} />
     <div class="layers" role="tree" aria-label="Layers" data-testid="layers">
       <LayersTree nodes={layers} {picked} selected={selectedKeys} badge={badgeOf(elementState)} open={layersOpen} onselect={selectRow} onhover={hoverLayer} onopen={(at) => toHost({ kind: ToHost.Open, at })} onmove={moveLayer} onusage={moveUsage} dragging={layerDrag} hidden={hiddenNow} locked={lockedNow} ontoggle={toggleFlag} oncontext={openLayerMenu} onadd={layerAdd} onfocus={(node) => viewing === View.Page && enterFocus(rowFocus(node))} ondelete={deleteRow} />
     </div>
     </Tabs.Content>
     <Tabs.Content value={LeftTab.Pages}>
-      <PagesList rows={pages} onopen={go} onadd={typedExample} oncanvas={() => openCanvas(CanvasKind.Pages)} />
+      <PagesList rows={pages} onopen={go} onadd={typedExample} oncanvas={CANVAS_RELEASED ? () => openCanvas(CanvasKind.Pages) : undefined} />
     </Tabs.Content>
     <Tabs.Content value={LeftTab.Components}>
-      <ComponentsList rows={projectComponents} props={componentProps} open={componentFolders} onfolders={(open) => ((componentFolders = open), savePrefs())} onopen={openComponent} oncanvas={() => openCanvas(CanvasKind.Components)} />
+      <ComponentsList rows={projectComponents} props={componentProps} open={componentFolders} onfolders={(open) => ((componentFolders = open), savePrefs())} onopen={openComponent} oncanvas={CANVAS_RELEASED ? () => openCanvas(CanvasKind.Components) : undefined} />
     </Tabs.Content>
     </Tabs.Root>
     {/if}
@@ -1741,7 +1742,7 @@
       <button type="button" class="icon" title="Back (⌘[)" disabled={!canBack} onclick={() => go(history.back())}><ArrowLeft size={15} /></button>
       <button type="button" class="icon" title="Forward (⌘])" disabled={!canForward} onclick={() => go(history.forward())}><ArrowRight size={15} /></button>
       <button type="button" class="icon" title="Reload (⌘R)" onclick={() => go(route)}><RotateCw size={14} /></button>
-      <button type="button" class="icon" title="Pages canvas" aria-label="Pages canvas" data-testid="canvas-toggle" onclick={() => openCanvas(CanvasKind.Pages)}><LayoutGrid size={14} /></button>
+      {#if CANVAS_RELEASED}<button type="button" class="icon" title="Pages canvas" aria-label="Pages canvas" data-testid="canvas-toggle" onclick={() => openCanvas(CanvasKind.Pages)}><LayoutGrid size={14} /></button>{/if}
       <NewPage items={libraryItems} onopen={() => toHost({ kind: ToHost.LibraryList })} oncreate={(route, item) => toHost({ kind: ToHost.NewPage, route, item })} />
       <form class="address" onsubmit={(e) => (e.preventDefault(), go(address))}>
         <ServerPopover state={server} reason={serverReason} info={serverInfo} onopen={(link) => toHost({ kind: ToHost.External, url: link })} onaction={(action) => (action === ServerAction.ReloadPage ? go(route) : toHost({ kind: ToHost.Server, action }))} />
