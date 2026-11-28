@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CAPTURED } from '../messages';
-import { SHOT_TIMEOUT_MS, shotOf } from './canvas-shot';
+import { FULL_SHOT_TIMEOUT_MS, SHOT_TIMEOUT_MS, fullShotOf, shotOf } from './canvas-shot';
 
 const ORIGIN = 'http://localhost:5173';
 
@@ -65,5 +65,51 @@ describe('shotOf', () => {
     setup();
 
     expect(await shotOf({ src: '', contentWindow: null } as unknown as HTMLIFrameElement)).toBeNull();
+  });
+});
+
+describe('fullShotOf', () => {
+  const ASK = { scale: 0.5, maxHeight: 15000 };
+
+  it('asks for the whole document at the scale and cap it was given', () => {
+    const { frame, posted } = setup();
+
+    void fullShotOf(frame, ASK);
+
+    expect(posted[0]).toMatchObject({ type: 'feega:capture', full: true, scale: 0.5, maxHeight: 15000 });
+  });
+
+  it('resolves with the picture and the height of the document', async () => {
+    const { frame, posted, reply } = setup();
+    const shot = fullShotOf(frame, ASK);
+
+    reply({ type: CAPTURED, id: posted[0].id, png: 'iVBORw0K', height: 4200, capped: false });
+
+    expect(await shot).toEqual({ snap: { url: 'data:image/png;base64,iVBORw0K', height: 4200, capped: false } });
+  });
+
+  it('says why the page could not be drawn', async () => {
+    const { frame, posted, reply } = setup();
+    const shot = fullShotOf(frame, ASK);
+
+    reply({ type: CAPTURED, id: posted[0].id, error: 'tainted canvas' });
+
+    expect(await shot).toEqual({ reason: 'tainted canvas' });
+  });
+
+  it('says the bridge never answered', async () => {
+    vi.useFakeTimers();
+    const { frame } = setup();
+    const shot = fullShotOf(frame, ASK);
+
+    vi.advanceTimersByTime(FULL_SHOT_TIMEOUT_MS);
+
+    expect(await shot).toEqual({ reason: 'the page did not answer the capture' });
+  });
+
+  it('says there is no frame to ask', async () => {
+    setup();
+
+    expect(await fullShotOf({ src: '', contentWindow: null } as unknown as HTMLIFrameElement, ASK)).toEqual({ reason: 'the frame has no window' });
   });
 });

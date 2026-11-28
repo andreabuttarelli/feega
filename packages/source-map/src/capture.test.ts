@@ -1,7 +1,7 @@
 import { JSDOM } from 'jsdom';
 import { describe, expect, it } from 'vitest';
 import { installBridge } from './bridge.js';
-import { captureTab } from './capture.js';
+import { captureFull, captureTab } from './capture.js';
 
 const PNG = 'iVBORw0KGgo=';
 const URL_PNG = `data:image/png;base64,${PNG}`;
@@ -63,6 +63,48 @@ describe('capturing the tab', () => {
   });
 });
 
+describe('capturing the whole document', () => {
+  const tall = (height: number) => {
+    const win = page();
+    Object.defineProperty(win, 'innerWidth', { value: 1440 });
+    Object.defineProperty(win, 'innerHeight', { value: 900 });
+    Object.defineProperty(win.document.documentElement, 'scrollHeight', { value: height });
+    return win;
+  };
+
+  it('draws from the top at the document height and the asked scale', async () => {
+    const win = tall(4200);
+    Object.defineProperty(win, 'scrollY', { value: 300 });
+    const { drawn, render } = renderer();
+
+    const shot = await captureFull(win, { full: true, scale: 0.5, maxHeight: 15000 }, render);
+
+    expect(shot).toEqual({ png: PNG, height: 4200, capped: false });
+    expect(drawn[0].node).toBe(win.document.documentElement);
+    expect(drawn[0].options).toMatchObject({ width: 1440, height: 4200, scale: 0.5 });
+    expect(drawn[0].options.style).toBeUndefined();
+  });
+
+  it('cuts a page taller than the cap and says so', async () => {
+    const { drawn, render } = renderer();
+
+    const shot = await captureFull(tall(40000), { full: true, scale: 0.4, maxHeight: 15000 }, render);
+
+    expect(shot).toMatchObject({ height: 15000, capped: true });
+    expect(drawn[0].options).toMatchObject({ height: 15000 });
+  });
+
+  it('waits for the fonts before it measures', async () => {
+    const win = tall(1000);
+    const order: string[] = [];
+    Object.defineProperty(win.document, 'fonts', { value: { ready: new Promise<void>((resolve) => setTimeout(() => (order.push('fonts'), resolve()), 5)) } });
+
+    await captureFull(win, { full: true, scale: 1, maxHeight: 15000 }, async () => (order.push('draw'), URL_PNG));
+
+    expect(order).toEqual(['fonts', 'draw']);
+  });
+});
+
 describe('the bridge answering a capture', () => {
   const bridged = (render: (node: Element, options: Record<string, unknown>) => Promise<string>) => {
     const win = page();
@@ -81,6 +123,16 @@ describe('the bridge answering a capture', () => {
     await new Promise((resolve) => setTimeout(resolve, 10));
 
     expect(up).toContainEqual({ type: 'feega:captured', id: 4, png: PNG });
+  });
+
+  it('replies with the height of the document for a full capture', async () => {
+    const { render } = renderer();
+    const { up, send } = bridged(render);
+
+    send({ type: 'feega:capture', id: 6, full: true, scale: 0.5, maxHeight: 15000 });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(up).toContainEqual({ type: 'feega:captured', id: 6, png: PNG, height: 0, capped: false });
   });
 
   it('replies with the reason when the page cannot be drawn', async () => {

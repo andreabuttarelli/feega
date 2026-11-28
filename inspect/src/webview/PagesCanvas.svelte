@@ -1,9 +1,13 @@
 <script lang="ts">
   import CanvasShell from './CanvasShell.svelte';
+  import { untrack } from 'svelte';
+  import { capturer } from './canvas-capture';
   import { CANVAS_COLUMNS, layoutCanvas, type CanvasFrame } from './canvas-layout';
-  import { MIN_LIVE_WIDTH } from './canvas-live';
   import { openOf, type CanvasOpen } from './canvas-open';
+  import { sessionSnaps } from './canvas-session';
+  import { SNAP_CONCURRENCY, snapQueue, type SnapJob } from './canvas-snaps';
   import { pageKeysOf } from './canvas-stale';
+  import type { CanvasView, Viewport } from './canvas-view';
   import ExampleField from './ExampleField.svelte';
   import type { FilesChange } from './files-change';
   import type { PageRow } from './pages';
@@ -13,11 +17,45 @@
 
   let { rows, base, onopen, onadd, onclose, changed }: Props = $props();
 
-  const layout = $derived(layoutCanvas(rows, CANVAS_COLUMNS));
-  const stale = $derived(changed ? { keys: pageKeysOf(layout.frames, changed.files) } : null);
+  let snaps = $state<Record<string, { url: string; capped: boolean; height: number }>>({});
+  let unrendered = $state<string[]>([]);
+  let view = $state<CanvasView>({ scale: 1, x: 0, y: 0 });
+  let viewport = $state<Viewport>({ w: 0, h: 0 });
+
+  const queue = snapQueue({ max: SNAP_CONCURRENCY, store: sessionSnaps, capture: (job) => capturer(base)(job), changed: publish });
+
+  function publish() {
+    snaps = Object.fromEntries(queue.snaps);
+    unrendered = [...queue.failed];
+  }
+
+  publish();
+
+  const heights = $derived(Object.fromEntries(Object.entries(snaps).filter(([, snap]) => snap.height > 0).map(([key, snap]) => [key, snap.height])));
+  const layout = $derived(layoutCanvas(rows, CANVAS_COLUMNS, heights, viewport));
+  const shown = $derived(Object.fromEntries(layout.frames.filter((f) => snaps[f.key]).map((f) => [f.key, { url: snaps[f.key].url, capped: snaps[f.key].capped || snaps[f.key].height > f.height }])));
+
+  const jobOf = (f: CanvasFrame): SnapJob => ({ key: f.key, target: f.target!, x: f.x, y: f.y, width: f.width, height: f.height, device: { w: SIZES[f.size].width ?? f.width, h: SIZES[f.size].height ?? f.height } });
+
+  $effect(() => {
+    queue.want(layout.frames.filter((f) => f.target !== null).map(jobOf), view, viewport);
+  });
+
+  let seen = untrack(() => changed);
+
+  $effect(() => {
+    if (changed && changed !== seen) {
+      seen = changed;
+      queue.invalidate(pageKeysOf(layout.frames, changed.files));
+    }
+  });
+
+  $effect(() => () => queue.want([], view, viewport));
+
+  const watch = (next: CanvasView, size: Viewport) => ((view = next), (viewport = size));
   const currentRoute = $derived(rows.find((r) => r.current)?.route ?? null);
 
-  const dimsOf = (f: CanvasFrame) => `${SIZES[f.size].label} · ${f.width} × ${f.height}`;
+  const dimsOf = (f: CanvasFrame) => `${SIZES[f.size].label} · ${f.width} × ${f.pageHeight}`;
 
   const hitOf = (f: CanvasFrame) => ({
     label: `Open ${f.target ?? f.route} at ${SIZES[f.size].label}`,
@@ -38,21 +76,21 @@
   bounds={layout.bounds}
   label="Pages canvas"
   testid="pages-canvas"
-  minLiveWidth={MIN_LIVE_WIDTH}
   frameLabel={dimsOf}
-  srcOf={(f) => (f.target === null ? null : new URL(f.target, base).toString())}
+  snapshots={shown}
+  {unrendered}
+  onview={watch}
   {hitOf}
   onopen={open}
   {onclose}
-  {stale}
 >
   {#snippet world()}
     {#each layout.rows as row (row.route)}
-      <h2 class="row-label" class:on={row.route === currentRoute} style={`left:0;top:${row.y}px`} data-testid="canvas-row">{row.route}{#if row.dynamic}<span class="tag" data-testid="canvas-example">{row.example?.label ?? 'dynamic'}</span>{/if}</h2>
+      <h2 class="row-label" class:on={row.route === currentRoute} style={`left:${row.x}px;top:${row.y}px`} data-testid="canvas-row">{row.route}{#if row.dynamic}<span class="tag" data-testid="canvas-example">{row.example?.label ?? 'dynamic'}</span>{/if}</h2>
     {/each}
   {/snippet}
   {#snippet card(frame: CanvasFrame)}
-    <b>{frame.route}</b><span>{frame.dynamic ? 'Dynamic route' : dimsOf(frame)}</span>
+    <b>{frame.route}</b><span>{frame.target === null ? 'Dynamic route' : dimsOf(frame)}</span>
     {#if frame.target === null}<div class="manual"><ExampleField pattern={frame.route} onadd={(path) => onadd(frame.route, path)} /></div>{/if}
   {/snippet}
 </CanvasShell>
@@ -63,6 +101,7 @@
     margin: 0;
     color: var(--ui-text-2);
     font-size: calc(var(--label) * 1.15);
+    line-height: 1.25;
     font-weight: 500;
     white-space: nowrap;
   }
@@ -85,7 +124,7 @@
     z-index: 1;
     width: 60%;
     margin-top: calc(8px / var(--zoom));
-    font-size: min(calc(13px / var(--zoom)), 120px);
+    font-size: min(calc(13px / var(--zoom)), 5cqw);
   }
 
   .manual :global(.field) {

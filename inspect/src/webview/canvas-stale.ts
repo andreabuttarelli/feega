@@ -10,3 +10,12 @@ export function pageKeysOf(frames: CanvasFrame[], files: string[]): string[] {
 }
 
 export const componentKeysOf = (rows: ComponentRow[], files: string[]): string[] => rows.filter((row) => files.includes(row.file)).map(keyOfComponent);
+
+export function forgetPages(store: Map<string, unknown>, files: string[]) {
+  const routes = new Set(files.flatMap((file) => pageOfFile(file)?.route ?? []));
+  for (const key of [...store.keys()]) {
+    if (routes.has(key.slice(0, key.lastIndexOf('::')))) {
+      store.delete(key);
+    }
+  }
+}
