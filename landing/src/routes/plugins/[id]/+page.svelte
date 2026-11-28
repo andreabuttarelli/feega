@@ -1,5 +1,6 @@
 <script lang="ts">
   import Pixel from '$lib/site/alternatives/Pixel.svelte';
+  import LabelBadges from '$lib/site/plugins/LabelBadges.svelte';
   import TierBadge from '$lib/site/plugins/TierBadge.svelte';
   import { PLUGINS_PATH } from '$lib/site/plugins/plugins';
   import { primaryCta } from '$lib/site/install';
@@ -27,7 +28,8 @@
       <span class="icon"><Pixel icon={plugin.icon} size={8} /></span>
       <div>
         <h1>{lower(plugin.name)}</h1>
-        <p class="meta">by {plugin.author} · v{plugin.version}</p>
+        <p class="meta">v{plugin.version}</p>
+        <p class="labels"><LabelBadges labels={plugin.labels} /></p>
         {#if plugin.credit}<p class="meta">built on <a href={plugin.credit.url} rel="noopener">{lower(plugin.credit.name)}</a> · {lower(plugin.credit.license)}</p>{/if}
       </div>
       <TierBadge tier={plugin.tier} />
@@ -94,6 +96,13 @@
     font-family: var(--sx-mono);
     font-size: 13px;
     opacity: 0.6;
+  }
+
+  .labels {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 8px 0 0;
   }
 
   .meta a {

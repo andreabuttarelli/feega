@@ -19,7 +19,7 @@ describe('permission words', () => {
 
 describe('plugins', () => {
   it('lists the built-ins', () => {
-    expect(PLUGINS.map((p) => p.id)).toEqual(['mesh-gradient', '3d-object', 'lucide-icons', 'brand-logos', 'gradient-presets', 'phosphor-icons', 'heroicons']);
+    expect(PLUGINS.map((p) => p.id)).toEqual(['mesh-gradient', '3d-object', 'lucide-icons', 'brand-logos', 'gradient-presets', 'phosphor-icons', 'heroicons', 'shadergradient']);
   });
 
   it('writes each permission in plain words', () => {
@@ -46,4 +46,13 @@ describe('plugins', () => {
     expect(pluginPath('3d-object')).toBe('/plugins/3d-object');
   });
 
+
+  it('labels the plugins Feega made By Feega and the library ones Community and Unofficial', () => {
+    expect(PLUGINS.find((p) => p.id === 'mesh-gradient')?.labels).toEqual(['By Feega']);
+    expect(PLUGINS.find((p) => p.id === 'lucide-icons')?.labels).toEqual(['Community', 'Unofficial']);
+  });
+
+  it('gives each plugin its own pixel icon', () => {
+    expect(new Set(PLUGINS.map((p) => p.icon)).size).toBe(PLUGINS.length);
+  });
 });

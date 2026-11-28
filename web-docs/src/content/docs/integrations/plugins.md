@@ -5,18 +5,19 @@ sidebar:
   order: 4
 ---
 
-Plugins add controls to Feega Inspect. Seven are built in and on by default: **Mesh gradient**,
-**3D object**, **Lucide icons**, **Brand logos**, **Gradient presets**, **Phosphor icons** and
-**Heroicons**. You can also install third-party plugins or load one from a folder while you build
+Plugins add controls to Feega Inspect. Eight are built in and on by default: **Mesh gradient**,
+**3D object**, **Lucide icons**, **Brand logos**, **Gradient presets**, **Phosphor icons**,
+**Heroicons** and **ShaderGradient**. You can also install third-party plugins or load one from a folder while you build
 it: see [Write a plugin](/integrations/write-a-plugin/).
 
 ## Browse plugins
 
 In the Feega menu (the logo, top left), **Plugins**, then **Browse plugins**, opens a full-panel
-view of every plugin as a card: name, one-line description, a **By Feega** or **Community**
-badge, and an **Enabled** switch. **By Feega** means we made the plugin, not that the library it
-wraps is ours: plugins built on a third-party library (Lucide, Phosphor, Heroicons, Simple Icons)
-credit it with its license, for example "Built on Lucide · ISC". This works the same in the VS Code
+view of every plugin as a card: name, one-line description, an icon, a **By Feega** or **Community**
+badge, and an **Enabled** switch. **By Feega** marks plugins we made from scratch. Plugins built on
+a third-party library (Lucide, Phosphor, Heroicons, Simple Icons, ShaderGradient) are **Community**
+and **Unofficial**: the library's authors did not make or endorse them. They credit the library with
+its license, for example "Built on Lucide · ISC". This works the same in the VS Code
 extension, `npx feega` and the desktop app.
 
 - Type in **Search plugins** to filter by name or description.
@@ -28,7 +29,7 @@ extension, `npx feega` and the desktop app.
   command instead: `npx feega plugin add`.
 
 Plugin commands still appear under **Plugins** in the Feega menu.
-A third built-in, [ShaderGradient (community)](/integrations/shadergradient/), edits ShaderGradient props.
+A third built-in, [ShaderGradient](/integrations/shadergradient/), edits ShaderGradient props.
 
 Every plugin change goes through the same edit engine as a manual edit. It shows in **Changes**,
 opens in the diff, and **Undo** reverts it in one step.
