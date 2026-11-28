@@ -3,8 +3,6 @@
   import ArrowLeft from '@lucide/svelte/icons/arrow-left';
   import ArrowRight from '@lucide/svelte/icons/arrow-right';
   import RotateCw from '@lucide/svelte/icons/rotate-cw';
-  import Plus from '@lucide/svelte/icons/plus';
-  import ActionBanner from './ActionBanner.svelte';
   import ExternalLink from '@lucide/svelte/icons/external-link';
   import PanelRight from '@lucide/svelte/icons/panel-right';
   import PanelLeft from '@lucide/svelte/icons/panel-left';
@@ -42,6 +40,7 @@
   import { dockedEdge, isDocked, slideAway, tabBox, type Docked } from './dock';
   import FeegaMenu from './FeegaMenu.svelte';
   import PluginBrowser from './PluginBrowser.svelte';
+  import AddRow from './AddRow.svelte';
   import { cardsOf } from './plugin-browser';
   import OnboardingDialog from './Onboarding.svelte';
   import ServerPopover from './ServerPopover.svelte';
@@ -1719,7 +1718,7 @@
       <Tabs.Trigger value={LeftTab.Components} class="tab" data-testid="components-tab">Components</Tabs.Trigger>
     </Tabs.List>
     <Tabs.Content value={LeftTab.Layers}>
-    <ActionBanner title="Add element" testid="add-button" icon={Plus} disabled={!picked} onopen={(e) => openAddMenu(e.clientX, e.clientY)} />
+    <AddRow disabled={!picked} onadd={(kind) => addElement(kind)} onmore={(e) => openAddMenu(e.clientX, e.clientY)} />
     <div class="layers" role="tree" aria-label="Layers" data-testid="layers">
       <LayersTree nodes={layers} {picked} selected={selectedKeys} badge={badgeOf(elementState)} open={layersOpen} onselect={selectRow} onhover={hoverLayer} onopen={(at) => toHost({ kind: ToHost.Open, at })} onmove={moveLayer} onusage={moveUsage} dragging={layerDrag} hidden={hiddenNow} locked={lockedNow} ontoggle={toggleFlag} oncontext={openLayerMenu} onadd={layerAdd} onfocus={(node) => viewing === View.Page && enterFocus(rowFocus(node))} ondelete={deleteRow} />
     </div>

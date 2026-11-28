@@ -20,7 +20,7 @@ Right-click an element, on the page or in Layers, for the structure menu. Right-
 
 ## Add
 
-The **+ Add** button in Layers (or `/`) offers Text, Heading, Button, Link, Image and Container. A new element goes after the selection, or as its last child when the selection is a container.
+The row of icons at the top of Layers adds Text, Heading, Button, Link, Image or Container in one click; drag an icon onto a layer to place it. The last icon, **More elements** (or `/`), opens the full menu with library and plugin items. A new element goes after the selection, or as its last child when the selection is a container.
 
 To choose the place yourself:
 
