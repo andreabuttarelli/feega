@@ -127,7 +127,8 @@
   import PluginOverlay from './PluginOverlay.svelte';
   import { createPlugins } from './plugins.svelte';
   import { selectionOf, sourceOfText } from './plugin-editor';
-  import { addMenuItems, contextMenuItems, parseItemId, pluginDrop } from './plugin-menus';
+  import { addMenuItems, contextMenuItems, parseItemId, pluginDrop, popoverOf } from './plugin-menus';
+  import PluginPopover from './PluginPopover.svelte';
 
   const SETTLE_MS = 1200;
   const BAR_DEFAULT_PX = 300;
@@ -1176,7 +1177,17 @@
     toHost({ kind: ToHost.LibraryInsert, id, at: sourceText(target), place });
   }
 
+  let pluginPopover = $state<{ plugin: string; popover: string; title: string; x: number; y: number } | null>(null);
+
+  function openPopover(id: string) {
+    const opens = popoverOf(plugins.addMenu, id);
+    if (opens && addMenu) {
+      pluginPopover = { ...opens, x: addMenu.x, y: addMenu.y };
+    }
+  }
+
   function pickAdd(id: string) {
+    openPopover(id);
     if (runPluginItem(id, picked?.source ?? null)) {
       return;
     }
@@ -1829,6 +1840,11 @@
       {/if}
       {#if pluginsOpen}<PluginBrowser cards={cardsOf(plugins.rows)} problems={plugins.problems} canInstall={plugins.canInstall} onenable={(id, enabled) => toHost({ kind: ToHost.PluginEnable, id, enabled })} onremove={(id) => toHost({ kind: ToHost.PluginRemove, id })} oninstall={(source) => toHost({ kind: ToHost.PluginInstall, source })} onlink={(link) => toHost({ kind: ToHost.External, url: link })} onclose={() => (pluginsOpen = false)} />{/if}
       {#if menu}<StructureMenu x={menu.x} y={menu.y} items={contextMenuItems(menuFor(selection.refs.length, detachState(picked)), plugins.contextMenu, menu.where)} onpick={pickMenu} onclose={() => (menu = null)} />{/if}
+      {#if pluginPopover}
+        {@const open = pluginPopover}
+        {@const tree = plugins.ui(open.plugin, open.popover)}
+        {#if tree.length}<PluginPopover x={open.x} y={open.y} plugin={open.plugin} id={open.popover} title={open.title} {tree} {palette} onsend={(plugin, id, control, value, live) => plugins.host.control(plugin, id, control, value, live)} onclose={() => (pluginPopover = null)} />{/if}
+      {/if}
       {#if addMenu}<StructureMenu x={addMenu.x} y={addMenu.y} items={addMenuItems(picked && picked.instances > 1 ? [...ADD_ITEMS, ADD_LOOP_ITEM, LIBRARY_ITEM] : [...ADD_ITEMS, LIBRARY_ITEM], plugins.addMenu)} label="add" draggable={true} onpick={pickAdd} onclose={() => (addMenu = null)} />{/if}
       {#if skillHint}
         <div class="notice skillhint" data-testid="skill-hint">
