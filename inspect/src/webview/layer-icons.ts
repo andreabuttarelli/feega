@@ -30,7 +30,8 @@ export enum LayerIcon {
   Head = 'head',
   Meta = 'meta',
   Title = 'title',
-  Floating = 'floating'
+  Floating = 'floating',
+  Folder = 'folder'
 }
 
 export enum Floating {
@@ -81,6 +82,7 @@ export const ICON_SVG: Record<LayerIcon, string> = {
   [LayerIcon.Instance]: '<g><path d="M8.707 2.707 L13.293 7.293 C13.683 7.683 13.683 8.317 13.293 8.707 L8.707 13.293 C8.317 13.683 7.683 13.683 7.293 13.293 L2.707 8.707 C2.317 8.317 2.317 7.683 2.707 7.293 L7.293 2.707 C7.683 2.317 8.317 2.317 8.707 2.707 Z"/><path d="M8.424 6.174 L9.826 7.576 C10.06 7.81 10.06 8.19 9.826 8.424 L8.424 9.826 C8.19 10.06 7.81 10.06 7.576 9.826 L6.174 8.424 C5.94 8.19 5.94 7.81 6.174 7.576 L7.576 6.174 C7.81 5.94 8.19 5.94 8.424 6.174 Z"/></g>',
   [LayerIcon.Title]: '<g><line x1="4" y1="2.75" x2="4" y2="13.25"/><line x1="12" y1="2.75" x2="12" y2="13.25"/><line x1="4" y1="8" x2="12" y2="8"/></g>',
   [LayerIcon.Floating]: '<g><rect x="2.25" y="2.25" width="11.5" height="11.5" rx="2" stroke-dasharray="1.5 1.5"/><rect x="5.75" y="5.75" width="4.5" height="4.5" rx="1"/></g>',
+  [LayerIcon.Folder]: '<path d="M2.25 4.5 Q2.25 3.25 3.5 3.25 L6.25 3.25 L7.75 4.75 L12.5 4.75 Q13.75 4.75 13.75 6 L13.75 11.5 Q13.75 12.75 12.5 12.75 L3.5 12.75 Q2.25 12.75 2.25 11.5 Z"/>',
   [LayerIcon.Meta]: '<path d="M6 5L3 8l3 3M10 5l3 3-3 3"/>'
 };
 

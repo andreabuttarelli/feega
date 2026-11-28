@@ -16,7 +16,11 @@ Page and layout files (the ones that make routes, such as `+page.svelte` or `app
 
 ## The list
 
-Components are grouped by folder, with `src` left out. A number on the right shows how many files use the component. Type in the search field to filter by name or folder.
+Components sit in a tree of folders that looks and works like the Layers panel, with `src` left out. A folder that holds only another folder is shown on one row, such as `lib/components`. Folders come first, then components, both in alphabetical order. A number on the right of a component shows how many files use it.
+
+Click a folder or its arrow to open or close it. With a row selected, use the up and down arrows to move, right to open a folder, left to close it or jump to its parent, and Enter to open a component. Feega remembers which folders are open for each project.
+
+Type in the search field to filter by name or folder. Matching folders open on their own and the matching text is highlighted.
 
 ## Open one on its own
 

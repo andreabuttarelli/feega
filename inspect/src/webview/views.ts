@@ -12,6 +12,11 @@ export enum ViewIcon {
   Component = 'component'
 }
 
+export enum Chrome {
+  Full = 'full',
+  Bare = 'bare'
+}
+
 export enum HostKind {
   Browser = 'browser',
   Desktop = 'desktop',
@@ -29,13 +34,13 @@ export enum FocusControl {
   Transparent = 'transparent'
 }
 
-type ViewSpec = { title: (name: string) => string; icon: ViewIcon; closable: boolean; controls: FocusControl[] };
+type ViewSpec = { title: (name: string) => string; icon: ViewIcon; closable: boolean; controls: FocusControl[]; chrome: Chrome };
 
 export const VIEWS: Record<ViewKind, ViewSpec> = {
-  [ViewKind.Editor]: { title: () => 'Page', icon: ViewIcon.House, closable: false, controls: [] },
-  [ViewKind.PagesCanvas]: { title: () => 'Pages canvas', icon: ViewIcon.Grid, closable: true, controls: [] },
-  [ViewKind.ComponentsCanvas]: { title: () => 'Components canvas', icon: ViewIcon.Boxes, closable: true, controls: [] },
-  [ViewKind.Focus]: { title: (name) => name, icon: ViewIcon.Component, closable: true, controls: [FocusControl.Zoom, FocusControl.Scheme, FocusControl.Transparent] }
+  [ViewKind.Editor]: { title: () => 'Page', icon: ViewIcon.House, closable: false, controls: [], chrome: Chrome.Full },
+  [ViewKind.PagesCanvas]: { title: () => 'Pages canvas', icon: ViewIcon.Grid, closable: true, controls: [], chrome: Chrome.Bare },
+  [ViewKind.ComponentsCanvas]: { title: () => 'Components canvas', icon: ViewIcon.Boxes, closable: true, controls: [], chrome: Chrome.Bare },
+  [ViewKind.Focus]: { title: (name) => name, icon: ViewIcon.Component, closable: true, controls: [FocusControl.Zoom, FocusControl.Scheme, FocusControl.Transparent], chrome: Chrome.Full }
 };
 
 const PRESENTATION: Record<HostKind, Presentation> = {
@@ -73,3 +78,5 @@ export const shellTabsOf = (tabs: ViewTab[]): ViewTab[] => tabs.filter((tab) => 
 export const shellTitleOf = (project: string, title: string): string => `${project} · ${title}`;
 
 export const barControlsOf = (kind: ViewKind): FocusControl[] => VIEWS[kind].controls;
+
+export const chromeOf = (kind: ViewKind): Chrome => VIEWS[kind].chrome;

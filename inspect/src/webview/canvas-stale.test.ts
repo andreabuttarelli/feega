@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ComponentRow } from '../host/component-list';
-import { componentKeysOf, pageKeysOf } from './canvas-stale';
+import { componentKeysOf, forgetPages, pageKeysOf } from './canvas-stale';
 import { CANVAS_COLUMNS, layoutCanvas } from './canvas-layout';
 
 const frames = layoutCanvas(
@@ -22,6 +22,26 @@ describe('pageKeysOf', () => {
 
   it('leaves the pages alone when a file that is not a route changed', () => {
     expect(pageKeysOf(frames, ['src/lib/Card.svelte'])).toEqual([]);
+  });
+});
+
+describe('forgetPages', () => {
+  const store = () => new Map([['/::desktop', 1], ['/about::desktop', 2], ['/about::phone', 3]]);
+
+  it('drops every size of a page whose file changed while the canvas was closed', () => {
+    const kept = store();
+
+    forgetPages(kept, ['src/routes/about/+page.svelte']);
+
+    expect([...kept.keys()]).toEqual(['/::desktop']);
+  });
+
+  it('keeps everything when the file is not a route', () => {
+    const kept = store();
+
+    forgetPages(kept, ['src/lib/Card.svelte']);
+
+    expect(kept.size).toBe(3);
   });
 });
 

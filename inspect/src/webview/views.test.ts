@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FocusControl, HostKind, Presentation, VIEWS, ViewKind, barControlsOf, presentationOf, shellTabsOf, rowTabsOf, shellTitleOf, tabsOf } from './views';
+import { Chrome, FocusControl, HostKind, Presentation, VIEWS, ViewKind, barControlsOf, chromeOf, presentationOf, shellTabsOf, rowTabsOf, shellTitleOf, tabsOf } from './views';
 
 const NONE = { focus: null, pages: false, components: false };
 
@@ -97,5 +97,21 @@ describe('barControlsOf', () => {
 
   it.each([ViewKind.Editor, ViewKind.PagesCanvas, ViewKind.ComponentsCanvas])('adds nothing to the bottom bar of %s', (kind) => {
     expect(barControlsOf(kind)).toEqual([]);
+  });
+});
+
+describe('chromeOf', () => {
+  it.each([ViewKind.PagesCanvas, ViewKind.ComponentsCanvas])('leaves only the canvas in %s', (kind) => {
+    expect(chromeOf(kind)).toBe(Chrome.Bare);
+  });
+
+  it.each([ViewKind.Editor, ViewKind.Focus])('keeps every panel in %s', (kind) => {
+    expect(chromeOf(kind)).toBe(Chrome.Full);
+  });
+
+  it('says it for every view', () => {
+    for (const kind of Object.values(ViewKind)) {
+      expect(Object.values(Chrome)).toContain(VIEWS[kind].chrome);
+    }
   });
 });
