@@ -1,11 +1,15 @@
 import { readFile } from 'node:fs/promises';
-import { posix, relative, sep } from 'node:path';
+import { join, posix, relative, sep } from 'node:path';
+import { PropsSource } from '../props-source';
 import { isEntry, isPage } from './entry-files';
 import { nameOf } from './impact';
 import { scanProject } from './project-scan';
 import { componentNames } from './usages';
+import { literalPropsOf, type LiteralProps } from './usage-props';
 
-export type ComponentRow = { name: string; file: string; folder: string; uses: number };
+export type PropsSample = { props: LiteralProps; source: PropsSource };
+
+export type ComponentRow = { name: string; file: string; folder: string; uses: number; sample?: PropsSample };
 
 type Source = { path: string; text: string };
 
@@ -40,7 +44,20 @@ export function folderOf(file: string): string {
 
 const byFolderThenName = (a: ComponentRow, b: ComponentRow) => a.folder.localeCompare(b.folder) || a.name.localeCompare(b.name);
 
-export async function listComponents(appRoot: string, usesOf: (file: string) => Promise<number>): Promise<ComponentRow[]> {
+const MAX_USERS_READ = 8;
+
+async function sampleOf(appRoot: string, name: string, users: string[]): Promise<PropsSample | undefined> {
+  for (const user of users.slice(0, MAX_USERS_READ)) {
+    const props = literalPropsOf(await readFile(join(appRoot, user), 'utf8').catch(() => ''), name);
+    if (props) {
+      return { props, source: PropsSource.Code };
+    }
+  }
+
+  return undefined;
+}
+
+export async function listComponents(appRoot: string, usersOf: (file: string) => Promise<string[]>): Promise<ComponentRow[]> {
   const scan = await scanProject(appRoot, MAX_SOURCES);
   const sources = await Promise.all(
     scan.sources.map(async (full) => {
@@ -49,10 +66,16 @@ export async function listComponents(appRoot: string, usesOf: (file: string) => 
     })
   );
   const found = componentsOf(sources);
-  const uses = new Map<string, number>();
+  const users = new Map<string, string[]>();
   for (const { file } of found) {
-    uses.set(file, uses.get(file) ?? (await usesOf(file)));
+    users.set(file, users.get(file) ?? (await usersOf(file)));
   }
+  const rows = await Promise.all(
+    found.map(async ({ name, file }) => {
+      const sample = await sampleOf(appRoot, name, users.get(file) ?? []);
+      return { name, file, folder: folderOf(file), uses: users.get(file)?.length ?? 0, ...(sample && { sample }) };
+    })
+  );
 
-  return found.map(({ name, file }) => ({ name, file, folder: folderOf(file), uses: uses.get(file) ?? 0 })).sort(byFolderThenName);
+  return rows.sort(byFolderThenName);
 }

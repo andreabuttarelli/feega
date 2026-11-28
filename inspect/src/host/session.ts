@@ -320,7 +320,7 @@ export function inspectSession(platform: Platform, workspace: string, startApp: 
   const routesNow = () => listRoutes(appRootNow());
   const componentsNow = () => {
     const appDir = running?.plan.appDir ?? '';
-    return listComponents(appRootNow(), async (file) => (await usages.usersOf(posix.join(appDir, file))).length);
+    return listComponents(appRootNow(), async (file) => (await usages.usersOf(posix.join(appDir, file))).map((site) => posix.relative(appDir, site.file)));
   };
   const live = projectLive({ appRoot: appRootNow, routes: routesNow, components: componentsNow, post });
 

@@ -1,36 +1,53 @@
 import { describe, expect, it } from 'vitest';
-import { CANVAS_COLUMNS, COLUMN_GAP, COMPACT_HEIGHT, GRID_GAP_X, GRID_GAP_Y, GROUP_GAP, HEIGHT_CAP_FACTOR, ROW_GAP, ROW_HEAD, columnsFor, groupWidth, layoutCanvas, layoutGrid } from './canvas-layout';
+import { CANVAS_COLUMNS, COLUMN_GAP, COMPACT_HEIGHT, DEFAULT_CELL, FLOW_GAP_X, FLOW_GAP_Y, GROUP_GAP, HEIGHT_CAP_FACTOR, MAX_CELL, MIN_CELL, ROW_GAP, ROW_HEAD, ROW_WIDTH, columnsFor, groupWidth, layoutCanvas, layoutFlow } from './canvas-layout';
 import { Size, SIZES } from './sizes';
 
-describe('layoutGrid', () => {
-  const items = ['a', 'b', 'c', 'd', 'e'].map((key) => ({ key, name: key.toUpperCase() }));
+describe('layoutFlow', () => {
+  const sized = (key: string, width: number, height: number) => ({ key, name: key.toUpperCase(), size: { width, height } });
 
-  it('fills rows left to right, then wraps at the column count', () => {
-    const { frames } = layoutGrid(items, 3);
+  it('puts a frame without a measured size in a default cell', () => {
+    const { frames } = layoutFlow([{ key: 'a', name: 'A' }], ROW_WIDTH);
 
-    expect(frames.map((f) => [f.key, f.x === 0, f.y === 0])).toEqual([['a', true, true], ['b', false, true], ['c', false, true], ['d', true, false], ['e', false, false]]);
+    expect(frames[0]).toMatchObject({ width: DEFAULT_CELL.width, height: DEFAULT_CELL.height, x: 0, y: 0 });
   });
 
-  it('gives every cell the same size and gaps', () => {
-    const { frames } = layoutGrid(items, 3);
+  it('sizes a frame to its component, clamped to the minimum and maximum', () => {
+    const { frames } = layoutFlow([sized('a', 300, 120), sized('b', 20, 10), sized('c', 9000, 9000)], ROW_WIDTH * 10);
 
-    expect(new Set(frames.map((f) => `${f.width}x${f.height}`)).size).toBe(1);
-    expect(frames[1].x).toBe(frames[0].x + frames[0].width + GRID_GAP_X);
-    expect(frames[3].y).toBe(frames[0].y + frames[0].height + GRID_GAP_Y);
+    expect(frames.map((f) => [f.width, f.height])).toEqual([[300, 120], [MIN_CELL.width, MIN_CELL.height], [MAX_CELL.width, MAX_CELL.height]]);
+  });
+
+  it('flows left to right and starts a new row when the next one does not fit', () => {
+    const { frames } = layoutFlow([sized('a', 600, 200), sized('b', 600, 100), sized('c', 600, 100)], 1400);
+
+    expect(frames[1].x).toBe(600 + FLOW_GAP_X);
+    expect([frames[2].x, frames[2].y]).toEqual([0, 200 + FLOW_GAP_Y]);
+  });
+
+  it('lets a row be as tall as its tallest frame', () => {
+    const { frames } = layoutFlow([sized('a', 600, 200), sized('b', 600, 500), sized('c', 600, 100)], 1400);
+
+    expect(frames[2].y).toBe(500 + FLOW_GAP_Y);
+  });
+
+  it('puts a frame wider than the row alone on its row', () => {
+    const { frames } = layoutFlow([sized('a', 200, 100), sized('b', 1200, 100)], 800);
+
+    expect(frames[1]).toMatchObject({ x: 0, y: 100 + FLOW_GAP_Y });
   });
 
   it('carries the name and opens the frame by its key', () => {
-    expect(layoutGrid(items, 3).frames.map((f) => [f.name, f.target])).toEqual(items.map((i) => [i.name, i.key]));
+    expect(layoutFlow([sized('a', 300, 100)], ROW_WIDTH).frames.map((f) => [f.name, f.target])).toEqual([['A', 'a']]);
   });
 
-  it('bounds wrap the cells', () => {
-    const { frames, bounds } = layoutGrid(items, 3);
+  it('bounds wrap the frames', () => {
+    const { frames, bounds } = layoutFlow([sized('a', 600, 200), sized('b', 600, 100), sized('c', 600, 100)], 1400);
 
-    expect(bounds).toEqual({ x: 0, y: 0, width: frames[2].x + frames[2].width, height: frames[3].y + frames[3].height });
+    expect(bounds).toEqual({ x: 0, y: 0, width: frames[1].x + frames[1].width, height: frames[2].y + frames[2].height });
   });
 
   it('is empty without items', () => {
-    expect(layoutGrid([], 3)).toEqual({ frames: [], bounds: { x: 0, y: 0, width: 0, height: 0 } });
+    expect(layoutFlow([], ROW_WIDTH)).toEqual({ frames: [], bounds: { x: 0, y: 0, width: 0, height: 0 } });
   });
 });
 

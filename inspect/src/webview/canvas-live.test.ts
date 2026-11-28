@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CANVAS_COLUMNS, layoutCanvas } from './canvas-layout';
-import { VISIBLE_MARGIN, liveSet, visibleKeys } from './canvas-live';
+import { LIVE_CAP, VISIBLE_MARGIN, liveSet, visibleKeys } from './canvas-live';
 
 const pages = Array.from({ length: 10 }, (_, i) => ({ route: `/p${i}`, dynamic: i === 9 }));
 const { frames } = layoutCanvas(pages, CANVAS_COLUMNS);
@@ -56,5 +56,19 @@ describe('liveSet minimum width', () => {
 
   it('wakes it when the canvas has no minimum width', () => {
     expect(liveSet(frames, small, viewport, [], 0)).toEqual(['a']);
+  });
+});
+
+describe('liveSet cap', () => {
+  const many = Array.from({ length: 12 }, (_, i) => ({ key: `k${i}`, target: `k${i}`, x: i * 20, y: 0, width: 400, height: 300 }));
+  const viewport = { w: 1000, h: 800 };
+  const home = { scale: 1, x: 0, y: 0 };
+
+  it('wakes at most the default cap', () => {
+    expect(liveSet(many, home, viewport, [], 0)).toHaveLength(LIVE_CAP);
+  });
+
+  it('wakes as many as the canvas allows', () => {
+    expect(liveSet(many, home, viewport, [], 0, 12)).toHaveLength(12);
   });
 });

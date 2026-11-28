@@ -4,9 +4,10 @@
   import Plus from '@lucide/svelte/icons/plus';
   import type { Snippet } from 'svelte';
   import type { Bounds } from './canvas-layout';
+  import { LIVE_CAP, liveSet } from './canvas-live';
   import { labelMetrics } from './canvas-labels';
-  import { liveSet } from './canvas-live';
   import { LOAD_TIMEOUT_MS, MAX_LOADING, PAINT_DELAY_MS, POOL_CAP, SETTLE_MS, planPool, settler } from './canvas-pool';
+  import { CardState, statusOf } from './canvas-card';
   import { shotOf } from './canvas-shot';
   import type { Hit } from './canvas-open';
   import type { Placed } from './canvas-live';
@@ -27,21 +28,23 @@
     onopen: (frame: F) => void;
     onclose: () => void;
     stale?: { keys: string[] } | null;
+    snug?: boolean;
+    liveCap?: number;
+    frameBadge?: (frame: F) => string | null;
+    onready?: (key: string, report: { size: { width: number; height: number } | null; props: Record<string, unknown> }) => void;
     snapshots?: Record<string, Snapshot>;
     unrendered?: string[];
     onview?: (view: CanvasView, viewport: Viewport) => void;
     world?: Snippet;
-    card: Snippet<[F, boolean]>;
+    card: Snippet<[F, CardState, string]>;
   };
 
-  let { frames, bounds, label, testid, minLiveWidth = 0, frameLabel, srcOf = () => null, hitOf, onopen, onclose, stale = null, snapshots, unrendered = [], onview, world, card }: Props = $props();
+  let { frames, bounds, label, testid, minLiveWidth = 0, frameLabel, srcOf = () => null, hitOf, onopen, onclose, stale = null, snug = false, liveCap = LIVE_CAP, frameBadge, onready, snapshots, unrendered = [], onview, world, card }: Props = $props();
 
   const MIDDLE_BUTTON = 1;
   const SPACE_CODE = 'Space';
   const FIRST_SHOT_DELAY_MS = 800;
   const RECAPTURE_DELAY_MS = 1200;
-  const MOUNT_STATUS = 'feega:mount:status';
-  const MOUNT_FAILED = 'failed';
 
   let root = $state<HTMLElement | null>(null);
   let viewport = $state({ w: 0, h: 0 });
@@ -49,6 +52,7 @@
   let touched = $state(false);
   let fitted = false;
   let failed = $state<string[]>([]);
+  let reasons = $state<Record<string, string>>({});
   let held = $state(false);
   let panning = $state(false);
   let shots = $state<Record<string, string>>({});
@@ -117,7 +121,7 @@
   });
 
   $effect(() => {
-    const next = snapshots ? [] : liveSet(frames, settledView, viewport, untrack(() => live), minLiveWidth);
+    const next = snapshots ? [] : liveSet(frames, settledView, viewport, untrack(() => live), minLiveWidth, liveCap);
     if (next.join() !== untrack(() => live).join()) {
       live = next;
     }
@@ -137,7 +141,7 @@
   }
 
   $effect(() => {
-    const plan = planPool({ pool: untrack(() => pool), wanted: live, settled: loaded, cap: POOL_CAP, maxLoading: MAX_LOADING });
+    const plan = planPool({ pool: untrack(() => pool), wanted: live, settled: loaded, cap: Math.max(POOL_CAP, liveCap), maxLoading: MAX_LOADING });
     if (plan.pool.join() !== untrack(() => pool).join()) {
       pool = plan.pool;
     }
@@ -242,12 +246,18 @@
   const onkeyup = (e: KeyboardEvent) => e.code === SPACE_CODE && (held = false);
 
   function onmessage(e: MessageEvent) {
-    if (e.data?.type !== MOUNT_STATUS || e.data.status !== MOUNT_FAILED) {
+    const status = statusOf(e.data);
+    const key = status && Object.keys(frameEls).find((k) => frameEls[k]?.contentWindow === e.source);
+    if (!status || !key) {
       return;
     }
-    const key = Object.keys(frameEls).find((k) => frameEls[k]?.contentWindow === e.source);
-    if (key && !failed.includes(key)) {
+    if (status.kind === 'ready') {
+      onready?.(key, { size: status.size, props: status.props });
+      return;
+    }
+    if (!failed.includes(key)) {
       failed = [...failed, key];
+      reasons[key] = status.reason;
     }
   }
 </script>
@@ -272,10 +282,10 @@
 
     {#each frames as frame (frame.key)}
       {@const hit = hitOf(frame)}
-      <div class="frame" style={`left:${frame.x}px;top:${frame.y}px;width:${frame.width}px;height:${frame.height}px`} data-testid="canvas-frame" data-key={frame.key} data-live={live.includes(frame.key)} data-rendered={!cannotRender(frame.key)} data-snap={Boolean(imageOf(frame.key))}>
-        <span class="frame-label">{frameLabel(frame)}</span>
+      <div class="frame" class:snug style={`left:${frame.x}px;top:${frame.y}px;width:${frame.width}px;height:${frame.height}px`} data-testid="canvas-frame" data-key={frame.key} data-live={live.includes(frame.key)} data-rendered={!cannotRender(frame.key)} data-snap={Boolean(imageOf(frame.key))}>
+        <span class="frame-label">{frameLabel(frame)}{#if frameBadge?.(frame)}<em class="badge" data-testid="canvas-badge">{frameBadge(frame)}</em>{/if}</span>
         {#if imageOf(frame.key)}<img class="shot" src={imageOf(frame.key)} alt="" draggable="false" />{:else}
-          <div class="card">{@render card(frame, cannotRender(frame.key))}</div>
+          <div class="card" data-covered={ready.has(frame.key) && !cannotRender(frame.key)} data-state={cannotRender(frame.key) ? CardState.Failed : CardState.Loading}>{@render card(frame, cannotRender(frame.key) ? CardState.Failed : CardState.Loading, reasons[frame.key] ?? '')}</div>
         {/if}
         {#if snapshots?.[frame.key]?.capped}<div class="more" data-testid="canvas-continues">continues…</div>{/if}
         {#if mounted.has(frame.key) && srcOf(frame) !== null}
@@ -325,15 +335,74 @@
     box-shadow: 0 0 0 calc(1px / var(--zoom)) var(--ui-divider);
   }
 
+  .frame.snug {
+    background-color: var(--ui-backdrop);
+    background-image: conic-gradient(color-mix(in srgb, var(--ui-text) 6%, transparent) 25%, transparent 0 50%, color-mix(in srgb, var(--ui-text) 6%, transparent) 0 75%, transparent 0);
+    background-size: 16px 16px;
+    container-type: size;
+  }
+
+  .frame.snug iframe {
+    background: transparent;
+  }
+
+  .card {
+    overflow: hidden;
+  }
+
+  .snug .card {
+    gap: 0.4em;
+    padding: 0 6cqw;
+    font-size: clamp(9px, 7cqw, 40px);
+    text-align: center;
+  }
+
+  .snug .card[data-covered='true'] {
+    display: none;
+  }
+
+  .snug .card[data-state='loading'] {
+    background: linear-gradient(100deg, transparent 30%, color-mix(in srgb, var(--ui-text) 7%, transparent) 50%, transparent 70%) 0 0 / 200% 100%;
+    animation: shimmer 1.4s linear infinite;
+  }
+
+  .snug .card :global(.note) {
+    opacity: 0.6;
+    pointer-events: auto;
+    position: relative;
+    z-index: 1;
+  }
+
+  @keyframes shimmer {
+    from {
+      background-position: 100% 0;
+    }
+
+    to {
+      background-position: -100% 0;
+    }
+  }
+
   .frame-label {
     position: absolute;
     bottom: 100%;
     left: 0;
     padding-bottom: var(--label-pad);
     color: var(--ui-text-2);
+    max-width: 100%;
+    overflow: hidden;
     font-size: var(--label);
     line-height: 1.25;
+    text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .badge {
+    margin-left: 0.6em;
+    color: var(--ui-text-3, var(--ui-text-2));
+    font-size: 0.85em;
+    font-style: normal;
+    opacity: 0.7;
   }
 
   .shot {

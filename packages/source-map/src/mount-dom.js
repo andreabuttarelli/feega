@@ -60,8 +60,13 @@ export const vueMount = ({ createApp, h }, Target) => (host, props, fail) => {
   return () => app.unmount();
 };
 
-export const svelteMount = ({ mount, unmount }, Target) => (host, props) => {
-  const instance = mount(Target, { target: host, props });
+const textSnippet = ({ createRawSnippet }, text) => createRawSnippet(() => ({ render: () => `<span>${text}</span>` }));
+
+const withSnippet = (library, props) => (typeof props.children === 'string' ? { ...props, children: textSnippet(library, props.children) } : props);
+
+export const svelteMount = (library, Target) => (host, props) => {
+  const { mount, unmount } = library;
+  const instance = mount(Target, { target: host, props: withSnippet(library, props) });
   return () => unmount(instance);
 };
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ASTRO_ROUTE, PROPS_ROUTE, astroModule, mountHtml, reactModule, mountRequestOf } from './mount-page.ts';
+import { ASTRO_ROUTE, PROPS_ROUTE, astroModule, mountHtml, reactModule, svelteModule, mountRequestOf } from './mount-page.ts';
 
 const RUNTIME = '/@fs/x/mount-runtime.js';
 
@@ -49,7 +49,7 @@ describe('mountHtml', () => {
 
 describe('reactModule', () => {
   const request = { file: 'src/Card.tsx', name: 'Card', props: { size: 'sm' } };
-  const page = { runtimeUrl: RUNTIME, componentUrl: '/src/Card.tsx', providersUrl: null };
+  const page = { runtimeUrl: RUNTIME, componentUrl: '/src/Card.tsx', providersUrl: null, styleUrls: [] };
 
   it('imports the component from the project and starts the runtime', () => {
     const code = reactModule(request, page);
@@ -72,8 +72,34 @@ describe('reactModule', () => {
   });
 });
 
+describe('global styles of the app', () => {
+  const request = { file: 'src/Card.svelte', name: 'Card', props: {} };
+  const page = { runtimeUrl: RUNTIME, domRuntimeUrl: '/@fs/x/mount-dom.js', componentUrl: '/src/Card.svelte', providersUrl: null, styleUrls: ['/src/app.css', '@/theme.css'] };
+
+  it('are imported before a Svelte component mounts', () => {
+    const code = svelteModule(request, page);
+
+    expect(code).toContain('import "/src/app.css";');
+    expect(code).toContain('import "@/theme.css";');
+  });
+
+  it('are imported before a React component mounts', () => {
+    expect(reactModule({ ...request, file: 'src/Card.tsx' }, page)).toContain('import "/src/app.css";');
+  });
+
+  it('add nothing when the app has none', () => {
+    expect(svelteModule(request, { ...page, styleUrls: [] })).not.toContain('.css');
+  });
+});
+
+describe('mountHtml for SvelteKit', () => {
+  it('gives the page the environment object SvelteKit reads public env from', () => {
+    expect(mountHtml('file=a')).toContain('__sveltekit_dev');
+  });
+});
+
 describe('astroModule', () => {
-  const page = { runtimeUrl: RUNTIME, domRuntimeUrl: '/@fs/x/mount-dom.js', componentUrl: '/src/Card.astro', providersUrl: null };
+  const page = { runtimeUrl: RUNTIME, domRuntimeUrl: '/@fs/x/mount-dom.js', componentUrl: '/src/Card.astro', providersUrl: null, styleUrls: [] };
 
   it('asks the dev server to render the Astro component with the props', () => {
     const code = astroModule({ file: 'src/Card.astro', name: 'Card', props: { size: 'sm' } }, page);

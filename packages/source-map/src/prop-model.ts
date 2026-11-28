@@ -44,6 +44,7 @@ const COLOR_VALUE = /^(#[0-9a-f]{3,8}|(rgb|hsl|oklch|lab)a?\(.*\))$/i;
 const FUNCTION_MARK = { $fn: true };
 
 export const NOOP: PropValue = FUNCTION_MARK;
+export const SAMPLE_TEXT: PropValue = { $text: 'Text' };
 export const isNoop = (value: unknown): boolean => typeof value === 'object' && value !== null && (value as { $fn?: unknown }).$fn === true;
 
 const TAG_OF_FALLBACK: Record<string, (value: PropValue) => TypeTag> = {

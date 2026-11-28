@@ -14,10 +14,8 @@ describe('adapterOf', () => {
     expect(ADAPTERS[MountFramework.Astro].controls('---\n---\n<p />', 'Card.astro', 'Card', '/')).toBeNull();
   });
 
-  it('seeds the props of Astro and Svelte components, which have none on the page', () => {
-    expect(ADAPTERS[MountFramework.Astro].seedsProps).toBe(true);
-    expect(ADAPTERS[MountFramework.Svelte].seedsProps).toBe(true);
-    expect(ADAPTERS[MountFramework.React].seedsProps).toBe(false);
+  it('seeds the props of every component from its declared types, since it has none on the page', () => {
+    expect(Object.values(ADAPTERS).map((adapter) => adapter.seedsProps)).toEqual([true, true, true, true]);
   });
 
   it('reads the Props of an Astro component', () => {
@@ -37,7 +35,7 @@ describe('seededProps', () => {
   ];
 
   it('fills what the page could not tell with a value of the right kind', () => {
-    expect(seededProps(controls, {})).toEqual({ name: 'name', size: 'sm', big: false, count: 3 });
+    expect(seededProps(controls, {})).toEqual({ name: 'name', size: 'sm', big: false, count: 3, kids: { $text: 'Text' } });
   });
 
   it('seeds every kind with a value the component can render', () => {

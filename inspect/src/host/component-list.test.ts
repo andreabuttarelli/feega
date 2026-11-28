@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { PropsSource } from '../props-source';
 import { componentsOf, folderOf, listComponents } from './component-list';
 
 const file = (path: string, text = '') => ({ path, text });
@@ -82,11 +83,31 @@ describe('listComponents', () => {
       'node_modules/pkg/Skipped.svelte': '<i />'
     });
 
-    const rows = await listComponents(root, async (path) => (path.endsWith('Card.svelte') ? 3 : 0));
+    const rows = await listComponents(root, async (path) => (path.endsWith('Card.svelte') ? ['src/routes/+page.svelte', 'src/routes/+page.svelte', 'src/routes/+page.svelte'] : []));
 
     expect(rows).toEqual([
       { name: 'Card', file: 'src/lib/Card.svelte', folder: 'lib', uses: 3 },
       { name: 'Button', file: 'src/lib/ui/Button.svelte', folder: 'lib/ui', uses: 0 }
     ]);
+  });
+
+  it('takes the props of the first use that writes them as literals', async () => {
+    const root = project({
+      'src/lib/Card.svelte': '<div />',
+      'src/routes/a/+page.svelte': '<Card {item} />',
+      'src/routes/b/+page.svelte': '<Card title="Domanda 1" n={3} />'
+    });
+
+    const [card] = await listComponents(root, async () => ['src/routes/a/+page.svelte', 'src/routes/b/+page.svelte']);
+
+    expect(card.sample).toEqual({ props: { title: 'Domanda 1', n: 3 }, source: PropsSource.Code });
+  });
+
+  it('has no sample when no use writes literal props', async () => {
+    const root = project({ 'src/lib/Card.svelte': '<div />', 'src/routes/+page.svelte': '<Card {item} />' });
+
+    const [card] = await listComponents(root, async () => ['src/routes/+page.svelte']);
+
+    expect(card.sample).toBeUndefined();
   });
 });

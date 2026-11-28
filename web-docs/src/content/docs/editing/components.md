@@ -30,7 +30,7 @@ A component that cannot render alone, because it needs props or a provider, show
 
 ## Components canvas
 
-**Open canvas** at the top of the list shows every component in a grid, each one rendered on its own with its name above it. It has the same zoom, pan and fit controls as the [Pages canvas](/editing/pages-canvas/), and the same limit of six live frames. Other frames show a snapshot. A component that cannot render alone is drawn as a card with its name.
+**Open canvas** at the top of the list shows every component, each one rendered on its own with its name above it and cut to the size of the component, on a checkerboard. It has the same zoom, pan and fit controls as the [Pages canvas](/editing/pages-canvas/). The global stylesheets of your root layout are loaded, and props come from the first place the code uses the component with literal values, or else from sample values built from its declared types; a small badge next to the name says which (from code or sample). A frame shows a shimmer and Rendering… while it loads. A component that still cannot render alone shows Needs props, and hovering it shows the error.
 
 It opens as a view tab named Components canvas, next to the Pages canvas and Focus tabs (see [View tabs](/editing/focus/#view-tabs)). Click a frame to open that component in Focus.
 
