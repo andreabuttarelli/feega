@@ -72,7 +72,7 @@
   import { ExampleProps } from './component-props.svelte';
   import ComponentsList from './ComponentsList.svelte';
   import type { FilesChange } from './files-change';
-  import { componentFocus } from './components';
+  import { componentFocus, keyOfFocus } from './components';
   import type { ComponentRow } from '../host/component-list';
   import LayoutGrid from '@lucide/svelte/icons/layout-grid';
   import { addExample, linkedRoutes, pageRows, seenRoutes, withErrorPage } from './pages';
@@ -397,6 +397,7 @@
     tree: (tree) => ((layers = tree), askPalette()),
     mounted: (status) => {
       mount = { controls: controlsOf(status.controls, status.props), values: status.props, touched: mount?.touched ?? [], dynamic: mount?.dynamic ?? [] };
+      untrack(() => focus && (componentProps.controls[keyOfFocus(focus)] = status.controls));
       sendProps();
       askUsageProps();
     },
