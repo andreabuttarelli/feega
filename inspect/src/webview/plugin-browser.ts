@@ -1,22 +1,20 @@
-import { COPY, SOURCES, creditLine } from '@feega/plugin-registry/registry';
+import { COPY, PluginLabel, SOURCES, creditLine, labelsOf } from '@feega/plugin-registry/registry';
+import { pixelRowsOf } from '@feega/plugin-registry/pixel';
 import type { Row } from './plugin-manager';
 
-export enum Badge {
-  ByFeega = 'By Feega',
-  Community = 'Community'
-}
+export { PluginLabel as Badge };
 
-export type Card = Row & { summary: string; description: string; badge: Badge; credit: string };
+export type Card = Row & { summary: string; description: string; labels: PluginLabel[]; credit: string; pixels: readonly string[] | undefined };
 
 export function cardsOf(rows: Row[]): Card[] {
   return rows.map((row) => {
     const source = SOURCES.find((one) => one.manifestId === row.id);
     if (!source) {
-      return { ...row, summary: '', description: '', badge: Badge.Community, credit: '' };
+      return { ...row, summary: '', description: '', labels: labelsOf(undefined), credit: '', pixels: undefined };
     }
 
     const copy = COPY[source.id];
-    return { ...row, summary: source.summary, description: copy.description, badge: Badge.ByFeega, credit: creditLine(source.credit) };
+    return { ...row, summary: source.summary, description: copy.description, labels: labelsOf(source), credit: creditLine(source.credit), pixels: pixelRowsOf(copy.icon) };
   });
 }
 

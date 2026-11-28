@@ -1,8 +1,8 @@
 <script lang="ts">
   import ArrowLeft from '@lucide/svelte/icons/arrow-left';
-  import Puzzle from '@lucide/svelte/icons/puzzle';
   import X from '@lucide/svelte/icons/x';
   import { filterCards, type Card } from './plugin-browser';
+  import PluginGlyph from './PluginGlyph.svelte';
   import { LINKS } from '../settings';
 
   let { cards, problems, canInstall, onenable, onremove, oninstall, onlink, onclose }: { cards: Card[]; problems: string[]; canInstall: boolean; onenable: (id: string, enabled: boolean) => void; onremove: (id: string) => void; oninstall: (source: string) => void; onlink: (url: string) => void; onclose: () => void } = $props();
@@ -54,7 +54,8 @@
   {#if open}
     <article class="detail" data-testid="plugin-detail" data-plugin={open.id}>
       <div class="meta">
-        <span class="badge" data-testid="plugin-badge">{open.badge}</span>
+        <PluginGlyph pixels={open.pixels} />
+        {#each open.labels as label (label)}<span class="badge" data-testid="plugin-badge" data-label={label}>{label}</span>{/each}
         <span class="version">v{open.version}</span>
         {#each open.badges as badge (badge)}<span class="badge">{badge}</span>{/each}
       </div>
@@ -80,10 +81,10 @@
         <div class="card" data-testid="plugin-card" data-plugin={card.id}>
           <button type="button" class="open" aria-label={`Open ${card.name}`} data-testid="plugin-open" onclick={() => (openId = card.id)}>
             <span class="head">
-              <span class="glyph"><Puzzle size={16} /></span>
+              <PluginGlyph pixels={card.pixels} />
               <span class="name">{card.name}</span>
-              <span class="badge" data-testid="plugin-badge">{card.badge}</span>
             </span>
+            <span class="labels">{#each card.labels as label (label)}<span class="badge" data-testid="plugin-badge" data-label={label}>{label}</span>{/each}</span>
             <span class="summary">{card.summary}</span>
             {#if card.credit}<span class="credit" data-testid="plugin-credit">{card.credit}</span>{/if}
           </button>
@@ -226,15 +227,9 @@
     height: 32px;
   }
 
-  .glyph {
-    display: grid;
-    flex: none;
-    place-items: center;
-    width: 32px;
-    height: 32px;
-    border-radius: var(--ui-radius-md, 8px);
-    background: var(--ui-panel);
-    color: var(--ui-text-2);
+  .labels {
+    display: flex;
+    gap: var(--ui-space-1, 4px);
   }
 
   .name {
@@ -282,6 +277,10 @@
     background: var(--ui-panel);
     color: var(--ui-text-2);
     font-size: var(--ui-text-xs);
+  }
+
+  .badge[data-label='Unofficial'] {
+    color: var(--ui-text-3);
   }
 
   .version,

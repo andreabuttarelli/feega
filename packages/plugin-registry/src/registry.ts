@@ -4,6 +4,20 @@ export type PluginCredit = { name: string; url: string; license: string };
 
 export const creditLine = (credit: PluginCredit | undefined): string => (credit ? `Built on ${credit.name} · ${credit.license}` : '');
 
+export enum PluginLabel {
+  ByFeega = 'By Feega',
+  Community = 'Community',
+  Unofficial = 'Unofficial'
+}
+
+export const labelsOf = (source: PluginSource | undefined): PluginLabel[] => {
+  if (!source) {
+    return [PluginLabel.Community];
+  }
+
+  return source.credit ? [PluginLabel.Community, PluginLabel.Unofficial] : [PluginLabel.ByFeega];
+};
+
 export type PluginSource = {
   id: string;
   manifestId: string;
@@ -92,6 +106,17 @@ export const SOURCES: readonly PluginSource[] = [
     latestVersion: '1.0.0',
     permissions: ['selection', 'project', 'edit.insert', 'network:cdn.jsdelivr.net', 'network:unpkg.com'],
     credit: { name: 'Heroicons', url: 'https://heroicons.com', license: 'MIT' }
+  },
+  {
+    id: 'shadergradient',
+    manifestId: 'feega.shadergradient',
+    name: 'ShaderGradient',
+    summary: 'Insert a ShaderGradient background and edit its type, colours, grain and motion props.',
+    author: 'Feega',
+    tier: 'free',
+    latestVersion: '1.0.0',
+    permissions: ['selection', 'source', 'project', 'edit.attributes', 'edit.insert', 'edit.dependency'],
+    credit: { name: 'ShaderGradient', url: 'https://shadergradient.co', license: 'MIT' }
   }
 ];
 
@@ -130,5 +155,10 @@ export const COPY: Readonly<Record<string, PluginCopy>> = {
     icon: 'heroicons',
     description:
       'Select an element, search the 324 Heroicons, choose a style (outline, solid, mini or micro), size and colour, and insert it. Feega writes a small component with the SVG inline, or, when the project already uses @heroicons/react or @heroicons/vue, a component of that library, sized with width and height. Nothing is added to package.json. Icons are downloaded from jsDelivr (unpkg as fallback) the first time they are shown, so the first use needs internet. One undoable step. Heroicons are released under the MIT licence, Copyright Tailwind Labs, Inc.'
+  },
+  shadergradient: {
+    icon: 'shadergradient',
+    description:
+      'Select an element and add a ShaderGradient background, or select one that already holds a ShaderGradient and edit its type, colours, animation, grain, light and camera from the right bar. Feega adds the @shadergradient/react, @react-three/fiber and three packages to package.json when they are missing and writes a small component into your project. One undoable step you can review in Changes. ShaderGradient is released under the MIT licence. This plugin is a community plugin, not made or endorsed by ShaderGradient.'
   }
 };

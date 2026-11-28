@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Kind, type Row } from './plugin-manager';
 import { Badge, cardsOf, filterCards } from './plugin-browser';
+import { pixelRowsOf } from '@feega/plugin-registry/pixel';
 
 const row = (id: string, name: string, kind = Kind.BuiltIn, enabled = true): Row => ({ id, name, version: '1.0.0', kind, enabled, words: [], badges: [], removable: kind === Kind.Installed });
 
@@ -12,11 +13,25 @@ describe('cardsOf', () => {
     expect(card('feega.mesh-gradient').summary).toBe('Drag colour points over an element and get a plain CSS mesh gradient.');
   });
 
-  it('calls registry plugins by Feega and every other one community', () => {
-    expect(card('feega.mesh-gradient').badge).toBe(Badge.ByFeega);
-    expect(card('feega.mesh-gradient').badge).toBe('By Feega');
-    expect(card('feega.shadergradient').badge).toBe(Badge.Community);
-    expect(card('acme.a').badge).toBe(Badge.Community);
+  it('calls a plugin Feega made By Feega', () => {
+    expect(card('feega.mesh-gradient').labels).toEqual([Badge.ByFeega]);
+    expect(card('feega.mesh-gradient').labels).toEqual(['By Feega']);
+  });
+
+  it('calls a plugin built on a third-party library Community and Unofficial', () => {
+    expect(card('feega.lucide-icons').labels).toEqual([Badge.Community, Badge.Unofficial]);
+    expect(card('feega.shadergradient').labels).toEqual(['Community', 'Unofficial']);
+  });
+
+  it('calls a plugin outside the registry Community only', () => {
+    expect(card('acme.a').labels).toEqual([Badge.Community]);
+  });
+
+  it('gives each registry plugin its pixel icon and the others none', () => {
+    expect(card('feega.mesh-gradient').pixels).toBe(pixelRowsOf('mesh-gradient'));
+    expect(card('feega.lucide-icons').pixels).toBe(pixelRowsOf('lucide'));
+    expect(card('feega.shadergradient').pixels).toBe(pixelRowsOf('shadergradient'));
+    expect(card('acme.a').pixels).toBeUndefined();
   });
 
   it('credits the library a plugin is built on', () => {

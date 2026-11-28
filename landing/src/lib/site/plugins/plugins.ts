@@ -1,5 +1,5 @@
 import { PixelIcon } from '../alternatives/pixel';
-import { COPY, SOURCES, creditLine, type PluginCredit, type PluginTier } from '../../../../../packages/plugin-registry/src/registry';
+import { COPY, SOURCES, creditLine, labelsOf, type PluginCredit, type PluginLabel, type PluginTier } from '../../../../../packages/plugin-registry/src/registry';
 import { permissionWords } from './permissions';
 
 export const PLUGINS_PATH = '/plugins';
@@ -12,7 +12,7 @@ export type PluginView = {
   name: string;
   summary: string;
   description: string;
-  author: string;
+  labels: PluginLabel[];
   tier: PluginTier;
   version: string;
   permissions: string[];
@@ -27,7 +27,7 @@ export const PLUGINS: readonly PluginView[] = SOURCES.map((source) => ({
   name: source.name,
   summary: source.summary,
   description: COPY[source.id].description,
-  author: source.author,
+  labels: labelsOf(source),
   tier: source.tier,
   version: source.latestVersion,
   permissions: source.permissions.map(permissionWords),
