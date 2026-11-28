@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { Channel, type Link, type Preferences, type ShellState } from './types';
+import type { SettingKey, SettingValue } from '../../../inspect/src/settings';
 import type { NewProjectAsk } from './project-creator';
 import type { AcpAgent } from '../../../inspect/src/host/ai/acp-agents';
 
@@ -23,6 +24,7 @@ contextBridge.exposeInMainWorld('feega', {
   activate: (id: string | null) => call(Channel.Activate, id),
   pickView: (id: string, view: string) => call(Channel.PickView, id, view),
   dropView: (id: string, view: string) => call(Channel.DropView, id, view),
+  setEditorSetting: (key: SettingKey, value: SettingValue) => call(Channel.SetEditorSetting, key, value),
   setPreferences: (change: Partial<Preferences>) => call(Channel.SetPreferences, change),
   openLink: (link: Link) => call(Channel.OpenLink, link),
   overlay: (open: boolean) => call(Channel.Overlay, open),

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { cliEnv } from './cli-env';
 
 const base = { PATH: '/opt/homebrew/bin:/usr/bin', HOME: '/Users/a' } as NodeJS.ProcessEnv;
-const options = { editorPort: 0, telemetry: true, cloud: false };
+const options = { editorPort: 0, cloud: false };
 
 describe('cliEnv', () => {
   it('runs the launcher as node and keeps the merged PATH', () => {
@@ -25,7 +25,7 @@ describe('cliEnv', () => {
     expect(cliEnv({ ...base, FEEGA_CLOUD: '1' }, options, '/data').FEEGA_CLOUD).toBeUndefined();
   });
 
-  it('turns telemetry off when asked', () => {
-    expect(cliEnv(base, { ...options, telemetry: false }, '/data').FEEGA_TELEMETRY).toBe('0');
+  it('points the editor at the settings file the desktop Settings page edits', () => {
+    expect(cliEnv(base, options, '/data').FEEGA_SETTINGS_FILE).toBe(join('/data', 'editor-settings.json'));
   });
 });

@@ -9,6 +9,7 @@ import type { AcpAgent } from '../../../inspect/src/host/ai/acp-agents';
 import { onboardingView, skipOnboarding, type OnboardingDeps } from './onboarding';
 import { ViewKind, shellTitleOf } from '../../../inspect/src/webview/views';
 import { Link, NodeStatus, TabStatus, UpdateState, type RecentInfo, type ShellState, type TabInfo, type UpdateInfo, type ViewInfo } from '../main/types';
+import { Control, controlOf, groupedSettings, type SettingKey, type SettingRow, type SettingValue } from '../../../inspect/src/settings';
 import { NoticeAction, noticeFor, noticeKey } from './update-notice';
 
 type Bridge = {
@@ -25,6 +26,7 @@ type Bridge = {
   activate: (id: string | null) => Promise<void>;
   pickView: (id: string, view: string) => Promise<void>;
   dropView: (id: string, view: string) => Promise<void>;
+  setEditorSetting: (key: SettingKey, value: SettingValue) => Promise<void>;
   setPreferences: (change: Partial<ShellState['preferences']>) => Promise<void>;
   openLink: (link: Link) => Promise<void>;
   overlay: (open: boolean) => Promise<void>;
@@ -267,27 +269,49 @@ const portControl = (editorPort: number) => {
   return el('div', { class: 'port-control' }, input, el('div', { class: 'segmented' }, auto, own));
 };
 
+const editorControl = (row: SettingRow, value: SettingValue): HTMLElement => {
+  const change = (next: SettingValue) => void bridge.setEditorSetting(row.key, next);
+  const kind = controlOf(row);
+  if (kind === Control.Switch) {
+    return switchEl(Boolean(value), change);
+  }
+  if (kind === Control.Select) {
+    const select = el('select', { class: 'choice' }) as HTMLSelectElement;
+    select.append(...(row.choices ?? []).map((choice) => new Option(choice.label, choice.value, false, choice.value === String(value))));
+    select.addEventListener('change', () => change(select.value));
+    return select;
+  }
+  const input = el('input', { class: 'text-field' }) as HTMLInputElement;
+  input.value = String(value);
+  input.placeholder = 'auto';
+  input.addEventListener('change', () => change(input.value));
+  input.addEventListener('keydown', (event) => event.stopPropagation());
+  return input;
+};
+
+const group = (name: string, ...rows: HTMLElement[]) => el('section', { class: 'group' }, el('h2', { class: 'group-title', text: name.toLowerCase() }), el('div', { class: 'panel' }, ...rows));
+
 const settingsPanel = (state: ShellState) => {
-  const { editorPort, reopenOnLaunch, telemetry, automaticUpdates, cloud } = state.preferences;
-  return el(
-    'div',
-    { class: 'panel' },
+  const { editorPort, reopenOnLaunch, automaticUpdates, cloud } = state.preferences;
+  const app = group(
+    'App',
     settingRow('editor port', 'port of the first editor. more tabs take the next free one.', portControl(editorPort)),
     settingRow('open last projects on launch', 'reopen the folders that were open when you quit.', switchEl(reopenOnLaunch, (next) => void bridge.setPreferences({ reopenOnLaunch: next }))),
     settingRow('automatic updates', 'check for a new version on launch and every few hours.', switchEl(automaticUpdates, (next) => void bridge.setPreferences({ automaticUpdates: next }))),
     settingRow('Feega Cloud (beta)', 'share and comment through Feega Cloud. applies to editors opened from now on.', switchEl(cloud, (next) => void bridge.setPreferences({ cloud: next }))),
-    settingRow('onboarding', 'walk through the welcome steps again.', pill('show again', 'outline small', run(() => bridge.replayOnboarding()))),
-    settingRow('anonymous usage data', 'counts only, never your code. off starts the editor with FEEGA_TELEMETRY=0.', switchEl(telemetry, (next) => void bridge.setPreferences({ telemetry: next })))
+    settingRow('onboarding', 'walk through the welcome steps again.', pill('show again', 'outline small', run(() => bridge.replayOnboarding())))
   );
+  const editor = groupedSettings().map(({ group: name, rows }) => group(name, ...rows.map((row) => settingRow(row.label, row.hint, editorControl(row, state.editor[row.key])))));
+  return el('div', { class: 'groups' }, app, ...editor);
 };
 
 const settingsView = (state: ShellState): View => ({
   key: 'settings',
   build: () => el('div', { class: 'dash' }, el('div', { class: 'dash-head' }, el('div', {}, el('p', { class: 'kicker', text: 'feega desktop' }), el('h1', { class: 'display page-title', text: 'settings' })), pill('done', 'primary', () => showRoute(Route.Home))), settingsPanel(state)),
   patch: (root) => {
-    const typing = root.querySelector('input:focus');
+    const typing = root.querySelector('input:focus, select:focus');
     if (!typing) {
-      root.querySelector('.panel')?.replaceWith(settingsPanel(state));
+      root.querySelector('.groups')?.replaceWith(settingsPanel(state));
     }
   }
 });

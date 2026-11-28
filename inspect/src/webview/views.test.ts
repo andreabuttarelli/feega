@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Chrome, FocusControl, HostKind, Presentation, VIEWS, ViewKind, barControlsOf, chromeOf, presentationOf, shellTabsOf, rowTabsOf, shellTitleOf, tabsOf } from './views';
+import { Chrome, FocusControl, HostKind, Presentation, VIEWS, ViewKind, barControlsOf, chromeOf, presentationOf, SettingsRoute, settingsRouteOf, shellTabsOf, rowTabsOf, shellTitleOf, tabsOf } from './views';
 
 const NONE = { focus: null, pages: false, components: false };
 
@@ -113,5 +113,13 @@ describe('chromeOf', () => {
     for (const kind of Object.values(ViewKind)) {
       expect(Object.values(Chrome)).toContain(VIEWS[kind].chrome);
     }
+  });
+});
+
+describe('settingsRouteOf', () => {
+  it('sends the Desktop host to its own Settings page and keeps submenus elsewhere', () => {
+    expect(settingsRouteOf(HostKind.Desktop)).toBe(SettingsRoute.DesktopPage);
+    expect(settingsRouteOf(HostKind.Browser)).toBe(SettingsRoute.Submenus);
+    expect(settingsRouteOf(HostKind.VsCode)).toBe(SettingsRoute.Submenus);
   });
 });

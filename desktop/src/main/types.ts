@@ -1,3 +1,5 @@
+import type { Settings } from '../../../inspect/src/settings';
+
 export enum TabStatus {
   Starting = 'starting',
   Choosing = 'choosing',
@@ -13,7 +15,7 @@ export type TabInfo = { id: string; dir: string; name: string; status: TabStatus
 
 export type RecentInfo = { dir: string; name: string; framework: string; at: number };
 
-export type Preferences = { editorPort: number; reopenOnLaunch: boolean; telemetry: boolean; automaticUpdates: boolean; cloud: boolean };
+export type Preferences = { editorPort: number; reopenOnLaunch: boolean; automaticUpdates: boolean; cloud: boolean };
 
 export enum UpdateState {
   Idle = 'idle',
@@ -37,7 +39,7 @@ export type NodeState = { status: NodeStatus; message: string };
 
 export type ProjectState = { name: string; step: string; line: string; error: string };
 
-export type ShellState = { tabs: TabInfo[]; active: string | null; email: string | null; signingIn: boolean; skipped: boolean; recents: RecentInfo[]; preferences: Preferences; update: UpdateInfo; node: NodeState; project: ProjectState | null; invite: boolean; documents: string; onboarded: boolean };
+export type ShellState = { tabs: TabInfo[]; active: string | null; email: string | null; signingIn: boolean; skipped: boolean; recents: RecentInfo[]; preferences: Preferences; update: UpdateInfo; node: NodeState; project: ProjectState | null; invite: boolean; documents: string; onboarded: boolean; editor: Settings };
 
 export enum Link {
   Account = 'account',
@@ -63,6 +65,8 @@ export enum Channel {
   OpenLink = 'open-link',
   Overlay = 'overlay',
   ShowSettings = 'show-settings',
+  OpenSettings = 'open-settings',
+  SetEditorSetting = 'set-editor-setting',
   CheckUpdates = 'check-updates',
   InstallUpdate = 'install-update',
   Quit = 'quit',

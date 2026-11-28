@@ -21,6 +21,8 @@ export enum StylingChoice {
   Css = 'css'
 }
 
+export const SETTINGS_FILE_ENV = 'FEEGA_SETTINGS_FILE';
+
 export enum SettingGroup {
   General = 'General',
   DevServer = 'Dev server',
@@ -29,6 +31,12 @@ export enum SettingGroup {
 }
 
 export type SettingValue = string | boolean;
+
+export enum Control {
+  Switch = 'switch',
+  Select = 'select',
+  Text = 'text'
+}
 
 export type SettingRow = {
   key: SettingKey;
@@ -106,6 +114,14 @@ export const SETTINGS: SettingRow[] = [
     fallback: true
   }
 ];
+
+export const controlOf = (row: SettingRow): Control => {
+  if (typeof row.fallback === 'boolean') {
+    return Control.Switch;
+  }
+
+  return row.choices ? Control.Select : Control.Text;
+};
 
 export const groupedSettings = (): { group: SettingGroup; rows: SettingRow[] }[] =>
   Object.values(SettingGroup).map((group) => ({ group, rows: SETTINGS.filter((row) => row.group === group) }));

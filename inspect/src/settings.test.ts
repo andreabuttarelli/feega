@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { CLOUD_SETTING } from './cloud-flag';
-import { SETTINGS, SettingGroup, groupedSettings, helpLinks, issueUrl } from './settings';
+import { Control, SETTINGS, SettingGroup, SettingKey, controlOf, groupedSettings, helpLinks, issueUrl } from './settings';
 
 const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 const SETTINGS_JSON_ONLY = ['feegaInspect.plugins.dev'];
@@ -41,6 +41,16 @@ describe('grouped settings', () => {
 
   it('lists groups in menu order, none empty', () => {
     expect(groupedSettings().map((g) => g.group)).toEqual([SettingGroup.General, SettingGroup.DevServer, SettingGroup.Agents, SettingGroup.Notifications]);
+  });
+});
+
+describe('setting controls', () => {
+  const rowOf = (key: SettingKey) => SETTINGS.find((row) => row.key === key)!;
+
+  it('booleans are switches, rows with choices are selects, the rest is text', () => {
+    expect(controlOf(rowOf(SettingKey.Telemetry))).toBe(Control.Switch);
+    expect(controlOf(rowOf(SettingKey.Styling))).toBe(Control.Select);
+    expect(controlOf(rowOf(SettingKey.DevCommand))).toBe(Control.Text);
   });
 });
 

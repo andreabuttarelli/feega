@@ -10,7 +10,7 @@ export type Settings = { recents: Recent[]; skipped: boolean; openDirs: string[]
 
 export const AUTO_PORT = 0;
 
-const DEFAULT_PREFERENCES: Preferences = { editorPort: AUTO_PORT, reopenOnLaunch: false, telemetry: true, automaticUpdates: true, cloud: false };
+const DEFAULT_PREFERENCES: Preferences = { editorPort: AUTO_PORT, reopenOnLaunch: false, automaticUpdates: true, cloud: false };
 
 const EMPTY: Settings = { recents: [], skipped: false, openDirs: [], preferences: DEFAULT_PREFERENCES, createdProject: false, inviteDismissed: false, onboarded: false };
 
@@ -21,10 +21,12 @@ const asRecent = (entry: string | Recent): Recent => (typeof entry === 'string' 
 export function settingsStore(userData: string) {
   const path = join(userData, 'settings.json');
   let current: Settings = EMPTY;
+  let telemetryOff = false;
 
   try {
     const stored = JSON.parse(readFileSync(path, 'utf8'));
     const recents = (stored.recents ?? []).map(asRecent);
+    telemetryOff = stored.preferences?.telemetry === false;
     current = { ...EMPTY, ...stored, onboarded: stored.onboarded ?? recents.length > 0, recents, preferences: { ...DEFAULT_PREFERENCES, ...stored.preferences } };
   } catch {
     current = EMPTY;
@@ -38,6 +40,7 @@ export function settingsStore(userData: string) {
 
   return {
     get: () => current,
+    legacyTelemetryOff: () => telemetryOff,
     visit: (dir: string) => save({ ...current, recents: [{ dir, at: Date.now() }, ...current.recents.filter((r) => r.dir !== dir)].slice(0, MAX_RECENTS) }),
     skip: () => save({ ...current, skipped: true }),
     unskip: () => save({ ...current, skipped: false }),

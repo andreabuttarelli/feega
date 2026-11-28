@@ -1,122 +1,118 @@
 <script lang="ts">
+  import { DropdownMenu } from 'bits-ui';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import CircleUser from '@lucide/svelte/icons/circle-user-round';
-  import { tick } from 'svelte';
   import type { Contributed } from '@feega/plugin-api/host';
   import SupportList from './SupportList.svelte';
   import { AccountState, ToHost } from '../messages';
   import type { SupportItem } from '../support';
   import { groupedSettings, helpLinks, type ReportFacts, type SettingKey, type SettingValue, type Settings } from '../settings';
 
-  let { commands = [], oncommand = () => undefined, onplugins = () => undefined, values, facts, account, support = [], onaccount, onsupport = () => undefined, onsetting, onlink }: { commands?: Contributed[]; oncommand?: (plugin: string, command: string) => void; onplugins?: () => void; values: Settings | null; facts: ReportFacts | null; account: { state: AccountState; email?: string }; support?: SupportItem[]; onaccount: (kind: ToHost.SignIn | ToHost.CancelSignIn | ToHost.SignOut) => void; onsupport?: (item: SupportItem) => void; onsetting: (key: SettingKey, value: SettingValue) => void; onlink: (url: string) => void } = $props();
-
-  let open = $state(false);
-  let trigger = $state<HTMLButtonElement | null>(null);
-  let panel = $state<HTMLDivElement | null>(null);
-
-  async function toggle() {
-    open = !open;
-    if (open) {
-      await tick();
-      panel?.focus();
-    }
-  }
-
-  function close() {
-    open = false;
-    trigger?.focus();
-  }
-
-  function onKey(e: KeyboardEvent) {
-    if (e.key === 'Escape') {
-      e.stopPropagation();
-      close();
-    }
-  }
+  let { onsettings, commands = [], oncommand = () => undefined, onplugins = () => undefined, values, facts, account, support = [], onaccount, onsupport = () => undefined, onsetting, onlink }: { onsettings?: () => void; commands?: Contributed[]; oncommand?: (plugin: string, command: string) => void; onplugins?: () => void; values: Settings | null; facts: ReportFacts | null; account: { state: AccountState; email?: string }; support?: SupportItem[]; onaccount: (kind: ToHost.SignIn | ToHost.CancelSignIn | ToHost.SignOut) => void; onsupport?: (item: SupportItem) => void; onsetting: (key: SettingKey, value: SettingValue) => void; onlink: (url: string) => void } = $props();
 
   const help = $derived(helpLinks(facts));
   const groups = groupedSettings();
+  const typing = (e: KeyboardEvent) => {
+    if (e.key !== 'Escape') {
+      e.stopPropagation();
+    }
+  };
 </script>
 
-<div class="menu">
-  <button type="button" class="mark" bind:this={trigger} aria-haspopup="dialog" aria-expanded={open} title="Feega" onclick={toggle} data-testid="feega-menu">
-    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="5" cy="5" r="3.2" fill="#ff5a1f" /><circle cx="11" cy="5" r="3.2" fill="#ff8a3d" /><circle cx="5" cy="11" r="3.2" fill="#ff8a3d" /><circle cx="11" cy="11" r="3.2" fill="#ff5a1f" /></svg>
-    <ChevronDown size={12} />
-  </button>
+{#snippet sub(label: string)}
+  <DropdownMenu.SubTrigger class="dropdown-item fm-item">
+    <span class="name">{label}</span>
+    <ChevronRight size={12} />
+  </DropdownMenu.SubTrigger>
+{/snippet}
 
-  {#if open}
-    <div class="scrim" role="presentation" onclick={close}></div>
-    <div class="popover" role="dialog" aria-label="Feega" tabindex="-1" bind:this={panel} onkeydown={onKey}>
-      <section>
-        <h3>Account</h3>
-        {#if account.state === AccountState.SignedIn}
-          <div class="account">
-            <CircleUser size={20} />
+<div class="menu">
+  <DropdownMenu.Root>
+    <DropdownMenu.Trigger class="mark" title="Feega" data-testid="feega-menu">
+      <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="5" cy="5" r="3.2" fill="#ff5a1f" /><circle cx="11" cy="5" r="3.2" fill="#ff8a3d" /><circle cx="5" cy="11" r="3.2" fill="#ff8a3d" /><circle cx="11" cy="11" r="3.2" fill="#ff5a1f" /></svg>
+      <ChevronDown size={12} />
+    </DropdownMenu.Trigger>
+
+    <DropdownMenu.Portal>
+      <DropdownMenu.Content class="dropdown-menu fm-menu" sideOffset={6} align="start" aria-label="Feega">
+        <div class="account">
+          <CircleUser size={20} />
+          {#if account.state === AccountState.SignedIn}
             <p class="email" data-testid="account-email">{account.email}</p>
             <button type="button" class="ghost" data-testid="sign-out" onclick={() => onaccount(ToHost.SignOut)}>Sign out</button>
-          </div>
-        {:else if account.state === AccountState.Waiting}
-          <div class="account">
-            <CircleUser size={20} />
+          {:else if account.state === AccountState.Waiting}
             <p class="hint grow">Waiting for the browser…</p>
             <button type="button" class="ghost" data-testid="cancel-sign-in" onclick={() => onaccount(ToHost.CancelSignIn)}>Cancel</button>
-          </div>
-        {:else}
-          <div class="account">
-            <CircleUser size={20} />
+          {:else}
             <p class="hint grow">{account.state === AccountState.Cancelled ? 'Sign-in cancelled or timed out.' : 'Optional. Everything works without an account.'}</p>
             <button type="button" class="sign-in" data-testid="sign-in" onclick={() => onaccount(ToHost.SignIn)}>Sign in</button>
-          </div>
+          {/if}
+        </div>
+
+        <DropdownMenu.Separator class="dropdown-sep" />
+
+        {#if onsettings}
+          <DropdownMenu.Item class="dropdown-item fm-item" data-testid="open-settings" onSelect={() => onsettings()}>Settings</DropdownMenu.Item>
+        {:else}
+          <DropdownMenu.Sub>
+            {@render sub('Settings')}
+            <DropdownMenu.SubContent class="dropdown-menu fm-menu" sideOffset={4}>
+              {#each groups as { group, rows } (group)}
+                <DropdownMenu.Sub>
+                  {@render sub(group)}
+                  <DropdownMenu.SubContent class="dropdown-menu fm-menu fm-settings" sideOffset={4}>
+                    {#each rows as row (row.key)}
+                      {@const value = values?.[row.key] ?? row.fallback}
+                      <label class="setting" title={row.hint}>
+                        <span class="name" title={row.label}>{row.label}</span>
+                        {#if typeof row.fallback === 'boolean'}
+                          <span class="switch">
+                            <input type="checkbox" role="switch" checked={Boolean(value)} aria-label={row.label} onkeydown={typing} onchange={(e) => onsetting(row.key, e.currentTarget.checked)} />
+                            <span class="track"></span>
+                          </span>
+                        {:else if row.choices}
+                          <select value={String(value)} onkeydown={typing} onchange={(e) => onsetting(row.key, e.currentTarget.value)}>
+                            {#each row.choices as choice (choice.value)}<option value={choice.value}>{choice.label}</option>{/each}
+                          </select>
+                        {:else}
+                          <input type="text" value={String(value)} placeholder="auto" onkeydown={typing} onchange={(e) => onsetting(row.key, e.currentTarget.value)} />
+                        {/if}
+                      </label>
+                    {/each}
+                  </DropdownMenu.SubContent>
+                </DropdownMenu.Sub>
+              {/each}
+            </DropdownMenu.SubContent>
+          </DropdownMenu.Sub>
         {/if}
-      </section>
 
-      <section>
-        <h3>Settings</h3>
-        {#each groups as { group, rows } (group)}
-          <h4>{group}</h4>
-          {#each rows as row (row.key)}
-            {@const value = values?.[row.key] ?? row.fallback}
-            <label class="setting" title={row.hint}>
-              <span class="name" title={row.label}>{row.label}</span>
-              {#if typeof row.fallback === 'boolean'}
-                <span class="switch">
-                  <input type="checkbox" role="switch" checked={Boolean(value)} aria-label={row.label} onchange={(e) => onsetting(row.key, e.currentTarget.checked)} />
-                  <span class="track"></span>
-                </span>
-              {:else if row.choices}
-                <select value={String(value)} onchange={(e) => onsetting(row.key, e.currentTarget.value)}>
-                  {#each row.choices as choice (choice.value)}<option value={choice.value}>{choice.label}</option>{/each}
-                </select>
-              {:else}
-                <input type="text" value={String(value)} placeholder="auto" onchange={(e) => onsetting(row.key, e.currentTarget.value)} />
-              {/if}
-            </label>
-          {/each}
-        {/each}
-      </section>
+        <DropdownMenu.Sub>
+          {@render sub('Plugins')}
+          <DropdownMenu.SubContent class="dropdown-menu fm-menu" sideOffset={4}>
+            {#each commands as command (command.plugin + command.entry.id)}
+              <DropdownMenu.Item class="dropdown-item fm-item" data-testid="plugin-command" onSelect={() => oncommand(command.plugin, command.entry.id)}>{command.entry.title}</DropdownMenu.Item>
+            {/each}
+            <DropdownMenu.Item class="dropdown-item fm-item" data-testid="open-plugins" onSelect={() => onplugins()}>Browse plugins</DropdownMenu.Item>
+          </DropdownMenu.SubContent>
+        </DropdownMenu.Sub>
 
-      <section>
-        <h3>Support Feega</h3>
-        <SupportList done={support} onact={onsupport} />
-      </section>
+        <DropdownMenu.Sub>
+          {@render sub('Support Feega')}
+          <DropdownMenu.SubContent class="dropdown-menu fm-menu fm-support" sideOffset={4}>
+            <SupportList done={support} onact={onsupport} />
+          </DropdownMenu.SubContent>
+        </DropdownMenu.Sub>
 
-      <section>
-        <h3>Plugins</h3>
-        {#each commands as command (command.plugin + command.entry.id)}
-          <button type="button" class="row" data-testid="plugin-command" onclick={() => (oncommand(command.plugin, command.entry.id), close())}>{command.entry.title}</button>
-        {/each}
-        <button type="button" class="row" data-testid="open-plugins" onclick={() => (onplugins(), close())}>Browse plugins</button>
-      </section>
+        <DropdownMenu.Separator class="dropdown-sep" />
 
-      <section>
-        <h3>Help</h3>
         {#each help as link (link.label)}
-          <button type="button" class="row" onclick={() => onlink(link.url)}>{link.label}</button>
+          <DropdownMenu.Item class="dropdown-item fm-item" onSelect={() => onlink(link.url)}>{link.label}</DropdownMenu.Item>
         {/each}
         <p class="hint">Feega {facts?.version ?? ''}{facts ? ` · ${facts.framework} · ${facts.styling}` : ''}</p>
-      </section>
-    </div>
-  {/if}
+      </DropdownMenu.Content>
+    </DropdownMenu.Portal>
+  </DropdownMenu.Root>
 </div>
 
 <style>
@@ -124,7 +120,7 @@
     position: relative;
   }
 
-  .mark {
+  .menu :global(.mark) {
     display: flex;
     align-items: center;
     gap: 2px;
@@ -137,68 +133,37 @@
     cursor: pointer;
   }
 
-  .mark:hover,
-  .mark[aria-expanded='true'] {
+  .menu :global(.mark:hover),
+  .menu :global(.mark[data-state='open']) {
     background: var(--ui-input);
   }
 
-  .scrim {
-    position: fixed;
-    inset: 0;
-    z-index: 10;
-  }
-
-  .popover {
-    position: absolute;
-    top: 34px;
-    left: 0;
-    z-index: 11;
-    display: flex;
-    flex-direction: column;
-    width: 320px;
+  :global(.fm-menu) {
+    width: 280px;
     max-height: calc(100vh - 48px);
     overflow-y: auto;
-    border-radius: var(--ui-radius-lg);
-    background: var(--ui-panel);
-    box-shadow: 0 0 0 1px var(--ui-divider), 0 12px 32px rgb(0 0 0 / 0.28);
     outline: none;
   }
 
-  section {
-    display: flex;
-    flex-direction: column;
-    padding: 0 var(--ui-space-2) var(--ui-space-2);
-    border-bottom: 1px solid var(--ui-divider);
+  :global(.fm-settings) {
+    width: 320px;
   }
 
-  section:last-child {
-    border-bottom: 0;
+  :global(.fm-support) {
+    width: 300px;
   }
 
-  h3 {
-    position: sticky;
-    top: 0;
-    z-index: 1;
-    margin: 0 -8px 2px;
-    padding: 8px 16px 4px;
-    background: var(--ui-panel);
-    color: var(--ui-text-2);
-    font-size: var(--ui-text-xs);
-    font-weight: 600;
-  }
-
-  h4 {
-    margin: 8px 8px 2px;
-    color: var(--ui-text-3);
-    font-size: var(--ui-text-xs);
-    font-weight: 500;
+  :global(.fm-item) {
+    box-sizing: border-box;
+    height: 32px;
+    justify-content: space-between;
   }
 
   .account {
     display: flex;
     align-items: center;
     gap: 8px;
-    min-height: 32px;
+    min-height: 40px;
     padding: 0 8px;
     color: var(--ui-text-2);
   }
@@ -228,27 +193,6 @@
   .ghost {
     background: var(--ui-input);
     color: var(--ui-text);
-  }
-
-  .row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    height: 32px;
-    padding: 0 8px;
-    border: 0;
-    border-radius: var(--ui-radius-sm);
-    background: none;
-    color: var(--ui-text);
-    font: inherit;
-    font-size: var(--ui-text-sm);
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .row:hover:not(:disabled),
-  .row:focus-visible {
-    background: var(--ui-input);
   }
 
   .setting {

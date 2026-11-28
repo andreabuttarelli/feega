@@ -51,6 +51,19 @@ const PRESENTATION: Record<HostKind, Presentation> = {
 
 export const presentationOf = (host: HostKind): Presentation => PRESENTATION[host];
 
+export enum SettingsRoute {
+  Submenus = 'submenus',
+  DesktopPage = 'desktop-page'
+}
+
+const SETTINGS_ROUTE: Record<HostKind, SettingsRoute> = {
+  [HostKind.Browser]: SettingsRoute.Submenus,
+  [HostKind.Desktop]: SettingsRoute.DesktopPage,
+  [HostKind.VsCode]: SettingsRoute.Submenus
+};
+
+export const settingsRouteOf = (host: HostKind): SettingsRoute => SETTINGS_ROUTE[host];
+
 export type ViewTab = { id: string; kind: ViewKind; title: string; icon: ViewIcon; closable: boolean; active: boolean };
 
 export type OpenViews = { focus: string | null; pages: boolean; components: boolean };
