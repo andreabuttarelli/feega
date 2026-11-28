@@ -57,7 +57,7 @@ try {
 
   await panel.pickAt('#hero h1');
   await page.locator('[data-testid=add-button]').click();
-  await page.locator('[data-testid=add-menu] [role=menuitem]', { hasText: 'ShaderGradient (community)' }).click();
+  await page.locator('[data-testid=add-menu] [role=menuitem]', { hasText: 'ShaderGradient' }).click();
   await settle(5000);
   check('the wrapper component is written', existsSync(join(APP, 'src/feega/ShaderGradientBackground.jsx')));
   check('the page uses the wrapper', read('src/App.jsx').includes('<ShaderGradientBackground type="plane"'));

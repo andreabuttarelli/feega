@@ -1,10 +1,10 @@
 {
   "id": "feega.shadergradient",
-  "name": "ShaderGradient (community)",
+  "name": "ShaderGradient",
   "version": "1.0.0",
   "permissions": ["selection", "source", "project", "edit.attributes", "edit.insert", "edit.dependency"],
   "contributions": {
-    "addMenu": [{ "id": "insert", "title": "ShaderGradient (community)" }],
-    "rightBar": [{ "id": "props", "title": "ShaderGradient (community)", "when": ["selection"] }]
+    "addMenu": [{ "id": "insert", "title": "ShaderGradient" }],
+    "rightBar": [{ "id": "props", "title": "ShaderGradient", "when": ["selection"] }]
   }
 }

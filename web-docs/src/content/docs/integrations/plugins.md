@@ -29,7 +29,7 @@ extension, `npx feega` and the desktop app.
   command instead: `npx feega plugin add`.
 
 Plugin commands still appear under **Plugins** in the Feega menu.
-A third built-in, [ShaderGradient (community)](/integrations/shadergradient/), edits ShaderGradient props.
+A third built-in, [ShaderGradient](/integrations/shadergradient/), edits ShaderGradient props.
 
 Every plugin change goes through the same edit engine as a manual edit. It shows in **Changes**,
 opens in the diff, and **Undo** reverts it in one step.

@@ -4,7 +4,7 @@ import { Badge, cardsOf, filterCards } from './plugin-browser';
 
 const row = (id: string, name: string, kind = Kind.BuiltIn, enabled = true): Row => ({ id, name, version: '1.0.0', kind, enabled, words: [], badges: [], removable: kind === Kind.Installed });
 
-const cards = cardsOf([row('feega.mesh-gradient', 'Mesh gradient'), row('feega.lucide-icons', 'Lucide icons'), row('feega.shadergradient', 'ShaderGradient (community)'), row('acme.a', 'Acme', Kind.Installed, false)]);
+const cards = cardsOf([row('feega.mesh-gradient', 'Mesh gradient'), row('feega.lucide-icons', 'Lucide icons'), row('feega.shadergradient', 'ShaderGradient'), row('acme.a', 'Acme', Kind.Installed, false)]);
 const card = (id: string) => cards.find((one) => one.id === id)!;
 
 describe('cardsOf', () => {

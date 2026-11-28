@@ -1,5 +1,5 @@
 ---
-title: ShaderGradient (community)
+title: ShaderGradient
 description: Edit ShaderGradient props from the Properties bar. Community plugin, not affiliated with ShaderGradient.
 sidebar:
   order: 6
@@ -13,7 +13,7 @@ package is `@shadergradient/react`.
 ## Edit a gradient
 
 Select the element that holds a `<ShaderGradient>` (the section or wrapper around it). The
-**ShaderGradient (community)** section in **Properties** shows:
+**ShaderGradient** section in **Properties** shows:
 
 - **Type**: plane, sphere or waterPlane.
 - **Colour 1**, **Colour 2**, **Colour 3**: colour fields.
@@ -29,7 +29,7 @@ step. If the element holds several gradients, the first one is edited.
 
 ## Insert a gradient
 
-**+ Add**, then **ShaderGradient (community)**. One undoable step:
+**+ Add**, then **ShaderGradient**. One undoable step:
 
 - adds the packages that are missing to `package.json`: `@shadergradient/react`,
   `@react-three/fiber` and `three`, on the line that matches your React (React 18: fiber
